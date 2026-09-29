@@ -1,5 +1,8 @@
 //! `FakeMemory` — cenários fixos para os testes do kernel (E03-T05), sem puxar o `knudge-core`.
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use super::Memory;
 use super::error::{MemoryError, MemoryErrorKind};
 use super::io::{
@@ -21,6 +24,8 @@ pub struct FakeMemory {
     pub status: MemoryStatus,
     /// Quando `Some`, todos os métodos falham com esta natureza.
     pub fail: Option<MemoryErrorKind>,
+    /// Número de `record` efetivos (prova de "sem efeito" quando a política nega).
+    recorded: Arc<AtomicUsize>,
 }
 
 impl Default for FakeMemory {
@@ -31,6 +36,7 @@ impl Default for FakeMemory {
             session_end: SessionEndOutcome::default(),
             status: MemoryStatus::default(),
             fail: None,
+            recorded: Arc::new(AtomicUsize::new(0)),
         }
     }
 }
@@ -63,6 +69,12 @@ impl FakeMemory {
         self.fail
             .map(|kind| MemoryError::new(kind, "falha injetada no FakeMemory"))
     }
+
+    /// Número de commits (`record`) efetivos.
+    #[must_use]
+    pub fn recorded(&self) -> usize {
+        self.recorded.load(Ordering::SeqCst)
+    }
 }
 
 impl Memory for FakeMemory {
@@ -78,6 +90,14 @@ impl Memory for FakeMemory {
             Some(err) => Err(err),
             None => Ok(self.pre_edit.clone()),
         }
+    }
+
+    fn record(&self, _req: &PreWriteReq) -> Result<NoteRef, MemoryError> {
+        if let Some(err) = self.failure() {
+            return Err(err);
+        }
+        self.recorded.fetch_add(1, Ordering::SeqCst);
+        Ok(NoteRef::new("note:recorded"))
     }
 
     fn session_end(&self, _req: &SessionEndReq) -> Result<SessionEndOutcome, MemoryError> {
@@ -153,6 +173,22 @@ mod tests {
                 .as_ref()
                 .is_some_and(|e| !e.retryable())
         );
+    }
+
+    #[test]
+    fn record_counts_commits() -> Result<(), Box<dyn std::error::Error>> {
+        let memory = FakeMemory::default();
+        assert_eq!(memory.recorded(), 0);
+        memory.record(&request())?;
+        assert_eq!(memory.recorded(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn failing_record_is_not_counted() {
+        let memory = FakeMemory::failing(MemoryErrorKind::Internal);
+        assert!(memory.record(&request()).is_err());
+        assert_eq!(memory.recorded(), 0);
     }
 
     #[test]

@@ -5,3 +5,5 @@
 //! (firewall LLM-free, DF8).
 
 #![forbid(unsafe_code)]
+
+pub mod write;

@@ -11,6 +11,7 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 use serde::{Deserialize, Serialize};
 
 use crate::diag::{Level, events};
+use katu_policy::{ControlId, Evidence, RuleId};
 
 /// Categoria estável de erro (contrato de máquina).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -190,7 +191,7 @@ impl Error {
 }
 
 /// Efeito de uma operação de tool, incluindo negação e indisponibilidade.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum ToolOutcome {
@@ -198,18 +199,26 @@ pub enum ToolOutcome {
     Ok,
     /// Parcial (fez parte, falhou o resto).
     Partial,
-    /// Negado por política/contenção.
-    Denied,
+    /// Negado por política/contenção, com a regra e a evidência (§29).
+    Denied {
+        /// Regra que negou.
+        rule_id: RuleId,
+        /// Evidência estruturada.
+        evidence: Evidence,
+    },
     /// Tempo esgotado.
     Timeout,
-    /// Indisponível.
-    Unavailable,
+    /// Indisponível: falta um controlo (aprovação, memória, ...).
+    Unavailable {
+        /// Controlo em falta.
+        control: ControlId,
+    },
 }
 
 impl ToolOutcome {
     /// `true` se a operação teve efeito aceitável.
     #[must_use]
-    pub const fn is_success(self) -> bool {
+    pub const fn is_success(&self) -> bool {
         matches!(self, Self::Ok | Self::Partial)
     }
 }
@@ -242,49 +251,4 @@ pub fn lock_recover<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{Error, ErrorKind, ToolOutcome};
-    use std::io;
-
-    #[test]
-    fn exit_codes_are_distinct() {
-        let kinds = [
-            ErrorKind::NotFound,
-            ErrorKind::InvalidInput,
-            ErrorKind::Conflict,
-            ErrorKind::Io,
-            ErrorKind::Timeout,
-            ErrorKind::Config,
-            ErrorKind::Schema,
-            ErrorKind::UnsafeBlocked,
-            ErrorKind::Unavailable,
-            ErrorKind::Internal,
-        ];
-        let mut codes: Vec<u8> = kinds.iter().map(|kind| kind.exit_code()).collect();
-        codes.sort_unstable();
-        codes.dedup();
-        assert_eq!(codes.len(), kinds.len(), "códigos de saída duplicados");
-        assert!(kinds.iter().all(|kind| !kind.as_str().is_empty()));
-    }
-
-    #[test]
-    fn io_error_chains_source_and_keeps_path() {
-        let error = Error::io(
-            "a/b.txt",
-            io::Error::new(io::ErrorKind::NotFound, "ausente"),
-        );
-        assert_eq!(error.kind(), ErrorKind::Io);
-        let source = std::error::Error::source(&error);
-        assert!(source.is_some(), "o I/O deve encadear a causa");
-        assert!(error.to_string().contains("a/b.txt"));
-    }
-
-    #[test]
-    fn tool_outcome_success_axis() {
-        assert!(ToolOutcome::Ok.is_success());
-        assert!(ToolOutcome::Partial.is_success());
-        assert!(!ToolOutcome::Denied.is_success());
-        assert!(!ToolOutcome::Timeout.is_success());
-        assert!(!ToolOutcome::Unavailable.is_success());
-    }
-}
+mod tests;

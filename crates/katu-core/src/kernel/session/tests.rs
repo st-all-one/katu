@@ -85,7 +85,7 @@ fn denied_tool_call_is_logged_but_not_executed() -> Result<(), Box<dyn std::erro
         },
     )?;
     assert!(!result.ran());
-    assert_eq!(result.outcome(), ToolOutcome::Denied);
+    assert!(matches!(result.outcome(), ToolOutcome::Denied { .. }));
     assert_eq!(probe.calls.load(Ordering::SeqCst), 0);
     // O pedido e a negação ficam ambos no log.
     assert_eq!(read_records(&fs, session.log_path())?.len(), 4);

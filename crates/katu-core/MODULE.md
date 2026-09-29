@@ -13,7 +13,9 @@ função, o log é a fonte da verdade.
   - `kernel::step` — `step(State, Event) -> Result<State, Refusal>` (puro).
   - `kernel::log` — `Log`/`LogRecord` append-only JSONL (`session.v1.jsonl`) sobre a porta `Fs`.
   - `kernel::project` — `derive_messages`, `state_of`, `snapshot` (projeções puras).
-  - `kernel::pipeline` — `Tool`, `facts_for`, `dispatch` (facto → política → efeito).
+  - `kernel::pipeline` — `Tool`, `facts_for`/`facts_from`, `dispatch`/`dispatch_with` (facto →
+    política → efeito).
+  - `kernel::memory_gate` — `enforce_memory_write` (E05-T01): `pre_write` → capacidade → política.
   - `kernel::budget` — `Budget`/`BudgetCap`/`BudgetGate` (único dono do teto de contexto).
   - `kernel::bus` — `EventBus` (observadores + waterfall com a regra "tem de chamar `next`").
   - `kernel::checkpoint` — `Checkpoint` tipado (schema v1, validador zero-dep, `write_atomic`).

@@ -35,6 +35,13 @@ pub trait Memory: Send + Sync {
     /// [`MemoryError`] se o backend falhar ou o pedido for inválido.
     fn pre_edit(&self, req: &PreEditReq) -> Result<PreEditOutcome, MemoryError>;
 
+    /// Persiste a nota pré-validada (commit **por nota**, OA8). O chamador só invoca isto depois
+    /// de a política permitir a `memory_write` (E05-T01).
+    ///
+    /// # Errors
+    /// [`MemoryError`] se o backend falhar.
+    fn record(&self, req: &PreWriteReq) -> Result<NoteRef, MemoryError>;
+
     /// Finaliza a sessão: commit/sync e inferência do `outcome`.
     ///
     /// # Errors

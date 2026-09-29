@@ -19,7 +19,7 @@ pub fn step(state: &State, event: &Event) -> Result<State, Refusal> {
             Ok(state.clone())
         }
         Event::ToolCall { call, tool } => tool_call(state, call, tool),
-        Event::ToolResult { call, outcome } => tool_result(state, call, *outcome),
+        Event::ToolResult { call, outcome } => tool_result(state, call, outcome),
         Event::PhaseTransition { to } => phase_transition(state, *to),
         Event::TurnEnd { turn } => turn_end(state, *turn),
     }
@@ -52,7 +52,7 @@ fn tool_call(state: &State, call: &CallId, tool: &ToolUse) -> Result<State, Refu
 }
 
 /// Fecha um pedido de tool com o efeito observado.
-fn tool_result(state: &State, call: &CallId, outcome: ToolOutcome) -> Result<State, Refusal> {
+fn tool_result(state: &State, call: &CallId, outcome: &ToolOutcome) -> Result<State, Refusal> {
     let Some(CallStatus::Pending { tool }) = state.calls.get(call) else {
         return Err(refuse(
             state,
@@ -61,8 +61,12 @@ fn tool_result(state: &State, call: &CallId, outcome: ToolOutcome) -> Result<Sta
     };
     let name = tool.name;
     let mut next = state.clone();
-    next.calls
-        .insert(call.clone(), CallStatus::Done { outcome });
+    next.calls.insert(
+        call.clone(),
+        CallStatus::Done {
+            outcome: outcome.clone(),
+        },
+    );
     if outcome.is_success() {
         next.completed_tools.insert(name);
     }
@@ -127,7 +131,15 @@ mod tests {
     use crate::error::ToolOutcome;
     use crate::kernel::event::{CallId, Event};
     use crate::kernel::state::{CallStatus, RefusalReason, State};
-    use katu_policy::{Phase, ResolvedPath, ToolArgs, ToolName, ToolUse};
+    use katu_policy::{Evidence, Phase, ResolvedPath, RuleId, ToolArgs, ToolName, ToolUse};
+
+    fn denied_outcome() -> ToolOutcome {
+        let rule_id = RuleId::from("test");
+        ToolOutcome::Denied {
+            evidence: Evidence::new("facto", "argumento", rule_id.clone()),
+            rule_id,
+        }
+    }
 
     fn tool() -> Result<ToolUse, katu_policy::PolicyError> {
         let path = ResolvedPath::from_canonical("/work/src/main.rs")?;
@@ -232,14 +244,14 @@ mod tests {
             &state,
             &Event::ToolResult {
                 call,
-                outcome: ToolOutcome::Denied,
+                outcome: denied_outcome(),
             },
         )?;
         assert!(state.completed_tools.is_empty());
         assert!(matches!(
             state.calls.get(&CallId::new("c1")),
             Some(CallStatus::Done {
-                outcome: ToolOutcome::Denied
+                outcome: ToolOutcome::Denied { .. }
             })
         ));
         Ok(())

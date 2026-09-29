@@ -104,10 +104,11 @@ pub enum MemoryErrorKind { Unavailable, Timeout, Invalid, Internal }
 ### E03-T01 ☑ Porta e tipos do katu (em `katu-core`)
 - **Entregáveis:** módulo `katu_core::memory` com `Memory`, `PreWriteReq/Outcome`,
   `PreEditReq/Outcome`, `SessionEndReq/Outcome`, `MemoryStatus`, `NoteRef`, `Anchor`, `Score`,
-  `MemoryError`.
+  `MemoryError`; `record` (commit por nota, OA8) — usado por E05-T01.
 - **Estado:** implementado em `crates/katu-core/src/memory.rs` + `memory/{types,io,error,fake}.rs`.
   `Score` é **pontos base** (`0..=10_000`, sem `f32`, E18-T01); `MemoryError::retryable()` só em
-  `MemoryErrorKind::Timeout`; enums públicos `#[non_exhaustive]`.
+  `MemoryErrorKind::Timeout`; enums públicos `#[non_exhaustive]`. `FakeMemory` conta `record`
+  (prova de "sem efeito" quando a política nega).
 - **Aceite:** `xtask check-layers` falha se `knudge-core` aparecer fora do módulo do adaptador
   (`katu/src/memory/`); nenhum tipo do knudge na API pública.
 

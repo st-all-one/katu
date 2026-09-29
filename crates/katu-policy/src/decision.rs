@@ -61,6 +61,19 @@ pub struct Evidence {
     pub rule_id: RuleId,
 }
 
+impl Evidence {
+    /// Constrói uma evidência sem localização (`file:line`).
+    #[must_use]
+    pub fn new(fact: impl Into<String>, argument: impl Into<String>, rule_id: RuleId) -> Self {
+        Self {
+            file_line: None,
+            fact: fact.into(),
+            argument: argument.into(),
+            rule_id,
+        }
+    }
+}
+
 /// Pedido de aprovação humana.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApprovalRequest {

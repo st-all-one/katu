@@ -59,7 +59,7 @@ fn project_event(event: &Event) -> Option<Message> {
         }),
         Event::ToolResult { call, outcome } => Some(Message::ToolResult {
             call: call.clone(),
-            outcome: *outcome,
+            outcome: outcome.clone(),
         }),
         _ => None,
     }

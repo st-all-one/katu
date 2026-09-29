@@ -56,9 +56,16 @@ compressão de contexto. Nada disso entra antes do gate.
 
 ## Tarefas
 
-### E05-T01 ☐ Ferramenta `write` sujeita à política
+### E05-T01 ☑ Ferramenta `write` sujeita à política
 - **Entregáveis:** tool `write` que produz `ToolUse` resolvido e passa por `evaluate` antes de
   qualquer efeito; `Deny` devolve `ToolOutcome::Denied{rule_id, evidence}`.
+- **Estado:** `ToolOutcome` ganhou `Denied { rule_id, evidence }` e `Unavailable { control }`
+  (contrato de E06 antecipado); `katu_core::kernel::memory_gate` (`enforce_memory_write`,
+  `memory_write_use`, `MemoryWriteRequest`) liga `pre_write` → `Capability::Command{MemoryWrite}` →
+  `dispatch_with`; `katu_tools::write::WriteNoteTool` é o executor. A porta `Memory` ganhou
+  `record` (commit por nota, OA8) e o `FakeMemory` conta commits. Testes: duplicata →
+  `Denied{mem-no-duplicate}` **sem** executor nem commit; sem recall → `Unavailable`; permitido →
+  corre uma vez.
 - **Aceite:** com `FakeMemory` a acusar duplicata, a escrita **não** altera o disco e o resultado
   volta ao modelo como erro recuperável com `rule_id`.
 

@@ -11,6 +11,7 @@ pub mod bus;
 pub mod checkpoint;
 mod event;
 mod log;
+mod memory_gate;
 mod pipeline;
 mod project;
 mod session;
@@ -24,7 +25,12 @@ pub use event::{CallId, Event};
 pub use log::{
     LOG_SCHEMA_VERSION, Log, LogError, LogErrorKind, LogRecord, read_records, session_path,
 };
-pub use pipeline::{Dispatch, Effect, Tool, dispatch, facts_for};
+pub use memory_gate::{
+    MemoryWriteError, MemoryWriteRequest, enforce_memory_write, memory_write_use,
+};
+pub use pipeline::{
+    Dispatch, DispatchRequest, Effect, Tool, dispatch, dispatch_with, facts_for, facts_from,
+};
 pub use project::{Message, Snapshot, derive_messages, snapshot, state_of};
 pub use session::{CallContext, Session, SessionError};
 pub use state::{CallStatus, Refusal, RefusalReason, State, can_transition, next_phase};
