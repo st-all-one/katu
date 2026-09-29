@@ -8,6 +8,11 @@ função, o log é a fonte da verdade.
 ## Responsabilidade
 
 - `State`, `Event`, `Refusal`, pipeline de tool call, log append-only.
+  - `kernel::state` — `State`, `CallStatus`, `Refusal`/`RefusalReason`, `next_phase`/`can_transition`.
+  - `kernel::event` — `Event`, `CallId`.
+  - `kernel::step` — `step(State, Event) -> Result<State, Refusal>` (puro).
+  - `kernel::log` — `Log`/`LogRecord` append-only JSONL (`session.v1.jsonl`) sobre a porta `Fs`.
+  - `kernel::project` — `derive_messages`, `state_of`, `snapshot` (projeções puras).
 - `derive_messages`/`snapshot` — projeções puras.
 - Porta [`memory::Memory`](src/memory.rs) (tipos do katu, DF6), com submódulos:
   - `memory::types` — `NoteType`, `Status`, `Basis`, `NoteRef`, `Anchor`, `Score` (pontos base,

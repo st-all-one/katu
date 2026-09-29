@@ -42,25 +42,35 @@ Pré-condições verificáveis (a imposição, não a prosa — §51.2):
 
 ## Tarefas
 
-### E04-T01 ☐ Estado e eventos tipados
+### E04-T01 ☑ Estado e eventos tipados
 - **Entregáveis:** `State`, `Event` (`TurnStart`, `UserMessage`, `ToolCall`, `ToolResult`,
   `AssistantMessage`, `PhaseTransition`, `TurnEnd`), `Refusal`.
+- **Estado:** `kernel/{state,event,step}.rs`; `State` usa `BTreeMap`/`BTreeSet`; a transição
+  `step(&State, &Event)` é pura; a forma do caminho único está em `next_phase`/`can_transition`.
 - **Aceite:** `State` é `Clone`/`Eq`/`Serialize`; nenhum campo é `HashMap` sem ordem canônica.
 
-### E04-T02 ☐ Log de sessão append-only (`session.vN.jsonl`)
+### E04-T02 ☑ Log de sessão append-only (`session.vN.jsonl`)
 - **Entregáveis:** writer atómico (`temp→fsync→rename`); geração versionada; migrações adjacentes
   `vN→vN+1`; regra "gerações publicadas nunca são renomeadas nem apagadas" (§42).
+- **Estado:** `kernel/log.rs` sobre a porta `Fs` (novo `Fs::append`, com `fsync` no adaptador real):
+  `session.v1.jsonl`, `LogRecord { seq, event }`, `seq` contíguo desde 1. O **snapshot** usa
+  `write_atomic`; a migração `vN→vN+1` fica para quando o esquema mudar.
 - **Aceite:** o log é a fonte da verdade; `derive_messages()` projeta o histórico do modelo;
-  truncagem de ficheiro/roubo de lock é detetada e falha fechado.
+  truncagem/roubo de lock é detetada (salto de `seq`/linha ilegível → `LogError`, fail-closed).
 
-### E04-T03 ☐ Projeções (`derive_messages`, `state_of`, `snapshot`)
+### E04-T03 ☑ Projeções (`derive_messages`, `state_of`, `snapshot`)
 - **Entregáveis:** funções puras que derivam o histórico visível, o estado e snapshots do log.
+- **Estado:** `kernel/project.rs`; os eventos de controlo (`TurnStart`/`TurnEnd`/`PhaseTransition`)
+  **não** entram no histórico do modelo.
 - **Aceite:** propriedade: `state_of(replay(events)) == state_at_end`; tentativas falhadas
   retidas **sem** acrescentar histórico (§42).
 
-### E04-T04 ☐ **Gate do épico:** replay e refusals
+### E04-T04 ◐ **Gate do épico:** replay e refusals
 - **Entregáveis:** teste que conduz o loop e reproduz o estado final a partir do log; testes de
   transição ilegal (ex.: `Closed` sem verificação).
+- **Estado:** replay **byte-a-byte** do log (`replay_from_log_is_byte_stable`); transição ilegal
+  devolve `Refusal` tipado e **não** muda o estado; invariante `Model-visible ⟺ logged` testada.
+  **Falta** conduzir o **loop** real (E04-T08) e verificar a invariante em runtime.
 - **Aceite (gate):** replay byte-a-byte; transição ilegal devolve `Refusal` tipado e não muda o
   estado; invariante `Model-visible ⟺ logged` verificada em runtime.
 

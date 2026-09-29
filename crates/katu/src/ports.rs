@@ -84,6 +84,18 @@ impl Fs for StdFs {
         fs::rename(&temporary, path).map_err(|err| FsError::from_io(&err))
     }
 
+    fn append(&self, path: &Path, bytes: &[u8]) -> Result<(), FsError> {
+        let _span = katu_core::span!(Level::Trace, events::FS_WRITE);
+        let mut file = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .map_err(|err| FsError::from_io(&err))?;
+        file.write_all(bytes)
+            .map_err(|err| FsError::from_io(&err))?;
+        file.sync_data().map_err(|err| FsError::from_io(&err))
+    }
+
     fn exists(&self, path: &Path) -> bool {
         path.exists()
     }

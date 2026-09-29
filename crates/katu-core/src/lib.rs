@@ -8,6 +8,7 @@
 
 pub mod diag;
 pub mod error;
+pub mod kernel;
 pub mod memory;
 pub mod ports;
 

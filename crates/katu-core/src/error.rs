@@ -8,10 +8,13 @@
 
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
+use serde::{Deserialize, Serialize};
+
 use crate::diag::{Level, events};
 
 /// Categoria estável de erro (contrato de máquina).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum ErrorKind {
     /// Recurso não encontrado.
@@ -187,7 +190,8 @@ impl Error {
 }
 
 /// Efeito de uma operação de tool, incluindo negação e indisponibilidade.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum ToolOutcome {
     /// Completo.

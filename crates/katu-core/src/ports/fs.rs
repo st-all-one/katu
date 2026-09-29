@@ -28,6 +28,17 @@ impl FsError {
     }
 }
 
+impl std::fmt::Display for FsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotFound => f.write_str("caminho não encontrado"),
+            Self::Io(message) => write!(f, "erro de I/O: {message}"),
+        }
+    }
+}
+
+impl std::error::Error for FsError {}
+
 /// Porta de sistema de ficheiros (I/O confinado e testável).
 pub trait Fs: Send + Sync {
     /// Lê um ficheiro inteiro.
@@ -35,6 +46,9 @@ pub trait Fs: Send + Sync {
 
     /// Escreve atomicamente: temporário → `fsync` → `rename`.
     fn write_atomic(&self, path: &Path, bytes: &[u8]) -> Result<(), FsError>;
+
+    /// Anexa bytes ao fim de um ficheiro (cria se não existir), de forma durável.
+    fn append(&self, path: &Path, bytes: &[u8]) -> Result<(), FsError>;
 
     /// `true` se o caminho existe.
     fn exists(&self, path: &Path) -> bool;
@@ -100,6 +114,22 @@ impl Fs for MemFs {
             mtime: Timestamp::from_millis(next),
         };
         inner.files.insert(path.to_path_buf(), entry);
+        Ok(())
+    }
+
+    fn append(&self, path: &Path, bytes: &[u8]) -> Result<(), FsError> {
+        let mut inner = lock(&self.inner);
+        let next = inner.clock_ms.saturating_add(1);
+        inner.clock_ms = next;
+        let entry = inner
+            .files
+            .entry(path.to_path_buf())
+            .or_insert_with(|| Entry {
+                bytes: Vec::new(),
+                mtime: Timestamp::from_millis(0),
+            });
+        entry.bytes.extend_from_slice(bytes);
+        entry.mtime = Timestamp::from_millis(next);
         Ok(())
     }
 
