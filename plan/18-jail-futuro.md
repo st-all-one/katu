@@ -81,7 +81,8 @@ A política de projeto é **não confiável e monotónica**; config inválida/il
 - **E17-T01** Port de sandbox e modos; `WorkspaceRoot`/`PathGrant` (só `CliTui`); `FullAccess` fora
   do port.
 - **E17-T02** Backend Linux: bwrap + Landlock + seccomp + rlimits; rejeitar `bwrap` que não resolva
-  para binário root-owned e não-writable.
+  para binário root-owned e não-writable. O PID namespace + `--die-with-parent` dão o **kill da
+  árvore** (grupo de processos) que o MVP defere (ADR 0004).
 - **E17-T03** **Gate:** camada essencial ausente → `SandboxUnavailable`, sem execução livre.
 - **E17-T04** Suite de escape do workspace (kernel, não política).
 - **E17-T05** Autorização explícita (CLI/TUI) + política monotónica + `--dry-run`.

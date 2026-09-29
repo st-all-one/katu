@@ -23,6 +23,7 @@
 | [0001](0001-mvk-gate-aprovado.md) | MVK aprovado — o loop possuído (DF1) torna-se compromisso | aceite |
 | [0002](0002-ferramentas-ai-first.md) | Ferramentas AI-first: envelope + views + TOON (core por medição) | aceite |
 | [0003](0003-vocabulario-v2-contencao.md) | Vocabulário de política v2: leitura sensível e acesso fora do workspace | aceite |
+| [0004](0004-sem-ffi-kill-grupo-e17.md) | Sem FFI no MVP: kill do grupo de processos fica para a jail (E17) | aceite |
 
 ## Template
 

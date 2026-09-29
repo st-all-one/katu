@@ -8,9 +8,10 @@ todo o código impuro confinado.
 ## Responsabilidade
 
 - CLI (`clap`) e wiring das portas (`Clock`, `Rng`, `Fs`, `Env`, `Logger`).
-- Adaptadores das portas em `src/ports/` (`mod.rs` = relógio/RNG/env/processo; `fs/` = `StdFs` com
-  escrita atómica **endurecida**: temporário exclusivo `O_EXCL`/`0600` e nome imprevisível, para não
-  seguir um symlink plantado — E07-T04).
+- Adaptadores das portas em `src/ports/` (`mod.rs` = relógio/RNG/env; `process.rs` = `StdProcess`
+  com timeout, `process_group` e leitura limitada — E07-T04; `fs/` = `StdFs` com escrita atómica
+  **endurecida**: temporário exclusivo `O_EXCL`/`0600` e nome imprevisível, para não seguir um
+  symlink plantado — E07-T04). Sem FFI no MVP (ADR 0004).
 - Adaptador in-process da porta `Memory` sobre o `knudge-core` (`KnudgeBuilder`, D214) — o único
   sítio com dependência do knudge.
 - Exit codes na borda (a lógica propaga `Result`).

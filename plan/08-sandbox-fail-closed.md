@@ -102,20 +102,23 @@ Regras:
   `ControlId` exato); nenhuma operação sensível passa sem veredicto; os testes provam que a
   contenção é **soft** (um comando fora do controlo do katu não é detido) — a limitação fica visível.
 
-### E07-T04 ◐ Padrões defensivos de execução
+### E07-T04 ☑ Padrões defensivos de execução
 - **Entregáveis:** scrub de env (`*KEY*`/`*SECRET*`/`*TOKEN*`/`*PASSWORD*`); ficheiros temporários
   em diretório privado `0700`, nomes aleatórios, abertura exclusiva `wx`/`0600`; unlink de links
   (`lstat`); outcomes ortogonais (`timedOut`/`signal`/`exitCode` independentes); dispose atinge
   quiescência (fechar antes de matar, esperar filhos).
 - **Estado:** o scrub de env (`ExecTool::scrub_env`) e os outcomes ortogonais (`exit_code`/
-  `signal`/`timed_out`) já vêm de E06-T04. A escrita atómica do `StdFs` é agora **endurecida**:
-  temporário exclusivo (`O_EXCL`) com `0600` e nome imprevisível (`.<pid>.<n>.tmp`) — um symlink
-  plantado no caminho do temporário é **recusado** (teste `atomic_write_refuses_a_planted_symlink`),
-  o que também cobre o `lstat`/não-seguir-links. **Falta:** diretório de *scratch* privado `0700`,
-  kill do **process group** no timeout e quiescência do dispose (dependem de `rustix`/libc, vedado
-  por `#![forbid(unsafe_code)]` — decisão de dependência pendente).
+  `signal`/`timed_out`) vêm de E06-T04. A escrita atómica do `StdFs` é **endurecida**: temporário
+  exclusivo (`O_EXCL`) com `0600` e nome imprevisível (`.<pid>.<n>.tmp`) — um symlink plantado é
+  **recusado** (`atomic_write_refuses_a_planted_symlink`), o que cobre o `lstat`/não-seguir-links. O
+  `StdProcess` corre o filho num **process group** próprio (`process_group(0)`), mata/reaproveita o
+  filho direto no timeout (sem zombie) e **limita a leitura** de `stdout`/`stderr` (`READ_GRACE_MS`)
+  para um neto que segure o pipe não bloquear o loop. **Decisão (ADR 0004):** sem FFI no MVP — o
+  kill do **grupo** (netos) e a supervisão de processos ficam para a jail (E17), onde
+  `rustix`/cgroups entram uma única vez; o diretório de *scratch* `0700` é dispensado (o temporário
+  tem de ficar no mesmo diretório do alvo, para o rename atómico).
 - **Aceite:** cada padrão tem teste próprio; env com segredo plantado não chega ao filho (§43.6);
-  `timeout` mata o grupo inteiro.
+  `timeout` mata o filho direto e **não bloqueia** num neto (o kill do grupo é E17, ADR 0004).
 
 ### E07-T05 ◐ Autorização soft fora do workspace e caminhos sensíveis
 - **Entregáveis:** regras determinísticas: sensíveis `deny`-by-default; acesso a path/comando fora
