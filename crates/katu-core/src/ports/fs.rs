@@ -12,6 +12,8 @@ use super::clock::Timestamp;
 pub enum FsError {
     /// Caminho inexistente.
     NotFound,
+    /// O conteúdo mudou desde a leitura (escrita otimista recusada).
+    Stale,
     /// Outro erro de I/O (mensagem estável, sem segredo).
     Io(String),
 }
@@ -32,6 +34,7 @@ impl std::fmt::Display for FsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NotFound => f.write_str("caminho não encontrado"),
+            Self::Stale => f.write_str("conteúdo mudou desde a leitura"),
             Self::Io(message) => write!(f, "erro de I/O: {message}"),
         }
     }
@@ -46,6 +49,13 @@ pub trait Fs: Send + Sync {
 
     /// Escreve atomicamente: temporário → `fsync` → `rename`.
     fn write_atomic(&self, path: &Path, bytes: &[u8]) -> Result<(), FsError>;
+
+    /// Escreve atomicamente **só se** o conteúdo atual for exatamente `expected`.
+    ///
+    /// É o *compare-and-swap* do `edit` (read-before-write): se outro escritor alterou o ficheiro
+    /// entretanto, devolve [`FsError::Stale`] e **não** grava (fail-closed; nunca faz clobber de
+    /// uma edição concorrente). Um ficheiro inexistente nunca casa com `expected`.
+    fn write_atomic_if(&self, path: &Path, bytes: &[u8], expected: &[u8]) -> Result<(), FsError>;
 
     /// Anexa bytes ao fim de um ficheiro (cria se não existir), de forma durável.
     fn append(&self, path: &Path, bytes: &[u8]) -> Result<(), FsError>;
@@ -114,6 +124,27 @@ impl Fs for MemFs {
             mtime: Timestamp::from_millis(next),
         };
         inner.files.insert(path.to_path_buf(), entry);
+        Ok(())
+    }
+
+    fn write_atomic_if(&self, path: &Path, bytes: &[u8], expected: &[u8]) -> Result<(), FsError> {
+        let mut inner = lock(&self.inner);
+        let matches = inner
+            .files
+            .get(path)
+            .is_some_and(|entry| entry.bytes.as_slice() == expected);
+        if !matches {
+            return Err(FsError::Stale);
+        }
+        let next = inner.clock_ms.saturating_add(1);
+        inner.clock_ms = next;
+        inner.files.insert(
+            path.to_path_buf(),
+            Entry {
+                bytes: bytes.to_vec(),
+                mtime: Timestamp::from_millis(next),
+            },
+        );
         Ok(())
     }
 
@@ -203,5 +234,37 @@ mod tests {
         fs.write_atomic(second, b"2")?;
         assert!(fs.mtime(second)? > fs.mtime(first)?);
         Ok(())
+    }
+
+    #[test]
+    fn memfs_cas_writes_only_on_match() -> Result<(), FsError> {
+        let fs = MemFs::new();
+        let path = Path::new("/f");
+        fs.write_atomic(path, b"one")?;
+        fs.write_atomic_if(path, b"two", b"one")?;
+        assert_eq!(fs.read(path)?, b"two".to_vec());
+        Ok(())
+    }
+
+    #[test]
+    fn memfs_cas_refuses_stale_and_keeps_content() -> Result<(), FsError> {
+        let fs = MemFs::new();
+        let path = Path::new("/f");
+        fs.write_atomic(path, b"one")?;
+        assert_eq!(
+            fs.write_atomic_if(path, b"two", b"OLD"),
+            Err(FsError::Stale)
+        );
+        assert_eq!(fs.read(path)?, b"one".to_vec());
+        Ok(())
+    }
+
+    #[test]
+    fn memfs_cas_refuses_missing() {
+        let fs = MemFs::new();
+        assert_eq!(
+            fs.write_atomic_if(Path::new("/missing"), b"x", b""),
+            Err(FsError::Stale)
+        );
     }
 }

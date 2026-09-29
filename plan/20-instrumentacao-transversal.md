@@ -129,6 +129,12 @@ sink (`crates/katu/src/diag.rs`). Corre em `make check`.
   "regista quando ligado"; `check-diag` falha com sonda injetada.
 - **Estado:** `make instrument` e `check-diag` existem; falta ligar ao workflow do CI (E01-T10).
 
+### E19-T06 ☐ Filtro de nível por subsistema (OA18)
+- **Entregáveis:** além do nível global, ligar/desligar por prefixo de `event` (ex.: só
+  `provider.*`) via ambiente; custo zero por defeito mantido.
+- **Aceite:** ligar um prefixo não emite eventos de outros subsistemas; desligado continua sem
+  qualquer emissão.
+
 ## Definition of Done
 
 - [ ] Toda operação de produção abre um `span!` com nome estável.

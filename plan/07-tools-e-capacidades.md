@@ -71,13 +71,19 @@ verificação recusa `SUCCESS` com erros (§38).
   Do not use for Y." (< 1024 chars), enums para conjuntos fechados, IDs tipados com `pattern`,
   e **erros que ensinam** (`Invalid input: 'city' is required. Example: {...}`); anti-poisoning
   (rejeitar `<SYSTEM>`, "ignore previous", markdown oculto).
+- **Erros (OA19):** a validação devolve `Issue { path, message }` **agregado** (nunca `String`
+  solta), reusando o mesmo tipo de erro do validador de checkpoint (E09-T02).
 - **Aceite:** o CI falha se um schema violar as regras; o erro de validação de exemplo é testado.
 
 ### E06-T03 ☐ Escrita e leitura (`write`, `read`, `edit`)
 - **Entregáveis:** argumentos tipados, paths resolvidos, output determinístico; truncagem
   **determinística**; deltas (só o que mudou) como regra de contexto (§18).
+- **`edit` otimista (OA16):** `read` → aplicar patch → `Fs::write_atomic_if(path, novo, lido)`;
+  `FsError::Stale` (o ficheiro mudou desde a leitura) mapeia para `ToolOutcome` **recuperável**
+  ("relê e reaplica"), **nunca** sobrescreve edição concorrente.
 - **Aceite:** propriedade: output canónico (ordenação estável, sem `HashMap`); teste de truncagem
-  em limites minúsculos, exatos, chunks únicos enormes e multibyte (§45.22).
+  em limites minúsculos, exatos, chunks únicos enormes e multibyte (§45.22); teste de `Stale`
+  (edição externa entre a leitura e a escrita não é perdida).
 
 ### E06-T04 ☐ Execução (`bash`) com argv resolvido e capacidades
 - **Entregáveis:** execução que resolve `argv` e `cwd` **antes** da política; `Capability::Exec`;

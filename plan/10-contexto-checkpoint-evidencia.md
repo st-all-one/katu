@@ -62,6 +62,8 @@ método de verificação imposto e nomeado; negativos visíveis.
 
 ### E09-T02 ☐ Checkpoint tipado
 - **Entregáveis:** tipo `Checkpoint`, schema, validador zero-dep, escrita atómica.
+- **Erros (OA19):** o validador devolve `Issue { path, message }` agregado (não `String`),
+  reusando o tipo de erro de E06-T02; o percurso aponta o campo exato que falhou.
 - **Aceite:** checkpoint corrompido falha a validação; escrita é atómica sob crash simulado.
 
 ### E09-T03 ☐ Gate de verificação determinístico

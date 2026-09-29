@@ -47,7 +47,8 @@ Todos os entregáveis abaixo assumem e verificam:
 ### E01-T02 ☑ Ports determinísticos
 - **Objetivo:** traits `Clock`, `Rng`, `Fs`, `Env` no núcleo; impls reais nos adaptadores; fakes no
   núcleo para teste. (O port `Logger` foi substituído por `diag` — uma só superfície, DF9/E19.)
-- **Entregáveis:** traits + impls; fakes (`FixedClock`, `SeqRng`, `MemFs`, `NullLogger`).
+- **Entregáveis:** traits + impls; fakes (`FixedClock`, `SeqRng`, `MemFs`, `NullLogger`);
+  `Fs::write_atomic_if` (compare-and-swap para `edit`, OA16).
 - **Aceite:** o núcleo compila sem dependências de SO/terminal; um teste do núcleo usa só fakes e
   é reprodutível byte a byte; nenhuma chamada a `SystemTime::now()`/`HashMap`-sem-ordem fora dos
   ports (reforçado por `disallowed-methods` no `clippy.toml`).

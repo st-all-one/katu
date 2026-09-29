@@ -74,14 +74,17 @@ impl Fs for StdFs {
 
     fn write_atomic(&self, path: &Path, bytes: &[u8]) -> Result<(), FsError> {
         let _span = katu_core::span!(Level::Trace, events::FS_WRITE);
-        let temporary = temp_path(path);
-        {
-            let mut file = File::create(&temporary).map_err(|err| FsError::from_io(&err))?;
-            file.write_all(bytes)
-                .map_err(|err| FsError::from_io(&err))?;
-            file.sync_all().map_err(|err| FsError::from_io(&err))?;
+        write_bytes_atomic(path, bytes)
+    }
+
+    fn write_atomic_if(&self, path: &Path, bytes: &[u8], expected: &[u8]) -> Result<(), FsError> {
+        let _span = katu_core::span!(Level::Trace, events::FS_WRITE);
+        let current = fs::read(path).map_err(|err| FsError::from_io(&err))?;
+        if current.as_slice() != expected {
+            return Err(FsError::Stale);
         }
-        fs::rename(&temporary, path).map_err(|err| FsError::from_io(&err))
+        // CAS *best-effort*: a janela entre a verificação e o `rename` é reduzida, não eliminada.
+        write_bytes_atomic(path, bytes)
     }
 
     fn append(&self, path: &Path, bytes: &[u8]) -> Result<(), FsError> {
@@ -128,6 +131,18 @@ fn temp_path(path: &Path) -> PathBuf {
     let mut name = path.as_os_str().to_owned();
     name.push(".tmp");
     PathBuf::from(name)
+}
+
+/// Escrita atómica (`tmp` → `fsync` → `rename`), partilhada pelas variantes de escrita.
+fn write_bytes_atomic(path: &Path, bytes: &[u8]) -> Result<(), FsError> {
+    let temporary = temp_path(path);
+    {
+        let mut file = File::create(&temporary).map_err(|err| FsError::from_io(&err))?;
+        file.write_all(bytes)
+            .map_err(|err| FsError::from_io(&err))?;
+        file.sync_all().map_err(|err| FsError::from_io(&err))?;
+    }
+    fs::rename(&temporary, path).map_err(|err| FsError::from_io(&err))
 }
 
 /// Ambiente real do processo.

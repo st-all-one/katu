@@ -28,7 +28,8 @@ função, o log é a fonte da verdade.
   - `memory::error` — `MemoryError`/`MemoryErrorKind` (`retryable()` só em `Timeout`);
   - `memory::fake` — `FakeMemory` (cenários fixos, sem puxar `knudge-core`).
 - Modelo de erro [`error`](src/error.rs) (E01-T06) e ports determinísticos
-  [`ports`](src/ports/mod.rs) (`Clock`/`Rng`/`Fs`/`Env` + fakes).
+  [`ports`](src/ports/mod.rs) (`Clock`/`Rng`/`Fs`/`Env` + fakes; `Fs::write_atomic_if` = CAS
+  para `edit`, OA16).
 - Diagnóstico transversal [`diag`](src/diag/mod.rs) (DF9/E19): log estruturado + métrica de tempo,
   custo zero por defeito; catálogo de eventos em [`diag::events`](src/diag/events.rs).
 

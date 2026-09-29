@@ -111,6 +111,8 @@ Quatro dialetos a normalizar no adaptador (mapeados pelo `@ai-sdk/*` de referên
 ### E12-T04 ☐ Timeout, retry e cancelamento
 - **Entregáveis:** timeout tipado; retry/backoff só em operação idempotente; cancelamento que
   atinge quiescência (§43).
+- **Nota (OA17):** se surgir uma cadeia de fallback entre providers, o "primeiro que responde
+  vence" usa um despacho `bail` no event bus — **só** com consumidor real (não antecipar).
 - **Aceite:** provider que trava é cancelado sem vazar tarefa; retry não duplica efeito.
 
 ### E12-T05 ☐ Testes com provider fake e snapshot

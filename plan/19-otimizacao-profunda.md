@@ -300,6 +300,8 @@ quebra a soma.
 ### E18-T09 ☐ Fusão de canais RRF/PPR (F9)
 - **Entregáveis:** fusão RRF (pesos como dados, `k = 60`); PPR semeado pelo working set via
   `Memory`; degradação por canal ausente.
+- **Nota (OA17):** se a fusão precisar de "primeiro canal decisivo vence", usar um despacho `bail`
+  no event bus — **só** quando este for consumidor real; não antecipar.
 - **Aceite:** determinístico; canal ausente não quebra; pesos versionados.
 
 ### E18-T10 ☐ Harness estatístico e gate (método, §0.3)

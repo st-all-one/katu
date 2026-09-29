@@ -147,6 +147,7 @@ pub fn read_records(fs: &dyn Fs, path: &Path) -> Result<Vec<LogRecord>, LogError
 fn from_io(err: FsError) -> LogError {
     match err {
         FsError::NotFound => LogError::new(LogErrorKind::Io, "caminho não encontrado"),
+        FsError::Stale => LogError::new(LogErrorKind::Io, "conteúdo mudou desde a leitura"),
         FsError::Io(message) => LogError::new(LogErrorKind::Io, message),
     }
 }
