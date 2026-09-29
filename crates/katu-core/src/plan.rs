@@ -6,8 +6,11 @@
 
 use serde::{Deserialize, Serialize};
 
+mod merge;
+
 /// Correspondência glob determinística, partilhada com o motor de política (vocabulário v2).
 pub use katu_policy::matches_glob;
+pub use merge::MergeError;
 
 /// Estado de uma feature do plano.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -72,6 +75,12 @@ pub struct ScopeContract {
     pub acceptance_criteria: Vec<String>,
     /// Plano de reversão (obrigatório não vazio).
     pub rollback_plan: String,
+    /// Orçamento de tempo em minutos (`None` = sem teto). Merge = **mínimo** (E09-T04).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time_budget_minutes: Option<u64>,
+    /// Egress de rede permitido (`false` por omissão). Merge = `AND` (E09-T04).
+    #[serde(default)]
+    pub network_egress: bool,
 }
 
 impl ScopeContract {
@@ -88,7 +97,16 @@ impl ScopeContract {
             forbidden_files,
             acceptance_criteria,
             rollback_plan: rollback_plan.into(),
+            time_budget_minutes: None,
+            network_egress: false,
         }
+    }
+
+    /// Define o orçamento de tempo em minutos (merge por **mínimo**, E09-T04).
+    #[must_use]
+    pub fn with_time_budget(mut self, minutes: u64) -> Self {
+        self.time_budget_minutes = Some(minutes);
+        self
     }
 
     /// `true` se o caminho é permitido pelo contrato (proibido vence; `allowed` vazio = tudo).
@@ -142,6 +160,18 @@ impl Plan {
         if self.scope_contract.rollback_plan.trim().is_empty() {
             return Err(PlanError::MissingRollbackPlan);
         }
+        for pattern in self
+            .scope_contract
+            .allowed_files
+            .iter()
+            .chain(&self.scope_contract.forbidden_files)
+        {
+            if !is_relative_glob(pattern) {
+                return Err(PlanError::NonRelativeGlob {
+                    pattern: pattern.clone(),
+                });
+            }
+        }
         let in_progress = self
             .feature_list
             .iter()
@@ -166,6 +196,18 @@ pub enum PlanError {
     MissingRollbackPlan,
     /// Mais do que uma feature em curso.
     MultipleInProgress,
+    /// Glob absoluto ou com `..` (o escopo são globs relativos, não paths).
+    NonRelativeGlob {
+        /// O padrão rejeitado.
+        pattern: String,
+    },
+}
+
+/// `true` se o padrão é um glob relativo (sem raiz absoluta nem `..`).
+fn is_relative_glob(pattern: &str) -> bool {
+    !pattern.starts_with('/')
+        && !pattern.starts_with('\\')
+        && !pattern.split(['/', '\\']).any(|segment| segment == "..")
 }
 
 impl std::fmt::Display for PlanError {
@@ -175,6 +217,7 @@ impl std::fmt::Display for PlanError {
             Self::MissingForbiddenFiles => f.write_str("plano sem forbidden_files"),
             Self::MissingRollbackPlan => f.write_str("plano sem rollback_plan"),
             Self::MultipleInProgress => f.write_str("mais de uma feature in_progress"),
+            Self::NonRelativeGlob { pattern } => write!(f, "glob não relativo: {pattern}"),
         }
     }
 }
@@ -182,67 +225,4 @@ impl std::fmt::Display for PlanError {
 impl std::error::Error for PlanError {}
 
 #[cfg(test)]
-mod tests {
-    use super::{Feature, FeatureStatus, Plan, PlanError, ScopeContract};
-
-    fn contract() -> ScopeContract {
-        ScopeContract::new(
-            vec!["src/**".to_string()],
-            vec!["**/secrets/**".to_string()],
-            vec!["testes passam".to_string()],
-            "reverter o commit",
-        )
-    }
-
-    fn plan(features: Vec<Feature>) -> Plan {
-        Plan::new(contract(), features)
-    }
-
-    fn feature(id: &str, status: FeatureStatus) -> Feature {
-        Feature::new(id, "fazer", status)
-    }
-
-    #[test]
-    fn valid_plan_passes() -> Result<(), PlanError> {
-        plan(vec![feature("F1", FeatureStatus::InProgress)]).validate()
-    }
-
-    #[test]
-    fn empty_feature_list_is_rejected() {
-        assert_eq!(
-            plan(Vec::new()).validate(),
-            Err(PlanError::EmptyFeatureList)
-        );
-    }
-
-    #[test]
-    fn missing_forbidden_files_is_rejected() {
-        let mut plan = plan(vec![feature("F1", FeatureStatus::Pending)]);
-        plan.scope_contract.forbidden_files.clear();
-        assert_eq!(plan.validate(), Err(PlanError::MissingForbiddenFiles));
-    }
-
-    #[test]
-    fn missing_rollback_is_rejected() {
-        let mut plan = plan(vec![feature("F1", FeatureStatus::Pending)]);
-        plan.scope_contract.rollback_plan = "   ".to_string();
-        assert_eq!(plan.validate(), Err(PlanError::MissingRollbackPlan));
-    }
-
-    #[test]
-    fn multiple_in_progress_is_rejected() {
-        let plan = plan(vec![
-            feature("F1", FeatureStatus::InProgress),
-            feature("F2", FeatureStatus::InProgress),
-        ]);
-        assert_eq!(plan.validate(), Err(PlanError::MultipleInProgress));
-    }
-
-    #[test]
-    fn allows_respects_forbidden_first() {
-        let contract = contract();
-        assert!(contract.allows("src/main.rs"));
-        assert!(!contract.allows("src/secrets/token"));
-        assert!(!contract.allows("docs/readme.md"));
-    }
-}
+mod tests;

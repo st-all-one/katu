@@ -84,6 +84,7 @@ catalog! {
     (CONTEXT_TRIM, "context.trim", "Recorte/seleção de contexto."),
     (CONTEXT_CHECKPOINT, "context.checkpoint", "Checkpoint de evidência."),
     (VERIFY_REPORT, "verify.report", "Relatório do gate de verificação determinístico (E09)."),
+    (SCOPE_MERGE, "scope.merge", "Merge de contratos de escopo por menor privilégio (E09-T04)."),
 
     // -- Persistência --------------------------------------------------------
     (STORE_LOAD, "store.load", "Carregamento do estado persistido."),

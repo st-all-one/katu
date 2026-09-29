@@ -98,12 +98,22 @@ método de verificação imposto e nomeado; negativos visíveis.
   (CLI/TUI, E10).
 - **Aceite:** o gate nunca chama um LLM; override é assinado e registado (`overrides.jsonl`).
 
-### E09-T04 ☐ Scope contracts e `feature_list`
+### E09-T04 ◐ Scope contracts e `feature_list`
 - **Entregáveis:** `scope_contract.json` com **globs** (não paths), `forbidden_files` obrigatório,
   acceptance, rollback, `time_budget_minutes`, `network_egress`; merge por menor privilégio
   (allowed = interseção; forbidden = união; tempo = mínimo); `feature_list.json` com ≤ 1
   `in_progress` verificado no startup.
-- **Aceite:** contrato sem `forbidden_files` ou sem rollback **não** é aprovado; merge testado.
+- **Estado:** `ScopeContract` ganhou `time_budget_minutes` (`Option<u64>`, `None` = sem teto) e
+  `network_egress` (`bool`, default `false`); `validate` rejeita globs não relativos (`/…`, `..`)
+  e mantém `forbidden_files`/rollback obrigatórios. `ScopeContract::merge` (`plan/merge.rs`) faz o
+  merge por **menor privilégio**: `allowed` = interseção glob-aware (cobertura conservadora:
+  `src/**` cobre `src/parser/**`, `src/*.rs` cobre `src/main.rs`), `forbidden` = união, tempo =
+  mínimo, rede = `AND`. Se ambos os `allowed` são não vazios e disjuntos, o merge **falha**
+  (`MergeError::EmptyAllowedScope`, fail-closed) em vez de conceder "tudo". Emite o span
+  `scope.merge`. O `≤ 1 in_progress` é imposto por `Plan::validate` (E06-T06).
+- **Falta:** carregar `scope_contract.json`/`feature_list.json` no arranque (CLI/E10).
+- **Aceite:** contrato sem `forbidden_files` ou sem rollback **não** é aprovado; merge testado
+  (narrowing, união, mínimo, `AND`, conflito disjunto, contrato resultante válido).
 
 ### E09-T05 ◐ `Metric` e portão de publicação
 - **Entregáveis:** tipo `Metric`; `xtask gate:bench` que exige artefacto por número; checklist de

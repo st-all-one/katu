@@ -147,10 +147,11 @@ verificação recusa `SUCCESS` com erros (§38).
   `allowed_files`/`forbidden_files` (globs), `acceptance_criteria`, `rollback_plan`; invariante
   "≤ 1 `in_progress`" verificada no startup; o agente transita `Task → Planned` ao criar/atualizar.
 - **Estado:** `katu_core::plan` (`Plan`/`ScopeContract`/`Feature`/`FeatureStatus`/`PlanError`) com
-  `validate` (schema + "≤ 1 `in_progress`") e `allows` (globs; proibido vence); `PlanTool`
-  (`tool.plan`) devolve `plan.validate` ou `Unavailable{control}` acionável (DF10). No kernel,
-  `Event::PlanRecorded { plan }` regista o plano no `State` e a pré-condição de `Phase::Planned`
-  exige-o (E04): `Task → Planned` sem plano é `Refusal`.
+  `validate` (schema + "≤ 1 `in_progress`" + globs relativos), `allows` (globs; proibido vence) e
+  `merge` (menor privilégio — E09-T04); `ScopeContract` inclui `time_budget_minutes` e
+  `network_egress`. `PlanTool` (`tool.plan`) devolve `plan.validate` ou `Unavailable{control}`
+  acionável (DF10). No kernel, `Event::PlanRecorded { plan }` regista o plano no `State` e a
+  pré-condição de `Phase::Planned` exige-o (E04): `Task → Planned` sem plano é `Refusal`.
 - **Aceite:** plano sem `forbidden_files` ou sem rollback **não** é aceite; plano é validado por
   schema; `Task → Planned` sem plano é `Refusal` (E04).
 

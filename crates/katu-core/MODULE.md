@@ -55,9 +55,11 @@ função, o log é a fonte da verdade.
 - Gate de verificação [`verify`](src/verify/mod.rs) (E09-T03): `verify` **puro** (escopo/feedback/
   cobertura, zero LLM), `VerificationReport`/`Check`/`CheckStatus`, `--strict` promove warns a
   blocks; `Override` **assinado** (`reason`+`overridden_by`) registado em `overrides.jsonl`.
-- Plano tipado [`plan`](src/plan.rs) (E06-T06): `Plan`/`ScopeContract`/`Feature`/`FeatureStatus`;
-  `validate` (schema + "≤ 1 `in_progress`") e `allows` (globs; proibido vence). O kernel exige um
-  plano registado para `Phase::Planned`.
+- Plano tipado [`plan`](src/plan.rs) (E06-T06/E09-T04): `Plan`/`ScopeContract`/`Feature`/
+  `FeatureStatus`; `validate` (schema + "≤ 1 `in_progress`" + globs relativos), `allows` (globs;
+  proibido vence) e `merge` por menor privilégio ([`plan/merge`](src/plan/merge.rs): `allowed`
+  interseção, `forbidden` união, tempo mínimo, rede `AND`; fail-closed se disjuntos). O kernel
+  exige um plano registado para `Phase::Planned`.
 - Validação com erros que ensinam [`validate`](src/validate.rs) (OA19/E09-T02): `Issue { path,
   message }` + `Issues` agregado (ordem determinística), partilhado pelo validador de checkpoint e
   pelo linter de schema de tools (E06-T02).
