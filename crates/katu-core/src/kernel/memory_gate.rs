@@ -93,7 +93,7 @@ mod tests {
     use crate::kernel::pipeline::Tool;
     use crate::kernel::state::State;
     use crate::memory::{FakeMemory, NoteRef, NoteType, PreWriteReq, Score};
-    use katu_policy::{ResolvedPath, RuleSet, ToolName, ToolUse};
+    use katu_policy::{ResolvedPath, RuleId, RuleSet, ToolName, ToolUse};
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     /// Regras reais do protocolo, versionadas no repositório.
@@ -213,10 +213,12 @@ mod tests {
         )?;
         assert!(!dispatch.ran());
         assert_eq!(probe.calls.load(Ordering::SeqCst), 0);
-        assert!(matches!(
-            dispatch.outcome(),
-            ToolOutcome::Unavailable { .. }
-        ));
+        assert!(matches!(dispatch.outcome(), ToolOutcome::Denied { .. }));
+        assert_eq!(
+            dispatch.outcome().rule_id().map(RuleId::as_str),
+            Some("mem-recall-before-write"),
+            "a recusa tem de nomear a regra (DF10/DF11)"
+        );
         Ok(())
     }
 

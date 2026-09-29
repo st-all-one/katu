@@ -43,10 +43,45 @@ fn tool_outcome_success_axis() {
     };
     let unavailable = ToolOutcome::Unavailable {
         control: ControlId::new("memoria"),
+        rule_id: None,
     };
     assert!(ToolOutcome::Ok.is_success());
     assert!(ToolOutcome::Partial.is_success());
     assert!(!denied.is_success());
     assert!(!ToolOutcome::Timeout.is_success());
     assert!(!unavailable.is_success());
+}
+
+#[test]
+fn refusal_is_actionable_with_rule_id() {
+    let rule_id = RuleId::from("mem-recall-before-write");
+    let approval = ToolOutcome::Unavailable {
+        control: ControlId::new("approval"),
+        rule_id: Some(rule_id.clone()),
+    };
+    let denied = ToolOutcome::Denied {
+        rule_id: rule_id.clone(),
+        evidence: Evidence::new("facto", "argumento", rule_id.clone()),
+    };
+    assert_eq!(approval.rule_id(), Some(&rule_id));
+    assert_eq!(denied.rule_id(), Some(&rule_id));
+    assert_eq!(ToolOutcome::Ok.rule_id(), None);
+    assert_eq!(ToolOutcome::Timeout.rule_id(), None);
+}
+
+#[test]
+fn unavailable_schema_is_backward_compatible() -> Result<(), serde_json::Error> {
+    let with = ToolOutcome::Unavailable {
+        control: ControlId::new("approval"),
+        rule_id: Some(RuleId::from("r")),
+    };
+    let json = serde_json::to_string(&with)?;
+    assert!(json.contains("rule_id"), "{json}");
+    let round: ToolOutcome = serde_json::from_str(&json)?;
+    assert_eq!(round, with);
+
+    // Logs anteriores à DF10 (sem `rule_id`) continuam a desserializar.
+    let old: ToolOutcome = serde_json::from_str(r#"{"unavailable":{"control":"approval"}}"#)?;
+    assert_eq!(old.rule_id(), None);
+    Ok(())
 }

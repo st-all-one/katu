@@ -60,16 +60,19 @@ fn skipped_outcome(decision: &Decision) -> ToolOutcome {
             rule_id: rule_id.clone(),
             evidence: evidence.clone(),
         },
-        Decision::RequireApproval { .. } => ToolOutcome::Unavailable {
+        Decision::RequireApproval { request } => ToolOutcome::Unavailable {
             control: ControlId::new("approval"),
+            rule_id: Some(request.rule_id.clone()),
         },
         Decision::NeedsHuman {
             missing_control, ..
         } => ToolOutcome::Unavailable {
             control: missing_control.clone(),
+            rule_id: None,
         },
         _ => ToolOutcome::Unavailable {
             control: ControlId::new("unknown"),
+            rule_id: None,
         },
     }
 }

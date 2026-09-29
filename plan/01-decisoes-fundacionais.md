@@ -217,6 +217,72 @@ E15/E18 e substitui o port `Logger` (uma só superfície de diagnóstico).
 
 ---
 
+## DF10 — Recusas são acionáveis; pré-requisitos são aprovação (soft) ✅
+
+**Enunciado.** Toda recusa que chega ao modelo carrega o `rule_id` da regra que a produziu
+(`Denied` carrega também `evidence`; `Unavailable` carrega `rule_id`). A **forma de aplicação**
+decide o tipo de recusa, não a severidade: `DenyCommand`/`DenyWrite`/`DenyDelete` sem a capacidade
+correspondente → `Denied` (violação, falha fechada); `RequireBefore`/`RequireAfter` (pré-requisito
+de protocolo — ex.: recall antes de write, outcome antes de close) → `RequireApproval` →
+`Unavailable`. `severity` distingue apenas `Deny*` `critical` (nega) de `warn` (aprovação).
+Promover um pré-requisito a muro é decisão própria (nova DF/regra), nunca efeito colateral.
+
+> **Superada parcialmente por [DF11](#df11--severity-decide-também-para-requirebeforeafter-pré-requisito-crítico--muro-):**
+> a cláusula "`RequireBefore/After` são sempre aprovação" cai; passam a seguir a `severity`. O
+> resto (recusa sempre acionável) mantém-se.
+
+**Evidência a favor.** DF2/OA2: o veredicto é tipado e a distinção `Deny` vs `RequireApproval` tem
+de significar algo — `Deny` = violação, `RequireApproval` = falta um pré-requisito/controlo.
+`plan/03` (E02-T07) mapeia âncora e outcome a `RequireAfter` **de propósito**; a validação
+semântica (duplicata/âncora/claim) vive no adaptador e chega como **capacidade** → `Deny`. O
+`maxima` (§49) mostra o custo de "regras em prosa": aqui o que recusa é sempre identificável.
+
+**Evidência contra.** "Gravar sem recall" fica mais fraco como *muro* (é aprovação, não negação);
+num agente autónomo sem humano, aprovação = bloqueio, mas a evidência é de tipo diferente. Exige
+que `Unavailable` transporte o `rule_id` (antes era opaco).
+
+**Consequência.** `ToolOutcome::Unavailable { control, rule_id }` e `ToolOutcome::rule_id()`;
+`pipeline::skipped_outcome` propaga `RequireApproval.request.rule_id`. A checklist E05-T07 aceita
+`Denied` **ou** `Unavailable`, ambos com `rule_id`. A promoção de "sem recall" a `deny_command`
+fica em aberto, a decidir com medição (E05-T06).
+
+**Teste que trava.** `E05-T05` (`crates/katu/tests/mvk.rs`): (a) gravar sem recall → `Unavailable`
+com `rule_id == mem-recall-before-write`, executor a zero; (b) duplicata → `Denied` com
+`rule_id == mem-no-duplicate`; (c) fechar sem `outcome` → `Refusal`. O acesso `ToolOutcome::rule_id`
+tem teste próprio (`error::tests::refusal_is_actionable_with_rule_id`).
+
+---
+
+## DF11 — `severity` decide também para `RequireBefore/After` (pré-requisito crítico = muro) ✅
+
+**Enunciado.** `RequireBefore`/`RequireAfter` deixam de ser sempre aprovação: seguem a
+**severidade**, tal como as `Deny*`. `critical` → `Deny { reason, rule_id, evidence }`; `warn` →
+`RequireApproval`. Assim "gravar sem recall" e "fechar sem outcome" (ambos `critical`) passam a ser
+**muros** na política; o `Refusal` de kernel para `→ Closed` permanece (defense-in-depth).
+Substitui a cláusula de DF10 "`RequireBefore/After` são sempre aprovação"; o resto de DF10
+(recusa sempre acionável) mantém-se.
+
+**Evidência a favor.** O doc de `Severity` já diz "Crítica (nega)". A distinção `Deny` vs
+`RequireApproval` continua a ter significado (muro vs controlo em falta) e passa a depender de um
+campo explícito por regra, não do tipo de enforcement. O gate E05 pede um muro para "gravar sem
+busca". DF10 garante que o modelo recebe `rule_id` + `evidence` — a correção continua possível
+(fazer recall e repetir).
+
+**Evidência contra.** Muda a semântica congelada de E02 (2 testes). Torna um pré-requisito um muro
+(tensão com §47 "sem muros"); mitigação: `warn` existe para pré-requisitos genuinamente soft e o
+`waiver` (regra/fase) é o escape explícito. Pode esconder o *porquê* se o `rule_id` não for
+mostrado — coberto por DF10.
+
+**Consequência.** `engine::verdict` escolhe por `severity` para `Deny*` e `Require*` (helper
+`severity_verdict`); `ToolOutcome` mapeia `Deny` → `Denied { rule_id, evidence }`. Os testes de
+E02/E05 atualizados.
+
+**Teste que trava.** `E02-T05`/`E02-T07`: `critical_require_after_denies`,
+`write_without_recall_is_denied`, `close_without_outcome_is_denied`; `E05-T05`: (a) → `Denied` com
+`rule_id == mem-recall-before-write`; `warn_require_after_requires_approval` fixa o outro lado.
+
+---
+
 ## Tabela de rastreabilidade rápida
 
 | Decisão | Épicos que a implementam | Teste canónico |
@@ -230,6 +296,8 @@ E15/E18 e substitui o port `Logger` (uma só superfície de diagnóstico).
 | DF7 | E14, E15 | `E14-T01` |
 | DF8 | E12 | `E12-T01`, `E12-T07` |
 | DF9 | E19, E15, E18 | `E19-T01`, `make instrument` |
+| DF10 | E02, E04, E05 | `E05-T05` |
+| DF11 | E02, E05 | `E02-T05`, `E05-T05` |
 
 ---
 
@@ -238,7 +306,7 @@ E15/E18 e substitui o port `Logger` (uma só superfície de diagnóstico).
 | # | Ponto | Épico | Default provisório |
 |---|---|---|---|
 | OA1 | Persistência: JSONL append-only vs SQLite | E04 | **JSONL append-only** (o log é a verdade; índice derivado) |
-| OA2 | Semântica de negação: erro recuperável vs parada dura | E02 | **ambos**: `Denied` recuperável por default; `NeedsHuman` para irreversível |
+| OA2 | Semântica de negação: erro recuperável vs parada dura | E02 | **ambos**: `Denied` recuperável por default; `NeedsHuman` para irreversível. Refinada por **DF10** (recusa sempre acionável) e **DF11** (`critical Require*` = muro) |
 | OA3 | TUI: `crossterm` cru vs `ratatui` | E10 | **`ratatui` 0.30 + `crossterm` 0.29** (skill [`ratatui-tui`](../.agents/skill/ratatui-tui/SKILL.md): estado central, render puro, executor async); rever antes de E10-T01 |
 | OA4 | Providers do MVP | E12 | built-in first-party **`opencode go/zen`** (hot path) + **`llama.cpp`** (local, opcional); todo o resto via **GDK** ou ignorado ativamente |
 | OA5 | Contenção / jail | E07 → E17 | **soft agora** (E07: política imposta por operação, sem jail); **jail real depois** (E17: bwrap + Landlock + seccomp) |

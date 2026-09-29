@@ -76,6 +76,10 @@ pub enum Decision {
 5. **Sem jail no MVP; escopo global com travas.** O motor avalia capacidades sobre o host inteiro
    (o katu corre como o utilizador). Fora do workspace e caminhos sensíveis são
    `RequireApproval`/`NeedsHuman` por regra — não bloqueio de kernel; a jail real é futura (E17).
+6. **Toda recusa é acionável; a severidade decide o muro (DF10/DF11).** `Deny` carrega `rule_id` +
+   `evidence`; `RequireApproval` carrega `rule_id` no `ApprovalRequest` e propaga-o a
+   `ToolOutcome::Unavailable { rule_id }`. `severity` decide para `Deny*` **e**
+   `RequireBefore/After`: `critical` → `Deny` (muro); `warn` → `RequireApproval` (controlo em falta).
 
 ## Vocabulário fechado e versionado
 

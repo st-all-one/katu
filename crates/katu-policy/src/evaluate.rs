@@ -120,7 +120,7 @@ mod tests {
     }
 
     #[test]
-    fn require_after_produces_approval() -> Result<(), PolicyError> {
+    fn critical_require_after_denies() -> Result<(), PolicyError> {
         let rules = RuleSet {
             vocab: 1,
             rules: vec![rule(
@@ -132,6 +132,27 @@ mod tests {
                     tool: ToolName::Search,
                 },
             )],
+        };
+        let facts = write_facts("/work/x")?;
+        assert!(matches!(evaluate(&facts, &rules)?, Decision::Deny { .. }));
+        Ok(())
+    }
+
+    #[test]
+    fn warn_require_after_requires_approval() -> Result<(), PolicyError> {
+        let mut require = rule(
+            "need-verify",
+            RuleScope::Command {
+                tool: ToolName::Write,
+            },
+            Enforcement::RequireAfter {
+                tool: ToolName::Search,
+            },
+        );
+        require.severity = Severity::Warn;
+        let rules = RuleSet {
+            vocab: 1,
+            rules: vec![require],
         };
         let facts = write_facts("/work/x")?;
         assert!(matches!(

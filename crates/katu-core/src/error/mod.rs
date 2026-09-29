@@ -212,6 +212,9 @@ pub enum ToolOutcome {
     Unavailable {
         /// Controlo em falta.
         control: ControlId,
+        /// Regra que exige o controlo, quando aplicável (DF10).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rule_id: Option<RuleId>,
     },
 }
 
@@ -220,6 +223,19 @@ impl ToolOutcome {
     #[must_use]
     pub const fn is_success(&self) -> bool {
         matches!(self, Self::Ok | Self::Partial)
+    }
+
+    /// Regra que recusou, quando a recusa é acionável (DF10).
+    ///
+    /// É o que permite ao modelo **corrigir-se**: saber *qual* regra exige o quê, em vez de um
+    /// controlo opaco.
+    #[must_use]
+    pub fn rule_id(&self) -> Option<&RuleId> {
+        match self {
+            Self::Denied { rule_id, .. } => Some(rule_id),
+            Self::Unavailable { rule_id, .. } => rule_id.as_ref(),
+            _ => None,
+        }
     }
 }
 

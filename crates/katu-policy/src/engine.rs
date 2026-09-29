@@ -62,42 +62,39 @@ impl Rule {
         }
     }
 
-    /// Converte uma aplicação em veredicto (a severidade decide entre negar e pedir aprovação).
+    /// Converte uma aplicação em veredicto: a **severidade** decide entre negar e pedir aprovação
+    /// (DF11). `Budget` é sempre `NeedsHuman`; `Advisory` é `Allow`.
     pub(crate) fn verdict(&self, evidence: Evidence) -> Decision {
         match &self.enforcement {
             Enforcement::DenyCommand { .. }
             | Enforcement::DenyWrite { .. }
-            | Enforcement::DenyDelete { .. } => {
-                if self.severity == Severity::Warn {
-                    Decision::RequireApproval {
-                        request: ApprovalRequest {
-                            rule_id: self.id.clone(),
-                            reason: Reason::new(self.statement.clone()),
-                            scope: evidence.argument,
-                        },
-                    }
-                } else {
-                    Decision::Deny {
-                        reason: Reason::new(self.statement.clone()),
-                        rule_id: self.id.clone(),
-                        evidence,
-                    }
-                }
-            }
-            Enforcement::RequireBefore { .. } | Enforcement::RequireAfter { .. } => {
-                Decision::RequireApproval {
-                    request: ApprovalRequest {
-                        rule_id: self.id.clone(),
-                        reason: Reason::new(self.statement.clone()),
-                        scope: evidence.argument,
-                    },
-                }
-            }
+            | Enforcement::DenyDelete { .. }
+            | Enforcement::RequireBefore { .. }
+            | Enforcement::RequireAfter { .. } => self.severity_verdict(evidence),
             Enforcement::Budget { .. } => Decision::NeedsHuman {
                 reason: Reason::new("orçamento excedido"),
                 missing_control: ControlId::new("budget"),
             },
             Enforcement::Advisory => Decision::Allow,
+        }
+    }
+
+    /// `critical` nega (muro); `warn` pede aprovação (soft). DF11.
+    fn severity_verdict(&self, evidence: Evidence) -> Decision {
+        if self.severity == Severity::Warn {
+            Decision::RequireApproval {
+                request: ApprovalRequest {
+                    rule_id: self.id.clone(),
+                    reason: Reason::new(self.statement.clone()),
+                    scope: evidence.argument,
+                },
+            }
+        } else {
+            Decision::Deny {
+                reason: Reason::new(self.statement.clone()),
+                rule_id: self.id.clone(),
+                evidence,
+            }
         }
     }
 }

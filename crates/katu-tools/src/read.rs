@@ -37,6 +37,7 @@ impl Tool for ReadTool<'_> {
 fn unavailable() -> ToolOutcome {
     ToolOutcome::Unavailable {
         control: ControlId::new("read"),
+        rule_id: None,
     }
 }
 

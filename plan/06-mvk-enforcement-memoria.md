@@ -98,16 +98,22 @@ compressão de contexto. Nada disso entra antes do gate.
   `Denied`/`Refusal` com `rule_id` e evidência.
 - **Estado:** `crates/katu/tests/mvk.rs` (borda: vê `katu-core` + `katu-tools`): conduz
   `Session::open` → turno → `memory_write` (gate real) e `apply(PhaseTransition)`. (a) sem recall →
-  recusa **sem** executor (0 commits); (b) duplicata ≥ 0,92 → `Denied{mem-no-duplicate}` sem
-  commit; (c) fecho sem `outcome` → `Refusal::UnmetPrecondition{Closed}`. Cada teste tem
-  `session.verify()` (invariante `Model-visible ⟺ logged`).
-- **Nota de coerência:** a checklist de T07 diz `Denied` para (a), mas o contrato **fechado** de
-  E02 (e o próprio `policy/memory.toml`) classifica "sem recall" como `RequireAfter` →
-  `RequireApproval` (recusa determinística, não negação fechada). A negação fechada aplica-se à
-  **ausência de capacidade** (duplicata/âncora/claim). Decisão pendente de registo em ADR.
+  `Denied{mem-recall-before-write}` **sem** executor (0 commits); (b) duplicata ≥ 0,92 →
+  `Denied{mem-no-duplicate}` sem commit; (c) fecho sem `outcome` →
+  `Refusal::UnmetPrecondition{Closed}`. Cada teste tem `session.verify()` (invariante
+  `Model-visible ⟺ logged`).
+- **Nota de coerência:** a checklist de T07 dizia `Denied` para (a), mas o contrato **fechado** de
+  E02 classificava "sem recall" como `RequireAfter` → `RequireApproval`. **Resolvido por DF11**
+  (a `severity` decide; `critical` = muro) + DF10 (recusa acionável): "sem recall" é agora
+  `Denied` com `rule_id == mem-recall-before-write`.
 - **Aceite:** os 3 cenários ficam **vermelhos** se o enforcement for removido — a regressão é
   introduzida, vista vermelha e revertida, por regra (§51.9, "um guard só guarda se a regressão o
   falhar").
+- **Evidência red/green (executada):** (a) regra #1 → `advisory` ⇒ `write_without_recall…`
+  **FAILED**; (b) `capabilities_for(Reject)` → concede capacidade ⇒ `duplicate_write…` **FAILED**;
+  (c) `Phase::Closed => true` ⇒ `close_without_outcome…` **FAILED**; (DF11) `severity_verdict` →
+  sempre aprovação ⇒ `critical_require_after_denies` + `write_without_recall…` **FAILED**. Cada
+  regressão foi revertida e a suíte voltou a verde (134 testes).
 
 ### E05-T06 ☐ Medição honesta do atrito
 - **Objetivo:** decidir com números que citam o artefacto que os produziu (DF5).
@@ -120,7 +126,7 @@ compressão de contexto. Nada disso entra antes do gate.
 ### E05-T07 ☐ **Gate de decisão (a checklist)**
 Executar a checklist de [`README.md`](README.md) §5. O épico só fecha com **todos**:
 
-- [ ] gravação sem busca → `Denied` com evidência, pelo loop real;
+- [ ] gravação sem busca → `Denied` com `rule_id` e evidência, pelo loop real (DF11);
 - [ ] duplicata ≥ 0.92 → `Denied`;
 - [ ] fecho sem `outcome` → `Refusal`;
 - [ ] a regressão inverte cada um dos três testes para vermelho;

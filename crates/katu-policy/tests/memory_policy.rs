@@ -68,12 +68,13 @@ fn write_with_recall_and_capability_is_allowed() -> Result<(), PolicyError> {
 }
 
 #[test]
-fn write_without_recall_requires_approval() -> Result<(), PolicyError> {
+fn write_without_recall_is_denied() -> Result<(), PolicyError> {
     let rules = memory_rules()?;
     let facts = facts(ToolName::MemoryWrite, &[], command(ToolName::MemoryWrite))?;
+    let decision = evaluate(&facts, &rules)?;
     assert!(matches!(
-        evaluate(&facts, &rules)?,
-        Decision::RequireApproval { .. }
+        decision,
+        Decision::Deny { ref rule_id, .. } if rule_id.as_str() == "mem-recall-before-write"
     ));
     Ok(())
 }
@@ -87,12 +88,13 @@ fn write_without_capability_is_denied() -> Result<(), PolicyError> {
 }
 
 #[test]
-fn close_without_outcome_requires_approval() -> Result<(), PolicyError> {
+fn close_without_outcome_is_denied() -> Result<(), PolicyError> {
     let rules = memory_rules()?;
     let facts = facts(ToolName::MemoryClose, &[], command(ToolName::MemoryClose))?;
+    let decision = evaluate(&facts, &rules)?;
     assert!(matches!(
-        evaluate(&facts, &rules)?,
-        Decision::RequireApproval { .. }
+        decision,
+        Decision::Deny { ref rule_id, .. } if rule_id.as_str() == "mem-outcome-before-close"
     ));
     Ok(())
 }

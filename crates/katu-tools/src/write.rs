@@ -29,6 +29,7 @@ impl Tool for WriteNoteTool<'_> {
             Err(err) if err.retryable() => ToolOutcome::Timeout,
             Err(_) => ToolOutcome::Unavailable {
                 control: ControlId::new("memory"),
+                rule_id: None,
             },
         }
     }
