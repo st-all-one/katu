@@ -122,9 +122,9 @@ sink (`crates/katu/src/diag.rs`). Corre em `make check`.
   `katu.run`/`katu.setup`, `fs.*`, `kernel.step`/`kernel.transition`/`kernel.refusal`,
   `log.append`/`log.replay`, `policy.evaluate`/`policy.allow`/`policy.deny`,
   `tool.call`/`tool.ok`/`tool.error`, `tool.read`/`tool.write`/`tool.edit`/`tool.move`/
-  `tool.search`, `fs.rename`, `memory.write`, `kernel.budget[_refuse]`, `context.checkpoint`,
-  `lock.recovered`. Dos 52 ids, 28 estão emitidos; restam 24 por nascer (tools `bash`/`trash`/
-  `plan`, contenção E07, memória E03, contexto E09, providers E12, TUI E11).
+  `tool.search`/`tool.exec`/`tool.trash`/`tool.plan`, `fs.rename`/`fs.mkdir`, `memory.write`,
+  `kernel.budget[_refuse]`, `context.checkpoint`, `lock.recovered`. Dos 54 ids, 32 estão emitidos;
+  restam 22 por nascer (contenção E07, memória E03, contexto E09, providers E12, TUI E11).
 
 ### E19-T04 ☐ Consistência (fingerprint determinístico)
 - **Entregáveis**: `diag::fingerprint!` que acumula um hash determinístico do estado/resultado de

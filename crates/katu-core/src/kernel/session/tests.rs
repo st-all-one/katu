@@ -6,6 +6,7 @@ use crate::kernel::event::{CallId, Event};
 use crate::kernel::log::read_records;
 use crate::kernel::pipeline::{Tool, ToolOutput};
 use crate::kernel::state::RefusalReason;
+use crate::plan::{Feature, FeatureStatus, Plan, ScopeContract};
 use crate::ports::MemFs;
 use katu_policy::{
     Enforcement, Phase, PolicyError, ResolvedPath, Rule, RuleCategory, RuleExamples, RuleId,
@@ -16,6 +17,19 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 struct Probe {
     calls: AtomicUsize,
+}
+
+/// Plano mínimo válido (E06-T06).
+fn plan() -> Plan {
+    Plan::new(
+        ScopeContract::new(
+            Vec::new(),
+            vec!["**/secrets/**".to_string()],
+            Vec::new(),
+            "reverter",
+        ),
+        vec![Feature::new("F1", "fazer", FeatureStatus::Pending)],
+    )
 }
 
 impl Tool for Probe {
@@ -218,6 +232,7 @@ fn full_loop_verifies_and_messages_come_from_the_log() -> Result<(), Box<dyn std
         transition: Phase::KnowledgeConsulted,
         reason: "teste do loop completo".into(),
     })?;
+    session.apply(&Event::PlanRecorded { plan: plan() })?;
     for to in [
         Phase::KnowledgeConsulted,
         Phase::Planned,

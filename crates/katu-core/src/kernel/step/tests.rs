@@ -2,7 +2,21 @@ use super::step;
 use crate::error::ToolOutcome;
 use crate::kernel::event::{CallId, Event};
 use crate::kernel::state::{CallStatus, Refusal, RefusalReason, State};
+use crate::plan::{Feature, FeatureStatus, Plan, ScopeContract};
 use katu_policy::{Evidence, Phase, ResolvedPath, RuleId, ToolArgs, ToolName, ToolUse};
+
+/// Plano mínimo válido (E06-T06).
+fn plan() -> Plan {
+    Plan::new(
+        ScopeContract::new(
+            Vec::new(),
+            vec!["**/secrets/**".to_string()],
+            Vec::new(),
+            "reverter",
+        ),
+        vec![Feature::new("F1", "fazer", FeatureStatus::Pending)],
+    )
+}
 
 fn denied_outcome() -> ToolOutcome {
     let rule_id = RuleId::from("test");
@@ -63,6 +77,7 @@ fn happy_path_reaches_closed() -> Result<(), Box<dyn std::error::Error>> {
     state = step(&state, &Event::UserMessage { text: "oi".into() })?;
     state = complete(&state, "c0", read_tool()?)?;
     state = complete(&state, "c1", tool()?)?;
+    state = step(&state, &Event::PlanRecorded { plan: plan() })?;
     for to in [
         Phase::KnowledgeConsulted,
         Phase::Planned,
@@ -125,6 +140,48 @@ fn knowledge_consulted_requires_read_or_waiver() -> Result<(), Box<dyn std::erro
 }
 
 #[test]
+fn planned_requires_a_plan() -> Result<(), Box<dyn std::error::Error>> {
+    let waived = step(
+        &State::initial(),
+        &Event::Waiver {
+            transition: Phase::KnowledgeConsulted,
+            reason: "pulo a consulta no teste".into(),
+        },
+    )?;
+    let consulted = step(
+        &waived,
+        &Event::PhaseTransition {
+            to: Phase::KnowledgeConsulted,
+            outcome: None,
+        },
+    )?;
+    let refused = step(
+        &consulted,
+        &Event::PhaseTransition {
+            to: Phase::Planned,
+            outcome: None,
+        },
+    );
+    assert!(matches!(
+        refused,
+        Err(refusal) if matches!(
+            refusal.reason,
+            RefusalReason::UnmetPrecondition { to: Phase::Planned }
+        )
+    ));
+    let planned = step(&consulted, &Event::PlanRecorded { plan: plan() })?;
+    let allowed = step(
+        &planned,
+        &Event::PhaseTransition {
+            to: Phase::Planned,
+            outcome: None,
+        },
+    )?;
+    assert_eq!(allowed.phase, Phase::Planned);
+    Ok(())
+}
+
+#[test]
 fn closed_requires_outcome() -> Result<(), Box<dyn std::error::Error>> {
     let mut state = step(
         &State::initial(),
@@ -133,6 +190,7 @@ fn closed_requires_outcome() -> Result<(), Box<dyn std::error::Error>> {
             reason: "pulo a consulta no teste".into(),
         },
     )?;
+    state = step(&state, &Event::PlanRecorded { plan: plan() })?;
     for to in [
         Phase::KnowledgeConsulted,
         Phase::Planned,

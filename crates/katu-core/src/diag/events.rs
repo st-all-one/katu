@@ -33,6 +33,7 @@ catalog! {
     (FS_READ, "fs.read", "Leitura de um ficheiro."),
     (FS_WRITE, "fs.write", "Escrita atómica de um ficheiro."),
     (FS_RENAME, "fs.rename", "Movimento/renomeação atómica de um caminho."),
+    (FS_MKDIR, "fs.mkdir", "Criação de diretórios (idempotente)."),
     (FS_LIST, "fs.list", "Listagem de um diretório (ordem canónica)."),
     (FS_STAT, "fs.stat", "Metadados de um ficheiro (mtime)."),
 
@@ -65,6 +66,7 @@ catalog! {
     (TOOL_MOVE, "tool.move", "Movimento/renomeação via tool."),
     (TOOL_SEARCH, "tool.search", "Busca (ripgrep/índice)."),
     (TOOL_TRASH, "tool.trash", "Movimento para o lixo recuperável."),
+    (TOOL_PLAN, "tool.plan", "Validação/registo de um plano."),
     (CONTAIN_CHECK, "contain.check", "Verificação de contenção (traps suaves)."),
     (CONTAIN_DENY, "contain.deny", "Contenção negou a operação."),
 

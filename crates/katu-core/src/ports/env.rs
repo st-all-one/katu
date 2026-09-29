@@ -11,6 +11,9 @@ pub trait Env: Send + Sync {
 
     /// Argumentos do processo, sem o nome do programa.
     fn args(&self) -> Vec<String>;
+
+    /// Todas as variáveis de ambiente (para filtragem antes de executar).
+    fn vars(&self) -> Vec<(String, String)>;
 }
 
 /// Ambiente falso e determinístico.
@@ -49,6 +52,13 @@ impl Env for FakeEnv {
 
     fn args(&self) -> Vec<String> {
         self.args.clone()
+    }
+
+    fn vars(&self) -> Vec<(String, String)> {
+        self.vars
+            .iter()
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect()
     }
 }
 

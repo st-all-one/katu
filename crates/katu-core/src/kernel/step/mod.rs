@@ -4,6 +4,7 @@ use super::event::{CallId, Event};
 use super::state::{CallStatus, Refusal, RefusalReason, State, can_transition};
 use crate::diag::{Level, events};
 use crate::error::ToolOutcome;
+use crate::plan::Plan;
 use katu_policy::{Phase, ToolName, ToolUse};
 
 /// Aplica um evento ao estado, devolvendo o novo estado ou uma [`Refusal`].
@@ -24,6 +25,7 @@ pub fn step(state: &State, event: &Event) -> Result<State, Refusal> {
         Event::ToolResult { call, outcome } => tool_result(state, call, outcome),
         Event::PhaseTransition { to, outcome } => phase_transition(state, *to, outcome.as_deref()),
         Event::Waiver { transition, .. } => Ok(waiver(state, *transition)),
+        Event::PlanRecorded { plan } => Ok(plan_recorded(state, plan)),
         Event::TurnEnd { turn } => turn_end(state, *turn),
     }
 }
@@ -83,6 +85,13 @@ fn waiver(state: &State, transition: Phase) -> State {
     next
 }
 
+/// Regista/atualiza o plano do estado (E06-T06).
+fn plan_recorded(state: &State, plan: &Plan) -> State {
+    let mut next = state.clone();
+    next.plan = Some(plan.clone());
+    next
+}
+
 /// Muda de fase, validando a forma do caminho único e a pré-condição da fase destino.
 fn phase_transition(state: &State, to: Phase, outcome: Option<&str>) -> Result<State, Refusal> {
     if !can_transition(state.phase, to) {
@@ -112,6 +121,7 @@ fn satisfies_precondition(state: &State, to: Phase, outcome: Option<&str>) -> bo
             state.completed_tools.contains(&ToolName::Read)
                 || state.completed_tools.contains(&ToolName::MemoryRecall)
         }
+        Phase::Planned => state.plan.is_some(),
         Phase::Closed => outcome.is_some_and(|evidence| !evidence.trim().is_empty()),
         _ => true,
     }

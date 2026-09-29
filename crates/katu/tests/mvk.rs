@@ -9,6 +9,7 @@
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::{CallId, Event, MemoryWriteRequest, RefusalReason, Session, SessionError};
 use katu_core::memory::{FakeMemory, NoteRef, NoteType, PreWriteReq, Score};
+use katu_core::plan::{Feature, FeatureStatus, Plan, ScopeContract};
 use katu_core::ports::MemFs;
 use katu_policy::{
     BudgetState, Capability, Decision, Facts, Phase, ResolvedPath, RuleSet, ToolArgs, ToolName,
@@ -55,6 +56,19 @@ enum Recall {
 
 fn rules() -> TestResult<RuleSet> {
     Ok(RuleSet::from_toml(MEMORY_POLICY)?)
+}
+
+/// Plano mínimo válido (E06-T06).
+fn plan() -> Plan {
+    Plan::new(
+        ScopeContract::new(
+            Vec::new(),
+            vec!["**/secrets/**".to_string()],
+            Vec::new(),
+            "reverter",
+        ),
+        vec![Feature::new("F1", "fazer", FeatureStatus::Pending)],
+    )
 }
 
 fn request() -> PreWriteReq {
@@ -174,6 +188,7 @@ fn close_without_outcome_is_refused() -> TestResult<()> {
         transition: Phase::KnowledgeConsulted,
         reason: "sem consulta aplicável".into(),
     })?;
+    session.apply(&Event::PlanRecorded { plan: plan() })?;
     for to in [
         Phase::KnowledgeConsulted,
         Phase::Planned,

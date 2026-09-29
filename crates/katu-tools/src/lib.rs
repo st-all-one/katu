@@ -7,11 +7,14 @@
 #![forbid(unsafe_code)]
 
 pub mod edit;
+pub mod exec;
 pub mod lang;
 pub mod move_file;
 pub mod outline;
+pub mod plan;
 pub mod read;
 pub mod registry;
 pub mod search;
+pub mod trash;
 pub mod write;
 pub mod write_file;

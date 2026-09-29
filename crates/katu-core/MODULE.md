@@ -9,8 +9,9 @@ função, o log é a fonte da verdade.
 
 - `State`, `Event`, `Refusal`, pipeline de tool call, log append-only.
   - `kernel::state` — `State`, `CallStatus`, `Refusal`/`RefusalReason`, `next_phase`/`can_transition`,
-    `State::waivers` (exceções explícitas); `UnmetPrecondition` (E05-T02/T04).
-  - `kernel::event` — `Event`, `CallId`, `Event::kind`.
+    `State::waivers` (exceções explícitas) e `State::plan` (E06-T06); `UnmetPrecondition`
+    (E05-T02/T04).
+  - `kernel::event` — `Event`, `CallId`, `Event::kind` (`Waiver`, `PlanRecorded`).
   - `kernel::step` — `step(State, Event) -> Result<State, Refusal>` (puro) + pré-condições de fase.
   - `kernel::log` — `Log`/`LogRecord` append-only JSONL (`session.v1.jsonl`) sobre a porta `Fs`.
   - `kernel::project` — `derive_messages`, `state_of`, `snapshot` (projeções puras).
@@ -31,13 +32,16 @@ função, o log é a fonte da verdade.
   - `memory::error` — `MemoryError`/`MemoryErrorKind` (`retryable()` só em `Timeout`);
   - `memory::fake` — `FakeMemory` (cenários fixos, sem puxar `knudge-core`).
 - Modelo de erro [`error`](src/error.rs) (E01-T06) e ports determinísticos
-  [`ports`](src/ports/mod.rs) (`Clock`/`Rng`/`Fs`/`Env` + fakes; `Fs::write_atomic_if` = CAS
-  para `edit`, OA16).
+  [`ports`](src/ports/mod.rs) (`Clock`/`Rng`/`Fs`/`Env`/`Process` + fakes; `Fs::write_atomic_if` =
+  CAS para `edit`, OA16; `Process` = execução com timeout, E06-T04).
 - Diagnóstico transversal [`diag`](src/diag/mod.rs) (DF9/E19): log estruturado + métrica de tempo,
   custo zero por defeito; catálogo de eventos em [`diag::events`](src/diag/events.rs); sink
   agregador de percentis em `diag::aggregate` (E19-T02).
 - Evidência tipada [`evidence`](src/evidence.rs) (DF5/E09-T05): `Metric`/`EvidenceBasis`/
   `ArtifactRef`; um número sem artefacto não fundamenta decisão; a base não muda numa agregação.
+- Plano tipado [`plan`](src/plan.rs) (E06-T06): `Plan`/`ScopeContract`/`Feature`/`FeatureStatus`;
+  `validate` (schema + "≤ 1 `in_progress`") e `allows` (globs; proibido vence). O kernel exige um
+  plano registado para `Phase::Planned`.
 - Formato AI-first [`toon`](src/toon.rs) (DF12/E06-T12): emissor **TOON** canónico (zero deps) para a
   saída das tools ao modelo — sem `null`, vazios omitidos, ordem canónica; JSON é a alternativa.
 - Envelope [`report`](src/report.rs) (DF12/E06-T12): `ToolReport`/`Page`/`Cost`, ids

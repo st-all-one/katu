@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::error::ToolOutcome;
+use crate::plan::Plan;
 use katu_policy::{Phase, ToolUse};
 
 /// Identificador de um pedido de tool (correlaciona `ToolCall` ↔ `ToolResult`).
@@ -77,6 +78,11 @@ pub enum Event {
         /// Motivo legível (campo tipado, nunca interpolação).
         reason: String,
     },
+    /// Plano registado/atualizado (E06-T06). Evento de controlo (não vai ao modelo).
+    PlanRecorded {
+        /// Plano validado.
+        plan: Plan,
+    },
     /// Fim de um turno.
     TurnEnd {
         /// Número do turno.
@@ -96,6 +102,7 @@ impl Event {
             Self::ToolResult { .. } => "tool_result",
             Self::PhaseTransition { .. } => "phase_transition",
             Self::Waiver { .. } => "waiver",
+            Self::PlanRecorded { .. } => "plan_recorded",
             Self::TurnEnd { .. } => "turn_end",
         }
     }

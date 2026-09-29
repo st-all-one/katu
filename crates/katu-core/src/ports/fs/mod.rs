@@ -66,6 +66,9 @@ pub trait Fs: Send + Sync {
     /// destino antes, para nunca sobrescrever (fail-closed).
     fn rename(&self, from: &Path, to: &Path) -> Result<(), FsError>;
 
+    /// Cria um diretório e os seus pais (idempotente).
+    fn create_dir_all(&self, path: &Path) -> Result<(), FsError>;
+
     /// `true` se o caminho existe.
     fn exists(&self, path: &Path) -> bool;
 
@@ -200,6 +203,10 @@ impl Fs for MemFs {
         inner.clock_ms = next;
         entry.mtime = Timestamp::from_millis(next);
         inner.files.insert(to.to_path_buf(), entry);
+        Ok(())
+    }
+
+    fn create_dir_all(&self, _path: &Path) -> Result<(), FsError> {
         Ok(())
     }
 

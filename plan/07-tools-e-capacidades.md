@@ -108,10 +108,16 @@ verificação recusa `SUCCESS` com erros (§38).
 - **Estado (aceite):** round-trip `full` = bytes lidos testado; truncagem determinística testada;
   `Stale`/ambíguo/`dry-run` testados; falta a matriz multibyte de §45.22.
 
-### E06-T04 ☐ Execução (`bash`) com argv resolvido e capacidades
+### E06-T04 ☑ Execução (`bash`) com argv resolvido e capacidades
 - **Entregáveis:** execução que resolve `argv` e `cwd` **antes** da política; `Capability::Exec`;
   nenhuma decisão por regex sobre a string; o processo corre com o **uid/gid do utilizador que
   evocou o katu** (sem `sudo`/setuid; o sandbox só restringe, nunca amplia).
+- **Estado:** porta `Process` (`ExecRequest`/`ExecResult`/`ProcessError`, `MemProcess`) + `ExecTool`
+  (`tool.exec`). O `argv` vem de `ToolUse.argv` (fail-closed se ausente) e o `cwd` é fixado; o
+  ambiente é **filtrado** de segredos (`*KEY*`/`*SECRET*`/`*TOKEN*`/`*PASSWORD*`/…); outcomes
+  ortogonais (`exit`/`signal`/`timed_out`) com `stdout`/`stderr` truncados. `StdProcess` corre com o
+  utilizador que evocou o katu (sem elevação) e mata o filho no timeout; **kill do grupo** e scrub
+  de env mais amplo ficam em E07-T04 (exigem `nix`/`libc`; hoje `forbid(unsafe_code)`).
 - **Aceite:** `cd x && rm`, `bash -c`, `find -delete`, `r''m` são avaliados sobre factos; o golden
   de E02-T05 cobre estes casos; `Deny` = efeito não ocorre; o filho herda o utilizador e nenhum
   caminho eleva privilégio.
@@ -136,10 +142,15 @@ verificação recusa `SUCCESS` com erros (§38).
   escopo é negado; um repositório grande é pesquisado sem pico de memória; dois `grep` iguais dão
   bytes iguais (determinismo).
 
-### E06-T06 ☐ Planejamento (`plan`) como capacidade de primeira classe
+### E06-T06 ☑ Planejamento (`plan`) como capacidade de primeira classe
 - **Entregáveis:** artefacto de plano tipado (`scope_contract` + `feature_list`), com
   `allowed_files`/`forbidden_files` (globs), `acceptance_criteria`, `rollback_plan`; invariante
   "≤ 1 `in_progress`" verificada no startup; o agente transita `Task → Planned` ao criar/atualizar.
+- **Estado:** `katu_core::plan` (`Plan`/`ScopeContract`/`Feature`/`FeatureStatus`/`PlanError`) com
+  `validate` (schema + "≤ 1 `in_progress`") e `allows` (globs; proibido vence); `PlanTool`
+  (`tool.plan`) devolve `plan.validate` ou `Unavailable{control}` acionável (DF10). No kernel,
+  `Event::PlanRecorded { plan }` regista o plano no `State` e a pré-condição de `Phase::Planned`
+  exige-o (E04): `Task → Planned` sem plano é `Refusal`.
 - **Aceite:** plano sem `forbidden_files` ou sem rollback **não** é aceite; plano é validado por
   schema; `Task → Planned` sem plano é `Refusal` (E04).
 
@@ -156,12 +167,18 @@ verificação recusa `SUCCESS` com erros (§38).
 - **Aceite (gate):** nenhuma regra depende de ordem de listeners ou de filtro de prompt para ser
   imposta; a negação é observada no executor.
 
-### E06-T09 ☐ Lixeira do projeto (`trash` → `.katu/trash`)
+### E06-T09 ☑ Lixeira do projeto (`trash` → `.katu/trash`)
 - **Entregáveis:** `trash` **move** (não copia+apaga) para `.katu/trash`, preservando o caminho
   relativo e um índice com o original + timestamp do log; `restore` é **sempre** permitido; a
   lixeira é **por projeto**, fora do escopo de escrita normal; `Capability::Delete` cobre a
   operação; **nada** em `.katu/trash` é apagado automaticamente (sem TTL/auto-purge) e esvaziar a
   lixeira é `RequireApproval`/`NeedsHuman`.
+- **Estado:** `TrashTool` (`tool.trash`) **move** para `<root>/.katu/trash` (preserva o caminho
+  relativo; desambigua colisões com sufixo) e regista um índice append-only `index.tsv` (original +
+  timestamp); devolve `refs` (id) + `undo_token`. `restore` (função pública, **sempre permitido**,
+  sem política) repõe o original. Portas: `Fs::create_dir_all` (`fs.mkdir`) + `Fs::rename`
+  (`fs.rename`). `Capability::Delete` é imposta pela política (E02/E07). Nada é apagado
+  automaticamente; a lixeira fica sob `.katu`, que a varredura (`search`) ignora por omissão.
 - **Aceite:** `trash` de ficheiro sob escopo funciona e é reversível; `trash` fora do escopo é
   negado; nada em `.katu/trash` é servido ao modelo por omissão; nenhum processo apaga a lixeira
   sem aprovação humana; a política **não** trata `bash rm` como equivalente a `trash`, mas prefere

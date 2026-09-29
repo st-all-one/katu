@@ -11,6 +11,7 @@ pub mod error;
 pub mod evidence;
 pub mod kernel;
 pub mod memory;
+pub mod plan;
 pub mod ports;
 pub mod report;
 pub mod toon;

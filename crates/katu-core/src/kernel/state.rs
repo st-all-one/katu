@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::event::CallId;
 use crate::error::ToolOutcome;
+use crate::plan::Plan;
 use katu_policy::{BudgetState, Capability, Phase, ToolName, ToolUse};
 
 /// Estado de um pedido de tool (pendente ou concluído).
@@ -44,6 +45,9 @@ pub struct State {
     pub capabilities: Vec<Capability>,
     /// Consumo de orçamento dentro da tarefa (alimenta `Facts::budget`).
     pub budget: BudgetState,
+    /// Plano registado (E06-T06); exigido para transitar para [`Phase::Planned`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan: Option<Plan>,
 }
 
 impl State {
@@ -59,6 +63,7 @@ impl State {
             waivers: BTreeSet::new(),
             capabilities: Vec::new(),
             budget: BudgetState::default(),
+            plan: None,
         }
     }
 }

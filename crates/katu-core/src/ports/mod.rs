@@ -7,9 +7,11 @@
 pub mod clock;
 pub mod env;
 pub mod fs;
+pub mod process;
 pub mod rng;
 
 pub use clock::{Clock, FixedClock, Timestamp};
 pub use env::{Env, FakeEnv};
 pub use fs::{Fs, FsError, MemFs};
+pub use process::{ExecRequest, ExecResult, MemProcess, Process, ProcessError};
 pub use rng::{Rng, SeqRng};
