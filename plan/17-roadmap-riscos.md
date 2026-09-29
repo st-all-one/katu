@@ -41,7 +41,7 @@ E05 provar que a fiscalização da memória funciona e vale o esforço.
 |---|---|---|
 | 0 | `make check` verde em 1.97.0 | job `msrv` verde |
 | 1 | regras de memória **todas** `Enforced`; porta substituível | `policy/memory.toml` + E02-T07 + E03-T06 |
-| 2 | **MVK passa** (ou para) | E05-T07 checklist completa + relatório de atrito |
+| 2 | **MVK passa** (ou para) | E05-T07 checklist completa + relatório de atrito — **✅ assinado** ([ADR 0001](../docs/adr/0001-mvk-gate-aprovado.md)) |
 | 3 | negação pelo executor; sem passthrough silencioso | E06-T07 + E07-T03 |
 | 4 | nenhum número sem base; artefactos validados; token medido | E09-T05 + E15-T02 |
 | 5 | terminal panic-safe; evidência no ecrã | E10-T01/T04 |
@@ -80,6 +80,10 @@ O projeto **para ou pivota** se qualquer destes ocorrer:
 2. **K2 — Atrito maior que o benefício.** Se o relatório honesto de E05-T06 mostrar atrito
    inaceitável face a `pi + knudge-mcp` — inclusive nos casos em que o katu **não** ganha —
    **parar**. Não há vergonha em dizer que a tese não se paga (a honestidade do caveman §60).
+   **Estado:** resolvido por decisão do dono em 2026-09-29 — o atrito medido
+   (`memory.write` p50 ≈ 9,9 µs; caso negativo sem tocar a porta) é aceitável; a comparação
+   cross-tool foi **dispensada** e fica registada como `unpriced`
+   ([ADR 0001](../docs/adr/0001-mvk-gate-aprovado.md)).
 3. **K3 — Superfície incontível.** Se `xtask check-surface` exceder o teto em duas fases
    consecutivas sem que o valor cresça, **podar antes de continuar** (a lição do arags §20).
 4. **K4 — Firewall violada.** Se `katu-core`/`policy`/`tools` passarem a depender de um provider
@@ -101,10 +105,12 @@ O projeto **para ou pivota** se qualquer destes ocorrer:
 
 ## 6. Próximo passo imediato (a partir de agora)
 
-1. Criar o repositório de código **fora** deste repo de proposta (workspace `katu`), com
-   `rust-toolchain.toml` pinado a `1.97.0`.
-2. Executar **E01-T01…T03** (workspace, ports, gate de qualidade + job `msrv`).
-3. Executar **E02** (contrato de política) e **E03** (porta Memory) até ao gate de Fase 1.
-4. Só então **E04/E05** — e deixar o gate decidir o resto.
+> **Fases 0–2 concluídas; gate 2 assinado** ([ADR 0001](../docs/adr/0001-mvk-gate-aprovado.md)).
+> A Onda 4 arranca a seguir.
+
+1. ~~Criar o workspace, ports, gate de qualidade + job `msrv`.~~ **(E01 ☑)**
+2. ~~E02 (contrato de política) e E03 (porta `Memory`) até ao gate de Fase 1.~~ **(E02 ☑; E03 ◐)**
+3. ~~E04/E05 — deixar o gate decidir.~~ **(E04 ☑; E05 ☑ — passa)**
+4. **E06** (tools/capacidades) e **E07** (contenção soft) — Onda 4, desbloqueada pelo gate.
 
 **Regra de ouro do plano:** *medir primeiro, escalar depois.*

@@ -57,8 +57,11 @@ método de verificação imposto e nomeado; negativos visíveis.
 
 ### E09-T01 ☐ Montagem de contexto com orçamento
 - **Entregáveis:** `ContextBudget { raw_min, summary_max }`; `assemble(state, budget) -> Context`.
+- **Prime (DF12):** o contexto inclui um **prime compacto** que documenta o envelope das tools e a
+  gramática **TOON** (default compacto; `--long` para a spec completa) — o modelo é *ensinado* a
+  ler a saída; o prime é determinístico e versionado (`PRIME_VERSION`).
 - **Aceite:** nenhuma mensagem sem origem no log (`Model-visible ⟺ logged`); o orçamento é
-  respeitado; teste com limite exato e limite+1.
+  respeitado; teste com limite exato e limite+1; o prime aparece uma única vez e é estável.
 
 ### E09-T02 ☐ Checkpoint tipado
 - **Entregáveis:** tipo `Checkpoint`, schema, validador zero-dep, escrita atómica.
@@ -99,7 +102,7 @@ método de verificação imposto e nomeado; negativos visíveis.
 ---
 
 ### E09-T07 ☐ Compactação da conversa como controlo do core
-- **Objetivos:** tornar "compactar conversa" (core §1.1 #9) operação de primeira classe — via
+- **Objetivos:** tornar "compactar conversa" (core §1.1 #10) operação de primeira classe — via
   comando do utilizador e/ou gatilho do kernel no limite de fase/orçamento excedido — **nunca**
   inline no hot path.
 - **Entregáveis:** porta `katu-context` (`assemble`/`compact`) com **mapeamento determinístico
@@ -119,7 +122,7 @@ método de verificação imposto e nomeado; negativos visíveis.
 
 ## Não-objetivos
 
-- Compressão **inline no hot path**: a compactação é capacidade do core (§1.1 #9), mas é **porta**
+- Compressão **inline no hot path**: a compactação é capacidade do core (§1.1 #10), mas é **porta**
   (`katu-context`) acionada off hot path, com recuperação obrigatória (E15/incremental).
 - `durable execution` completo: começar com snapshot atómico; event log durável só quando a
   retomada multi-sessão for real (§34, tensões).

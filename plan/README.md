@@ -86,7 +86,7 @@ justifica (§53).
 | **1 — Contratos da tese** | E02 Motor de política (dados puros) | [`03-contrato-de-politica.md`](03-contrato-de-politica.md) | E01 | regras da memória expressáveis |
 | | E03 Porta `Memory` + adaptador in-process (knudge-core) | [`04-contrato-da-porta-memory.md`](04-contrato-da-porta-memory.md) | E01 | contrato + knudge in-process |
 | **2 — Núcleo vertical (MVK)** | E04 Kernel: loop possuído, estado, log | [`05-kernel-loop.md`](05-kernel-loop.md) | E02, E03 | replay determinístico |
-| | E05 **MVK: enforcement da memória** | [`06-mvk-enforcement-memoria.md`](06-mvk-enforcement-memoria.md) | E04 | **gate de decisão** (ver §5) |
+| | E05 **MVK: enforcement da memória** | [`06-mvk-enforcement-memoria.md`](06-mvk-enforcement-memoria.md) | E04 | **gate de decisão** — ✅ passa ([ADR 0001](../docs/adr/0001-mvk-gate-aprovado.md)) |
 | **3 — Capacidades** | E06 Tools, capacidades e `ToolOutcome` | [`07-tools-e-capacidades.md`](07-tools-e-capacidades.md) | E05 | negação pelo executor |
 | | E07 Contenção determinística (soft) e fail-closed | [`08-sandbox-fail-closed.md`](08-sandbox-fail-closed.md) | E05 | controlo em falta = recusa; honestidade soft |
 | **4 — Contexto e evidência** | E09 Contexto, checkpoint, evidência | [`10-contexto-checkpoint-evidencia.md`](10-contexto-checkpoint-evidencia.md) | E05 | artefactos validados |
@@ -151,6 +151,12 @@ existente. Isto é o inverso do erro do `maxima` (§49): provar primeiro, escala
 
 **Se o MVK passar**, as fases 3–7 são justificadas pela medida e cada uma mantém o seu próprio
 gate na tabela do §3.
+
+> **Decisão (2026-09-29): o MVK passou** ([ADR 0001](../docs/adr/0001-mvk-gate-aprovado.md)).
+> As regras do protocolo são todas `Enforced`; as negações são acionáveis e provadas pelo caminho
+> real com regressão vermelha; o atrito medido é aceitável. O loop possuído (DF1) vira compromisso.
+> A comparação cross-tool com `pi + knudge-mcp` foi **dispensada pelo dono** e permanece `unpriced`
+> (não inventada). As fases 3–7 arrancam; cada uma mantém o seu gate.
 
 ---
 

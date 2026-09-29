@@ -85,7 +85,7 @@ agente OpenCode v2. Todos os demais entram pelo **GDK/declarativo** (commodity) 
 |---|---|---|
 | Framework de plugins geral / contentor de DI | O `dsh` pagou-o com 316 pacotes e dois postmortems do próprio carregador | §42, §45, §66.4 |
 | WASM obrigatório no MVP | Custo real (enum de 10 versões × ~25 métodos, `wasi-sdk`); o **modelo** de capacidades entra já, o runtime pode esperar | §58–§59 |
-| Compressão **inline no hot path** | A compactação é capacidade do core (§1.1 #9), mas corre **off hot path**, como porta com recuperação | §61, §64 |
+| Compressão **inline no hot path** | A compactação é capacidade do core (§1.1 #10), mas corre **off hot path**, como porta com recuperação | §61, §64 |
 | Motor de memória dentro do katu | O knudge é o motor; fundir mata o agnosticismo | §11–§13 |
 | Servidor, multi-utilizador, daemon | O arags é a prova de que a plataforma maior que o agente é negativa líquida | §20 |
 | DSL de configuração / expressões avaliadas | Postmortem 0002 do `dsh` (`!!js`): risco de correção e segurança | §44–§45 |

@@ -283,6 +283,39 @@ E02/E05 atualizados.
 
 ---
 
+## DF12 — Ferramentas AI-first: envelope tipado + views; core otimizado por medição ✅
+
+**Enunciado.** A superfície de tools é **fechada** (§1.1), mas a sua **forma** é AI-first:
+
+1. Cada tool devolve um **envelope tipado único** (`ToolReport`: `kind`, `id`, `hash`, `data`,
+   `page`, `next`, `cost`) e as tools são **ortogonais** (`read`/`write`/`edit`/`move`/`trash`/
+   `bash`/`grep`/`find`/`ls`/`plan`) — nunca um `fs_op(mode=…)`. `ToolOutcome` continua o eixo de
+   **estado** (Ok/Partial/Denied/…); o envelope é o **payload**.
+2. `read` expõe **views** (`outline`/`summary`/`symbol`/`diff`/`full`); `grep`/`find` devolvem
+   **hits semânticos** (símbolo + tipo de linha + informação negativa), não `arquivo:linha:texto`.
+3. O formato **ao modelo** é um subconjunto **TOON** (canónico na emissão, sem `null`, vazios
+   omitidos, ordem canónica), precedido de um **prime compacto**; **JSON** é a alternativa de
+   máquina (`format=json` / `--json`).
+4. O **core** (índice, cache, syscalls) **só** se otimiza onde o profiler apontar (adoptar-ou-
+   reverter, E18); começa em `std::fs` + cache **L1** em memória por `path+fingerprint`.
+
+**Evidência a favor.** §18 ("só o delta chega ao modelo") e G6 já o exigem; o knudge prova o TOON
+como contrato de bytes (spec `TOON`, D74/D75/D166) e o custo de `cat`/`ls`/`grep` humanas (ruído
+em tokens, sem *affordance* de decisão) é observável.
+
+**Evidência contra.** TOON exige um **prime** (o modelo tem de ser ensinado); duplica a spec do
+knudge (não há crate partilhado — firewall); um envelope "rico" adiciona tokens **por chamada** —
+mitiga-se cortando **chamadas** (a métrica é tool calls/tarefa, não tokens/call).
+
+**Consequência.** `katu-core::toon` (emissor próprio, zero deps, golden) + `ToolReport` no contrato
+de tool; `move` entra na família de Escrita; o prime vive em E09 (contexto). Métricas por tool call
+em E15/E18-T10; índice/cache/syscalls gated por medição.
+
+**Teste que trava.** `E06-T01` (registry fechado), `E06-T03` (views + envelope), `E06-T05` (hits
+semânticos), `katu_core::toon` (golden/proptest), `E15` (tool calls/tarefa medidos).
+
+---
+
 ## Tabela de rastreabilidade rápida
 
 | Decisão | Épicos que a implementam | Teste canónico |
@@ -298,6 +331,7 @@ E02/E05 atualizados.
 | DF9 | E19, E15, E18 | `E19-T01`, `make instrument` |
 | DF10 | E02, E04, E05 | `E05-T05` |
 | DF11 | E02, E05 | `E02-T05`, `E05-T05` |
+| DF12 | E06, E09, E15, E18 | `E06-T03`, `E06-T05`, `toon::tests` |
 
 ---
 

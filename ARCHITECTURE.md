@@ -109,6 +109,13 @@ utilizador ─▶ katu (CLI/TUI) ─▶ katu-core (loop) ─▶ katu-policy.eval
 
 ## 7. Gates do repositório
 
-`make check` = `fmt` · `clippy -D warnings` · `test` · `layers` · `diag` · `docs` · `file-length`.
-Extras: `make instrument` (feature ligada), `make deny/audit/machete/typos/miri`. CI:
-`.github/workflows/` (`pr-fast`, `pr-msrv` em Rust 1.97.0, `ci`).
+`make check` = `fmt` · `clippy -D warnings` · `test` · `layers` · `diag` · `docs` · `policy` ·
+`bench` · `file-length`. Extras: `make instrument` (feature ligada), `make measure` (artefacto de
+medição do MVK), `make deny/audit/machete/typos/miri`. CI: `.github/workflows/` (`pr-fast`,
+`pr-msrv` em Rust 1.97.0, `ci`).
+
+- **Decisões:** [`docs/adr/`](docs/adr/README.md) (ADRs com `## Alternatives considered`,
+  verificadas por `xtask check-docs`); as fundacionais em
+  [`plan/01`](plan/01-decisoes-fundacionais.md). O gate do MVK foi assinado na
+  [ADR 0001](docs/adr/0001-mvk-gate-aprovado.md).
+- **Números:** nenhum valor publicado sem base e artefacto (`xtask gate:bench`, DF5).

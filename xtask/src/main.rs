@@ -19,6 +19,7 @@
 
 mod bench;
 mod diag;
+mod docs;
 mod ledger;
 mod policy;
 mod walk;
@@ -118,10 +119,13 @@ fn check_crate_coverage() -> Result<(), String> {
     }
 }
 
-/// Garante que todos os links relativos em `*.md` resolvem para um caminho existente.
+/// Garante que todos os links relativos em `*.md` resolvem para um caminho existente e que cada
+/// ADR tem `## Alternatives considered` (E14-T01).
 fn check_docs() -> Result<(), String> {
+    docs::check_adrs()?;
     let mut files: Vec<PathBuf> = DOC_ROOTS.iter().map(PathBuf::from).collect();
     collect_by_extension(Path::new("plan"), "md", &mut files)?;
+    collect_by_extension(Path::new("docs"), "md", &mut files)?;
     let mut violations: Vec<String> = Vec::new();
     for file in files {
         let source =

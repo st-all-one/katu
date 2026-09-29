@@ -59,7 +59,7 @@ Futuro (só após valor provado): E08 MCP · E11 plugins WASM · E17 jail de SO
 | **0** | Fundação + instrumentação | **E01** · E13(scaffold) · E14(scaffold) · E15-T01/T02 · E18-T01 · E16 | `make check` verde em 1.97.0 |
 | **1** | Contratos da tese | **E02** · E03 · (E18-T06 hook) | regras do knudge expressáveis; porta substituível |
 | **2** | Núcleo | **E04** (+E18-T05) · E13(replay) | replay determinístico |
-| **3** | **MVK** | **E05** | **GATE DE DECISÃO** (passa ou para) |
+| **3** | **MVK** | **E05** | **GATE DE DECISÃO — PASSA** ([ADR 0001](docs/adr/0001-mvk-gate-aprovado.md)) |
 | **4** | Capacidades | E06 · E07 · E18-T08 `✂` · E13/E14 | negação pelo executor; soft honesto |
 | **5** | Contexto + Providers | E09 (+E18-T02/T03/T09) · E12 (+E18-T04) · E18-T06/T07 · E15 | artefactos validados; firewall intacta |
 | **6** | UX | E10 | panic-safe + evidência no ecrã |
@@ -113,14 +113,19 @@ Futuro (só após valor provado): E08 MCP · E11 plugins WASM · E17 jail de SO
 ### Onda 3 — MVK (o gate que decide o projeto)
 
 - **E05** ([`06`](plan/06-mvk-enforcement-memoria.md)) — enforcement da memória sobre o kernel.
-- **GATE DE DECISÃO:** se o MVK **não** prova a tese (regras inexpressáveis, atrito > benefício),
-  **para-se** e reconsidera-se ([`17`](plan/17-roadmap-riscos.md) §5). Nada abaixo disto arranca
-  antes deste ponto.
+- **GATE DE DECISÃO: passa** ([ADR 0001](docs/adr/0001-mvk-gate-aprovado.md)) — a tese foi provada
+  pelo caminho real (regras `Enforced`, negações acionáveis, regressão vermelha) e o atrito é
+  aceitável (`memory.write` p50 ≈ 9,9 µs). O loop possuído (DF1) vira **compromisso**. A comparação
+  cross-tool com `pi + knudge-mcp` foi dispensada pelo dono e fica `unpriced` (não inventada).
+  A Onda 4 arranca.
 
 ### Onda 4 — Capacidades (paralelo)
 
-- **E06** ([`07`](plan/07-tools-e-capacidades.md)) — write/read/edit/trash/exec/search + planning;
-  `ToolOutcome`; `Capability`. Inclui `trash` (`.katu/trash`) e a tool `memory` (policy-gated).
+- **E06** ([`07`](plan/07-tools-e-capacidades.md)) — write/read/edit/move/trash/exec/search +
+  planning; `ToolOutcome`; `Capability`. **Forma AI-first (DF12):** envelope `ToolReport` +
+  **TOON** ao modelo (JSON alternativa), views de `read`, hits semânticos em `grep`/`find`; core
+  otimizado **por medição**. Inclui `move`, `trash` (`.katu/trash`) e a tool `memory`
+  (policy-gated).
 - **E07** ([`08`](plan/08-sandbox-fail-closed.md)) — contenção **soft** determinística; controlo em
   falta = recusa; honestidade soft ≠ segurança (jail é E17/futuro).
 - **E18-T08** `✂` ([`19`](plan/19-otimizacao-profunda.md)) — PERT/CPM sobre o DAG do plano (com E06).
@@ -160,7 +165,7 @@ Futuro (só após valor provado): E08 MCP · E11 plugins WASM · E17 jail de SO
 |---|---|---|
 | 0 | `make check` verde em 1.97.0 | job `msrv` |
 | 1 | regras de memória todas expressáveis; porta substituível | `policy/memory.toml` + E02-T07 + E03-T06 |
-| 2 | **MVK passa** (ou para) | E05-T07 + relatório de atrito |
+| 2 | **MVK passa** (ou para) | E05-T07 + relatório de atrito — **✅** [ADR 0001](docs/adr/0001-mvk-gate-aprovado.md) |
 | 3 | negação pelo executor; soft honesto | E06-T07 + E07-T03 |
 | 4 | artefactos validados; token medido | E09-T05 + E15-T02 |
 | 5 | firewall LLM-free intacta | `xtask check-layers` |

@@ -155,7 +155,7 @@ Quatro dialetos a normalizar no adaptador (mapeados pelo `@ai-sdk/*` de referên
   feature remove o crate do grafo; Miri/geiger verdes (E13-T04).
 
 ### E12-T10 ☐ Controlo de modelo e grau de pensamento
-- **Objetivos:** cumprir o core §1.1 #10 — alterar **modelo** e **grau de pensamento**
+- **Objetivos:** cumprir o core §1.1 #11 — alterar **modelo** e **grau de pensamento**
   (reasoning/thinking) em runtime, sem reiniciar a sessão.
 - **Entregáveis:** `Control::{SetModel, SetThinking}` no kernel; mapeamento por dialeto
   (`reasoning.effort` no OpenAI Responses, `thinking.budget_tokens` no Anthropic, `thinking_config`
@@ -182,4 +182,4 @@ Quatro dialetos a normalizar no adaptador (mapeados pelo `@ai-sdk/*` de referên
 - **Usar a HttpApi v2 do OpenCode como substrato do loop/sessão/política** (ver princípio 7 e seam acima).
 - Retomar o `pi-rs` (portar o commodity inteiro): **não** — é o oposto da regra commodity §2.
 - **Auto-escala de modelo pelo agente** (escolher um modelo/grau de pensamento mais caro sozinho):
-  viola o core §1.1 #10 — a troca é do utilizador (E12-T10).
+  viola o core §1.1 #11 — a troca é do utilizador (E12-T10).

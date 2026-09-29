@@ -14,7 +14,7 @@
 
 | Família | Ferramentas | Nota |
 |---|---|---|
-| **Escrita** | `write`, `edit`, `trash` | altera ficheiros sob escopo, sempre sujeita à política; `trash` move para `.katu/trash` (recuperável) |
+| **Escrita** | `write`, `edit`, `move`, `trash` | altera ficheiros sob escopo, sempre sujeita à política; `move` é atómico e invalida índice/cache; `trash` move para `.katu/trash` (recuperável) |
 | **Leitura** | `read` | fonte de verdade para a fase `KnowledgeConsulted` |
 | **Execução** | `bash` | `argv` resolvido + `Capability::Exec`; corre **como o utilizador que evocou o processo** (nunca eleva); a única superfície de execução |
 | **Pesquisa de ficheiros** | `grep`, `find`, `ls` | otimizada: respeita ignore, varredura em streaming, só o delta; output canónico e truncado |
@@ -23,8 +23,14 @@
 **Nada além disso entra agora.** `git`, LSP, browser, imagem, etc. são **`deferred`** com razão
 registada e auditável por `xtask check-surface` (filtro de [`00b`](00b-objetivos.md) §4).
 
+> **Forma AI-first (DF12).** Cada tool devolve um **envelope tipado** (`ToolReport`:
+> `kind`/`id`/`hash`/`data`/`page`/`next`/`cost`), renderizado em **TOON** ao modelo (JSON como
+> alternativa de máquina); `read` expõe **views** (`outline`/`summary`/`symbol`/`diff`/`full`) e
+> `grep`/`find` devolvem **hits semânticos**. O core (índice/cache/syscalls) otimiza-se **por
+> medição** (adoptar-ou-reverter, E18); começa em `std::fs` + cache L1 por `path+fingerprint`.
+
 > **Controlos do kernel.** Compactar a conversa (E09-T07) e alterar modelo/grau de pensamento
-> (E12-T10) são capacidades do [core](00b-objetivos.md) §1.1 #9/#10 — **não** acrescentam tools.
+> (E12-T10) são capacidades do [core](00b-objetivos.md) §1.1 #10/#11 — **não** acrescentam tools.
 > Registrar memória (#7) é **primariamente** pelos hooks/fases, com a tool `memory` (E06-T10) como
 > **pedido explícito policy-gated** no grupo de controlo — nunca uma família de codificação nova.
 
@@ -61,8 +67,9 @@ verificação recusa `SUCCESS` com erros (§38).
 ## Tarefas
 
 ### E06-T01 ☐ Registry de tools fechado
-- **Entregáveis:** registo tipado, namespace estável e ordem canônica; lista exata das cinco
-  famílias.
+- **Entregáveis:** registo tipado, namespace estável e ordem canônica; lista exata das famílias de
+  §1.1 (Escrita `write`/`edit`/`move`/`trash`; Leitura `read`; Execução `bash`; Pesquisa
+  `grep`/`find`/`ls`; Planeamento `plan`).
 - **Aceite:** qualquer tool fora do conjunto mínimo exige uma decisão registada (filtro `00b` §4);
   `xtask check-surface` falha ao exceder o teto; nenhum registo sem teste de teardown (§44).
 
@@ -78,12 +85,17 @@ verificação recusa `SUCCESS` com erros (§38).
 ### E06-T03 ☐ Escrita e leitura (`write`, `read`, `edit`)
 - **Entregáveis:** argumentos tipados, paths resolvidos, output determinístico; truncagem
   **determinística**; deltas (só o que mudou) como regra de contexto (§18).
+- **Views e envelope (DF12):** `read` aceita `view=outline|summary|symbol|diff|full` (default
+  `summary`), devolvendo o **envelope** com `id`/`hash`/`loc`/`truncated`/`next`; `symbol` devolve
+  só o range. A estrutura sai de uma **heurística leve** (Rust-first); tree-sitter fica gated por
+  medição. `write` é para ficheiros **novos**; existentes passam por `edit`.
 - **`edit` otimista (OA16):** `read` → aplicar patch → `Fs::write_atomic_if(path, novo, lido)`;
   `FsError::Stale` (o ficheiro mudou desde a leitura) mapeia para `ToolOutcome` **recuperável**
-  ("relê e reaplica"), **nunca** sobrescreve edição concorrente.
+  ("relê e reaplica"), **nunca** sobrescreve edição concorrente; `dry-run` mostra o patch antes de
+  aplicar.
 - **Aceite:** propriedade: output canónico (ordenação estável, sem `HashMap`); teste de truncagem
   em limites minúsculos, exatos, chunks únicos enormes e multibyte (§45.22); teste de `Stale`
-  (edição externa entre a leitura e a escrita não é perdida).
+  (edição externa entre a leitura e a escrita não é perdida); round-trip `view=full` = bytes lidos.
 
 ### E06-T04 ☐ Execução (`bash`) com argv resolvido e capacidades
 - **Entregáveis:** execução que resolve `argv` e `cwd` **antes** da política; `Capability::Exec`;
@@ -98,8 +110,13 @@ verificação recusa `SUCCESS` com erros (§38).
   `.gitignore`/ignore configurável, varredura em streaming (sem carregar o ficheiro inteiro) e
   paralela quando possível; resultado como **ponteiro** quando grande (só o delta chega ao modelo,
   §18).
+- **Saída AI-first (DF12):** motor `grep` (crate do ripgrep); hits **clusterizados por símbolo**
+  (`s_*`) com tipo de linha (código/comentário/string/import/teste), `path:line:preview`,
+  **informação negativa** ("0 outros callers"), relevância e `next`. `find` ranqueia por relevância
+  à tarefa; `ls` devolve **mapa semântico** (linguagem, loc, exports, testes) — nunca `ls -la`.
 - **Aceite:** output ordenado estavelmente; limite de resultados aplicado; teste com path fora do
-  escopo é negado; um repositório grande é pesquisado sem pico de memória.
+  escopo é negado; um repositório grande é pesquisado sem pico de memória; dois `grep` iguais dão
+  bytes iguais (determinismo).
 
 ### E06-T06 ☐ Planejamento (`plan`) como capacidade de primeira classe
 - **Entregáveis:** artefacto de plano tipado (`scope_contract` + `feature_list`), com
@@ -130,7 +147,7 @@ verificação recusa `SUCCESS` com erros (§38).
 - **Aceite:** `trash` de ficheiro sob escopo funciona e é reversível; `trash` fora do escopo é
   negado; nada em `.katu/trash` é servido ao modelo por omissão; nenhum processo apaga a lixeira
   sem aprovação humana; a política **não** trata `bash rm` como equivalente a `trash`, mas prefere
-  `trash` quando a regra o exigir.
+  `trash` quando a regra o exigir; `refs` antes de apagar e `undo_token` no retorno (DF12).
 
 ### E06-T10 ☐ Tool `memory` (pedido explícito, policy-gated, secundária)
 - **Objetivos:** o modelo pode **solicitar explicitamente** gravar memória, mas os hooks/fases do
@@ -145,6 +162,20 @@ verificação recusa `SUCCESS` com erros (§38).
 
 ---
 
+### E06-T11 ☐ Mover/renomear (`move`, atómico)
+- **Entregáveis:** `move` atómico (`rename`) sob escopo, sujeito à política; invalida o índice/cache
+  do caminho antigo e do novo; devolve o novo `id`/`hash`; em lote, atualiza referências uma vez.
+- **Aceite:** `move` de ficheiro sob escopo funciona e é reversível; `move` fora do escopo é negado;
+  nenhuma referência fica pendurada (a busca após o `move` encontra o caminho novo); o índice não
+  serve o caminho antigo.
+
+### E06-T12 ☐ Formato AI-first (envelope + TOON + JSON)
+- **Entregáveis:** `ToolReport` tipado; emissor **TOON** próprio em `katu-core::toon` (canónico,
+  sem `null`, vazios omitidos, ordem canónica, zero deps); `format=json`/`--json` como alternativa;
+  `cost` (bytes/tokens estimados/ms) com base DF5; IDs content-addressed estáveis.
+- **Aceite:** golden + proptest do emissor (determinismo byte-a-byte); o mesmo `ToolReport` em TOON
+  e JSON reconstrói a mesma informação; nenhum campo vazio/`null` é emitido; o JSON é válido.
+
 ## Deferred (não-mínimo, registado)
 
 | Ferramenta | Por que fica fora agora | Condição de retomada |
@@ -158,7 +189,8 @@ verificação recusa `SUCCESS` com erros (§38).
 ## Definition of Done
 
 - [ ] E06-T01…T10 concluídas.
-- [ ] Superfície = exatamente as cinco famílias (com `trash` na família de **Escrita**); `deferred` auditável.
+- [ ] Superfície = exatamente as famílias de §1.1 (com `move`/`trash` na família de **Escrita**);
+  `deferred` auditável.
 - [ ] `Partial` tratado em todos os consumidores; "nunca Ok com erros" testado.
 - [ ] Tool-schema linter no CI; `cargo xtask check` e job `msrv` verdes.
 

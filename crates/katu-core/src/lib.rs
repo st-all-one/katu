@@ -12,6 +12,7 @@ pub mod evidence;
 pub mod kernel;
 pub mod memory;
 pub mod ports;
+pub mod toon;
 
 /// Versão do vocabulário de política que o kernel respeita (E02).
 pub use katu_policy::POLICY_VOCAB_VERSION;

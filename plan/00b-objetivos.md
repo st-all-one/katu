@@ -23,20 +23,22 @@ Este é o conjunto **completo** do MVP. Nada além disto entra sem passar o filt
 
 | # | Capacidade | Forma | Onde |
 |---|---|---|---|
-| 1 | **Ler** ficheiros | tool `read` | E06-T03 |
-| 2 | **Escrever** ficheiros | tool `write` | E06-T03 |
-| 3 | **Editar** ficheiros | tool `edit` | E06-T03 |
-| 4 | **Mover para a lixeira** do projeto | tool `trash` → `.katu/trash` (recuperável) | E06-T09 |
-| 5 | **Executar** comandos | tool `bash`, **com as permissões do utilizador que evocou o processo** (nunca eleva) | E06-T04, E07 |
-| 6 | **Pesquisar** ficheiros otimizadamente | tools `grep`/`find`/`ls` (respeitam ignore, streaming, só o delta) | E06-T05 |
-| 7 | **Registrar memória** (knudge) | hooks/fases (**prioritários**) + tool `memory` policy-gated (pedido explícito) | E03, E05, E06-T10 |
-| 8 | **Planejar** | tool `plan` (artefacto de fase) | E06-T06 |
-| 9 | **Compactar a conversa** | comando/porta `katu-context` (off hot path, com recuperação) | E09-T07 |
-| 10 | **Alterar modelo e grau de pensamento** | controlo de runtime (`set_model` / `set_thinking`) | E12-T10 |
+| 1 | **Ler** ficheiros | tool `read` (views `outline`/`summary`/`symbol`/`diff`/`full`) | E06-T03 |
+| 2 | **Escrever** ficheiros | tool `write` (ficheiros novos; existentes via `edit`) | E06-T03 |
+| 3 | **Editar** ficheiros | tool `edit` (patch `old`→`new`, `dry-run`, hash) | E06-T03 |
+| 4 | **Mover/renomear** ficheiros | tool `move` (atómico; invalida índice/cache) | E06-T11 |
+| 5 | **Mover para a lixeira** do projeto | tool `trash` → `.katu/trash` (recuperável) | E06-T09 |
+| 6 | **Executar** comandos | tool `bash`, **com as permissões do utilizador que evocou o processo** (nunca eleva) | E06-T04, E07 |
+| 7 | **Pesquisar** ficheiros otimizadamente | tools `grep`/`find`/`ls` (respeitam ignore, streaming, só o delta) | E06-T05 |
+| 8 | **Registrar memória** (knudge) | hooks/fases (**prioritários**) + tool `memory` policy-gated (pedido explícito) | E03, E05, E06-T10 |
+| 9 | **Planejar** | tool `plan` (artefacto de fase) | E06-T06 |
+| 10 | **Compactar a conversa** | comando/porta `katu-context` (off hot path, com recuperação) | E09-T07 |
+| 11 | **Alterar modelo e grau de pensamento** | controlo de runtime (`set_model` / `set_thinking`) | E12-T10 |
 
-**Distinção:** 1–6 e 8 são **tools** do modelo (superfície fechada, E06). 7, 9 e 10 são
-**capacidades do kernel** (portas/controlos) — o modelo **não** ganha superfície nova por causa
-delas (a tool `memory` de #7 é a exceção, policy-gated e secundária aos hooks/fases).
+**Distinção:** 1–7 e 9 são **tools** do modelo (superfície fechada, E06), com **envelope tipado** e
+formato **TOON** ao modelo (JSON como alternativa) — DF12. 8, 10 e 11 são **capacidades do kernel**
+(portas/controlos) — o modelo **não** ganha superfície nova por causa delas (a tool `memory` de #8
+é a exceção, policy-gated e secundária aos hooks/fases).
 
 **Fronteira de execução (MVP).** **Não há jail de SO ativo**: o katu é **global de facto** e corre
 como o utilizador que o evocou. A limitação vem das **travas determinísticas** (caminhos
@@ -55,7 +57,7 @@ silenciosos; saltar uma fase é uma decisão declarada e registada.
 |---|---|---|
 | **G1** | **Kernel mínimo.** Núcleo pequeno, puro e possuído — a política é o kernel, não um acessório. | `xtask check-surface`; ficheiros ≤ 300 linhas; núcleo sem dependências de provider |
 | **G2** | **Foco em código.** Tudo serve o fluxo de editar, executar e verificar código. Sem features laterais. | Toda capacidade nova passa o filtro do §4 |
-| **G3** | **Conjunto mínimo de capacidades:** o **core** do §1.1 — ler/escrever/editar/lixeira, executar, pesquisar, memória, planejar, compactar, modelo/pensamento. Nada mais. | A superfície de **tools** são as famílias fechadas do §1.1; memória/compaction/modelo são **controlos do kernel**; extras são `deferred` explícitos |
+| **G3** | **Conjunto mínimo de capacidades:** o **core** do §1.1 — ler/escrever/editar/mover/lixeira, executar, pesquisar, memória, planejar, compactar, modelo/pensamento. Nada mais. | A superfície de **tools** são as famílias fechadas do §1.1; memória/compaction/modelo são **controlos do kernel**; extras são `deferred` explícitos |
 | **G4** | **knudge integrado como memória.** O knudge **não** é plugin opcional: é a memória do agente, in-process. | E03 (porta + adaptador in-process); `Memory` nunca desligada em produção |
 | **G5** | **Guardrails determinísticos e estritos.** Regras avaliadas sobre factos, com bloqueio duro e evidência. | E02/E05; nenhuma regra `Enforced` sem teste pelo caminho real |
 | **G6** | **Otimizado para tokens.** Só o delta chega ao modelo; orçamento de contexto; medir o custo por turno. | E09 (orçamento) + E15 (medição); `Metric` com base tipada. No caminho built-in (`opencode go/zen`), latência precede compressão (E12) |
@@ -75,7 +77,7 @@ silenciosos; saltar uma fase é uma decisão declarada e registada.
 | Web, desktop, Electron, mobile, voz, imagem, browser | Fora do fluxo de codificação no terminal (G2/G7). |
 | Plugins/WASM | O **modelo** de capacidades já entra na política (E02); o plugin host/ABI é **futuro**, fora do plano principal (E11, [`12`](12-plugins-e-abi.md)). |
 | Reimplementar providers, OAuth, gateways de plataforma | Os built-in são só o gateway `opencode go/zen` e o `llama.cpp` local; os demais vêm do **GDK/declarativo** ou são **ativamente ignorados** (§13). |
-| Compressão **inline no hot path** | A compactação é um controlo do core (§1.1 #9), mas corre **off hot path**, como porta com recuperação obrigatória (§61). |
+| Compressão **inline no hot path** | A compactação é um controlo do core (§1.1 #10), mas corre **off hot path**, como porta com recuperação obrigatória (§61). |
 | Jail de SO real no MVP | É feature **futura** (E17), pós-MVP; no MVP a contenção é **soft** e declarada (E07). |
 | Servir de "mais um agente de codificação" genérico | Sem o knudge integrado, o katu não se justifica (§53). |
 

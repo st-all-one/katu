@@ -24,9 +24,12 @@ via PR, o revisor decide. **"Trampas a evitar, não mapas a seguir."**
 
 ## Tarefas
 
-### E14-T01 ☐ ADRs com alternativas obrigatórias
+### E14-T01 ☑ ADRs com alternativas obrigatórias
 - **Entregáveis:** `docs/adr/`; template exige `## Alternatives considered` (uma decisão sem o que
   venceu convida a re-litigar, §44).
+- **Estado:** `docs/adr/README.md` (convenções + template) e a primeira ADR
+  (`0001-mvk-gate-aprovado.md`). `xtask check-docs` valida a secção obrigatória em todas as ADRs e
+  verifica os links de `docs/` (vermelho demonstrado: ADR sem a secção falha o check).
 - **Aceite:** `xtask check-docs` falha se uma ADR não tiver a secção; nenhuma ADR é editada para
   outra decisão — substitui-se com uma nova e mantém-se ligada.
 
@@ -72,7 +75,7 @@ via PR, o revisor decide. **"Trampas a evitar, não mapas a seguir."**
 ## Definition of Done (permanente)
 
 - [ ] `xtask check-docs`, `check-surface` verdes.
-- [ ] ADRs/postmortems com as secções obrigatórias.
+- [x] ADRs/postmortems com as secções obrigatórias.
 - [ ] `AGENTS.md` router ≤ 50 linhas e links válidos.
 - [ ] job `msrv` verde em Rust 1.97.0.
 
