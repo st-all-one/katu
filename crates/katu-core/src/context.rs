@@ -12,6 +12,13 @@ use crate::error::ToolOutcome;
 use crate::kernel::{Event, Message, derive_messages};
 use katu_policy::ToolUse;
 
+mod compact;
+
+pub use compact::{
+    COMPACTION_SCHEMA_VERSION, Compaction, CompactionMode, Replacement, compact, message_id,
+    recover,
+};
+
 /// Versão do prime (DF12). Mudar o texto do prime exige incrementar isto.
 pub const PRIME_VERSION: u32 = 1;
 
@@ -29,7 +36,7 @@ pub struct ContextBudget {
 pub struct Context {
     /// Prime compacto, determinístico e versionado (aparece **uma** vez).
     pub prime: String,
-    /// Resumo do histórico antigo (`None` até E09-T07).
+    /// Resumo do histórico antigo (preenchido pela compactação de E09-T07; `None` sem compactar).
     pub summary: Option<String>,
     /// Mensagens cruas que cabem no orçamento (ordem do log).
     pub messages: Vec<Message>,
@@ -39,9 +46,15 @@ pub struct Context {
     pub tokens: usize,
 }
 
-/// Monta o contexto a partir do log, respeitando o orçamento.
+/// Monta o contexto a partir do log, respeitando o orçamento (prime compacto).
 #[must_use]
 pub fn assemble(events: &[Event], budget: ContextBudget) -> Context {
+    assemble_with_prime(events, budget, PrimeMode::Compact)
+}
+
+/// Monta o contexto no modo de prime pedido (`--long` usa a spec completa — E09-T01).
+#[must_use]
+pub fn assemble_with_prime(events: &[Event], budget: ContextBudget, mode: PrimeMode) -> Context {
     let _span = crate::span!(
         Level::Debug,
         events::CONTEXT_BUILD,
@@ -51,7 +64,7 @@ pub fn assemble(events: &[Event], budget: ContextBudget) -> Context {
     let all = derive_messages(events);
     let messages = fit_raw(&all, budget.raw_min);
     let raw_tokens = messages.iter().map(message_weight).sum();
-    let prime = prime();
+    let prime = prime_for(mode);
     let tokens = tokens_from_bytes(prime.len()).saturating_add(raw_tokens);
     Context {
         prime,
@@ -60,6 +73,23 @@ pub fn assemble(events: &[Event], budget: ContextBudget) -> Context {
         raw_tokens,
         tokens,
     }
+}
+
+/// Gatilho do kernel (E09-T07): há prefixo fora do orçamento a compactar?
+#[must_use]
+pub fn needs_compaction(events: &[Event], budget: ContextBudget) -> bool {
+    let all = derive_messages(events);
+    fit_raw(&all, budget.raw_min).len() < all.len()
+}
+
+/// Variante do prime (E09-T01): compacto (default) ou completo (`--long`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PrimeMode {
+    /// Prime compacto (default).
+    #[default]
+    Compact,
+    /// Prime completo (spec TOON) — `--long`.
+    Long,
 }
 
 /// Prime compacto (DF12): ensina o envelope das tools e a gramática TOON. Estável por versão.
@@ -71,6 +101,28 @@ pub fn prime() -> String {
          saida: TOON (chave: valor; listas com '-'; blocos com '|'); JSON com format=json\n\
          cada resultado traz kind/id/hash; so o delta chega ao modelo\n"
     )
+}
+
+/// Prime completo (spec TOON) — `--long` (E09-T01). Determinístico e versionado.
+#[must_use]
+pub fn prime_long() -> String {
+    format!(
+        "katu prime v{PRIME_VERSION} (long)\n\
+         tools: read/write/edit/move/trash/bash/grep/find/ls/plan/memory\n\
+         saida: TOON — `chave: valor` por linha; listas com `- item`; blocos de texto com `|`;\n\
+         strings entre aspas quando contêm `:`/`#`; inteiros e booleanos sem aspas.\n\
+         JSON equivalente com `format=json`/`--json`.\n\
+         cada resultado traz kind/id/hash/page; so o delta chega ao modelo; o original fica no log.\n"
+    )
+}
+
+/// Prime no modo pedido.
+#[must_use]
+pub fn prime_for(mode: PrimeMode) -> String {
+    match mode {
+        PrimeMode::Compact => prime(),
+        PrimeMode::Long => prime_long(),
+    }
 }
 
 /// Mantém o **sufixo mais recente** cujo peso cabe em `raw_min`.
@@ -131,84 +183,4 @@ fn tokens_from_bytes(bytes: usize) -> usize {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{ContextBudget, PRIME_VERSION, assemble, prime};
-    use crate::kernel::{Event, derive_messages};
-
-    fn budget(raw_min: usize) -> ContextBudget {
-        ContextBudget {
-            raw_min,
-            summary_max: 0,
-        }
-    }
-
-    fn conversation() -> Vec<Event> {
-        vec![
-            Event::UserMessage {
-                text: "primeiro pedido".into(),
-            },
-            Event::AssistantMessage {
-                text: "primeira resposta".into(),
-            },
-            Event::UserMessage {
-                text: "segundo pedido".into(),
-            },
-        ]
-    }
-
-    #[test]
-    fn prime_is_stable_and_versioned() {
-        assert_eq!(prime(), prime(), "o prime é determinístico");
-        assert!(prime().contains(&format!("v{PRIME_VERSION}")));
-        assert!(prime().contains("TOON"));
-    }
-
-    #[test]
-    fn prime_appears_once_in_the_context() {
-        let context = assemble(&conversation(), budget(1_000));
-        assert_eq!(context.prime, prime());
-        assert!(!context.prime.is_empty());
-    }
-
-    #[test]
-    fn every_message_comes_from_the_log() {
-        let events = conversation();
-        let context = assemble(&events, budget(1_000));
-        assert_eq!(context.messages, derive_messages(&events));
-    }
-
-    #[test]
-    fn budget_is_respected_and_keeps_the_latest() {
-        let events = conversation();
-        let full = assemble(&events, budget(1_000));
-        assert_eq!(full.messages.len(), 3);
-        assert!(full.raw_tokens <= 1_000);
-        let tight = assemble(&events, budget(4));
-        assert_eq!(tight.messages.len(), 1, "só a mensagem mais recente cabe");
-        assert_eq!(
-            tight.messages,
-            derive_messages(&events)
-                .get(2..)
-                .unwrap_or_default()
-                .to_vec()
-        );
-    }
-
-    #[test]
-    fn exact_limit_keeps_and_limit_minus_one_drops() {
-        let events = vec![Event::UserMessage {
-            text: "12345678".into(),
-        }];
-        let weight = 2; // 8 bytes / 4
-        assert_eq!(assemble(&events, budget(weight)).messages.len(), 1);
-        assert_eq!(assemble(&events, budget(weight - 1)).messages.len(), 0);
-    }
-
-    #[test]
-    fn zero_budget_keeps_no_message() {
-        let context = assemble(&conversation(), budget(0));
-        assert!(context.messages.is_empty());
-        assert_eq!(context.raw_tokens, 0);
-        assert!(context.tokens > 0, "o prime continua presente");
-    }
-}
+mod tests;

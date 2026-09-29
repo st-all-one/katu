@@ -55,7 +55,7 @@ método de verificação imposto e nomeado; negativos visíveis.
 
 ## Tarefas
 
-### E09-T01 ◐ Montagem de contexto com orçamento
+### E09-T01 ☑ Montagem de contexto com orçamento
 - **Entregáveis:** `ContextBudget { raw_min, summary_max }`; `assemble(state, budget) -> Context`.
 - **Prime (DF12):** o contexto inclui um **prime compacto** que documenta o envelope das tools e a
   gramática **TOON** (default compacto; `--long` para a spec completa) — o modelo é *ensinado* a
@@ -64,8 +64,8 @@ método de verificação imposto e nomeado; negativos visíveis.
   (a assinatura usa os **eventos**, não `State`, porque o invariante é `Model-visible ⟺ logged`) e
   `prime()` (`PRIME_VERSION = 1`). A montagem é pura: projeta com `derive_messages` e mantém o
   **sufixo mais recente** que cabe em `raw_min`; a contagem de tokens é estimativa determinística
-  (`bytes/4`, base `inferred`). Emite o span `context.build`. **Falta:** o resumo/compactação
-  (`summary` fica `None` até E09-T07) e a variante `--long` do prime.
+  (`bytes/4`, base `inferred`). Emite o span `context.build`. O `summary` é preenchido pela
+  compactação (E09-T07) e o prime tem variante `--long` (`PrimeMode::Long`/`assemble_with_prime`).
 - **Aceite:** nenhuma mensagem sem origem no log (`Model-visible ⟺ logged`); o orçamento é
   respeitado; teste com limite exato e limite+1; o prime aparece uma única vez e é estável.
 
@@ -125,7 +125,7 @@ método de verificação imposto e nomeado; negativos visíveis.
 - **Aceite:** build falha se um valor publicado não tiver base; a linha negativa do benchmark
   permanece.
 
-### E09-T06 ◐ Cost governor
+### E09-T06 ☑ Cost governor
 - **Entregáveis:** camadas (`max_tokens`, orçamento por task, cap por ferramenta, `max_turns`,
   janelas rolantes, velocidade financeira, kill switch com re-enable separado).
 - **Estado:** `katu_core::kernel::cost` implementa `CostGovernor` com as camadas avaliadas por
@@ -135,15 +135,17 @@ método de verificação imposto e nomeado; negativos visíveis.
   `CostCharge` traz `now_millis` (as camadas temporais só correm com relógio). O kill switch
   (`trip`) só reabre com `Reenable` (motivo + autor não vazios — o agente não assina).
   `from_events` reconstrói o uso global e por ferramenta; a recusa nunca altera o uso (§29).
-  Emite `cost.check`/`cost.refuse`/`cost.kill`/`cost.reenable`.
-- **Falta:** ligar o governor ao `Session`/loop (passar o relógio de `CallContext` às camadas
-  temporais).
+  Ligado ao loop: `Session::open_with_cost`, `Session::cost` e `apply_at` passam o relógio de
+  `CallContext` às camadas temporais (teste
+  `per_tool_cap_fires_before_the_global_cap_in_the_loop`). Emite
+  `cost.check`/`cost.refuse`/`cost.kill`/`cost.reenable`.
 - **Aceite:** loop patológico cortado pelo teto por ferramenta **antes** do global; kill switch
-  testado (engata → recusa; re-enable separado → reabre).
+  testado (engata → recusa; re-enable separado → reabre). O gatilho automático do kill switch
+  (anomalia CUSUM/SPRT) é E18-T07.
 
 ---
 
-### E09-T07 ☐ Compactação da conversa como controlo do core
+### E09-T07 ◐ Compactação da conversa como controlo do core
 - **Objetivos:** tornar "compactar conversa" (core §1.1 #10) operação de primeira classe — via
   comando do utilizador e/ou gatilho do kernel no limite de fase/orçamento excedido — **nunca**
   inline no hot path.
@@ -151,9 +153,18 @@ método de verificação imposto e nomeado; negativos visíveis.
   original→substituto** (preserva o cache de prefixo do provider, §1 deste épico); um único dono
   do teto de contexto (evita a cicatriz dos 6 donos, §49.4); recuperação obrigatória (o original
   continua endereçável no log); `Metric` do ganho com base `provider_reported`/`inferred`.
-- **Aceite:** compactar não perde nenhuma mensagem reconstruível do log (`Model-visible ⟺ logged`);
-  o resultado é determinístico para o mesmo input; desligar a porta mantém o comportamento
-  original; nenhuma compactação silenciosa no caminho built-in (E12).
+- **Estado:** `katu_core::context` expõe `compact(events, budget, mode) -> Option<Compaction>`
+  (determinístico, sem LLM): o prefixo que não cabe em `raw_min` é substituído por um **digest**
+  (linha por mensagem: tipo + id de conteúdo + excerto) limitado a `summary_max`; o mapeamento
+  original→substituto (`content_id` FNV-1a) é estável para o mesmo input (cache de prefixo, §1).
+  `CompactionMode::Disabled` (default) devolve `None` — nada silencioso no caminho built-in.
+  `recover(events, id)` devolve a mensagem original do log (recuperação obrigatória). O ganho é um
+  `Metric` com base `inferred` (E09-T05). Um único dono do teto (`ContextBudget`). Emite
+  `context.compact`. Gatilho do kernel: `needs_compaction(events, budget)` e
+  `Session::compact_context`.
+- **Falta:** comando do utilizador (CLI/TUI, E10).
+- **Aceite:** compactar não perde nenhuma mensagem recuperável; determinístico para o mesmo input;
+  desligar mantém o `assemble`; nenhuma compactação silenciosa no caminho built-in (E12).
 
 ## Definition of Done
 

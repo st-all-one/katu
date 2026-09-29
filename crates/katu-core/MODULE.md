@@ -24,7 +24,8 @@ função, o log é a fonte da verdade.
   - `kernel::budget` — `Budget`/`BudgetCap`/`BudgetGate` (único dono do teto de contexto).
   - `kernel::cost` — `CostGovernor` (E09-T06): camadas `KillSwitch → PerTool → RollingWindow →
     FinancialVelocity → Global`, kill switch com `Reenable` assinado (o agente não assina) e
-    reconstrução `from_events`; teto por ferramenta antes do global.
+    reconstrução `from_events`; teto por ferramenta antes do global. Ligado ao `Session`
+    (`open_with_cost`/`apply_at` com o relógio de `CallContext`).
   - `kernel::bus` — `EventBus` (observadores + waterfall com a regra "tem de chamar `next`").
   - `kernel::checkpoint` — `Checkpoint` tipado (schema v1, validador zero-dep `validate`,
     `write_atomic`); erros agregados em `Issue { path, message }` (OA19/E09-T02).
@@ -52,9 +53,12 @@ função, o log é a fonte da verdade.
   `Jail`/`NoJail` (jail futura E17; `Full`/`Partial` ⇒ `Unavailable`).
 - Evidência tipada [`evidence`](src/evidence.rs) (DF5/E09-T05): `Metric`/`EvidenceBasis`/
   `ArtifactRef`; um número sem artefacto não fundamenta decisão; a base não muda numa agregação.
-- Contexto com orçamento [`context`](src/context.rs) (E09-T01): `ContextBudget`/`Context`/`assemble`
-  (prime determinístico + sufixo de mensagens do log; `Model-visible ⟺ logged`) e `prime()`
-  (`PRIME_VERSION = 1`); tokens por estimativa determinística (`bytes/4`).
+- Contexto com orçamento [`context`](src/context.rs) (E09-T01/T07): `ContextBudget`/`Context`/
+  `assemble` (prime determinístico + sufixo de mensagens do log; `Model-visible ⟺ logged`) e
+  `prime()` (`PRIME_VERSION = 1`); tokens por estimativa determinística (`bytes/4`). A compactação
+  [`context/compact`](src/context/compact.rs) (E09-T07) é determinística e opt-in
+  (`CompactionMode`, default `Disabled`): digest do prefixo + mapeamento original→substituto,
+  `recover` pelo log, ganho como `Metric` `inferred`.
 - Gate de verificação [`verify`](src/verify/mod.rs) (E09-T03): `verify` **puro** (escopo/feedback/
   cobertura, zero LLM), `VerificationReport`/`Check`/`CheckStatus`, `--strict` promove warns a
   blocks; `Override` **assinado** (`reason`+`overridden_by`) registado em `overrides.jsonl`.

@@ -160,7 +160,7 @@ fn budget_cap_refuses_tool_call_without_effect() -> Result<(), Box<dyn std::erro
             tool: &probe,
         },
     );
-    assert!(matches!(result, Err(SessionError::Budget(_))));
+    assert!(matches!(result, Err(SessionError::Cost(_))));
     assert_eq!(
         probe.calls.load(Ordering::SeqCst),
         0,
@@ -175,5 +175,6 @@ fn budget_cap_refuses_tool_call_without_effect() -> Result<(), Box<dyn std::erro
     Ok(())
 }
 
+mod cost;
 mod replay;
 mod workspace;

@@ -82,6 +82,7 @@ catalog! {
     // -- Contexto / checkpoint -----------------------------------------------
     (CONTEXT_BUILD, "context.build", "Construção do contexto do modelo."),
     (CONTEXT_TRIM, "context.trim", "Recorte/seleção de contexto."),
+    (CONTEXT_COMPACT, "context.compact", "Compactação determinística do histórico antigo (E09-T07)."),
     (CONTEXT_CHECKPOINT, "context.checkpoint", "Checkpoint de evidência."),
     (VERIFY_REPORT, "verify.report", "Relatório do gate de verificação determinístico (E09)."),
     (SCOPE_MERGE, "scope.merge", "Merge de contratos de escopo por menor privilégio (E09-T04)."),

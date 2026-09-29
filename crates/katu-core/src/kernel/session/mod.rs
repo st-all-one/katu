@@ -6,63 +6,28 @@
 
 use std::path::{Path, PathBuf};
 
-use super::budget::{Budget, BudgetCap, BudgetGate, BudgetRefusal, charge_for};
+use super::budget::{BudgetCap, BudgetGate};
 use super::checkpoint::{self, Checkpoint, CheckpointError};
+use super::cost::{CostCaps, CostGovernor, cost_charge_for};
 use super::event::{CallId, Event};
-use super::log::{Log, LogError, read_records, session_path};
-use super::memory_gate::{
-    MemoryWriteError, MemoryWriteRequest, enforce_memory_write, memory_write_use,
-};
-use super::pipeline::{Dispatch, Tool, dispatch};
+use super::log::{Log, read_records, session_path};
+use super::memory_gate::{MemoryWriteRequest, enforce_memory_write, memory_write_use};
+use super::pipeline::{Dispatch, dispatch};
 use super::project::{Message, derive_messages, state_of};
-use super::state::{Refusal, State};
+use super::state::State;
 use super::step::step;
+use crate::context::{Compaction, CompactionMode, ContextBudget, compact};
 use crate::diag::{Level, events};
-use crate::error::ToolOutcome;
 use crate::ports::{Fs, FsError};
 use crate::verify::VerificationReport;
-use katu_policy::{PolicyError, ResolvedPath, RuleSet, ToolUse};
+use katu_policy::{ResolvedPath, ToolUse};
 
-/// Erro de uma operação de sessão.
-#[derive(Debug, thiserror::Error)]
-#[non_exhaustive]
-pub enum SessionError {
-    /// Falha no log.
-    #[error("log: {0}")]
-    Log(#[from] LogError),
-    /// Transição recusada (fail-closed).
-    #[error("recusa: {0}")]
-    Refusal(#[from] Refusal),
-    /// Vocabulário de política inválido.
-    #[error("política: {0}")]
-    Policy(#[from] PolicyError),
-    /// Teto de orçamento atingido (E04-T07).
-    #[error("orçamento: {0}")]
-    Budget(#[from] BudgetRefusal),
-    /// Falha no checkpoint de fase.
-    #[error("checkpoint: {0}")]
-    Checkpoint(#[from] CheckpointError),
-    /// Falha ao avaliar uma escrita de memória (E05-T04).
-    #[error("memória: {0}")]
-    MemoryWrite(#[from] MemoryWriteError),
-    /// Falha de sistema de ficheiros.
-    #[error("fs: {0}")]
-    Fs(#[from] FsError),
-    /// Invariante `Model-visible ⟺ logged` violada (§42).
-    #[error("invariante: {0}")]
-    Invariant(String),
-}
+mod context;
+mod error;
 
-/// Contexto de execução de uma tool call (evita uma assinatura com demasiados argumentos).
-#[derive(Clone, Copy)]
-pub struct CallContext<'a> {
-    /// Regras de política a avaliar.
-    pub rules: &'a RuleSet,
-    /// Instante corrente (ms desde a época), injetado pelo clock do kernel.
-    pub now_millis: u64,
-    /// Tool a executar se a política permitir.
-    pub tool: &'a dyn Tool,
-}
+pub use context::CallContext;
+use context::log_outcome;
+pub use error::SessionError;
 
 /// Sessão append-only: o log é a fonte da verdade e o estado é a sua projeção.
 pub struct Session<'a> {
@@ -70,7 +35,7 @@ pub struct Session<'a> {
     dir: PathBuf,
     log: Log<'a>,
     state: State,
-    budget: BudgetGate,
+    cost: CostGovernor,
 }
 
 impl<'a> Session<'a> {
@@ -87,17 +52,36 @@ impl<'a> Session<'a> {
     /// # Errors
     /// [`SessionError`] se o log estiver corrompido ou contiver uma transição inválida.
     pub fn open_with_cap(fs: &'a dyn Fs, dir: &Path, cap: BudgetCap) -> Result<Self, SessionError> {
+        Self::open_with_cost(
+            fs,
+            dir,
+            CostCaps {
+                global: cap,
+                ..CostCaps::default()
+            },
+        )
+    }
+
+    /// Abre a sessão com as camadas do cost governor (E09-T06), retomando uso e estado do log.
+    ///
+    /// # Errors
+    /// [`SessionError`] se o log estiver corrompido ou contiver uma transição inválida.
+    pub fn open_with_cost(
+        fs: &'a dyn Fs,
+        dir: &Path,
+        caps: CostCaps,
+    ) -> Result<Self, SessionError> {
         let records = read_records(fs, &session_path(dir))?;
         let events: Vec<Event> = records.into_iter().map(|record| record.event).collect();
         let state = state_of(&events)?;
-        let budget = BudgetGate::resume(cap, Budget::from_events(&events));
+        let cost = CostGovernor::from_events(caps, &events);
         let log = Log::open(fs, dir)?;
         Ok(Self {
             fs,
             dir: dir.to_path_buf(),
             log,
             state,
-            budget,
+            cost,
         })
     }
 
@@ -107,10 +91,16 @@ impl<'a> Session<'a> {
         &self.state
     }
 
-    /// Portão de orçamento (único dono do teto de contexto).
+    /// Cost governor (E09-T06): único dono dos tetos.
+    #[must_use]
+    pub fn cost(&self) -> &CostGovernor {
+        &self.cost
+    }
+
+    /// Portão global/tarefa (único dono do teto de contexto).
     #[must_use]
     pub fn budget(&self) -> BudgetGate {
-        self.budget
+        self.cost.global()
     }
 
     /// Caminho do ficheiro de log da sessão.
@@ -119,22 +109,30 @@ impl<'a> Session<'a> {
         self.log.path()
     }
 
-    /// Aplica um evento: valida transição **e orçamento** antes de gravar.
+    /// Aplica um evento: valida transição **e custo** antes de gravar.
     ///
     /// # Errors
-    /// [`SessionError::Refusal`] se a transição for inválida; [`SessionError::Budget`] se um teto
-    /// for atingido; [`SessionError::Log`] se a gravação falhar. Em qualquer caso o estado fica
+    /// [`SessionError::Refusal`] se a transição for inválida; [`SessionError::Cost`] se um teto for
+    /// atingido; [`SessionError::Log`] se a gravação falhar. Em qualquer caso o estado fica
     /// inalterado.
     pub fn apply(&mut self, event: &Event) -> Result<(), SessionError> {
+        self.apply_at(event, None)
+    }
+
+    /// Aplica um evento com o instante (para as camadas temporais do governor).
+    fn apply_at(&mut self, event: &Event, now_millis: Option<u64>) -> Result<(), SessionError> {
         let _span = crate::span!(Level::Trace, events::KERNEL_TRANSITION, "event" => event.kind());
-        let charge = charge_for(event);
+        let charge = cost_charge_for(event).map(|charge| match now_millis {
+            Some(now) => charge.at(now),
+            None => charge,
+        });
         let next = step(&self.state, event)?;
-        if let Some(charge) = charge {
-            self.budget.check(charge)?;
+        if let Some(charge) = &charge {
+            self.cost.check(charge)?;
         }
         self.log.append(event)?;
-        if let Some(charge) = charge {
-            self.budget.commit(charge);
+        if let Some(charge) = &charge {
+            self.cost.commit(charge);
         }
         self.state = next;
         Ok(())
@@ -153,10 +151,13 @@ impl<'a> Session<'a> {
         context: CallContext<'_>,
     ) -> Result<Dispatch, SessionError> {
         let _span = crate::span!(Level::Trace, events::TOOL_CALL);
-        self.apply(&Event::ToolCall {
-            call: call.clone(),
-            tool: use_.clone(),
-        })?;
+        self.apply_at(
+            &Event::ToolCall {
+                call: call.clone(),
+                tool: use_.clone(),
+            },
+            Some(context.now_millis),
+        )?;
         let outcome = dispatch(
             &self.state,
             use_,
@@ -191,6 +192,18 @@ impl<'a> Session<'a> {
         self.apply(&Event::VerificationRecorded {
             report: report.clone(),
         })
+    }
+
+    /// Compacta o contexto pelo gatilho do kernel (E09-T07); determinístico e explícito.
+    ///
+    /// # Errors
+    /// [`SessionError::Log`] se o log estiver corrompido.
+    pub fn compact_context(
+        &self,
+        budget: ContextBudget,
+        mode: CompactionMode,
+    ) -> Result<Option<Compaction>, SessionError> {
+        Ok(compact(&self.log_events()?, budget, mode))
     }
 
     /// Executa uma **escrita de memória** pela ordem §42, com o gate de E05: loga o pedido, corre
@@ -274,7 +287,7 @@ impl<'a> Session<'a> {
             Err(FsError::NotFound) => {}
             Err(other) => return Err(SessionError::Fs(other)),
         }
-        Session::open_with_cap(self.fs, dst_dir, self.budget.cap())
+        Session::open_with_cap(self.fs, dst_dir, self.cost.caps().global)
     }
 
     /// Lê os eventos do log.
@@ -283,15 +296,5 @@ impl<'a> Session<'a> {
         Ok(records.into_iter().map(|record| record.event).collect())
     }
 }
-
-/// Emite o evento estruturado de resultado (`tool.ok`/`tool.error`).
-fn log_outcome(outcome: &ToolOutcome) {
-    if outcome.is_success() {
-        crate::event!(Level::Debug, events::TOOL_OK);
-    } else {
-        crate::event!(Level::Warn, events::TOOL_ERROR);
-    }
-}
-
 #[cfg(test)]
 mod tests;
