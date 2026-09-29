@@ -38,6 +38,8 @@ pub struct State {
     pub calls: BTreeMap<CallId, CallStatus>,
     /// Tools efetivamente concluídas com sucesso (para `RequireAfter` da política).
     pub completed_tools: BTreeSet<ToolName>,
+    /// Fases com pré-condição dispensada por um `waiver` explícito (E05-T02, §47).
+    pub waivers: BTreeSet<Phase>,
     /// Capacidades concedidas no contexto corrente (DF2/DF4; a política é falha-fechado sem elas).
     pub capabilities: Vec<Capability>,
     /// Consumo de orçamento dentro da tarefa (alimenta `Facts::budget`).
@@ -54,6 +56,7 @@ impl State {
             turn_open: false,
             calls: BTreeMap::new(),
             completed_tools: BTreeSet::new(),
+            waivers: BTreeSet::new(),
             capabilities: Vec::new(),
             budget: BudgetState::default(),
         }
@@ -91,6 +94,11 @@ pub enum RefusalReason {
         /// Fase de origem.
         from: Phase,
         /// Fase destino.
+        to: Phase,
+    },
+    /// Pré-condição da fase destino não satisfeita (E05-T02/T04, fail-closed).
+    UnmetPrecondition {
+        /// Fase destino cuja pré-condição falhou.
         to: Phase,
     },
 }

@@ -97,6 +97,7 @@ instrument:
 	$(CARGO) clippy -p katu-core --features instrument --all-targets -- -D warnings
 	$(CARGO) clippy -p katu --features profile --all-targets -- -D warnings
 	$(CARGO) test -p katu-core --features instrument
+	$(CARGO) test -p katu --features profile
 
 ## Portão do CI: check + extras disponíveis.
 ci: check deny audit machete typos miri

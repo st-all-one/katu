@@ -147,6 +147,13 @@ panic = "abort"
 [profile.dev]
 debug-assertions = true
 overflow-checks = true
+# Skill Rust §15: dependências otimizadas em dev/teste — o loop de teste fica muito mais rápido
+# sem perder símbolos do nosso código. Não afeta `build.rs` (ver `build-override`).
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.dev.build-override]
+opt-level = 3
 
 [profile.bench]
 inherits = "release"

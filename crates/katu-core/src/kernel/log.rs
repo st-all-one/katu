@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use super::event::Event;
+use crate::diag::{Level, events};
 use crate::ports::{Fs, FsError};
 
 /// Versão do esquema do log; faz parte do nome do ficheiro.
@@ -98,6 +99,7 @@ impl<'a> Log<'a> {
     /// [`LogError`] se a serialização ou o I/O falharem.
     pub fn append(&mut self, event: &Event) -> Result<u64, LogError> {
         let seq = self.seq.saturating_add(1);
+        let _span = crate::span!(Level::Trace, events::LOG_APPEND, "seq" => seq);
         let record = LogRecord {
             seq,
             event: event.clone(),
@@ -116,6 +118,7 @@ impl<'a> Log<'a> {
 /// # Errors
 /// [`LogError`] se o ficheiro não for UTF-8, tiver uma linha ilegível ou um salto de `seq`.
 pub fn read_records(fs: &dyn Fs, path: &Path) -> Result<Vec<LogRecord>, LogError> {
+    let _span = crate::span!(Level::Trace, events::LOG_REPLAY);
     if !fs.exists(path) {
         return Ok(Vec::new());
     }
@@ -230,8 +233,13 @@ mod tests {
                 call,
                 outcome: ToolOutcome::Ok,
             },
+            Event::Waiver {
+                transition: Phase::KnowledgeConsulted,
+                reason: "teste do log".into(),
+            },
             Event::PhaseTransition {
                 to: Phase::KnowledgeConsulted,
+                outcome: None,
             },
             Event::TurnEnd { turn: 7 },
         ];

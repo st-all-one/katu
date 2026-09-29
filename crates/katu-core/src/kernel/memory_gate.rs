@@ -8,6 +8,7 @@
 
 use super::pipeline::{Dispatch, DispatchRequest, Tool, dispatch_with};
 use super::state::State;
+use crate::diag::{Level, events};
 use crate::memory::{Memory, MemoryError, PreWriteOutcome, PreWriteReq};
 use katu_policy::{Capability, PolicyError, ResolvedPath, RuleSet, ToolArgs, ToolName, ToolUse};
 
@@ -60,6 +61,7 @@ pub fn enforce_memory_write(
     state: &State,
     request: MemoryWriteRequest<'_>,
 ) -> Result<Dispatch, MemoryWriteError> {
+    let _span = crate::span!(Level::Trace, events::MEMORY_WRITE);
     let pre_write = request.memory.pre_write(request.req)?;
     let capabilities = capabilities_for(&pre_write);
     let use_ = memory_write_use(request.cwd);

@@ -6,4 +6,5 @@
 
 #![forbid(unsafe_code)]
 
+pub mod read;
 pub mod write;

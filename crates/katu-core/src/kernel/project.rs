@@ -121,8 +121,13 @@ mod tests {
                 text: "faz isto".into(),
             },
             Event::AssistantMessage { text: "ok".into() },
+            Event::Waiver {
+                transition: Phase::KnowledgeConsulted,
+                reason: "teste de projeção".into(),
+            },
             Event::PhaseTransition {
                 to: Phase::KnowledgeConsulted,
+                outcome: None,
             },
             Event::TurnEnd { turn: 1 },
         ]
@@ -162,7 +167,10 @@ mod tests {
 
     #[test]
     fn illegal_sequence_is_refused_and_state_unchanged() {
-        let events = vec![Event::PhaseTransition { to: Phase::Closed }];
+        let events = vec![Event::PhaseTransition {
+            to: Phase::Closed,
+            outcome: None,
+        }];
         let state = State::initial();
         assert!(state_of(&events).is_err());
         if let Some(event) = events.first() {

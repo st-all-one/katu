@@ -162,12 +162,14 @@ pub fn dispatch_with(request: DispatchRequest<'_>) -> Result<Dispatch, PolicyErr
         evaluate(&facts, request.rules)?
     };
     if decision.is_allow() {
+        crate::event!(Level::Debug, events::POLICY_ALLOW);
         let outcome = request.tool.execute(request.use_);
         Ok(Dispatch {
             decision,
             effect: Effect::Ran { outcome },
         })
     } else {
+        crate::event!(Level::Warn, events::POLICY_DENY);
         Ok(Dispatch {
             decision,
             effect: Effect::Skipped,

@@ -1,0 +1,158 @@
+//! `step(State, Event) -> Result<State, Refusal>` (E04-T01). Transição pura e determinística.
+
+use super::event::{CallId, Event};
+use super::state::{CallStatus, Refusal, RefusalReason, State, can_transition};
+use crate::diag::{Level, events};
+use crate::error::ToolOutcome;
+use katu_policy::{Phase, ToolName, ToolUse};
+
+/// Aplica um evento ao estado, devolvendo o novo estado ou uma [`Refusal`].
+///
+/// `step` é **puro**: não toca relógio, FS nem RNG. Uma recusa não altera o estado (§42).
+///
+/// # Errors
+/// [`Refusal`] se o evento violar a forma do caminho único ou o protocolo de turnos/chamadas.
+pub fn step(state: &State, event: &Event) -> Result<State, Refusal> {
+    let _span = crate::span!(Level::Trace, events::KERNEL_STEP, "event" => event.kind());
+    match event {
+        Event::TurnStart { turn } => turn_start(state, *turn),
+        Event::UserMessage { .. } | Event::AssistantMessage { .. } => {
+            require_open(state)?;
+            Ok(state.clone())
+        }
+        Event::ToolCall { call, tool } => tool_call(state, call, tool),
+        Event::ToolResult { call, outcome } => tool_result(state, call, outcome),
+        Event::PhaseTransition { to, outcome } => phase_transition(state, *to, outcome.as_deref()),
+        Event::Waiver { transition, .. } => Ok(waiver(state, *transition)),
+        Event::TurnEnd { turn } => turn_end(state, *turn),
+    }
+}
+
+/// Abre um turno.
+fn turn_start(state: &State, turn: u32) -> Result<State, Refusal> {
+    if state.turn_open {
+        return Err(refuse(state, RefusalReason::TurnAlreadyOpen));
+    }
+    let mut next = state.clone();
+    next.turn = turn;
+    next.turn_open = true;
+    Ok(next)
+}
+
+/// Regista um pedido de tool.
+fn tool_call(state: &State, call: &CallId, tool: &ToolUse) -> Result<State, Refusal> {
+    require_open(state)?;
+    if state.calls.contains_key(call) {
+        return Err(refuse(
+            state,
+            RefusalReason::DuplicateCall { call: call.clone() },
+        ));
+    }
+    let mut next = state.clone();
+    next.calls
+        .insert(call.clone(), CallStatus::Pending { tool: tool.clone() });
+    Ok(next)
+}
+
+/// Fecha um pedido de tool com o efeito observado.
+fn tool_result(state: &State, call: &CallId, outcome: &ToolOutcome) -> Result<State, Refusal> {
+    let Some(CallStatus::Pending { tool }) = state.calls.get(call) else {
+        return Err(refuse(
+            state,
+            RefusalReason::UnknownCall { call: call.clone() },
+        ));
+    };
+    let name = tool.name;
+    let mut next = state.clone();
+    next.calls.insert(
+        call.clone(),
+        CallStatus::Done {
+            outcome: outcome.clone(),
+        },
+    );
+    if outcome.is_success() {
+        next.completed_tools.insert(name);
+    }
+    Ok(next)
+}
+
+/// Regista um `waiver` explícito para uma transição de fase.
+fn waiver(state: &State, transition: Phase) -> State {
+    let mut next = state.clone();
+    next.waivers.insert(transition);
+    next
+}
+
+/// Muda de fase, validando a forma do caminho único e a pré-condição da fase destino.
+fn phase_transition(state: &State, to: Phase, outcome: Option<&str>) -> Result<State, Refusal> {
+    if !can_transition(state.phase, to) {
+        return Err(refuse(
+            state,
+            RefusalReason::IllegalTransition {
+                from: state.phase,
+                to,
+            },
+        ));
+    }
+    if !satisfies_precondition(state, to, outcome) {
+        return Err(refuse(state, RefusalReason::UnmetPrecondition { to }));
+    }
+    let mut next = state.clone();
+    next.phase = to;
+    Ok(next)
+}
+
+/// Pré-condição da fase destino (E05-T02/T04); um `waiver` dispensa-a (§47).
+fn satisfies_precondition(state: &State, to: Phase, outcome: Option<&str>) -> bool {
+    if state.waivers.contains(&to) {
+        return true;
+    }
+    match to {
+        Phase::KnowledgeConsulted => {
+            state.completed_tools.contains(&ToolName::Read)
+                || state.completed_tools.contains(&ToolName::MemoryRecall)
+        }
+        Phase::Closed => outcome.is_some_and(|evidence| !evidence.trim().is_empty()),
+        _ => true,
+    }
+}
+
+/// Fecha um turno, validando o número.
+fn turn_end(state: &State, turn: u32) -> Result<State, Refusal> {
+    if !state.turn_open {
+        return Err(refuse(state, RefusalReason::NoOpenTurn));
+    }
+    if state.turn != turn {
+        return Err(refuse(
+            state,
+            RefusalReason::TurnMismatch {
+                expected: state.turn,
+                got: turn,
+            },
+        ));
+    }
+    let mut next = state.clone();
+    next.turn_open = false;
+    Ok(next)
+}
+
+/// Exige um turno aberto.
+fn require_open(state: &State) -> Result<(), Refusal> {
+    if state.turn_open {
+        Ok(())
+    } else {
+        Err(refuse(state, RefusalReason::NoOpenTurn))
+    }
+}
+
+/// Constrói uma recusa ancorada na fase corrente.
+fn refuse(state: &State, reason: RefusalReason) -> Refusal {
+    crate::event!(Level::Warn, events::KERNEL_REFUSAL);
+    Refusal {
+        reason,
+        phase: state.phase,
+    }
+}
+
+#[cfg(test)]
+mod tests;

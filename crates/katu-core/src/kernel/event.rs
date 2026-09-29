@@ -60,13 +60,43 @@ pub enum Event {
         outcome: ToolOutcome,
     },
     /// Transição de fase do caminho único.
+    ///
+    /// `outcome` é a evidência de fecho (§51.2): obrigatória quando `to == Closed`, ignorada nas
+    /// restantes fases. A evidência fica no log (é o próprio evento).
     PhaseTransition {
         /// Fase destino.
         to: Phase,
+        /// Evidência de fecho, exigida pela pré-condição de `Closed` (E05-T04).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        outcome: Option<String>,
+    },
+    /// `Waiver` explícito: dispensa a pré-condição da fase indicada (§47).
+    Waiver {
+        /// Fase cuja pré-condição é dispensada.
+        transition: Phase,
+        /// Motivo legível (campo tipado, nunca interpolação).
+        reason: String,
     },
     /// Fim de um turno.
     TurnEnd {
         /// Número do turno.
         turn: u32,
     },
+}
+
+impl Event {
+    /// Rótulo estável do variante, para campos de diagnóstico (nunca muda).
+    #[must_use]
+    pub const fn kind(&self) -> &'static str {
+        match self {
+            Self::TurnStart { .. } => "turn_start",
+            Self::UserMessage { .. } => "user_message",
+            Self::AssistantMessage { .. } => "assistant_message",
+            Self::ToolCall { .. } => "tool_call",
+            Self::ToolResult { .. } => "tool_result",
+            Self::PhaseTransition { .. } => "phase_transition",
+            Self::Waiver { .. } => "waiver",
+            Self::TurnEnd { .. } => "turn_end",
+        }
+    }
 }

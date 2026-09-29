@@ -11,6 +11,7 @@ sem veredicto; controlo em falta = recusa.
 - `ToolOutcome`, capacidades e negação **pelo executor**.
 - `write::WriteNoteTool` (E05-T01): executor do commit de nota; só é invocado depois de a política
   permitir.
+- `read::ReadTool` (E05-T02): leitura pela porta `Fs`; conclui a fase `KnowledgeConsulted`.
 - Contenção **soft** (E07): caminhos canonicalizados, `argv` resolvido, autorização explícita.
 - `trash` → `.katu/trash` (recuperável; esvaziar exige humano).
 

@@ -69,23 +69,42 @@ compressão de contexto. Nada disso entra antes do gate.
 - **Aceite:** com `FakeMemory` a acusar duplicata, a escrita **não** altera o disco e o resultado
   volta ao modelo como erro recuperável com `rule_id`.
 
-### E05-T02 ☐ Ferramenta `read` mínima e fase `KnowledgeConsulted`
+### E05-T02 ☑ Ferramenta `read` mínima e fase `KnowledgeConsulted`
 - **Entregáveis:** `read` que permite a transição para `KnowledgeConsulted`; ou `waiver` explícito.
+- **Estado:** `katu_tools::read::ReadTool` lê um `ResolvedPath` pela porta `Fs`; a pré-condição de
+  `step` (`satisfies_precondition`) exige `Read` ou `MemoryRecall` concluído **ou** um
+  `Event::Waiver { transition, reason }` (novo estado `State::waivers`). Transição recusada com
+  `RefusalReason::UnmetPrecondition { to }`.
 - **Aceite:** sem `read`/`waiver`, a transição é recusada; com ela, é permitida.
 
-### E05-T03 ☐ Integração das regras de memória na `policy/memory.toml`
+### E05-T03 ☑ Integração das regras de memória na `policy/memory.toml`
 - **Entregáveis:** as 4 regras como `Enforced`, com exemplo negativo cada.
+- **Estado:** as 5 regras do protocolo (recall→write, outcome→close, sem duplicata, âncora,
+  single-claim) são `Enforced` com exemplo negativo; `Advisory` vazio. Cobertas pelo teste de
+  E02-T07 (`memory_policy_is_all_enforced_and_advisory_free`, com `audit::is_clean()`).
 - **Aceite:** todas constam na lista `Enforced`; `Advisory` do protocolo = vazio.
 
-### E05-T04 ☐ Fechar tarefa exige `outcome`
+### E05-T04 ☑ Fechar tarefa exige `outcome`
 - **Entregáveis:** pré-condição de transição `→ Closed` que consulta o `outcome`.
+- **Estado:** `Event::PhaseTransition { to, outcome }`; `outcome` (evidência) é gravada no log
+  (o próprio evento) e exigida quando `to == Closed`. `Session::memory_write` fecha o caminho do
+  gate no loop (E04-T08 ◐), com `SessionError::MemoryWrite`.
 - **Aceite:** `Close` sem `outcome` é `Refusal`; com `outcome`, passa e loga a evidência.
 
-### E05-T05 ☐ **Teste pelo caminho real (o coração do gate)**
+### E05-T05 ☑ **Teste pelo caminho real (o coração do gate)**
 - **Objetivo:** não testar extractores puros; conduzir o **loop real** e assertar a negação.
 - **Entregáveis:** teste de integração que inicia o binário/loop, injeta um guião de agente que
   tenta (a) gravar sem buscar, (b) gravar com duplicata, (c) fechar sem `outcome`; asserta
   `Denied`/`Refusal` com `rule_id` e evidência.
+- **Estado:** `crates/katu/tests/mvk.rs` (borda: vê `katu-core` + `katu-tools`): conduz
+  `Session::open` → turno → `memory_write` (gate real) e `apply(PhaseTransition)`. (a) sem recall →
+  recusa **sem** executor (0 commits); (b) duplicata ≥ 0,92 → `Denied{mem-no-duplicate}` sem
+  commit; (c) fecho sem `outcome` → `Refusal::UnmetPrecondition{Closed}`. Cada teste tem
+  `session.verify()` (invariante `Model-visible ⟺ logged`).
+- **Nota de coerência:** a checklist de T07 diz `Denied` para (a), mas o contrato **fechado** de
+  E02 (e o próprio `policy/memory.toml`) classifica "sem recall" como `RequireAfter` →
+  `RequireApproval` (recusa determinística, não negação fechada). A negação fechada aplica-se à
+  **ausência de capacidade** (duplicata/âncora/claim). Decisão pendente de registo em ADR.
 - **Aceite:** os 3 cenários ficam **vermelhos** se o enforcement for removido — a regressão é
   introduzida, vista vermelha e revertida, por regra (§51.9, "um guard só guarda se a regressão o
   falhar").

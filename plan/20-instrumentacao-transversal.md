@@ -114,7 +114,12 @@ sink (`crates/katu/src/diag.rs`). Corre em `make check`.
   tools/contenção (E06/E07), memória (E03), contexto (E09) e providers (E12); ids do catálogo,
   campos tipados.
 - **Aceite:** `xtask check-diag` verde (sem texto livre); todo `span!` usa id do catálogo.
-- **Estado:** entrada e portas instrumentadas (E01); os restantes épicos instrumentam ao nascer.
+- **Estado:** entrada, portas `fs`, kernel (E04) e o gate de memória (E05) instrumentados:
+  `katu.run`/`katu.setup`, `fs.*`, `kernel.step`/`kernel.transition`/`kernel.refusal`,
+  `log.append`/`log.replay`, `policy.evaluate`/`policy.allow`/`policy.deny`,
+  `tool.call`/`tool.ok`/`tool.error`, `tool.read`/`tool.write`, `memory.write`,
+  `kernel.budget[_refuse]`, `context.checkpoint`, `lock.recovered`. Dos 50 ids, restam 26 por
+  nascer (tools E06, contenção E07, memória E03, contexto E09, providers E12, TUI E11).
 
 ### E19-T04 ☐ Consistência (fingerprint determinístico)
 - **Entregáveis**: `diag::fingerprint!` que acumula um hash determinístico do estado/resultado de
@@ -127,7 +132,8 @@ sink (`crates/katu/src/diag.rs`). Corre em `make check`.
   `make check`.
 - **Aceite:** `clippy -D warnings` verde com `instrument`/`profile`; "zero quando desligado" e
   "regista quando ligado"; `check-diag` falha com sonda injetada.
-- **Estado:** `make instrument` e `check-diag` existem; falta ligar ao workflow do CI (E01-T10).
+- **Estado:** `make instrument` existe e está ligado ao CI (`ci.yml`: clippy+test com
+  `--features instrument`/`profile`); `check-diag` corre em `pr-fast.yml` e em `make check`.
 
 ### E19-T06 ☐ Filtro de nível por subsistema (OA18)
 - **Entregáveis:** além do nível global, ligar/desligar por prefixo de `event` (ex.: só

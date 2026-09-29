@@ -168,8 +168,13 @@ fn checkpoint_survives_reopen_at_phase_boundary() -> Result<(), Box<dyn std::err
     let dir = Path::new("/sessions");
     let mut session = Session::open(&fs, dir)?;
     session.apply(&Event::TurnStart { turn: 1 })?;
+    session.apply(&Event::Waiver {
+        transition: Phase::KnowledgeConsulted,
+        reason: "teste de checkpoint".into(),
+    })?;
     session.apply(&Event::PhaseTransition {
         to: Phase::KnowledgeConsulted,
+        outcome: None,
     })?;
     let written = session.write_checkpoint("objetivo", "planear")?;
     assert_eq!(written.phase, Phase::KnowledgeConsulted);
@@ -209,16 +214,23 @@ fn full_loop_verifies_and_messages_come_from_the_log() -> Result<(), Box<dyn std
     session.apply(&Event::AssistantMessage {
         text: "feito".into(),
     })?;
+    session.apply(&Event::Waiver {
+        transition: Phase::KnowledgeConsulted,
+        reason: "teste do loop completo".into(),
+    })?;
     for to in [
         Phase::KnowledgeConsulted,
         Phase::Planned,
         Phase::Implemented,
         Phase::Verified,
         Phase::Persisted,
-        Phase::Closed,
     ] {
-        session.apply(&Event::PhaseTransition { to })?;
+        session.apply(&Event::PhaseTransition { to, outcome: None })?;
     }
+    session.apply(&Event::PhaseTransition {
+        to: Phase::Closed,
+        outcome: Some("feito e verificado".into()),
+    })?;
     session.apply(&Event::TurnEnd { turn: 1 })?;
 
     session.verify()?;

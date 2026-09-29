@@ -3,6 +3,7 @@
 //! Não decide política: o kernel só a invoca **depois** de `evaluate` permitir (ordem §42), pelo que
 //! uma negação nunca tem efeito. A porta `Memory` faz o commit por nota (OA8).
 
+use katu_core::diag::{Level, events};
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::Tool;
 use katu_core::memory::{Memory, PreWriteReq};
@@ -22,6 +23,7 @@ impl Tool for WriteNoteTool<'_> {
     }
 
     fn execute(&self, _use_: &ToolUse) -> ToolOutcome {
+        let _span = katu_core::span!(Level::Trace, events::TOOL_WRITE);
         match self.memory.record(&self.req) {
             Ok(_) => ToolOutcome::Ok,
             Err(err) if err.retryable() => ToolOutcome::Timeout,

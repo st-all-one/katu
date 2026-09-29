@@ -62,6 +62,10 @@ Todos os entregáveis abaixo assumem e verificam:
   (`lto = "fat"`, `codegen-units = 1`, `strip = "symbols"`, `overflow-checks = true`,
   `panic = "abort"`); `Cargo.lock` commitado; `publish = false`; `scripts/check_file_length.sh`
   (≤ 300 linhas de produção); alvo `make check`; `cargo denial`/`cargo tree` sem runtime pesado.
+- **Otimizações de build (skill Rust §15):** `[profile.dev.package."*"] opt-level = 2` +
+  `[profile.dev.build-override] opt-level = 3` — o loop de teste corre com dependências
+  otimizadas sem perder símbolos do código do katu (o `[profile.release]` mantém LTO *fat*),
+  `codegen-units = 1`, `strip`).
 - **Aceite:** `make check` roda `fmt --check` + `clippy --all-targets -D warnings` + `test` +
   gate de linhas + `cargo tree`; `clippy.toml` aplicado.
 - **Rust 1.97.0+:** `clippy.toml` declara `msrv = "1.97"`; o gate roda também no job `msrv`.

@@ -8,9 +8,10 @@ função, o log é a fonte da verdade.
 ## Responsabilidade
 
 - `State`, `Event`, `Refusal`, pipeline de tool call, log append-only.
-  - `kernel::state` — `State`, `CallStatus`, `Refusal`/`RefusalReason`, `next_phase`/`can_transition`.
-  - `kernel::event` — `Event`, `CallId`.
-  - `kernel::step` — `step(State, Event) -> Result<State, Refusal>` (puro).
+  - `kernel::state` — `State`, `CallStatus`, `Refusal`/`RefusalReason`, `next_phase`/`can_transition`,
+    `State::waivers` (exceções explícitas); `UnmetPrecondition` (E05-T02/T04).
+  - `kernel::event` — `Event`, `CallId`, `Event::kind`.
+  - `kernel::step` — `step(State, Event) -> Result<State, Refusal>` (puro) + pré-condições de fase.
   - `kernel::log` — `Log`/`LogRecord` append-only JSONL (`session.v1.jsonl`) sobre a porta `Fs`.
   - `kernel::project` — `derive_messages`, `state_of`, `snapshot` (projeções puras).
   - `kernel::pipeline` — `Tool`, `facts_for`/`facts_from`, `dispatch`/`dispatch_with` (facto →
@@ -20,7 +21,7 @@ função, o log é a fonte da verdade.
   - `kernel::bus` — `EventBus` (observadores + waterfall com a regra "tem de chamar `next`").
   - `kernel::checkpoint` — `Checkpoint` tipado (schema v1, validador zero-dep, `write_atomic`).
   - `kernel::session` — `Session`/`CallContext` (loop mínimo: valida transição + orçamento antes de
-    gravar, ordem §42, checkpoint de fase, `messages`/`verify`/`fork`).
+    gravar; `tool_call` e `memory_write` pela ordem §42; `verify`/`messages`/`fork`).
 - `derive_messages`/`snapshot` — projeções puras.
 - Porta [`memory::Memory`](src/memory.rs) (tipos do katu, DF6), com submódulos:
   - `memory::types` — `NoteType`, `Status`, `Basis`, `NoteRef`, `Anchor`, `Score` (pontos base,

@@ -10,10 +10,15 @@ use super::budget::{Budget, BudgetCap, BudgetGate, BudgetRefusal, charge_for};
 use super::checkpoint::{self, Checkpoint, CheckpointError};
 use super::event::{CallId, Event};
 use super::log::{Log, LogError, read_records, session_path};
+use super::memory_gate::{
+    MemoryWriteError, MemoryWriteRequest, enforce_memory_write, memory_write_use,
+};
 use super::pipeline::{Dispatch, Tool, dispatch};
 use super::project::{Message, derive_messages, state_of};
 use super::state::{Refusal, State};
 use super::step::step;
+use crate::diag::{Level, events};
+use crate::error::ToolOutcome;
 use crate::ports::{Fs, FsError};
 use katu_policy::{PolicyError, RuleSet, ToolUse};
 
@@ -36,6 +41,9 @@ pub enum SessionError {
     /// Falha no checkpoint de fase.
     #[error("checkpoint: {0}")]
     Checkpoint(#[from] CheckpointError),
+    /// Falha ao avaliar uma escrita de memória (E05-T04).
+    #[error("memória: {0}")]
+    MemoryWrite(#[from] MemoryWriteError),
     /// Falha de sistema de ficheiros.
     #[error("fs: {0}")]
     Fs(#[from] FsError),
@@ -117,6 +125,7 @@ impl<'a> Session<'a> {
     /// for atingido; [`SessionError::Log`] se a gravação falhar. Em qualquer caso o estado fica
     /// inalterado.
     pub fn apply(&mut self, event: &Event) -> Result<(), SessionError> {
+        let _span = crate::span!(Level::Trace, events::KERNEL_TRANSITION, "event" => event.kind());
         let charge = charge_for(event);
         let next = step(&self.state, event)?;
         if let Some(charge) = charge {
@@ -142,6 +151,7 @@ impl<'a> Session<'a> {
         use_: &ToolUse,
         context: CallContext<'_>,
     ) -> Result<Dispatch, SessionError> {
+        let _span = crate::span!(Level::Trace, events::TOOL_CALL);
         self.apply(&Event::ToolCall {
             call: call.clone(),
             tool: use_.clone(),
@@ -153,11 +163,38 @@ impl<'a> Session<'a> {
             context.now_millis,
             context.tool,
         )?;
+        let result = outcome.outcome();
+        log_outcome(&result);
         self.apply(&Event::ToolResult {
             call,
-            outcome: outcome.outcome(),
+            outcome: result,
         })?;
         Ok(outcome)
+    }
+
+    /// Executa uma **escrita de memória** pela ordem §42, com o gate de E05: loga o pedido, corre
+    /// `pre_write` → capacidade → política → efeito, e loga o resultado.
+    ///
+    /// # Errors
+    /// [`SessionError`] se a chamada não puder ser logada, a política recusar ou o `pre_write`
+    /// falhar.
+    pub fn memory_write(
+        &mut self,
+        call: CallId,
+        request: MemoryWriteRequest<'_>,
+    ) -> Result<Dispatch, SessionError> {
+        self.apply(&Event::ToolCall {
+            call: call.clone(),
+            tool: memory_write_use(request.cwd),
+        })?;
+        let dispatch = enforce_memory_write(&self.state, request)?;
+        let result = dispatch.outcome();
+        log_outcome(&result);
+        self.apply(&Event::ToolResult {
+            call,
+            outcome: result,
+        })?;
+        Ok(dispatch)
     }
 
     /// Escreve o checkpoint de fase (artefacto durável) a partir do estado corrente.
@@ -223,6 +260,15 @@ impl<'a> Session<'a> {
     fn log_events(&self) -> Result<Vec<Event>, SessionError> {
         let records = read_records(self.fs, &session_path(&self.dir))?;
         Ok(records.into_iter().map(|record| record.event).collect())
+    }
+}
+
+/// Emite o evento estruturado de resultado (`tool.ok`/`tool.error`).
+fn log_outcome(outcome: &ToolOutcome) {
+    if outcome.is_success() {
+        crate::event!(Level::Debug, events::TOOL_OK);
+    } else {
+        crate::event!(Level::Warn, events::TOOL_ERROR);
     }
 }
 
