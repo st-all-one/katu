@@ -74,12 +74,16 @@ Pré-condições verificáveis (a imposição, não a prosa — §51.2):
 - **Aceite (gate):** replay byte-a-byte; transição ilegal devolve `Refusal` tipado e não muda o
   estado; invariante `Model-visible ⟺ logged` verificada em runtime.
 
-### E04-T05 ☐ Pipeline de tool call
+### E04-T05 ☑ Pipeline de tool call
 - **Entregáveis:** ordem explícita (adaptada do §42):
   `tool/call` (logado antes de executar) → `policy.evaluate(Facts)` →
   `Allow|Deny|RequireApproval|NeedsHuman` → execução → `ToolOutcome` → `tool/result`.
-- **Aceite:** um `Deny` significa que o efeito **não** ocorreu e o resultado é devolvido ao modelo
-  como erro recuperável; teste prova a negação **pelo executor** (§51.9).
+- **Estado:** `kernel/pipeline.rs` — `Tool` (trait), `facts_for`, `dispatch`; span
+  `policy.evaluate` no caminho. `State` passou a transportar `capabilities`/`budget` (alimentam
+  `Facts`).
+- **Aceite:** um `Deny` significa que o efeito **não** ocorreu (a `Tool` **não** é invocada —
+  contador a zero no teste) e o resultado volta como `ToolOutcome::Denied`; vocabulário inválido
+  falha fechado sem efeito (§51.9).
 
 ### E04-T06 ☐ Event bus mínimo
 - **Entregáveis:** `emit` e `waterfall` (around-middleware com a regra explícita "tem de chamar
@@ -87,9 +91,15 @@ Pré-condições verificáveis (a imposição, não a prosa — §51.2):
 - **Aceite:** um listener que só observa e não chama `next()` falha o build/teste; exceções de
   callbacks são contidas no dispatcher (§43.5).
 
-### E04-T07 ☐ Orçamento e checkpoint de fase
+### E04-T07 ☑ Orçamento e checkpoint de fase
 - **Entregáveis:** `Budget { turns, tool_calls, tokens, wall_clock }`; `BudgetGate` que recusa ao
   atingir o teto; checkpoint tipado no limite de fase; artefacto durável.
+- **Estado:** `kernel/budget.rs` — `Budget`/`BudgetCap`/`Charge`/`BudgetGate`; o uso é reconstruído
+  do log (`Budget::from_events`) e o `Session` verifica-o **antes** de gravar (recusa = estado e log
+  inalterados, sem cortar uso). `kernel/checkpoint.rs` — `Checkpoint` (schema v1,
+  `deny_unknown_fields`), validador zero-dep e `write_atomic`; o `Session` expõe
+  `write_checkpoint`/`read_checkpoint`. O `BudgetGate` é o **único dono do teto de contexto**
+  (§51.8).
 - **Aceite:** orçamento excedido = recusa, nunca "corta a evidência" (§29); o checkpoint valida
   contra schema; um único dono do teto de contexto (§51.8).
 
@@ -100,8 +110,12 @@ Pré-condições verificáveis (a imposição, não a prosa — §51.2):
 > (fora de G3 e de [`00b` §3](00b-objetivos.md)); reusa só o padrão de teto/paragem e de
 > replay a partir do log (que já é E04-T02/T04).
 
-### E04-T08 ☐ Loop e sessão
+### E04-T08 ◐ Loop e sessão
 - **Entregáveis:** laço que consome eventos e aplica transições; retoma a partir do log.
+- **Estado:** `kernel/session.rs` — `Session` abre/replaya o log, `apply` valida **antes** de
+  gravar, `tool_call` executa a ordem §42 (pedido logado → política → efeito → resultado).
+  Testes: negação logada mas sem efeito; reabertura retoma o estado; recusa não muda estado nem log.
+  **Falta** o laço completo com `FakeMemory` + provider fake (depende de E12) e fork/resume explícito.
 - **Aceite:** um teste conduz o loop do início ao fim com um `FakeMemory` e um provider fake;
   fork/resume derivam do mesmo log.
 

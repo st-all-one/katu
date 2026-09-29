@@ -13,6 +13,11 @@ função, o log é a fonte da verdade.
   - `kernel::step` — `step(State, Event) -> Result<State, Refusal>` (puro).
   - `kernel::log` — `Log`/`LogRecord` append-only JSONL (`session.v1.jsonl`) sobre a porta `Fs`.
   - `kernel::project` — `derive_messages`, `state_of`, `snapshot` (projeções puras).
+  - `kernel::pipeline` — `Tool`, `facts_for`, `dispatch` (facto → política → efeito).
+  - `kernel::budget` — `Budget`/`BudgetCap`/`BudgetGate` (único dono do teto de contexto).
+  - `kernel::checkpoint` — `Checkpoint` tipado (schema v1, validador zero-dep, `write_atomic`).
+  - `kernel::session` — `Session`/`CallContext` (loop mínimo: valida transição + orçamento antes de
+    gravar, ordem §42, checkpoint de fase).
 - `derive_messages`/`snapshot` — projeções puras.
 - Porta [`memory::Memory`](src/memory.rs) (tipos do katu, DF6), com submódulos:
   - `memory::types` — `NoteType`, `Status`, `Basis`, `NoteRef`, `Anchor`, `Score` (pontos base,

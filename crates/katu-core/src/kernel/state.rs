@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::event::CallId;
 use crate::error::ToolOutcome;
-use katu_policy::{Phase, ToolName, ToolUse};
+use katu_policy::{BudgetState, Capability, Phase, ToolName, ToolUse};
 
 /// Estado de um pedido de tool (pendente ou concluído).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -38,6 +38,10 @@ pub struct State {
     pub calls: BTreeMap<CallId, CallStatus>,
     /// Tools efetivamente concluídas com sucesso (para `RequireAfter` da política).
     pub completed_tools: BTreeSet<ToolName>,
+    /// Capacidades concedidas no contexto corrente (DF2/DF4; a política é falha-fechado sem elas).
+    pub capabilities: Vec<Capability>,
+    /// Consumo de orçamento dentro da tarefa (alimenta `Facts::budget`).
+    pub budget: BudgetState,
 }
 
 impl State {
@@ -50,6 +54,8 @@ impl State {
             turn_open: false,
             calls: BTreeMap::new(),
             completed_tools: BTreeSet::new(),
+            capabilities: Vec::new(),
+            budget: BudgetState::default(),
         }
     }
 }
