@@ -2,8 +2,8 @@
 //!
 //! Regras do projeto:
 //!
-//! - **Logs sempre estruturados**: um registo é um **identificador estável** + **campos tipados**;
-//!   nunca texto livre interpolado (os dados vão sempre em campos).
+//! - **Logs sempre estruturados**: um registo é um **identificador estável** (do catálogo
+//!   [`events`]) + **campos tipados**; nunca texto livre interpolado.
 //! - **Custo zero por defeito**: sem `feature = "instrument"`, [`span!`](crate::span) e
 //!   [`event!`](crate::event) são *no-op* e o caminho ativo **não existe** no binário.
 //! - **On-demand**: com a feature, liga-se em runtime (`KATU_INSTRUMENT=1`); desligado, é uma
@@ -12,13 +12,15 @@
 //! A instrumentação é **diagnóstico**: nunca entra no log de sessão nem no contexto do modelo.
 //!
 //! ```
-//! use katu_core::diag::Level;
+//! use katu_core::diag::{Level, events};
 //!
 //! fn exemplo(n: usize) {
-//!     let _span = katu_core::span!(Level::Info, "exemplo", "n" => n);
-//!     katu_core::event!(Level::Debug, "exemplo.passo", "ok" => true);
+//!     let _span = katu_core::span!(Level::Info, events::KATU_RUN, "n" => n);
+//!     katu_core::event!(Level::Debug, events::POLICY_EVALUATE, "ok" => true);
 //! }
 //! ```
+
+pub mod events;
 
 /// Nível de diagnóstico, do mais grave (`Error`) ao mais verboso (`Trace`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -106,7 +108,7 @@ pub enum Kind {
 pub struct Record<'a> {
     /// Nível do registo.
     pub level: Level,
-    /// Identificador estável do evento (ex.: `policy.deny`).
+    /// Identificador estável do evento (do catálogo [`events`]).
     pub event: &'static str,
     /// Tipo do registo.
     pub kind: Kind,
@@ -141,10 +143,10 @@ impl Span {
         }
     }
 
-    /// Span no-op (instrumentação compilada fora).
+    /// Span no-op; marca `level`/`event` como usados (instrumentação compilada fora).
     #[cfg(not(feature = "instrument"))]
     #[must_use]
-    pub const fn noop() -> Self {
+    pub const fn noop(_level: Level, _event: &'static str) -> Self {
         Self {}
     }
 }
@@ -168,18 +170,18 @@ mod disabled;
 pub use active::{current_level, enabled, install, record, set_enabled, set_level};
 
 #[cfg(not(feature = "instrument"))]
-pub use disabled::enabled;
+pub use disabled::{enabled, noop_event};
 
-/// Abre um [`Span`] estruturado.
+/// Abre um [`Span`] estruturado. `$event` vem do catálogo [`events`].
 ///
 /// ```
-/// use katu_core::diag::Level;
-/// let _span = katu_core::span!(Level::Info, "operacao", "n" => 1_u64);
+/// use katu_core::diag::{Level, events};
+/// let _span = katu_core::span!(Level::Info, events::KATU_RUN, "n" => 1_u64);
 /// ```
 #[cfg(feature = "instrument")]
 #[macro_export]
 macro_rules! span {
-    ($level:expr, $event:literal $(, $key:literal => $value:expr)* $(,)?) => {
+    ($level:expr, $event:expr $(, $key:literal => $value:expr)* $(,)?) => {
         $crate::diag::Span::start(
             $level,
             $event,
@@ -188,25 +190,28 @@ macro_rules! span {
     };
 }
 
-/// Abre um [`Span`] (no-op: instrumentação compilada fora).
+/// Abre um [`Span`] (no-op: instrumentação compilada fora). Os campos são ignorados.
 #[cfg(not(feature = "instrument"))]
 #[macro_export]
 macro_rules! span {
-    ($($tokens:tt)*) => {
-        $crate::diag::Span::noop()
+    ($level:expr, $event:expr) => {
+        $crate::diag::Span::noop($level, $event)
+    };
+    ($level:expr, $event:expr, $($rest:tt)*) => {
+        $crate::diag::Span::noop($level, $event)
     };
 }
 
-/// Regista um **evento** estruturado (log pontual).
+/// Regista um **evento** estruturado (log pontual). `$event` vem do catálogo [`events`].
 ///
 /// ```
-/// use katu_core::diag::Level;
-/// katu_core::event!(Level::Debug, "operacao.passo", "ok" => true);
+/// use katu_core::diag::{Level, events};
+/// katu_core::event!(Level::Debug, events::TOOL_OK, "ok" => true);
 /// ```
 #[cfg(feature = "instrument")]
 #[macro_export]
 macro_rules! event {
-    ($level:expr, $event:literal $(, $key:literal => $value:expr)* $(,)?) => {
+    ($level:expr, $event:expr $(, $key:literal => $value:expr)* $(,)?) => {
         $crate::diag::record(
             $level,
             $event,
@@ -219,12 +224,17 @@ macro_rules! event {
 #[cfg(not(feature = "instrument"))]
 #[macro_export]
 macro_rules! event {
-    ($($tokens:tt)*) => {};
+    ($level:expr, $event:expr) => {
+        $crate::diag::noop_event($level, $event)
+    };
+    ($level:expr, $event:expr, $($rest:tt)*) => {
+        $crate::diag::noop_event($level, $event)
+    };
 }
 
 #[cfg(all(test, feature = "instrument"))]
 mod active_tests {
-    use super::{Kind, Level, Record, Sink, install, set_enabled, set_level};
+    use super::{Kind, Level, Record, Sink, events, install, set_enabled, set_level};
     use std::sync::{Arc, Mutex};
 
     #[derive(Default)]
@@ -248,8 +258,8 @@ mod active_tests {
         set_level(Level::Trace);
         set_enabled(true);
         {
-            let _span = crate::span!(Level::Info, "teste.span", "n" => 1_u64);
-            crate::event!(Level::Debug, "teste.event", "ok" => true);
+            let _span = crate::span!(Level::Info, events::KATU_RUN, "n" => 1_u64);
+            crate::event!(Level::Debug, events::TOOL_OK, "ok" => true);
         }
         let records = recorder
             .records
@@ -265,11 +275,12 @@ mod active_tests {
 
 #[cfg(all(test, not(feature = "instrument")))]
 mod zero_cost_tests {
+    use super::{Level, events};
     use std::hint::black_box;
 
     #[test]
     fn instrumentation_is_off_by_default() {
         assert!(!black_box(super::enabled()));
-        let _span = crate::span!("irrelevante", "k" => black_box(1_u64));
+        let _span = crate::span!(Level::Info, events::KATU_RUN, "k" => black_box(1_u64));
     }
 }

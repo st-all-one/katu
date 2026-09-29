@@ -52,11 +52,11 @@ Instalação (borda, no binário): `install(Arc<dyn Sink>)`; controlo: `set_enab
 **Uso padrão** (a regra para todo o código):
 
 ```rust
-use katu_core::diag::Level;
+use katu_core::diag::{Level, events};
 
 fn operacao(n: usize) -> Result<(), Error> {
-    let _span = katu_core::span!(Level::Info, "operacao", "n" => n);
-    katu_core::event!(Level::Debug, "operacao.passo", "ok" => true);
+    let _span = katu_core::span!(Level::Info, events::KERNEL_STEP, "n" => n);
+    katu_core::event!(Level::Debug, events::POLICY_EVALUATE, "ok" => true);
     // …
     Ok(())
 }
@@ -64,6 +64,22 @@ fn operacao(n: usize) -> Result<(), Error> {
 
 - Identificadores **estáveis** e **namespaced** (`<subsistema>.<ação>`), nunca mensagens.
 - A duração vive no `Kind::SpanEnd`; agrega-se fora do processo (p50/p95/p99), sem tocar no código.
+
+### 2.1 Catálogo de eventos (`katu_core::diag::events`)
+
+**Fonte única de verdade** dos identificadores (`CATALOG_VERSION = 1`, `ALL`), validada por teste
+(formato `<subsistema>.<ação>`, sem duplicados). Cobre execução/fs, kernel/log, política, tools e
+contenção, memória, contexto, store, providers e TUI. Mudar um id é decisão registada.
+
+> **Camadas sem acesso a `katu-core`** (ex.: `katu-policy`, por firewall/E01) são instrumentadas
+> **pelo chamador**: o kernel abre o span `policy.evaluate` em torno da avaliação. As funções
+> continuam puras e silenciosas — o orquestrador mede.
+
+### 2.2 Gate: `xtask check-diag`
+
+O clippy (`print_stdout`/`print_stderr`/`dbg_macro`) é a primeira linha; o gate é **duro** contra
+`#[allow]`: falha se `crates/*/src` usar `eprintln!`/`eprint!`/`println!`/`print!`/`dbg!` fora do
+sink (`crates/katu/src/diag.rs`). Corre em `make check`.
 
 ## 3. Como medir sem interferir
 
@@ -77,13 +93,14 @@ fn operacao(n: usize) -> Result<(), Error> {
 
 ## Tarefas
 
-### E19-T01 ☑ Mecanismo base: porta `Sink` + macros + feature
+### E19-T01 ☑ Mecanismo base: porta `Sink` + macros + feature + catálogo
 - **Entregáveis:** `katu-core::diag` (`Level`, `Value`, `Kind`, `Record`, `Sink`, `Span`); macros
-  `span!`/`event!`; `feature = "instrument"` (off por defeito); adapter de `stderr` no binário
-  (`--features profile`); `make instrument`.
+  `span!`/`event!`; catálogo `diag::events` (validado por teste); `feature = "instrument"` (off por
+  defeito); adapter de `stderr` no binário (`--features profile`); `make instrument`.
 - **Aceite:** ligada, spans/eventos são registados (teste); desligada, `Span` é *zero-sized* e
-  `enabled() == false`; build por defeito **não** compila `diag::active`.
-- **Estado:** implementado (`diag/mod.rs`, `diag/active.rs`, `diag/disabled.rs`).
+  `enabled() == false`; build por defeito **não** compila `diag::active`; catálogo bem-formado.
+- **Estado:** implementado (`diag/mod.rs`, `diag/active.rs`, `diag/disabled.rs`, `diag/events.rs`);
+  entrada do binário instrumentada (`katu.run`, `katu.setup`, `fs.*`).
 
 ### E19-T02 ☐ Sink agregador (histogramas) + dump
 - **Entregáveis:** sink que agrega contagens e durações por `event` (min/p50/p95/p99/max) e
@@ -92,11 +109,12 @@ fn operacao(n: usize) -> Result<(), Error> {
 - **Aceite:** os números saem com base tipada (DF5) e artefacto; o dump é determinístico por ordem
   canônica de `event`.
 
-### E19-T03 ☐ Instrumentar o caminho crítico por épico
-- **Entregáveis:** `span!` em cada operação do kernel (E04), política (E02), tools/contenção
-  (E06/E07), memória (E03), contexto (E09) e providers (E12); nomes estáveis, campos tipados.
-- **Aceite:** `xtask` verifica que cada módulo de produção tem spans (cobertura mínima); nenhum
-  `println!`/texto livre em log.
+### E19-T03 ◐ Instrumentar o caminho crítico por épico
+- **Entregáveis:** `span!` em cada operação do kernel (E04), política (E02 — **pelo chamador**),
+  tools/contenção (E06/E07), memória (E03), contexto (E09) e providers (E12); ids do catálogo,
+  campos tipados.
+- **Aceite:** `xtask check-diag` verde (sem texto livre); todo `span!` usa id do catálogo.
+- **Estado:** entrada e portas instrumentadas (E01); os restantes épicos instrumentam ao nascer.
 
 ### E19-T04 ☐ Consistência (fingerprint determinístico)
 - **Entregáveis**: `diag::fingerprint!` que acumula um hash determinístico do estado/resultado de
@@ -104,16 +122,19 @@ fn operacao(n: usize) -> Result<(), Error> {
 - **Aceite:** mesma entrada → mesma impressão; o teste falha se a impressão mudar sem mudança de
   código (deteta não-determinismo).
 
-### E19-T05 ☐ Gate no CI
-- **Entregáveis:** `make instrument` no job de CI (clippy + testes com a feature).
-- **Aceite:** `clippy -D warnings` verde com `instrument`/`profile`; o teste "zero quando desligado"
-  e o teste "regista quando ligado" correm ambos.
+### E19-T05 ◐ Gate no CI
+- **Entregáveis:** `make instrument` no CI (clippy + testes com a feature); `xtask check-diag` em
+  `make check`.
+- **Aceite:** `clippy -D warnings` verde com `instrument`/`profile`; "zero quando desligado" e
+  "regista quando ligado"; `check-diag` falha com sonda injetada.
+- **Estado:** `make instrument` e `check-diag` existem; falta ligar ao workflow do CI (E01-T10).
 
 ## Definition of Done
 
 - [ ] Toda operação de produção abre um `span!` com nome estável.
 - [ ] Logs **só** estruturados (identificador + campos); zero texto livre.
-- [ ] Custo zero por defeito provado por build (sem `diag::active`) e por teste.
+- [x] Custo zero por defeito provado por build (sem `diag::active`) e por teste.
+- [x] Catálogo de eventos único e validado; logs **só** estruturados (gate `check-diag`).
 - [ ] `make check` e `make instrument` verdes; `xtask check` verde em Rust 1.97.0.
 
 ## Não-objetivos

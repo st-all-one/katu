@@ -1,7 +1,7 @@
 //! `katu` — binário: CLI, composição e adaptador in-process do `knudge`.
 //!
 //! E01 define o esqueleto, os adaptadores das portas e o diagnóstico estruturado; o wiring real
-//! chega com E04 (kernel).
+//! chega com E04 (kernel). Toda a operação de topo abre um `span!` (DF9/E19).
 
 #![forbid(unsafe_code)]
 #![allow(
@@ -17,9 +17,12 @@ mod ports;
 
 use std::process::ExitCode;
 
+use katu_core::diag::{Level, events};
+
 fn main() -> ExitCode {
     #[cfg(feature = "profile")]
     setup_diag();
+    let _span = katu_core::span!(Level::Info, events::KATU_RUN);
     ExitCode::SUCCESS
 }
 
@@ -31,6 +34,7 @@ fn setup_diag() {
     use katu_core::diag::{Sink, install};
     use katu_core::ports::Env;
 
+    let _span = katu_core::span!(Level::Info, events::KATU_SETUP);
     let env = ports::StdEnv;
     let requested = env
         .var("KATU_INSTRUMENT")

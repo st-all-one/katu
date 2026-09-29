@@ -10,6 +10,8 @@ função, o log é a fonte da verdade.
 - `State`, `Event`, `Refusal`, pipeline de tool call, log append-only.
 - `derive_messages`/`snapshot` — projeções puras.
 - Porta [`memory::Memory`](src/memory.rs) (tipos do katu, DF6).
+- Diagnóstico transversal [`diag`](src/diag/mod.rs) (DF9/E19): log estruturado + métrica de tempo,
+  custo zero por defeito; catálogo de eventos em [`diag::events`](src/diag/events.rs).
 
 ## Fronteira
 

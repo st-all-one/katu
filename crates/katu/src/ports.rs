@@ -9,6 +9,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use katu_core::diag::{Level, events};
 use katu_core::ports::{Clock, Env, Fs, FsError, Rng, Timestamp};
 
 /// Relógio do sistema.
@@ -67,10 +68,12 @@ pub(crate) struct StdFs;
 
 impl Fs for StdFs {
     fn read(&self, path: &Path) -> Result<Vec<u8>, FsError> {
+        let _span = katu_core::span!(Level::Trace, events::FS_READ);
         fs::read(path).map_err(|err| FsError::from_io(&err))
     }
 
     fn write_atomic(&self, path: &Path, bytes: &[u8]) -> Result<(), FsError> {
+        let _span = katu_core::span!(Level::Trace, events::FS_WRITE);
         let temporary = temp_path(path);
         {
             let mut file = File::create(&temporary).map_err(|err| FsError::from_io(&err))?;
@@ -86,6 +89,7 @@ impl Fs for StdFs {
     }
 
     fn mtime(&self, path: &Path) -> Result<Timestamp, FsError> {
+        let _span = katu_core::span!(Level::Trace, events::FS_STAT);
         let meta = fs::metadata(path).map_err(|err| FsError::from_io(&err))?;
         let modified = meta.modified().map_err(|err| FsError::from_io(&err))?;
         let elapsed = modified
@@ -96,6 +100,7 @@ impl Fs for StdFs {
     }
 
     fn list_dir(&self, path: &Path) -> Result<Vec<PathBuf>, FsError> {
+        let _span = katu_core::span!(Level::Trace, events::FS_LIST);
         let mut entries: Vec<PathBuf> = fs::read_dir(path)
             .map_err(|err| FsError::from_io(&err))?
             .map(|entry| entry.map(|item| item.path()))
