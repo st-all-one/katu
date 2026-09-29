@@ -11,10 +11,10 @@ use super::checkpoint::{self, Checkpoint, CheckpointError};
 use super::event::{CallId, Event};
 use super::log::{Log, LogError, read_records, session_path};
 use super::pipeline::{Dispatch, Tool, dispatch};
-use super::project::state_of;
+use super::project::{Message, derive_messages, state_of};
 use super::state::{Refusal, State};
 use super::step::step;
-use crate::ports::Fs;
+use crate::ports::{Fs, FsError};
 use katu_policy::{PolicyError, RuleSet, ToolUse};
 
 /// Erro de uma operação de sessão.
@@ -36,6 +36,12 @@ pub enum SessionError {
     /// Falha no checkpoint de fase.
     #[error("checkpoint: {0}")]
     Checkpoint(#[from] CheckpointError),
+    /// Falha de sistema de ficheiros.
+    #[error("fs: {0}")]
+    Fs(#[from] FsError),
+    /// Invariante `Model-visible ⟺ logged` violada (§42).
+    #[error("invariante: {0}")]
+    Invariant(String),
 }
 
 /// Contexto de execução de uma tool call (evita uma assinatura com demasiados argumentos).
@@ -174,6 +180,49 @@ impl<'a> Session<'a> {
     /// [`CheckpointError`] se o ficheiro existir mas não validar.
     pub fn read_checkpoint(&self) -> Result<Option<Checkpoint>, CheckpointError> {
         checkpoint::load(self.fs, &self.dir)
+    }
+
+    /// Histórico visível ao modelo, derivado **só** do log (§42).
+    ///
+    /// # Errors
+    /// [`SessionError::Log`] se o log estiver corrompido.
+    pub fn messages(&self) -> Result<Vec<Message>, SessionError> {
+        Ok(derive_messages(&self.log_events()?))
+    }
+
+    /// Verifica a invariante `Model-visible ⟺ logged` (§42) em runtime: o estado corrente tem de
+    /// ser exatamente a projeção do log.
+    ///
+    /// # Errors
+    /// [`SessionError::Invariant`] se o estado divergir do log.
+    pub fn verify(&self) -> Result<(), SessionError> {
+        let replayed = state_of(&self.log_events()?)?;
+        if replayed != self.state {
+            return Err(SessionError::Invariant(
+                "estado corrente diverge do log".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Bifurca (*fork*): copia o prefixo do log para outro diretório e retoma lá, sem afetar esta
+    /// sessão. Fork e resume derivam ambos do **mesmo** log.
+    ///
+    /// # Errors
+    /// [`SessionError`] se a cópia ou a abertura do destino falharem.
+    pub fn fork(&self, dst_dir: &Path) -> Result<Self, SessionError> {
+        match self.fs.read(&session_path(&self.dir)) {
+            Ok(bytes) => self.fs.write_atomic(&session_path(dst_dir), &bytes)?,
+            Err(FsError::NotFound) => {}
+            Err(other) => return Err(SessionError::Fs(other)),
+        }
+        Session::open_with_cap(self.fs, dst_dir, self.budget.cap())
+    }
+
+    /// Lê os eventos do log.
+    fn log_events(&self) -> Result<Vec<Event>, SessionError> {
+        let records = read_records(self.fs, &session_path(&self.dir))?;
+        Ok(records.into_iter().map(|record| record.event).collect())
     }
 }
 

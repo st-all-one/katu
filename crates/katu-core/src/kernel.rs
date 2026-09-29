@@ -7,6 +7,7 @@
 //! - Tentativas falhadas ficam no log mas **não** acrescentam histórico ao modelo.
 
 pub mod budget;
+pub mod bus;
 pub mod checkpoint;
 mod event;
 mod log;
@@ -17,6 +18,7 @@ mod state;
 mod step;
 
 pub use budget::{Budget, BudgetCap, BudgetGate, BudgetRefusal, Charge};
+pub use bus::{EventBus, HandlerError, HandlerResult, Middleware, Next, Observer};
 pub use checkpoint::{CHECKPOINT_SCHEMA_VERSION, Checkpoint, CheckpointError, checkpoint_path};
 pub use event::{CallId, Event};
 pub use log::{

@@ -65,12 +65,13 @@ Pré-condições verificáveis (a imposição, não a prosa — §51.2):
 - **Aceite:** propriedade: `state_of(replay(events)) == state_at_end`; tentativas falhadas
   retidas **sem** acrescentar histórico (§42).
 
-### E04-T04 ◐ **Gate do épico:** replay e refusals
+### E04-T04 ☑ **Gate do épico:** replay e refusals
 - **Entregáveis:** teste que conduz o loop e reproduz o estado final a partir do log; testes de
   transição ilegal (ex.: `Closed` sem verificação).
 - **Estado:** replay **byte-a-byte** do log (`replay_from_log_is_byte_stable`); transição ilegal
-  devolve `Refusal` tipado e **não** muda o estado; invariante `Model-visible ⟺ logged` testada.
-  **Falta** conduzir o **loop** real (E04-T08) e verificar a invariante em runtime.
+  devolve `Refusal` tipado e **não** muda o estado; `Session::verify` compara o estado corrente com
+  a projeção do log e `Session::messages` deriva o histórico visível **só** do log (invariante
+  `Model-visible ⟺ logged` verificada em runtime no teste do loop completo).
 - **Aceite (gate):** replay byte-a-byte; transição ilegal devolve `Refusal` tipado e não muda o
   estado; invariante `Model-visible ⟺ logged` verificada em runtime.
 
@@ -85,9 +86,14 @@ Pré-condições verificáveis (a imposição, não a prosa — §51.2):
   contador a zero no teste) e o resultado volta como `ToolOutcome::Denied`; vocabulário inválido
   falha fechado sem efeito (§51.9).
 
-### E04-T06 ☐ Event bus mínimo
+### E04-T06 ☑ Event bus mínimo
 - **Entregáveis:** `emit` e `waterfall` (around-middleware com a regra explícita "tem de chamar
   `next()`"); sem contentor de DI geral (§45).
+- **Estado:** `kernel/bus.rs` — `EventBus` (observadores + cadeia de middleware + terminal),
+  `Observer` (infalível: é assim que as exceções ficam contidas) e `Middleware`/`Next`;
+  `HandlerError::{SkippedNext, CalledTwice, Failed}`. O bus deteta um middleware que devolve `Ok`
+  sem chamar `next` (observador a fingir-se de middleware) e um `next` chamado duas vezes; um
+  curto-circuito legítimo é `Err(..)` explícito.
 - **Aceite:** um listener que só observa e não chama `next()` falha o build/teste; exceções de
   callbacks são contidas no dispatcher (§43.5).
 
@@ -112,21 +118,23 @@ Pré-condições verificáveis (a imposição, não a prosa — §51.2):
 
 ### E04-T08 ◐ Loop e sessão
 - **Entregáveis:** laço que consome eventos e aplica transições; retoma a partir do log.
-- **Estado:** `kernel/session.rs` — `Session` abre/replaya o log, `apply` valida **antes** de
-  gravar, `tool_call` executa a ordem §42 (pedido logado → política → efeito → resultado).
-  Testes: negação logada mas sem efeito; reabertura retoma o estado; recusa não muda estado nem log.
-  **Falta** o laço completo com `FakeMemory` + provider fake (depende de E12) e fork/resume explícito.
+- **Estado:** `kernel/session.rs` — `Session` abre/replaya o log, valida transição + orçamento
+  **antes** de gravar, executa a ordem §42 (`tool_call`) e expõe `messages`/`verify`/`fork`.
+  Testes: negação logada sem efeito; reabertura retoma o estado; recusa não muda estado nem log;
+  **loop completo** até `Closed` com `verify()` verde; fork e resume derivam do mesmo prefixo de
+  log. **Falta** o `FakeMemory` + provider fake no laço — dependem de E03/E12/E05 (a memória é
+  enforcement do MVK).
 - **Aceite:** um teste conduz o loop do início ao fim com um `FakeMemory` e um provider fake;
-  fork/resume derivam do mesmo log.
+  fork/resume derivam do mesmo log. *(parte do fake provider + memória fica para E05/E12)*
 
 ---
 
 ## Definition of Done
 
-- [ ] E04-T01…T08 concluídas.
-- [ ] Replay determinístico e refusals verdes.
-- [ ] `Model-visible ⟺ logged` verificada.
-- [ ] `cargo xtask check` e job `msrv` verdes.
+- [ ] E04-T01…T08 concluídas. *(T08 ◐: falta o provider fake + `FakeMemory` no laço — E05/E12)*
+- [x] Replay determinístico e refusals verdes.
+- [x] `Model-visible ⟺ logged` verificada.
+- [x] `cargo xtask check` e job `msrv` verdes.
 
 ## Não-objetivos
 

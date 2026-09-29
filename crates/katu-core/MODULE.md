@@ -15,9 +15,10 @@ função, o log é a fonte da verdade.
   - `kernel::project` — `derive_messages`, `state_of`, `snapshot` (projeções puras).
   - `kernel::pipeline` — `Tool`, `facts_for`, `dispatch` (facto → política → efeito).
   - `kernel::budget` — `Budget`/`BudgetCap`/`BudgetGate` (único dono do teto de contexto).
+  - `kernel::bus` — `EventBus` (observadores + waterfall com a regra "tem de chamar `next`").
   - `kernel::checkpoint` — `Checkpoint` tipado (schema v1, validador zero-dep, `write_atomic`).
   - `kernel::session` — `Session`/`CallContext` (loop mínimo: valida transição + orçamento antes de
-    gravar, ordem §42, checkpoint de fase).
+    gravar, ordem §42, checkpoint de fase, `messages`/`verify`/`fork`).
 - `derive_messages`/`snapshot` — projeções puras.
 - Porta [`memory::Memory`](src/memory.rs) (tipos do katu, DF6), com submódulos:
   - `memory::types` — `NoteType`, `Status`, `Basis`, `NoteRef`, `Anchor`, `Score` (pontos base,
