@@ -5,6 +5,7 @@
 //! - `check-crate-coverage` — cada crate tem `MODULE.md`;
 //! - `check-diag` — logs só estruturados (nenhuma macro de texto livre fora do sink);
 //! - `check-docs` — todos os links de `*.md` resolvem;
+//! - `gate:bench` — nenhum número publicado sem base e artefacto (DF5/E15-T02);
 //! - `policy:audit` — regras `Enforced`/`Advisory` coerentes (E02-T04);
 //! - `ledger:validate` — ledger de cobertura consistente com `policy/` (E02-T06).
 //!
@@ -16,6 +17,7 @@
     reason = "binário: sem API externa; os módulos internos usam pub(crate)"
 )]
 
+mod bench;
 mod diag;
 mod ledger;
 mod policy;
@@ -51,11 +53,12 @@ fn main() -> ExitCode {
         Some("check-crate-coverage") => check_crate_coverage(),
         Some("check-diag") => check_diag(),
         Some("check-docs") => check_docs(),
+        Some("gate:bench") => bench::gate_bench(&rest),
         Some("policy:audit") => policy::policy_audit(&rest),
         Some("ledger:validate") => ledger::ledger_validate(&rest),
         Some(other) => Err(format!("tarefa desconhecida: {other}")),
         None => Err(
-            "uso: xtask <check-layers|check-crate-coverage|check-diag|check-docs|policy:audit|ledger:validate>"
+            "uso: xtask <check-layers|check-crate-coverage|check-diag|check-docs|gate:bench|policy:audit|ledger:validate>"
                 .to_string(),
         ),
     };

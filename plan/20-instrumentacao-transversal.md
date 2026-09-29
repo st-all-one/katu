@@ -102,10 +102,14 @@ sink (`crates/katu/src/diag.rs`). Corre em `make check`.
 - **Estado:** implementado (`diag/mod.rs`, `diag/active.rs`, `diag/disabled.rs`, `diag/events.rs`);
   entrada do binário instrumentada (`katu.run`, `katu.setup`, `fs.*`).
 
-### E19-T02 ☐ Sink agregador (histogramas) + dump
+### E19-T02 ☑ Sink agregador (histogramas) + dump
 - **Entregáveis:** sink que agrega contagens e durações por `event` (min/p50/p95/p99/max) e
   descarrega em `.katu/diag/*.jsonl` (ou `stderr`) sob pedido; sem alocação no caminho quente
   além do registo.
+- **Estado:** `katu_core::diag::aggregate::AggregatingSink` (feature `instrument`): agrega só
+  `SpanEnd`, percentis por *nearest-rank* em pontos base (sem vírgula flutuante), instantâneo
+  determinístico por ordem canónica de `event`. O harness `measure_mvk` grava o dump como
+  `bench/mvk/raw.json`.
 - **Aceite:** os números saem com base tipada (DF5) e artefacto; o dump é determinístico por ordem
   canônica de `event`.
 

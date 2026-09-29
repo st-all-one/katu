@@ -11,6 +11,8 @@ todo o código impuro confinado.
 - Adaptador in-process da porta `Memory` sobre o `knudge-core` (`KnudgeBuilder`, D214) — o único
   sítio com dependência do knudge.
 - Exit codes na borda (a lógica propaga `Result`).
+- Harness de medição do MVK (`examples/measure_mvk.rs`, feature `profile`, E05-T06): corre o
+  caminho real e grava `bench/mvk/raw.json` (evidência tipada, DF5).
 
 ## Fronteira
 

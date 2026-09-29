@@ -80,10 +80,13 @@ método de verificação imposto e nomeado; negativos visíveis.
   `in_progress` verificado no startup.
 - **Aceite:** contrato sem `forbidden_files` ou sem rollback **não** é aprovado; merge testado.
 
-### E09-T05 ☐ `Metric` e portão de publicação
+### E09-T05 ◐ `Metric` e portão de publicação
 - **Entregáveis:** tipo `Metric`; `xtask gate:bench` que exige artefacto por número; checklist de
   7 itens e portão (≥ 6 casos, ≥ 3 repetições, IC 95% todo acima de zero, negativos não
   removíveis) (§62).
+- **Estado:** `Metric`/`EvidenceBasis`/`ArtifactRef` implementados em `katu_core::evidence` (DF5),
+  com agregação que **não muda a base**; `xtask gate:bench` implementado e ligado ao CI. Falta o
+  portão estatístico (IC 95 %/repetições) — E18-T10.
 - **Aceite:** build falha se um valor publicado não tiver base; a linha negativa do benchmark
   permanece.
 

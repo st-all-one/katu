@@ -22,6 +22,10 @@
 
 pub mod events;
 
+/// Sink agregador de contagens e durações por evento (E19-T02).
+#[cfg(feature = "instrument")]
+pub mod aggregate;
+
 /// Nível de diagnóstico, do mais grave (`Error`) ao mais verboso (`Trace`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Level {
@@ -168,6 +172,9 @@ mod disabled;
 
 #[cfg(feature = "instrument")]
 pub use active::{current_level, enabled, install, record, set_enabled, set_level};
+
+#[cfg(feature = "instrument")]
+pub use aggregate::{AggregatingSink, EventSummary};
 
 #[cfg(not(feature = "instrument"))]
 pub use disabled::{enabled, noop_event};

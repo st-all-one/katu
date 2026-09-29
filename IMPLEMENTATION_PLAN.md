@@ -79,9 +79,11 @@ Futuro (só após valor provado): E08 MCP · E11 plugins WASM · E17 jail de SO
 - **E14** ([`15`](plan/15-governanca-superficie.md)) — scaffold de governança: ADRs com
   `Alternatives considered`, `policy/` versionado, `check-docs`.
 - **E15-T01/T02** ([`16`](plan/16-performance-benchmarks.md)) — harness e **portão de publicação de
-  números** (DF5). **Mede antes de otimizar.**
-- **E19-T01** ([`20`](plan/20-instrumentacao-transversal.md)) — **instrumentação transversal**
-  (`katu-core::diag`): logs estruturados + métrica de tempo, custo zero por defeito (DF9).
+  números** (DF5). **Mede antes de otimizar.** T02 ☑ (`Metric` + `xtask gate:bench` + `bench/`);
+  T01 ◐ (falta `criterion` do hot path).
+- **E19-T01/T02** ([`20`](plan/20-instrumentacao-transversal.md)) — **instrumentação transversal**
+  (`katu-core::diag`): logs estruturados + métrica de tempo, custo zero por defeito (DF9); sink
+  agregador de percentis (E19-T02 ☑).
 - **E18-T01** ([`19`](plan/19-otimizacao-profunda.md)) — **contrato de determinismo numérico**:
   entra como restrição de design de E02/E04.
 - **E16** ([`17`](plan/17-roadmap-riscos.md)) — contínuo (riscos, kill criteria).

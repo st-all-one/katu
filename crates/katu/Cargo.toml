@@ -11,6 +11,11 @@ publish.workspace = true
 name = "katu"
 path = "src/main.rs"
 
+[[example]]
+name = "measure_mvk"
+path = "examples/measure_mvk.rs"
+required-features = ["profile"]
+
 [features]
 default = []
 # Instrumentação transversal (DF9/E19): compila o caminho ativo e o sink de `stderr`.

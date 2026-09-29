@@ -115,23 +115,31 @@ compressão de contexto. Nada disso entra antes do gate.
   sempre aprovação ⇒ `critical_require_after_denies` + `write_without_recall…` **FAILED**. Cada
   regressão foi revertida e a suíte voltou a verde (134 testes).
 
-### E05-T06 ☐ Medição honesta do atrito
+### E05-T06 ◐ Medição honesta do atrito
 - **Objetivo:** decidir com números que citam o artefacto que os produziu (DF5).
 - **Entregáveis:** um protocolo de medição com base de evidência tipada; casos **positivos,
   negativos e no-op** (não removíveis); comparação com `pi + knudge-mcp` no mesmo cenário;
   relatório com linhas vermelhas mantidas.
+- **Estado:** protocolo + artefacto existem. `katu_core::evidence` (DF5) e o sink agregador
+  (E19-T02) alimentam o harness `crates/katu/examples/measure_mvk.rs` (feature `profile`), que
+  grava `bench/mvk/raw.json` (contadores + percentis, `os`/`arch`). `bench/mvk/REPORT.md` mostra o
+  custo (`memory.write` p50 ≈ 9,9 µs) e a **linha vermelha**: `mvk.cross_tool.gain_ratio`
+  permanece `unpriced` (0) — a comparação com `pi + knudge-mcp` **ainda não foi medida**.
 - **Aceite:** nenhum número publicado sem artefacto commitado; a linha em que o katu **não** ganha
-  permanece visível (§62).
+  permanece visível (§62). `xtask gate:bench` (E15-T02) trava o manifesto `bench/published.toml`.
+- **Falta:** correr o cenário equivalente em `pi + knudge-mcp` e publicar o rácio com base
+  `benchmark_counterfactual`.
 
-### E05-T07 ☐ **Gate de decisão (a checklist)**
+### E05-T07 ◐ **Gate de decisão (a checklist)**
 Executar a checklist de [`README.md`](README.md) §5. O épico só fecha com **todos**:
 
-- [ ] gravação sem busca → `Denied` com `rule_id` e evidência, pelo loop real (DF11);
-- [ ] duplicata ≥ 0.92 → `Denied`;
-- [ ] fecho sem `outcome` → `Refusal`;
-- [ ] a regressão inverte cada um dos três testes para vermelho;
-- [ ] 100% das regras do protocolo são `Enforced` (nenhuma `Advisory`);
-- [ ] o atrito medido e a comparação com `pi + knudge-mcp` estão no relatório, com negativos.
+- [x] gravação sem busca → `Denied` com `rule_id` e evidência, pelo loop real (DF11);
+- [x] duplicata ≥ 0.92 → `Denied`;
+- [x] fecho sem `outcome` → `Refusal`;
+- [x] a regressão inverte cada um dos três testes para vermelho;
+- [x] 100% das regras do protocolo são `Enforced` (nenhuma `Advisory`);
+- [ ] o atrito medido e a comparação com `pi + knudge-mcp` estão no relatório, com negativos
+  (medido do lado do katu; falta o contrafactual cross-tool — E05-T06).
 
 **Interpretação:**
 - **Passa** → escalar para E06 (tools/capacidades), E07 (sandbox) e E09 (contexto/evidência).

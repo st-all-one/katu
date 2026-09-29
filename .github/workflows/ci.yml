@@ -17,5 +17,6 @@ jobs:
       - run: cargo test --workspace
       - run: cargo clippy -p katu-core --features instrument --all-targets -- -D warnings
       - run: cargo clippy -p katu --features profile --all-targets -- -D warnings
+      - run: cargo run -q -p xtask -- gate:bench
       - run: cargo test -p katu-core --features instrument
       - run: cargo test -p katu --features profile

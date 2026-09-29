@@ -1,0 +1,50 @@
+# Números publicados do katu (DF5 / E15-T02).
+#
+# `xtask gate:bench` falha se algum número não tiver **base** e **artefacto**, se o artefacto não
+# existir no repositório, ou se uma linha `unpriced` tiver valor diferente de zero. As linhas
+# negativas e `unpriced` permanecem visíveis (§62): o que não se mediu não se inventa.
+#
+# Resumo humano em `bench/mvk/REPORT.md`; protocolo em `bench/mvk/PROTOCOL.md`.
+
+[[metrics]]
+name = "mvk.positive.commits"
+value = 1.0
+unit = "count"
+basis = "measured"
+artifact = { path = "bench/mvk/raw.json", note = "cenário positivo (recall → write)" }
+
+[[metrics]]
+name = "mvk.negative.commits"
+value = 0.0
+unit = "count"
+basis = "measured"
+artifact = { path = "bench/mvk/raw.json", note = "cenário negativo (write sem recall): nada commitado" }
+
+[[metrics]]
+name = "mvk.negative.denied"
+value = 1.0
+unit = "count"
+basis = "measured"
+artifact = { path = "bench/mvk/raw.json", note = "1 negação fechada (Denied) no cenário negativo" }
+
+[[metrics]]
+name = "mvk.noop.commits"
+value = 0.0
+unit = "count"
+basis = "measured"
+artifact = { path = "bench/mvk/raw.json", note = "cenário no-op (só leitura): nada commitado" }
+
+[[metrics]]
+name = "mvk.enforcement.memory_write.p50_nanos"
+value = 9918.0
+unit = "nanos"
+basis = "measured"
+artifact = { path = "bench/mvk/raw.json", note = "p50 do span memory.write, 500 repetições" }
+
+# Linha vermelha do gate E05: comparação com `pi + knudge-mcp` por medir.
+# Zero + `unpriced` — nunca um número adivinhado (DF5).
+[[metrics]]
+name = "mvk.cross_tool.gain_ratio"
+value = 0.0
+unit = "ratio"
+basis = "unpriced"

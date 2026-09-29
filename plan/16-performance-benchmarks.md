@@ -36,16 +36,23 @@ Cada meta tem um **artefacto** (saída crua commitada) e a base de evidência ti
 
 ## Tarefas
 
-### E15-T01 ☐ `criterion` e gate de performance no CI
+### E15-T01 ◐ `criterion` e gate de performance no CI
 - **Entregáveis:** benchmarks do hot path; gate obrigatório de PR em Linux com entradas sintéticas
   e orçamentos de tempo/heap/escala (§44).
+- **Estado:** existe um harness **zero-dep** (`crates/katu/examples/measure_mvk.rs`) com o sink
+  agregador (E19-T02) e o portão `xtask gate:bench`; falta o `criterion` do hot path e o job de
+  regressão de tempo no CI.
 - **Aceite:** uma regressão > X% falha o job de benchmark; os números do CI e do README vêm do
   mesmo artefacto.
 
-### E15-T02 ☐ Portão de publicação de números
+### E15-T02 ☑ Portão de publicação de números
 - **Entregáveis:** `Metric` (E09-T05); `xtask gate:bench` com a checklist de 7 itens; insumos
   contados mesmo quando o resultado é rejeitado ("spend occurred"); overhead da própria ferramenta
   contado.
+- **Estado:** `katu_core::evidence::{Metric, EvidenceBasis, ArtifactRef}` (DF5) + `xtask gate:bench`
+  que lê `bench/published.toml` e falha se um número não tiver base e artefacto, se o artefacto não
+  existir, ou se `unpriced` tiver valor ≠ 0. `make bench`/`make measure`; ligado a `make check`,
+  `pr-fast.yml` e `ci.yml`.
 - **Aceite:** build falha se um valor publicado não tiver base; o artefacto commitado é referenciado
   a partir do número.
 

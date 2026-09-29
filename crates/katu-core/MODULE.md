@@ -34,7 +34,10 @@ função, o log é a fonte da verdade.
   [`ports`](src/ports/mod.rs) (`Clock`/`Rng`/`Fs`/`Env` + fakes; `Fs::write_atomic_if` = CAS
   para `edit`, OA16).
 - Diagnóstico transversal [`diag`](src/diag/mod.rs) (DF9/E19): log estruturado + métrica de tempo,
-  custo zero por defeito; catálogo de eventos em [`diag::events`](src/diag/events.rs).
+  custo zero por defeito; catálogo de eventos em [`diag::events`](src/diag/events.rs); sink
+  agregador de percentis em `diag::aggregate` (E19-T02).
+- Evidência tipada [`evidence`](src/evidence.rs) (DF5/E09-T05): `Metric`/`EvidenceBasis`/
+  `ArtifactRef`; um número sem artefacto não fundamenta decisão; a base não muda numa agregação.
 
 ## Fronteira
 

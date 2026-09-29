@@ -1,0 +1,97 @@
+{
+  "machine": {
+    "arch": "x86_64",
+    "os": "linux"
+  },
+  "reps": 500,
+  "scenarios": {
+    "negative": {
+      "commits": 0,
+      "denied": true,
+      "refused": true
+    },
+    "noop": {
+      "commits": 0,
+      "denied": false,
+      "refused": false
+    },
+    "positive": {
+      "commits": 1,
+      "denied": false,
+      "refused": false
+    }
+  },
+  "schema": 1,
+  "timings": [
+    {
+      "count": 2511,
+      "event": "kernel.step",
+      "max_nanos": 16553,
+      "min_nanos": 908,
+      "p50_nanos": 2305,
+      "p95_nanos": 3353,
+      "p99_nanos": 8102,
+      "total_nanos": 6018557
+    },
+    {
+      "count": 2511,
+      "event": "kernel.transition",
+      "max_nanos": 46864,
+      "min_nanos": 8591,
+      "p50_nanos": 14388,
+      "p95_nanos": 21023,
+      "p99_nanos": 30521,
+      "total_nanos": 38139155
+    },
+    {
+      "count": 2511,
+      "event": "log.append",
+      "max_nanos": 26679,
+      "min_nanos": 2375,
+      "p50_nanos": 6635,
+      "p95_nanos": 11315,
+      "p99_nanos": 16693,
+      "total_nanos": 18553687
+    },
+    {
+      "count": 1006,
+      "event": "log.replay",
+      "max_nanos": 13270,
+      "min_nanos": 907,
+      "p50_nanos": 1466,
+      "p95_nanos": 1886,
+      "p99_nanos": 1956,
+      "total_nanos": 1513339
+    },
+    {
+      "count": 502,
+      "event": "memory.write",
+      "max_nanos": 23328,
+      "min_nanos": 7054,
+      "p50_nanos": 9918,
+      "p95_nanos": 10477,
+      "p99_nanos": 20324,
+      "total_nanos": 5031159
+    },
+    {
+      "count": 502,
+      "event": "policy.evaluate",
+      "max_nanos": 15645,
+      "min_nanos": 908,
+      "p50_nanos": 2374,
+      "p95_nanos": 2445,
+      "p99_nanos": 2864,
+      "total_nanos": 1152756
+    },
+    {
+      "count": 501,
+      "event": "tool.write",
+      "max_nanos": 15295,
+      "min_nanos": 908,
+      "p50_nanos": 1816,
+      "p95_nanos": 1956,
+      "p99_nanos": 2374,
+      "total_nanos": 854030
+    }
+  ]
+}
