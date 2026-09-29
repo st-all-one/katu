@@ -55,11 +55,17 @@ método de verificação imposto e nomeado; negativos visíveis.
 
 ## Tarefas
 
-### E09-T01 ☐ Montagem de contexto com orçamento
+### E09-T01 ◐ Montagem de contexto com orçamento
 - **Entregáveis:** `ContextBudget { raw_min, summary_max }`; `assemble(state, budget) -> Context`.
 - **Prime (DF12):** o contexto inclui um **prime compacto** que documenta o envelope das tools e a
   gramática **TOON** (default compacto; `--long` para a spec completa) — o modelo é *ensinado* a
   ler a saída; o prime é determinístico e versionado (`PRIME_VERSION`).
+- **Estado:** `katu-core::context` implementa `ContextBudget`, `Context`, `assemble(events, budget)`
+  (a assinatura usa os **eventos**, não `State`, porque o invariante é `Model-visible ⟺ logged`) e
+  `prime()` (`PRIME_VERSION = 1`). A montagem é pura: projeta com `derive_messages` e mantém o
+  **sufixo mais recente** que cabe em `raw_min`; a contagem de tokens é estimativa determinística
+  (`bytes/4`, base `inferred`). Emite o span `context.build`. **Falta:** o resumo/compactação
+  (`summary` fica `None` até E09-T07) e a variante `--long` do prime.
 - **Aceite:** nenhuma mensagem sem origem no log (`Model-visible ⟺ logged`); o orçamento é
   respeitado; teste com limite exato e limite+1; o prime aparece uma única vez e é estável.
 
