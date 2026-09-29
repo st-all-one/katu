@@ -20,7 +20,7 @@ pub enum View {
     Summary,
     /// Corpo de um símbolo.
     Symbol,
-    /// Diff (ainda indisponível).
+    /// Diff contra a versão anterior (`base`).
     Diff,
 }
 
@@ -68,6 +68,8 @@ pub(super) struct Build<'a> {
     pub range: Option<LineRange>,
     /// Símbolo (para [`View::Symbol`]).
     pub symbol: Option<&'a str>,
+    /// Versão anterior do conteúdo (para [`View::Diff`]).
+    pub base: Option<&'a str>,
     /// Orçamento.
     pub budget: ReadBudget,
 }
@@ -106,7 +108,10 @@ pub(super) fn build(input: Build<'_>) -> Option<ToolReport> {
         View::Outline => reports::outline_report(&lines, &meta),
         View::Summary => reports::summary(&lines, &meta),
         View::Symbol => reports::symbol(&lines, &meta, input.symbol.unwrap_or("")),
-        View::Diff => return None,
+        View::Diff => {
+            let base = input.base?;
+            reports::diff(base, input.text, &meta)
+        }
     };
     Some(report)
 }

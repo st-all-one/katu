@@ -26,6 +26,12 @@ const NESTED_FLAGS: &[&str] = &["-exec", "-execdir", "-ok", "-okdir", "--exec"];
 /// Flags destrutivas reconhecidas (alteram/removem sem confirmação).
 const DESTRUCTIVE_FLAGS: &[&str] = &["-delete", "-remove", "--delete"];
 
+/// Programas que **acedam à rede** (comparados pelo *basename*, exato). E07-T05.
+const NETWORK_PROGRAMS: &[&str] = &[
+    "curl", "wget", "ssh", "scp", "sftp", "rsync", "nc", "netcat", "ncat", "telnet", "ping", "ftp",
+    "socat",
+];
+
 /// Natureza do programa (evita dois `bool` ortogonais no mesmo struct).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -50,6 +56,10 @@ pub struct ArgvInspection {
     pub destructive: Vec<String>,
     /// Flags que aninham outro comando (`find -exec`, …).
     pub nested: Vec<String>,
+    /// `true` se o programa acede à rede (`curl`, `ssh`, …).
+    pub network: bool,
+    /// Host extraído do `argv` (autoridade de URL ou `user@host`), quando reconhecível.
+    pub host: Option<String>,
 }
 
 impl ArgvInspection {
@@ -66,10 +76,11 @@ impl ArgvInspection {
         matches!(self.kind, ProgramKind::InlineInterpreter) || !self.nested.is_empty()
     }
 
-    /// `true` se a capacidade por programa pode destrancar a execução (verificável e não destrutiva).
+    /// `true` se a capacidade por programa pode destrancar a execução (verificável, não destrutiva
+    /// e **não de rede** — a rede exige `Capability::Net`, E07-T05).
     #[must_use]
     pub fn is_plain(&self) -> bool {
-        !self.is_opaque() && self.destructive.is_empty()
+        !self.is_opaque() && self.destructive.is_empty() && !self.network
     }
 }
 
@@ -98,12 +109,41 @@ pub fn inspect(argv: &ResolvedArgv) -> ArgvInspection {
         (true, false) => ProgramKind::Interpreter,
         (true, true) => ProgramKind::InlineInterpreter,
     };
+    let network = NETWORK_PROGRAMS.contains(&program.as_str());
+    let host = if network {
+        host_of(argv.as_slice())
+    } else {
+        None
+    };
     ArgvInspection {
         program,
         kind,
         destructive,
         nested,
+        network,
+        host,
     }
+}
+
+/// Extrai o host de um `argv` (autoridade de URL ou `user@host`), sem I/O.
+fn host_of(args: &[String]) -> Option<String> {
+    for arg in args.iter().skip(1) {
+        if let Some((_, rest)) = arg.split_once("://") {
+            let authority = rest.split(['/', '?', '#']).next().unwrap_or(rest);
+            let host = authority.rsplit('@').next().unwrap_or(authority);
+            let host = host.split(':').next().unwrap_or(host);
+            if !host.is_empty() {
+                return Some(host.to_string());
+            }
+        }
+        if let Some((_, host)) = arg.split_once('@') {
+            let host = host.split(':').next().unwrap_or(host);
+            if !host.is_empty() {
+                return Some(host.to_string());
+            }
+        }
+    }
+    None
 }
 
 /// Basename de um programa (sem diretório), sem I/O.
@@ -169,6 +209,24 @@ mod tests {
         assert_eq!(inspection.program, "r''m");
         assert_eq!(inspection.kind, ProgramKind::Command);
         assert!(inspection.is_plain());
+        Ok(())
+    }
+
+    #[test]
+    fn network_programs_are_flagged_with_a_host() -> Result<(), crate::PolicyError> {
+        let curl = inspect_parts(&["curl", "https://example.com/a?b=1"])?;
+        assert!(curl.network);
+        assert_eq!(curl.host.as_deref(), Some("example.com"));
+        assert!(!curl.is_plain(), "a rede exige `Capability::Net`");
+
+        let ssh = inspect_parts(&["ssh", "user@host.example:2222"])?;
+        assert!(ssh.network);
+        assert_eq!(ssh.host.as_deref(), Some("host.example"));
+
+        let local = inspect_parts(&["ls", "-la"])?;
+        assert!(!local.network);
+        assert_eq!(local.host, None);
+        assert!(local.is_plain());
         Ok(())
     }
 }

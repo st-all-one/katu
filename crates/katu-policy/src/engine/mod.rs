@@ -114,12 +114,12 @@ fn is_write_tool(tool: ToolName) -> bool {
     matches!(tool, ToolName::Write | ToolName::Edit | ToolName::Move)
 }
 
-/// `true` se a tool lê conteúdo diretamente (`read`).
+/// `true` se a tool lê conteúdo (`read` e a busca `grep`/`find`/`ls`).
 ///
-/// A busca (`grep`/`find`/`ls`) fica para o chamador decidir — o `ToolUse` de leitura tem de
-/// trazer os caminhos resolvidos para a política os poder avaliar (E07-T05).
+/// O `ToolUse` de busca tem de trazer a **raiz resolvida** em `resolved_paths` (E07-T05), para o
+/// motor avaliar `DenyRead`/`DenySensitiveRead` sobre o que a busca vai varrer.
 fn is_read_tool(tool: ToolName) -> bool {
-    tool == ToolName::Read
+    matches!(tool, ToolName::Read | ToolName::Search)
 }
 
 /// Nome estável de uma tool.
@@ -268,15 +268,28 @@ fn command_capability(facts: &Facts, tool: ToolName) -> bool {
         Capability::Exec { program } => {
             tool == ToolName::Exec && exec_program_covers(facts, program)
         }
+        Capability::Net { host } => tool == ToolName::Exec && net_capability_covers(facts, host),
         _ => false,
     })
 }
 
-/// `true` se `program` concede o `argv` corrente e este é **verificável** (não opaco/destrutivo).
+/// `true` se `program` concede o `argv` corrente e este é **verificável** (não opaco/destrutivo
+/// **nem de rede** — a rede exige [`Capability::Net`], E07-T05).
 fn exec_program_covers(facts: &Facts, program: &str) -> bool {
     facts.tool.argv.as_ref().is_some_and(|argv| {
         let inspection = crate::inspect(argv);
         inspection.program == program && inspection.is_plain()
+    })
+}
+
+/// `true` se `host` concede o `argv` de rede corrente (`*` = qualquer host).
+///
+/// Só se aplica a um `argv` reconhecido como programa de rede; o host sai da autoridade do URL ou
+/// de `user@host` (`None` quando não reconhecível → só `*` destranca).
+fn net_capability_covers(facts: &Facts, host: &str) -> bool {
+    facts.tool.argv.as_ref().is_some_and(|argv| {
+        let inspection = crate::inspect(argv);
+        inspection.network && (host == "*" || inspection.host.as_deref() == Some(host))
     })
 }
 

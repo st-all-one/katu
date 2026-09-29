@@ -257,6 +257,39 @@ fn exec_program_capability_rejects_opaque_and_destructive() -> Result<(), Policy
 }
 
 #[test]
+fn net_program_requires_a_net_grant_not_a_program_grant() -> Result<(), PolicyError> {
+    let rules = rules()?;
+
+    // Uma capacidade por programa **não** destranca um programa de rede (E07-T05).
+    let mut curl = exec_facts("curl", &["https://example.com/a"])?;
+    curl.capabilities.push(Capability::Exec {
+        program: "curl".to_string(),
+    });
+    assert!(matches!(evaluate(&curl, &rules)?, Decision::Deny { .. }));
+
+    // Só `Capability::Net` destranca, e o host tem de casar.
+    let mut granted = exec_facts("curl", &["https://example.com/a"])?;
+    granted.capabilities.push(Capability::Net {
+        host: "example.com".to_string(),
+    });
+    assert!(evaluate(&granted, &rules)?.is_allow());
+
+    let mut any = exec_facts("wget", &["https://example.com"])?;
+    any.capabilities.push(Capability::Net {
+        host: "*".to_string(),
+    });
+    assert!(evaluate(&any, &rules)?.is_allow());
+
+    let mut wrong = exec_facts("curl", &["https://evil.com"])?;
+    wrong.capabilities.push(Capability::Net {
+        host: "example.com".to_string(),
+    });
+    assert!(matches!(evaluate(&wrong, &rules)?, Decision::Deny { .. }));
+
+    Ok(())
+}
+
+#[test]
 fn argv_text_never_changes_the_verdict() -> Result<(), PolicyError> {
     let rules = rules()?;
     let samples = [

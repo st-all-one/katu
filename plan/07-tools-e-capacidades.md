@@ -90,16 +90,18 @@ verificação recusa `SUCCESS` com erros (§38).
 ### E06-T03 ◐ Escrita e leitura (`write`, `read`, `edit`)
 - **Entregáveis:** argumentos tipados, paths resolvidos, output determinístico; truncagem
   **determinística**; deltas (só o que mudou) como regra de contexto (§18).
-- **Estado:** `read` com **views** `full`/`range`/`outline`/`summary`/`symbol` (heurística Rust-first
-  em `katu_tools::outline`; `diff` ainda indisponível) devolve `ToolReport` com `id`/`hash`/`loc`/
-  `page`/`next`; `write` (`write_file`) só para ficheiros **novos** (existentes → `Unavailable`);
-  `edit` otimista com `write_atomic_if` (CAS), `dry-run` e `Unavailable{stale}`/`ambiguous`.
-  Truncagem determinística (linhas/bytes) testada. **Falta:** view `diff`, tree-sitter (gated) e
-  a matriz multibyte exata de §45.22.
+- **Estado:** `read` com **views** `full`/`range`/`outline`/`summary`/`symbol`/`diff` (heurística
+  Rust-first em `katu_tools::outline`; `diff` é um delta unificado determinístico em
+  `katu_tools::diff`) devolve `ToolReport` com `id`/`hash`/`loc`/`page`/`next`; `write`
+  (`write_file`) só para ficheiros **novos** (existentes → `Unavailable`); `edit` otimista com
+  `write_atomic_if` (CAS), `dry-run` e `Unavailable{stale}`/`ambiguous`. Truncagem determinística
+  (linhas/bytes) testada. **Falta:** a matriz multibyte exata de §45.22; tree-sitter fica gated por
+  medição (não-objetivo até E18).
 - **Views e envelope (DF12):** `read` aceita `view=outline|summary|symbol|diff|full` (default
   `summary`), devolvendo o **envelope** com `id`/`hash`/`loc`/`truncated`/`next`; `symbol` devolve
-  só o range. A estrutura sai de uma **heurística leve** (Rust-first); tree-sitter fica gated por
-  medição. `write` é para ficheiros **novos**; existentes passam por `edit`.
+  só o range. A view `diff` compara com a versão anterior (`base`) e devolve só o delta (hunks
+  `+`/`-`/contexto). A estrutura sai de uma **heurística leve** (Rust-first); tree-sitter fica gated
+  por medição. `write` é para ficheiros **novos**; existentes passam por `edit`.
 - **`edit` otimista (OA16):** `read` → aplicar patch → `Fs::write_atomic_if(path, novo, lido)`;
   `FsError::Stale` (o ficheiro mudou desde a leitura) mapeia para `ToolOutcome` **recuperável**
   ("relê e reaplica"), **nunca** sobrescreve edição concorrente; `dry-run` mostra o patch antes de

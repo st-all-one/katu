@@ -3,6 +3,7 @@
 use katu_core::report::{Page, ToolReport, content_id};
 use katu_core::toon::Value;
 
+use crate::diff::{DiffLine, Hunk, unified};
 use crate::outline::{Symbol, outline};
 use crate::read::{LineRange, ReadBudget};
 
@@ -172,5 +173,51 @@ fn symbol_value(path: &str, symbol: &Symbol) -> Value {
                 Value::int(i64::from(symbol.end)),
             ]),
         ),
+    ])
+}
+
+/// Diff contra uma versão anterior (`base`): só o delta (E06-T03, G6).
+pub(super) fn diff(base: &str, current: &str, meta: &Meta<'_>) -> ToolReport {
+    let delta = unified(base, current, 3);
+    let hunks: Vec<Value> = delta.hunks.iter().map(hunk_value).collect();
+    let data = Value::map(vec![
+        ("path".to_string(), Value::str(meta.path)),
+        (
+            "added".to_string(),
+            Value::int(to_i64(u64::from(delta.added))),
+        ),
+        (
+            "removed".to_string(),
+            Value::int(to_i64(u64::from(delta.removed))),
+        ),
+        ("hunks".to_string(), Value::list(hunks)),
+    ]);
+    ToolReport::new("read.diff", data)
+        .with_id(meta.id.clone())
+        .with_hash(meta.hash.clone())
+}
+
+fn hunk_value(hunk: &Hunk) -> Value {
+    let lines: Vec<Value> = hunk
+        .lines
+        .iter()
+        .map(|line| match line {
+            DiffLine::Context(text) => Value::str(format!(" {text}")),
+            DiffLine::Remove(text) => Value::str(format!("-{text}")),
+            DiffLine::Add(text) => Value::str(format!("+{text}")),
+        })
+        .collect();
+    Value::map(vec![
+        (
+            "old_start".to_string(),
+            Value::int(i64::from(hunk.old_start)),
+        ),
+        ("old_len".to_string(), Value::int(i64::from(hunk.old_len))),
+        (
+            "new_start".to_string(),
+            Value::int(i64::from(hunk.new_start)),
+        ),
+        ("new_len".to_string(), Value::int(i64::from(hunk.new_len))),
+        ("lines".to_string(), Value::list(lines)),
     ])
 }

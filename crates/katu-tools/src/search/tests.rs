@@ -1,26 +1,16 @@
-use super::{DEFAULT_LIMIT, SearchTool};
+use super::{DEFAULT_LIMIT, SearchTool, search_use};
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::{Tool, ToolOutput};
 use katu_core::ports::{Fs, FsError, MemFs};
 use katu_core::report::ToolReport;
-use katu_policy::{ResolvedPath, SearchMode, ToolArgs, ToolName, ToolUse};
+use katu_policy::{ResolvedPath, SearchMode, ToolUse};
 use std::path::Path;
 
 const ROOT: &str = "/work";
 
 fn use_at(root: &str, mode: SearchMode, query: &str) -> Result<ToolUse, katu_policy::PolicyError> {
     let root = ResolvedPath::from_canonical(root)?;
-    Ok(ToolUse {
-        name: ToolName::Search,
-        args: ToolArgs::Search {
-            root: root.clone(),
-            query: query.to_string(),
-            mode,
-        },
-        resolved_paths: vec![root.clone()],
-        argv: None,
-        cwd: root,
-    })
+    Ok(search_use(&root, query, mode))
 }
 
 fn use_(mode: SearchMode, query: &str) -> Result<ToolUse, katu_policy::PolicyError> {

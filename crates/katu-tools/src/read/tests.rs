@@ -39,6 +39,21 @@ fn report(view: View, range: Option<LineRange>, symbol: Option<&str>) -> String 
         bytes: SOURCE.as_bytes(),
         range,
         symbol,
+        base: None,
+        budget: ReadBudget::default(),
+    })
+    .map_or_else(String::new, |report| report.to_toon())
+}
+
+fn diff_report(base: &str) -> String {
+    views::build(views::Build {
+        view: View::Diff,
+        path: "src/point.rs",
+        text: SOURCE,
+        bytes: SOURCE.as_bytes(),
+        range: None,
+        symbol: None,
+        base: Some(base),
         budget: ReadBudget::default(),
     })
     .map_or_else(String::new, |report| report.to_toon())
@@ -74,6 +89,7 @@ fn full_round_trips_the_bytes() -> Result<(), Box<dyn std::error::Error>> {
         bytes: SOURCE.as_bytes(),
         range: None,
         symbol: None,
+        base: None,
         budget: ReadBudget::default(),
     })
     .ok_or("sem relatório")?;
@@ -137,6 +153,7 @@ fn small_budget_truncates_deterministically() {
         bytes: SOURCE.as_bytes(),
         range: None,
         symbol: None,
+        base: None,
         budget,
     });
     let toon = report.map_or_else(String::new, |report| report.to_toon());
@@ -145,8 +162,13 @@ fn small_budget_truncates_deterministically() {
 }
 
 #[test]
-fn diff_is_unavailable() {
+fn diff_without_base_is_unavailable_and_with_base_shows_the_delta() {
     assert!(report(View::Diff, None, None).is_empty());
+    let toon = diff_report("use std::fmt;\npub struct Point {\n    x: i32,\n}\n");
+    assert!(toon.starts_with("kind: read.diff\n"), "{toon}");
+    assert!(toon.contains("added:"), "{toon}");
+    assert!(toon.contains("removed:"), "{toon}");
+    assert!(toon.contains("hunks:"), "{toon}");
     assert_eq!(View::parse("summary"), Some(View::Summary));
     assert_eq!(View::parse("bogus"), None);
 }
@@ -163,6 +185,7 @@ fn tool_reads_and_reports() -> Result<(), Box<dyn std::error::Error>> {
         view: View::Summary,
         range: None,
         symbol: None,
+        base: None,
         budget: ReadBudget::default(),
     };
     let output = tool.execute(&use_()?);
@@ -179,11 +202,34 @@ fn missing_file_is_unavailable() -> Result<(), Box<dyn std::error::Error>> {
         view: View::Summary,
         range: None,
         symbol: None,
+        base: None,
         budget: ReadBudget::default(),
     };
     assert!(matches!(
         tool.execute(&use_()?).outcome,
         ToolOutcome::Unavailable { .. }
     ));
+    Ok(())
+}
+
+#[test]
+fn tool_diff_uses_the_base() -> Result<(), Box<dyn std::error::Error>> {
+    let fs = MemFs::new();
+    fs.write_atomic(
+        std::path::Path::new("/work/src/point.rs"),
+        SOURCE.as_bytes(),
+    )?;
+    let tool = ReadTool {
+        fs: &fs,
+        view: View::Diff,
+        range: None,
+        symbol: None,
+        base: Some("use std::fmt;\n".to_string()),
+        budget: ReadBudget::default(),
+    };
+    let output = tool.execute(&use_()?);
+    let report = output.report.as_ref().ok_or("sem relatório")?;
+    assert_eq!(report.kind, "read.diff");
+    assert!(report.to_toon().contains("hunks:"), "{report:?}");
     Ok(())
 }

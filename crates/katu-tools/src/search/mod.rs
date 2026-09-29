@@ -14,7 +14,7 @@ use katu_core::diag::{Level, events};
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::{Tool, ToolOutput};
 use katu_core::ports::Fs;
-use katu_policy::{ControlId, SearchMode, ToolArgs, ToolName, ToolUse};
+use katu_policy::{ControlId, ResolvedPath, SearchMode, ToolArgs, ToolName, ToolUse};
 
 /// Limite por omissão de resultados.
 pub const DEFAULT_LIMIT: usize = 200;
@@ -25,6 +25,23 @@ pub struct SearchTool<'a> {
     pub fs: &'a dyn Fs,
     /// Limite de resultados.
     pub limit: usize,
+}
+
+/// Constrói o `ToolUse` de busca com a **raiz resolvida** em `resolved_paths` (E07-T05), para a
+/// política avaliar `DenyRead`/`DenySensitiveRead` sobre o que a busca vai varrer.
+#[must_use]
+pub fn search_use(root: &ResolvedPath, query: impl Into<String>, mode: SearchMode) -> ToolUse {
+    ToolUse {
+        name: ToolName::Search,
+        args: ToolArgs::Search {
+            root: root.clone(),
+            query: query.into(),
+            mode,
+        },
+        resolved_paths: vec![root.clone()],
+        argv: None,
+        cwd: root.clone(),
+    }
 }
 
 impl Tool for SearchTool<'_> {

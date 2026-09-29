@@ -1,7 +1,7 @@
 //! Tool `read` com **views** (E06-T03/DF12): devolve metadados e ponteiros, não um despejo.
 //!
 //! Views: `full` (conteúdo, truncado de forma determinística), `range`, `outline`, `summary`
-//! (default), `symbol` e `diff` (ainda indisponível). A estrutura sai de uma heurística leve
+//! (default), `symbol` e `diff` (delta contra `base`). A estrutura sai de uma heurística leve
 //! ([`crate::outline`]); tree-sitter fica gated por medição.
 
 mod views;
@@ -56,6 +56,8 @@ pub struct ReadTool<'a> {
     pub range: Option<LineRange>,
     /// Símbolo (para [`View::Symbol`]).
     pub symbol: Option<String>,
+    /// Versão anterior do conteúdo (para [`View::Diff`]); sem base, a view fica indisponível.
+    pub base: Option<String>,
     /// Orçamento de truncagem.
     pub budget: ReadBudget,
 }
@@ -81,6 +83,7 @@ impl Tool for ReadTool<'_> {
             bytes: &bytes,
             range: self.range,
             symbol: self.symbol.as_deref(),
+            base: self.base.as_deref(),
             budget: self.budget,
         }) {
             Some(report) => ToolOutput::report(report),

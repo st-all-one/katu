@@ -11,8 +11,10 @@ sem veredicto; controlo em falta = recusa.
   + `plan` + `memory` (grupo de **controlo**, E06-T10) — registada em `registry` (E06-T01).
 - Forma AI-first (DF12): cada tool devolve um `ToolReport` (`katu_core::report`) renderizado em
   **TOON** ao modelo (JSON como alternativa).
-- `read` (E06-T03): views `full`/`range`/`outline`/`summary`/`symbol`; estrutura por `outline`
-  (heurística Rust-first); truncagem determinística; envelope com `id`/`hash`/`page`/`next`.
+- `read` (E06-T03): views `full`/`range`/`outline`/`summary`/`symbol`/`diff`; estrutura por
+  `outline` (heurística Rust-first); truncagem determinística; envelope com `id`/`hash`/`page`/`next`.
+  A view `diff` compara com a versão anterior (`base`) via `diff::unified`.
+- `diff` (E06-T03): diff unificado determinístico (prefixo/sufixo comum, sem LCS O(n·m)).
 - `write_file` (E06-T03): só ficheiros **novos**; existentes via `edit`.
 - `edit` (E06-T03/OA16): patch otimista com `write_atomic_if` (CAS), `dry-run`, `Stale` recuperável.
 - `exec` (E06-T04/T07): `ExecTool` com `argv`/`cwd` resolvidos, ambiente filtrado de segredos e
@@ -22,7 +24,8 @@ sem veredicto; controlo em falta = recusa.
 - `trash` (E06-T09): move para `<root>/.katu/trash` (preserva o relativo) com índice append-only;
   `restore` é sempre permitido; nada é apagado automaticamente.
 - `search` (E06-T05): `grep`/`find`/`ls` determinísticos (`walk` com ignore + teto); hits
-  clusterizados por símbolo; `ls` devolve o mapa semântico.
+  clusterizados por símbolo; `ls` devolve o mapa semântico. `search_use` traz a **raiz resolvida**
+  em `resolved_paths` (E07-T05), para a política avaliar leitura fora do workspace/sensíveis.
 - `lang` (E06-T05): linguagem por extensão e conversões inteiras saturantes, partilhadas.
 - `outline` (E06-T03): scanner heurístico de símbolos (Rust-first), sem tree-sitter.
 - `plan` (E06-T06): `PlanTool` valida o plano tipado (`katu_core::plan`) e devolve `plan.validate`

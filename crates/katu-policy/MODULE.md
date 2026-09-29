@@ -11,7 +11,8 @@ O **motor de política** do katu: avalia factos tipados e devolve um veredicto d
 - Tipos de regra: `Rule`, `RuleScope`, `Enforcement`, `RuleCategory`, `Decision`, `Evidence`.
 - `evaluate(facts, rules) -> Decision` — **puro**, sem relógio, sem FS, sem regex sobre texto.
 - `inspect(argv) -> ArgvInspection` — inspetor de `argv` determinístico (E07-T02): interpretadores,
-  código inline, flags destrutivas/aninhadas; sem regex.
+  código inline, flags destrutivas/aninhadas, programas de **rede** (`curl`/`ssh`/…) e o host
+  extraído; sem regex.
 - `audit(rules, now) -> AuditReport` — categorias (`Enforced`/`Advisory`), exemplos negativos,
   duplicados e enunciados vazios (E02-T04).
 - Vocabulário **fechado e versionado** (`POLICY_VOCAB_VERSION`).
@@ -24,7 +25,10 @@ contexto tiver a `Capability` correspondente (`WritePath`/`ReadPath`/`DeletePath
 dentro do workspace, mas **nunca** `DenySensitiveRead` — esse só cede a `ReadPath` explícito
 (aprovação humana). `Capability::Exec { program }` é mais fino: só destranca `DenyCommand { Exec }`
 para um `argv` **verificável** (não opaco/destrutivo) cujo programa casa exatamente — `bash -c`,
-`find -delete`, `find -exec` e `r''m` continuam negados. O motor não lê prosa nem calcula
+`find -delete`, `find -exec` e `r''m` continuam negados. Programas de **rede** não são destrancados
+por `Exec`: só `Capability::Net { host }` (`*` = qualquer) os concede, casando o host do URL/`user@host`
+(E07-T05). A leitura inclui a **busca** (`read` + `grep`/`find`/`ls`): o `ToolUse` traz a raiz
+resolvida em `resolved_paths`. O motor não lê prosa nem calcula
 similaridade; as pré-condições semânticas (dedup ≥ 0.92, âncora, uma afirmação) chegam como
 **capacidade** concedida pelo adaptador de memória (E03). O motor mantém-se determinístico.
 

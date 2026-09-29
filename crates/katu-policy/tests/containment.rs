@@ -7,8 +7,8 @@
 use std::collections::BTreeSet;
 
 use katu_policy::{
-    BudgetState, Capability, Decision, Facts, Phase, PolicyError, ResolvedPath, RuleSet, ToolArgs,
-    ToolName, ToolUse, evaluate,
+    BudgetState, Capability, Decision, Facts, Phase, PolicyError, ResolvedPath, RuleSet,
+    SearchMode, ToolArgs, ToolName, ToolUse, evaluate,
 };
 
 const CONTAINMENT: &str = include_str!("../../../policy/containment.toml");
@@ -64,6 +64,28 @@ fn write_facts(target: &str, capabilities: Vec<Capability>) -> Result<Facts, Pol
             args: ToolArgs::Write {
                 path: resolved.clone(),
                 bytes: 1,
+            },
+            resolved_paths: vec![resolved.clone()],
+            argv: None,
+            cwd: resolved,
+        },
+        capabilities,
+        budget: BudgetState::default(),
+        completed: BTreeSet::new(),
+    })
+}
+
+fn search_facts(root: &str, capabilities: Vec<Capability>) -> Result<Facts, PolicyError> {
+    let resolved = ResolvedPath::from_canonical(root)?;
+    Ok(Facts {
+        now_millis: 0,
+        phase: Phase::Task,
+        tool: ToolUse {
+            name: ToolName::Search,
+            args: ToolArgs::Search {
+                root: resolved.clone(),
+                query: "secret".to_string(),
+                mode: SearchMode::Grep,
             },
             resolved_paths: vec![resolved.clone()],
             argv: None,
@@ -146,6 +168,33 @@ fn write_inside_workspace_is_allowed_and_outside_needs_approval()
     assert_eq!(
         classify(&evaluate(&outside, &rules)?),
         Verdict::RequireApproval
+    );
+    Ok(())
+}
+
+#[test]
+fn search_inside_workspace_is_allowed_but_outside_requires_approval()
+-> Result<(), Box<dyn std::error::Error>> {
+    let rules = rules()?;
+    let inside = search_facts("/work", vec![workspace("/work")?])?;
+    assert_eq!(classify(&evaluate(&inside, &rules)?), Verdict::Allow);
+    let outside = search_facts("/etc", vec![workspace("/work")?])?;
+    assert_eq!(
+        classify(&evaluate(&outside, &rules)?),
+        Verdict::RequireApproval,
+        "a busca fora do workspace exige aprovação (E07-T05)"
+    );
+    Ok(())
+}
+
+#[test]
+fn search_rooted_at_a_sensitive_path_is_denied() -> Result<(), Box<dyn std::error::Error>> {
+    let rules = rules()?;
+    let ssh = search_facts("/home/u/.ssh", Vec::new())?;
+    assert_eq!(
+        classify(&evaluate(&ssh, &rules)?),
+        Verdict::Deny,
+        "varrer `.ssh` é negado por default"
     );
     Ok(())
 }

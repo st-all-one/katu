@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod diff;
 pub mod edit;
 pub mod exec;
 pub mod lang;

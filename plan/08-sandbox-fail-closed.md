@@ -129,9 +129,14 @@ Regras:
   `policy/containment.toml` traz `contain-sensitive-read` (critical: `.ssh`/`.env`/chaves) e
   `contain-{read,write}-outside-workspace` (warn → `RequireApproval`). Testes:
   `katu-policy/tests/containment.rs` (matriz real) e
-  `pipeline::tests::sensitive_read_is_denied_even_with_a_workspace`. **Falta:** o fluxo interativo
-  de autorização (`override_reason`+`granted_by`, CLI/TUI E10 — hoje fica `Unavailable{approval}`),
-  `Capability::Net`, e popular `resolved_paths` na busca (`grep`/`find`) para o motor a avaliar.
+  `pipeline::tests::sensitive_read_is_denied_even_with_a_workspace`. A busca (`grep`/`find`/`ls`)
+  é agora uma tool de **leitura** para o motor (`is_read_tool` inclui `Search`) e o `ToolUse` traz a
+  raiz resolvida (`search::search_use`), pelo que varrer fora do workspace pede aprovação e varrer
+  um caminho sensível (`.ssh`/`.env`) é negado. `Capability::Net` está implementada:
+  `argv::inspect` marca programas de rede (`curl`/`ssh`/…) e extrai o host; `is_plain()` recusa-os
+  (uma capacidade por programa **não** os destranca) e `command_capability` só cede a
+  `Capability::Net { host }` (`*` = qualquer). **Falta:** o fluxo interativo de autorização
+  (`override_reason`+`granted_by`, CLI/TUI E10 — hoje fica `Unavailable{approval}`).
 - **Aceite:** ler `.ssh`/`.env` sem autorização é `Denied`; um pedido aprovado fica no log e na UI;
   a autorização não é herdada por um comando subsequente.
 

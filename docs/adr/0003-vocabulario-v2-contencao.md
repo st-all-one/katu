@@ -62,9 +62,11 @@ Regras em `policy/containment.toml`: `contain-sensitive-read` (critical), e
   fora do workspace é aprovação explícita; um único glob no projeto; recusa acionável com `rule_id`
   (`contain-sensitive-read`) e evidência estruturada.
 - **Negativas / dívida:** o fluxo interativo de aprovação (`override_reason`+`granted_by`, E10)
-  ainda não existe — hoje o pedido fica `Unavailable { control: "approval", rule_id }`; a busca
-  (`grep`/`find`) ainda não traz `resolved_paths` para o motor avaliar (o chamador tem de os
-  popular); `Capability::Net` continua por implementar.
+  ainda não existe — hoje o pedido fica `Unavailable { control: "approval", rule_id }`. A busca
+  (`grep`/`find`) já é avaliada como leitura (`is_read_tool` inclui `Search`; a raiz resolvida vai em
+  `resolved_paths` via `search_use`) e `Capability::Net` está implementada (`argv::inspect` marca
+  programas de rede e extrai o host; `is_plain()` recusa-os; só `Capability::Net { host }` os
+  destranca).
 - **Travas:** `katu-policy/tests/containment.rs` (matriz real do `policy/containment.toml`),
   `pipeline/tests.rs` (`sensitive_read_is_denied_even_with_a_workspace`), ledger
   (`containment.*`), `policy:audit` (exemplo negativo por regra `Enforced`).
