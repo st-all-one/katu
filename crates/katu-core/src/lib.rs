@@ -9,6 +9,7 @@
 pub mod diag;
 pub mod error;
 pub mod evidence;
+pub mod feedback;
 pub mod kernel;
 pub mod memory;
 pub mod plan;

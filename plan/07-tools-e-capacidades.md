@@ -154,16 +154,27 @@ verificação recusa `SUCCESS` com erros (§38).
 - **Aceite:** plano sem `forbidden_files` ou sem rollback **não** é aceite; plano é validado por
   schema; `Task → Planned` sem plano é `Refusal` (E04).
 
-### E06-T07 ☐ Feedback runner e registo de comando
+### E06-T07 ◐ Feedback runner e registo de comando
 - **Entregáveis:** cada comando captura `stdout_tail`/`stderr_tail`/`exit_code`/`duration_ms`/
   `parent_command_id`; truncagem determinística; redação no write; rotação; `exit_code: null` ⇒
   **recusa avançar** (§31).
+- **Estado:** `katu_core::feedback` (`CommandRecord` com `argv`/`cwd`/`exit_code`/`signal`/
+  `timed_out`/`duration_ms`/`stdout_tail`/`stderr_tail`/`parent_command_id`, `CommandStatus`) +
+  `tail` (cauda determinística, respeita limites de caractere) + `redact` (chaves `*KEY*`/
+  `*TOKEN*`/`Authorization`, …). `ExecTool` redige/trunca e devolve o registo; `StdProcess` mede
+  `duration_ms`. No kernel, `Event::CommandRecorded { record }` + `State.last_command`: um comando
+  **ambíguo** (`exit_code: null`) bloqueia avançar (§31). **Falta:** rotação de ficheiros —
+  deliberadamente gated (o projeto nunca apaga automaticamente; E01-T07).
 - **Aceite:** `exit_code: null` bloqueia a transição de fase; redação tem teste.
 
-### E06-T08 ☐ **Gate do épico:** imposição na operação, não em wrapper
+### E06-T08 ☑ **Gate do épico:** imposição na operação, não em wrapper
 - **Objetivo:** a regra "impor a decisão na operação que a toma" (§45.20).
 - **Entregáveis:** para cada tool, um teste que tenta contornar a política por um chamador direto
   ou caminho alternativo e **falha**.
+- **Estado:** `crates/katu-tools/tests/enforcement.rs` despacha cada tool real por
+  `kernel::dispatch`: com `Deny`, `Effect::Skipped` e **nenhum efeito** (ficheiro intacto, comando
+  não corre, lixeira não cresce); com `Allow`, a mesma tool corre. Cobre `write`/`edit`/`move`/
+  `trash`/`exec` (`bash -c rm` é negado como `Exec`, nunca por regex sobre o texto)/`plan`.
 - **Aceite (gate):** nenhuma regra depende de ordem de listeners ou de filtro de prompt para ser
   imposta; a negação é observada no executor.
 

@@ -4,6 +4,7 @@ use super::event::{CallId, Event};
 use super::state::{CallStatus, Refusal, RefusalReason, State, can_transition};
 use crate::diag::{Level, events};
 use crate::error::ToolOutcome;
+use crate::feedback::{CommandRecord, CommandStatus};
 use crate::plan::Plan;
 use katu_policy::{Phase, ToolName, ToolUse};
 
@@ -26,6 +27,7 @@ pub fn step(state: &State, event: &Event) -> Result<State, Refusal> {
         Event::PhaseTransition { to, outcome } => phase_transition(state, *to, outcome.as_deref()),
         Event::Waiver { transition, .. } => Ok(waiver(state, *transition)),
         Event::PlanRecorded { plan } => Ok(plan_recorded(state, plan)),
+        Event::CommandRecorded { record } => Ok(command_recorded(state, record)),
         Event::TurnEnd { turn } => turn_end(state, *turn),
     }
 }
@@ -92,6 +94,13 @@ fn plan_recorded(state: &State, plan: &Plan) -> State {
     next
 }
 
+/// Regista o feedback do último comando (E06-T07).
+fn command_recorded(state: &State, record: &CommandRecord) -> State {
+    let mut next = state.clone();
+    next.last_command = Some(record.status());
+    next
+}
+
 /// Muda de fase, validando a forma do caminho único e a pré-condição da fase destino.
 fn phase_transition(state: &State, to: Phase, outcome: Option<&str>) -> Result<State, Refusal> {
     if !can_transition(state.phase, to) {
@@ -116,6 +125,12 @@ fn satisfies_precondition(state: &State, to: Phase, outcome: Option<&str>) -> bo
     if state.waivers.contains(&to) {
         return true;
     }
+    if to == Phase::Task {
+        return true;
+    }
+    if command_ambiguous(state) {
+        return false;
+    }
     match to {
         Phase::KnowledgeConsulted => {
             state.completed_tools.contains(&ToolName::Read)
@@ -125,6 +140,11 @@ fn satisfies_precondition(state: &State, to: Phase, outcome: Option<&str>) -> bo
         Phase::Closed => outcome.is_some_and(|evidence| !evidence.trim().is_empty()),
         _ => true,
     }
+}
+
+/// `true` se o último comando é **ambíguo** (`exit_code: null`) — bloqueia avançar (§31).
+fn command_ambiguous(state: &State) -> bool {
+    state.last_command.is_some_and(CommandStatus::is_ambiguous)
 }
 
 /// Fecha um turno, validando o número.

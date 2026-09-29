@@ -15,8 +15,9 @@ sem veredicto; controlo em falta = recusa.
   (heurística Rust-first); truncagem determinística; envelope com `id`/`hash`/`page`/`next`.
 - `write_file` (E06-T03): só ficheiros **novos**; existentes via `edit`.
 - `edit` (E06-T03/OA16): patch otimista com `write_atomic_if` (CAS), `dry-run`, `Stale` recuperável.
-- `exec` (E06-T04): `ExecTool` com `argv`/`cwd` resolvidos, ambiente filtrado de segredos e timeout;
-  outcomes ortogonais (`exit`/`signal`/`timed_out`); porta `Process` (fake `MemProcess`).
+- `exec` (E06-T04/T07): `ExecTool` com `argv`/`cwd` resolvidos, ambiente filtrado de segredos e
+  timeout; devolve um `CommandRecord` (redigido + truncado pela cauda, `duration_ms`); outcomes
+  ortogonais (`exit`/`signal`/`timed_out`); porta `Process` (fake `MemProcess`).
 - `move_file` (E06-T11): renomeação atómica (`Fs::rename`) sob escopo; recusa destino existente.
 - `trash` (E06-T09): move para `<root>/.katu/trash` (preserva o relativo) com índice append-only;
   `restore` é sempre permitido; nada é apagado automaticamente.

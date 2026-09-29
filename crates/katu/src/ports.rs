@@ -203,6 +203,7 @@ impl Process for StdProcess {
         let Some((program, args)) = request.argv.split_first() else {
             return Err(ProcessError::Io("argv vazio".to_string()));
         };
+        let started = Instant::now();
         let mut command = Command::new(program);
         command.args(args);
         command.current_dir(&request.cwd);
@@ -238,6 +239,7 @@ impl Process for StdProcess {
             exit_code: status.code(),
             signal: signal_of(status),
             timed_out,
+            duration_ms: elapsed_millis(started.elapsed()),
             stdout: out_reader.join().unwrap_or_default(),
             stderr: err_reader.join().unwrap_or_default(),
         })
@@ -278,4 +280,9 @@ fn map_spawn_error(err: &std::io::Error) -> ProcessError {
 /// Mapeia um erro de I/O do processo para a porta.
 fn map_io_error(err: &std::io::Error) -> ProcessError {
     ProcessError::Io(err.to_string())
+}
+
+/// Duração em milissegundos, saturante.
+fn elapsed_millis(duration: Duration) -> u64 {
+    u64::try_from(duration.as_millis()).unwrap_or(u64::MAX)
 }

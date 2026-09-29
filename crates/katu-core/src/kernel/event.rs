@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::error::ToolOutcome;
+use crate::feedback::CommandRecord;
 use crate::plan::Plan;
 use katu_policy::{Phase, ToolUse};
 
@@ -83,6 +84,11 @@ pub enum Event {
         /// Plano validado.
         plan: Plan,
     },
+    /// Feedback de um comando executado (E06-T07). Evento de controlo.
+    CommandRecorded {
+        /// Registo redigido + truncado.
+        record: CommandRecord,
+    },
     /// Fim de um turno.
     TurnEnd {
         /// Número do turno.
@@ -103,6 +109,7 @@ impl Event {
             Self::PhaseTransition { .. } => "phase_transition",
             Self::Waiver { .. } => "waiver",
             Self::PlanRecorded { .. } => "plan_recorded",
+            Self::CommandRecorded { .. } => "command_recorded",
             Self::TurnEnd { .. } => "turn_end",
         }
     }

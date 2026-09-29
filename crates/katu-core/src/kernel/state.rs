@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::event::CallId;
 use crate::error::ToolOutcome;
+use crate::feedback::CommandStatus;
 use crate::plan::Plan;
 use katu_policy::{BudgetState, Capability, Phase, ToolName, ToolUse};
 
@@ -48,6 +49,9 @@ pub struct State {
     /// Plano registado (E06-T06); exigido para transitar para [`Phase::Planned`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub plan: Option<Plan>,
+    /// Estado do último comando (E06-T07); `exit_code: null` bloqueia avançar (§31).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_command: Option<CommandStatus>,
 }
 
 impl State {
@@ -64,6 +68,7 @@ impl State {
             capabilities: Vec::new(),
             budget: BudgetState::default(),
             plan: None,
+            last_command: None,
         }
     }
 }

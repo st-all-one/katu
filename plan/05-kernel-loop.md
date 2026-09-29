@@ -35,6 +35,7 @@ Pré-condições verificáveis (a imposição, não a prosa — §51.2):
 | `Task → KnowledgeConsulted` | existe `knowledge_query_id` **ou** um `waiver` explícito |
 | `→ Planned` | existe um `Plan` registado (`PlanRecorded`, E06-T06) |
 | `→ Implemented` | há um `Plan` com escopo (`allowed_files`/`forbidden_files`) |
+| qualquer avanço | o último comando não é ambíguo (`exit_code: null` ⇒ recusa, §31) |
 | `→ Verified` | existe `verification_report` válido (gate determinístico, E09) |
 | `→ Persisted` | `session_end` da memória devolveu `Ok` |
 | `→ Closed` | tarefa sem `outcome` **é recusada** |
@@ -45,7 +46,8 @@ Pré-condições verificáveis (a imposição, não a prosa — §51.2):
 
 ### E04-T01 ☑ Estado e eventos tipados
 - **Entregáveis:** `State`, `Event` (`TurnStart`, `UserMessage`, `ToolCall`, `ToolResult`,
-  `AssistantMessage`, `PhaseTransition`, `Waiver`, `PlanRecorded`, `TurnEnd`), `Refusal`.
+  `AssistantMessage`, `PhaseTransition`, `Waiver`, `PlanRecorded`, `CommandRecorded`, `TurnEnd`),
+  `Refusal`.
 - **Estado:** `kernel/{state,event,step}.rs`; `State` usa `BTreeMap`/`BTreeSet`; a transição
   `step(&State, &Event)` é pura; a forma do caminho único está em `next_phase`/`can_transition`.
 - **Aceite:** `State` é `Clone`/`Eq`/`Serialize`; nenhum campo é `HashMap` sem ordem canônica.

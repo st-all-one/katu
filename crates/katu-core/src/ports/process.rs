@@ -25,6 +25,8 @@ pub struct ExecResult {
     pub signal: Option<i32>,
     /// `true` se o timeout disparou.
     pub timed_out: bool,
+    /// Duração de *wall-clock* em milissegundos.
+    pub duration_ms: u64,
     /// `stdout` (UTF-8 *lossy*).
     pub stdout: String,
     /// `stderr` (UTF-8 *lossy*).
@@ -76,6 +78,7 @@ impl MemProcess {
             exit_code: Some(0),
             signal: None,
             timed_out: false,
+            duration_ms: 0,
             stdout: stdout.to_string(),
             stderr: String::new(),
         }))
@@ -143,10 +146,13 @@ mod tests {
             exit_code: None,
             signal: Some(9),
             timed_out: true,
+            duration_ms: 42,
             stdout: String::new(),
             stderr: String::new(),
         }));
         let result = process.run(&request());
-        assert!(matches!(result, Ok(outcome) if outcome.timed_out && outcome.signal == Some(9)));
+        assert!(
+            matches!(result, Ok(outcome) if outcome.timed_out && outcome.signal == Some(9) && outcome.duration_ms == 42)
+        );
     }
 }

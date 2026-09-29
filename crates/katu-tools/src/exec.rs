@@ -8,17 +8,17 @@ use std::path::Path;
 
 use katu_core::diag::{Level, events};
 use katu_core::error::ToolOutcome;
+use katu_core::feedback::{CommandRecord, DEFAULT_TAIL, redact, tail};
 use katu_core::kernel::{Tool, ToolOutput};
 use katu_core::ports::{Env, ExecRequest, ExecResult, Process, ProcessError};
 use katu_core::report::{ToolReport, content_hash, content_id};
 use katu_core::toon::Value;
 use katu_policy::{ControlId, ToolArgs, ToolName, ToolUse};
 
+use crate::lang::to_i64;
+
 /// Timeout por omissão (30 s).
 pub const DEFAULT_TIMEOUT_MS: u64 = 30_000;
-
-/// Limite de bytes de `stdout`/`stderr` mostrados.
-const MAX_OUTPUT: usize = 16_384;
 
 /// Fragmentos que marcam uma variável como sensível (não chega ao filho).
 const SECRET_MARKERS: &[&str] = &["KEY", "SECRET", "TOKEN", "PASSWORD", "PASSWD", "CREDENTIAL"];
@@ -31,6 +31,8 @@ pub struct ExecTool<'a> {
     pub env: &'a dyn Env,
     /// Timeout de *wall-clock*.
     pub timeout_ms: u64,
+    /// Comando pai, se aninhado (E06-T07).
+    pub parent: Option<String>,
 }
 
 impl Tool for ExecTool<'_> {
@@ -53,7 +55,10 @@ impl Tool for ExecTool<'_> {
             timeout_ms: self.timeout_ms,
         };
         match self.process.run(&request) {
-            Ok(result) => ToolOutput::report(build(&request, &result)),
+            Ok(result) => {
+                let record = build(&request, &result, self.parent.as_deref());
+                ToolOutput::report(report(&record))
+            }
             Err(ProcessError::NotFound) => unavailable("not-found"),
             Err(ProcessError::Denied) => unavailable("denied"),
             Err(_) => unavailable("exec"),
@@ -73,51 +78,58 @@ pub fn scrub_env(vars: &[(String, String)]) -> Vec<(String, String)> {
         .collect()
 }
 
-fn build(request: &ExecRequest, result: &ExecResult) -> ToolReport {
-    let (stdout, out_cut) = clip(&result.stdout);
-    let (stderr, err_cut) = clip(&result.stderr);
-    let exit = result.exit_code.map_or(-1, i64::from);
-    let data = Value::map(vec![
-        (
-            "argv".to_string(),
-            Value::list(
-                request
-                    .argv
-                    .iter()
-                    .map(|arg| Value::str(arg.clone()))
-                    .collect(),
-            ),
-        ),
-        (
-            "cwd".to_string(),
-            Value::str(request.cwd.display().to_string()),
-        ),
-        ("exit".to_string(), Value::int(exit)),
-        (
-            "signal".to_string(),
-            Value::int(result.signal.map_or(0, i64::from)),
-        ),
-        ("timed_out".to_string(), Value::bool(result.timed_out)),
-        ("stdout".to_string(), Value::block(stdout)),
-        ("stderr".to_string(), Value::block(stderr)),
-        ("truncated".to_string(), Value::bool(out_cut || err_cut)),
-    ]);
+/// Constrói o registo do comando (redigido + truncado pela cauda).
+fn build(request: &ExecRequest, result: &ExecResult, parent: Option<&str>) -> CommandRecord {
     let seed = format!("exec:{}", request.argv.join(" "));
-    ToolReport::new("exec.run", data)
-        .with_id(content_id("x", seed.as_bytes()))
-        .with_hash(content_hash(seed.as_bytes()))
+    CommandRecord {
+        id: content_id("x", seed.as_bytes()),
+        argv: request.argv.clone(),
+        cwd: request.cwd.display().to_string(),
+        exit_code: result.exit_code,
+        signal: result.signal,
+        timed_out: result.timed_out,
+        duration_ms: result.duration_ms,
+        stdout_tail: tail(&redact(&result.stdout), DEFAULT_TAIL),
+        stderr_tail: tail(&redact(&result.stderr), DEFAULT_TAIL),
+        parent_command_id: parent.map(str::to_string),
+    }
 }
 
-/// Corta o texto ao limite, num limite de caractere válido.
-fn clip(text: &str) -> (String, bool) {
-    if text.len() <= MAX_OUTPUT {
-        return (text.to_string(), false);
-    }
-    let mut end = MAX_OUTPUT;
-    while end > 0 && !text.is_char_boundary(end) {
-        end = end.saturating_sub(1);
-    }
-    (format!("{}…", &text[..end]), true)
+/// Renderiza o registo no envelope AI-first (DF12).
+fn report(record: &CommandRecord) -> ToolReport {
+    let argv: Vec<Value> = record
+        .argv
+        .iter()
+        .map(|arg| Value::str(arg.clone()))
+        .collect();
+    let data = Value::map(vec![
+        ("argv".to_string(), Value::list(argv)),
+        ("cwd".to_string(), Value::str(record.cwd.clone())),
+        (
+            "exit".to_string(),
+            Value::int(record.exit_code.map_or(-1, i64::from)),
+        ),
+        (
+            "signal".to_string(),
+            Value::int(record.signal.map_or(0, i64::from)),
+        ),
+        ("timed_out".to_string(), Value::bool(record.timed_out)),
+        (
+            "duration_ms".to_string(),
+            Value::int(to_i64(record.duration_ms)),
+        ),
+        (
+            "stdout".to_string(),
+            Value::block(record.stdout_tail.clone()),
+        ),
+        (
+            "stderr".to_string(),
+            Value::block(record.stderr_tail.clone()),
+        ),
+    ]);
+    ToolReport::new("exec.run", data)
+        .with_id(record.id.clone())
+        .with_hash(content_hash(record.id.as_bytes()))
 }
 
 fn unavailable(control: &'static str) -> ToolOutput {
@@ -165,6 +177,7 @@ mod tests {
             process,
             env,
             timeout_ms: DEFAULT_TIMEOUT_MS,
+            parent: None,
         }
     }
 
@@ -194,6 +207,7 @@ mod tests {
             exit_code: Some(2),
             signal: None,
             timed_out: false,
+            duration_ms: 7,
             stdout: String::new(),
             stderr: "boom".to_string(),
         }));
@@ -201,6 +215,7 @@ mod tests {
         let output = tool(&process, &env).execute(&use_()?);
         let rendered = render(&output);
         assert!(rendered.contains("exit: 2\n"), "{rendered}");
+        assert!(rendered.contains("duration_ms: 7\n"), "{rendered}");
         assert!(rendered.contains("boom"), "{rendered}");
         Ok(())
     }
@@ -211,6 +226,7 @@ mod tests {
             exit_code: None,
             signal: Some(9),
             timed_out: true,
+            duration_ms: 0,
             stdout: String::new(),
             stderr: String::new(),
         }));
@@ -219,6 +235,17 @@ mod tests {
         let rendered = render(&output);
         assert!(rendered.contains("timed_out: true\n"), "{rendered}");
         assert!(rendered.contains("signal: 9\n"), "{rendered}");
+        Ok(())
+    }
+
+    #[test]
+    fn redacts_secret_stdout() -> Result<(), Box<dyn std::error::Error>> {
+        let process = MemProcess::ok("MY_SECRET=abc123\n");
+        let env = FakeEnv::new();
+        let output = tool(&process, &env).execute(&use_()?);
+        let rendered = render(&output);
+        assert!(!rendered.contains("abc123"), "{rendered}");
+        assert!(rendered.contains("[redacted]"), "{rendered}");
         Ok(())
     }
 

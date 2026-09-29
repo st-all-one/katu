@@ -9,9 +9,9 @@ função, o log é a fonte da verdade.
 
 - `State`, `Event`, `Refusal`, pipeline de tool call, log append-only.
   - `kernel::state` — `State`, `CallStatus`, `Refusal`/`RefusalReason`, `next_phase`/`can_transition`,
-    `State::waivers` (exceções explícitas) e `State::plan` (E06-T06); `UnmetPrecondition`
-    (E05-T02/T04).
-  - `kernel::event` — `Event`, `CallId`, `Event::kind` (`Waiver`, `PlanRecorded`).
+    `State::waivers` (exceções explícitas), `State::plan` (E06-T06) e `State::last_command`
+    (E06-T07); `UnmetPrecondition` (E05-T02/T04).
+  - `kernel::event` — `Event`, `CallId`, `Event::kind` (`Waiver`, `PlanRecorded`, `CommandRecorded`).
   - `kernel::step` — `step(State, Event) -> Result<State, Refusal>` (puro) + pré-condições de fase.
   - `kernel::log` — `Log`/`LogRecord` append-only JSONL (`session.v1.jsonl`) sobre a porta `Fs`.
   - `kernel::project` — `derive_messages`, `state_of`, `snapshot` (projeções puras).
@@ -42,6 +42,8 @@ função, o log é a fonte da verdade.
 - Plano tipado [`plan`](src/plan.rs) (E06-T06): `Plan`/`ScopeContract`/`Feature`/`FeatureStatus`;
   `validate` (schema + "≤ 1 `in_progress`") e `allows` (globs; proibido vence). O kernel exige um
   plano registado para `Phase::Planned`.
+- Feedback de comando [`feedback`](src/feedback.rs) (E06-T07): `CommandRecord`/`CommandStatus`,
+  `tail` (cauda determinística) e `redact` (segredos); `exit_code: null` bloqueia avançar (§31).
 - Formato AI-first [`toon`](src/toon.rs) (DF12/E06-T12): emissor **TOON** canónico (zero deps) para a
   saída das tools ao modelo — sem `null`, vazios omitidos, ordem canónica; JSON é a alternativa.
 - Envelope [`report`](src/report.rs) (DF12/E06-T12): `ToolReport`/`Page`/`Cost`, ids
