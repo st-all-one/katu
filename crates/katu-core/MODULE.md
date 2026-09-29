@@ -21,7 +21,8 @@ função, o log é a fonte da verdade.
   - `kernel::memory_gate` — `enforce_memory_write` (E05-T01): `pre_write` → capacidade → política.
   - `kernel::budget` — `Budget`/`BudgetCap`/`BudgetGate` (único dono do teto de contexto).
   - `kernel::bus` — `EventBus` (observadores + waterfall com a regra "tem de chamar `next`").
-  - `kernel::checkpoint` — `Checkpoint` tipado (schema v1, validador zero-dep, `write_atomic`).
+  - `kernel::checkpoint` — `Checkpoint` tipado (schema v1, validador zero-dep `validate`,
+    `write_atomic`); erros agregados em `Issue { path, message }` (OA19/E09-T02).
   - `kernel::session` — `Session`/`CallContext` (loop mínimo: valida transição + orçamento antes de
     gravar; `tool_call` e `memory_write` pela ordem §42; `verify`/`messages`/`fork`).
 - `derive_messages`/`snapshot` — projeções puras.
@@ -51,6 +52,9 @@ função, o log é a fonte da verdade.
 - Plano tipado [`plan`](src/plan.rs) (E06-T06): `Plan`/`ScopeContract`/`Feature`/`FeatureStatus`;
   `validate` (schema + "≤ 1 `in_progress`") e `allows` (globs; proibido vence). O kernel exige um
   plano registado para `Phase::Planned`.
+- Validação com erros que ensinam [`validate`](src/validate.rs) (OA19/E09-T02): `Issue { path,
+  message }` + `Issues` agregado (ordem determinística), partilhado pelo validador de checkpoint e
+  pelo linter de schema de tools (E06-T02).
 - Feedback de comando [`feedback`](src/feedback.rs) (E06-T07): `CommandRecord`/`CommandStatus`,
   `tail` (cauda determinística) e `redact` (segredos); `exit_code: null` bloqueia avançar (§31).
 - Formato AI-first [`toon`](src/toon.rs) (DF12/E06-T12): emissor **TOON** canónico (zero deps) para a

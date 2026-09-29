@@ -69,10 +69,16 @@ método de verificação imposto e nomeado; negativos visíveis.
 - **Aceite:** nenhuma mensagem sem origem no log (`Model-visible ⟺ logged`); o orçamento é
   respeitado; teste com limite exato e limite+1; o prime aparece uma única vez e é estável.
 
-### E09-T02 ☐ Checkpoint tipado
+### E09-T02 ☑ Checkpoint tipado
 - **Entregáveis:** tipo `Checkpoint`, schema, validador zero-dep, escrita atómica.
 - **Erros (OA19):** o validador devolve `Issue { path, message }` agregado (não `String`),
   reusando o tipo de erro de E06-T02; o percurso aponta o campo exato que falhou.
+- **Estado:** `kernel::checkpoint` traz o `Checkpoint` (schema v1, `write_atomic`) e o validador
+  zero-dep `validate`; a partir de E09-T02 o erro agregado vive em `katu-core::validate`
+  (`Issue { path, message }` + `Issues`), **partilhado** com o linter de schema (E06-T02). O
+  validador agrega **todos** os problemas com o caminho exato (`goal`, `pending`, `phase`,
+  `surpresa`, …) em vez de parar no primeiro; a versão de esquema presente mas não suportada
+  mantém a recusa dedicada `SchemaVersion`. `CheckpointError::Invalid` passa a carregar `Issues`.
 - **Aceite:** checkpoint corrompido falha a validação; escrita é atómica sob crash simulado.
 
 ### E09-T03 ☐ Gate de verificação determinístico
