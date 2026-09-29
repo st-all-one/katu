@@ -31,7 +31,7 @@ pub use log::{
     LOG_SCHEMA_VERSION, Log, LogError, LogErrorKind, LogRecord, read_records, session_path,
 };
 pub use memory_gate::{
-    MemoryWriteError, MemoryWriteRequest, enforce_memory_write, memory_write_use,
+    MemoryWriteError, MemoryWriteRequest, enforce_memory_write, memory_recall_use, memory_write_use,
 };
 pub use pipeline::{
     Dispatch, DispatchRequest, Effect, Tool, ToolOutput, dispatch, dispatch_with, facts_for,

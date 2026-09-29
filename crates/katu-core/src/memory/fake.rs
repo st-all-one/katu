@@ -6,8 +6,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use super::Memory;
 use super::error::{MemoryError, MemoryErrorKind};
 use super::io::{
-    MemoryStatus, PreEditOutcome, PreEditReq, PreWriteOutcome, PreWriteReq, SessionEndOutcome,
-    SessionEndReq,
+    MemoryStatus, PreEditOutcome, PreEditReq, PreWriteOutcome, PreWriteReq, RecallHit, RecallReq,
+    SessionEndOutcome, SessionEndReq,
 };
 use super::types::{Basis, NoteRef, Score};
 
@@ -22,6 +22,8 @@ pub struct FakeMemory {
     pub session_end: SessionEndOutcome,
     /// Resposta de `status`.
     pub status: MemoryStatus,
+    /// Resultados fixos de `search` (recall).
+    pub recall: Vec<RecallHit>,
     /// Quando `Some`, todos os métodos falham com esta natureza.
     pub fail: Option<MemoryErrorKind>,
     /// Número de `record` efetivos (prova de "sem efeito" quando a política nega).
@@ -34,7 +36,11 @@ impl Default for FakeMemory {
             pre_write: PreWriteOutcome::Create,
             pre_edit: PreEditOutcome::Update,
             session_end: SessionEndOutcome::default(),
-            status: MemoryStatus::default(),
+            status: MemoryStatus {
+                backend: "fake".to_string(),
+                ..MemoryStatus::default()
+            },
+            recall: Vec::new(),
             fail: None,
             recorded: Arc::new(AtomicUsize::new(0)),
         }
@@ -60,6 +66,15 @@ impl FakeMemory {
     pub fn failing(kind: MemoryErrorKind) -> Self {
         Self {
             fail: Some(kind),
+            ..Self::default()
+        }
+    }
+
+    /// Fake que devolve resultados fixos no `search`.
+    #[must_use]
+    pub fn with_hits(hits: Vec<RecallHit>) -> Self {
+        Self {
+            recall: hits,
             ..Self::default()
         }
     }
@@ -100,6 +115,13 @@ impl Memory for FakeMemory {
         Ok(NoteRef::new("note:recorded"))
     }
 
+    fn search(&self, req: &RecallReq) -> Result<Vec<RecallHit>, MemoryError> {
+        if let Some(err) = self.failure() {
+            return Err(err);
+        }
+        Ok(self.recall.iter().take(req.limit).cloned().collect())
+    }
+
     fn session_end(&self, _req: &SessionEndReq) -> Result<SessionEndOutcome, MemoryError> {
         match self.failure() {
             Some(err) => Err(err),
@@ -120,7 +142,7 @@ mod tests {
     use super::FakeMemory;
     use crate::memory::{
         Basis, Health, Memory, MemoryError, MemoryErrorKind, MemoryStatus, NoteRef, NoteType,
-        PreWriteOutcome, PreWriteReq, Score, Status,
+        PreWriteOutcome, PreWriteReq, RecallHit, RecallReq, Score, Status,
     };
 
     fn request() -> PreWriteReq {
@@ -189,6 +211,26 @@ mod tests {
         let memory = FakeMemory::failing(MemoryErrorKind::Internal);
         assert!(memory.record(&request()).is_err());
         assert_eq!(memory.recorded(), 0);
+    }
+
+    #[test]
+    fn search_returns_fixed_hits_bounded_by_limit() -> Result<(), Box<dyn std::error::Error>> {
+        let score = Score::from_basis_points(9_000).ok_or("score inválido")?;
+        let hit = RecallHit {
+            note: NoteRef::new("n1"),
+            statement: "cache usa LRU".to_string(),
+            score,
+            basis: Basis::Measured,
+            anchor: None,
+        };
+        let memory = FakeMemory::with_hits(vec![hit.clone(), hit.clone()]);
+        let hits = memory.search(&RecallReq {
+            query: "cache".to_string(),
+            limit: 1,
+        })?;
+        assert_eq!(hits.len(), 1, "o limite é respeitado");
+        assert_eq!(hits.first(), Some(&hit));
+        Ok(())
     }
 
     #[test]

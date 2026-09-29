@@ -59,6 +59,17 @@ pub enum Basis {
     Inferred,
 }
 
+impl Basis {
+    /// Nome estável (para envelopes/diagnóstico).
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Measured => "measured",
+            Self::Inferred => "inferred",
+        }
+    }
+}
+
 /// Referência opaca a uma nota (nunca um tipo do knudge).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]

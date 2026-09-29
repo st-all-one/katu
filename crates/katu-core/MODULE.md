@@ -36,10 +36,11 @@ função, o log é a fonte da verdade.
 - Porta [`memory::Memory`](src/memory.rs) (tipos do katu, DF6), com submódulos:
   - `memory::types` — `NoteType`, `Status`, `Basis`, `NoteRef`, `Anchor`, `Score` (pontos base,
     `0..=10_000`, determinístico — E18-T01);
-  - `memory::io` — `PreWriteReq/Outcome`, `PreEditReq/Outcome`, `SessionEndReq/Outcome`,
-    `MemoryStatus`, `Health`;
+  - `memory::io` — `PreWriteReq/Outcome`, `PreEditReq/Outcome`, `RecallReq`/`RecallHit`,
+    `SessionEndReq/Outcome`, `MemoryStatus`, `Health`;
   - `memory::error` — `MemoryError`/`MemoryErrorKind` (`retryable()` só em `Timeout`);
-  - `memory::fake` — `FakeMemory` (cenários fixos, sem puxar `knudge-core`).
+  - `memory::fake` — `FakeMemory` (cenários fixos, sem puxar `knudge-core`);
+  - `memory::conformance` — `assert_contract` (E03-T05): suíte partilhada por backend.
 - Modelo de erro [`error`](src/error.rs) (E01-T06) e ports determinísticos
   [`ports`](src/ports/mod.rs) (`Clock`/`Rng`/`Fs`/`Env`/`Process` + fakes; `Fs::write_atomic_if` =
   CAS para `edit`, OA16; `Process` = execução com timeout, E06-T04).

@@ -135,9 +135,10 @@ pub enum MemoryErrorKind { Unavailable, Timeout, Invalid, Internal }
 ### E03-T05 ◐ `FakeMemory` e suíte de conformidade
 - **Entregáveis:** `FakeMemory` com cenários (`Create`/`Merge`/`Reject`) e scores fixos; suíte de
   conformidade do contrato.
-- **Estado:** `FakeMemory` feito (`memory::fake`, com `rejecting`/`failing` e falha injetável).
-  **Falta** a suíte de conformidade partilhada com o adaptador in-process (corre quando E03-T02
-  existir).
+- **Estado:** `FakeMemory` feito (`memory::fake`, com `rejecting`/`failing`/`with_hits` e falha
+  injetável). A suíte de conformidade `memory::assert_contract` (E03-T05) corre contra o fake e
+  fica pronta para o adaptador in-process (E03-T02) e o futuro MCP (E08). **Falta** correr a suíte
+  contra o adaptador in-process (bloqueado por E03-T02, que precisa do `knudge-core`).
 - **Aceite:** a suíte passa com o fake **e** com o adaptador in-process; fica pronta para reuso
   pelo futuro adaptador MCP (E08), testando paridade entre backends (§16.6).
 

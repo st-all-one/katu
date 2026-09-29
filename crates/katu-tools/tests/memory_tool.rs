@@ -34,9 +34,11 @@ fn memory_tool_is_in_the_control_family() -> TestResult<()> {
         .iter()
         .find(|spec| spec.id == ToolId::Memory)
         .ok_or("tool `memory` não registada")?;
-    assert_eq!(spec.name, ToolName::MemoryWrite);
+    assert!(spec.names.contains(&ToolName::MemoryWrite));
+    assert!(spec.names.contains(&ToolName::MemoryRecall));
     assert_eq!(spec.family, Family::Control);
     assert!(is_registered(ToolName::MemoryWrite));
+    assert!(is_registered(ToolName::MemoryRecall));
     Ok(())
 }
 

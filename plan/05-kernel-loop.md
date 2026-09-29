@@ -124,22 +124,23 @@ Pré-condições verificáveis (a imposição, não a prosa — §51.2):
 > (fora de G3 e de [`00b` §3](00b-objetivos.md)); reusa só o padrão de teto/paragem e de
 > replay a partir do log (que já é E04-T02/T04).
 
-### E04-T08 ◐ Loop e sessão
+### E04-T08 ☑ Loop e sessão
 - **Entregáveis:** laço que consome eventos e aplica transições; retoma a partir do log.
 - **Estado:** `kernel/session.rs` — `Session` abre/replaya o log, valida transição + orçamento
   **antes** de gravar, executa a ordem §42 (`tool_call`) e expõe `messages`/`verify`/`fork`.
   Testes: negação logada sem efeito; reabertura retoma o estado; recusa não muda estado nem log;
   **loop completo** até `Closed` com `verify()` verde; fork e resume derivam do mesmo prefixo de
-  log. **Falta** o `FakeMemory` + provider fake no laço — dependem de E03/E12/E05 (a memória é
-  enforcement do MVK).
-- **Aceite:** um teste conduz o loop do início ao fim com um `FakeMemory` e um provider fake;
-  fork/resume derivam do mesmo log. *(parte do fake provider + memória fica para E05/E12)*
+  log. O laço fecha com o `FakeMemory`: `crates/katu/tests/loop.rs` conduz `Task → Closed` com
+  recall → write → close (gate E05) e `session.verify()`. O **trait de provider fake** fica para
+  E12-T05.
+- **Aceite:** um teste conduz o loop do início ao fim com um `FakeMemory` e um guião determinístico
+  (provider fake); fork/resume derivam do mesmo log.
 
 ---
 
 ## Definition of Done
 
-- [ ] E04-T01…T08 concluídas. *(T08 ◐: falta o provider fake + `FakeMemory` no laço — E05/E12)*
+- [x] E04-T01…T08 concluídas. *(T08 ☑: `FakeMemory` no laço; o trait de provider fake é E12-T05)*
 - [x] Replay determinístico e refusals verdes.
 - [x] `Model-visible ⟺ logged` verificada.
 - [x] `cargo xtask check` e job `msrv` verdes.

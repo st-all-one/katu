@@ -89,8 +89,8 @@ impl ToolId {
 pub struct ToolSpec {
     /// Identidade ao modelo.
     pub id: ToolId,
-    /// Nome no vocabulário de política.
-    pub name: ToolName,
+    /// Comandos de política que esta tool resolve (a `memory` resolve `record`/`search`).
+    pub names: &'static [ToolName],
     /// Família.
     pub family: Family,
 }
@@ -99,57 +99,57 @@ pub struct ToolSpec {
 pub const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         id: ToolId::Write,
-        name: ToolName::Write,
+        names: &[ToolName::Write],
         family: Family::Write,
     },
     ToolSpec {
         id: ToolId::Edit,
-        name: ToolName::Edit,
+        names: &[ToolName::Edit],
         family: Family::Write,
     },
     ToolSpec {
         id: ToolId::Move,
-        name: ToolName::Move,
+        names: &[ToolName::Move],
         family: Family::Write,
     },
     ToolSpec {
         id: ToolId::Trash,
-        name: ToolName::Trash,
+        names: &[ToolName::Trash],
         family: Family::Write,
     },
     ToolSpec {
         id: ToolId::Read,
-        name: ToolName::Read,
+        names: &[ToolName::Read],
         family: Family::Read,
     },
     ToolSpec {
         id: ToolId::Bash,
-        name: ToolName::Exec,
+        names: &[ToolName::Exec],
         family: Family::Exec,
     },
     ToolSpec {
         id: ToolId::Grep,
-        name: ToolName::Search,
+        names: &[ToolName::Search],
         family: Family::Search,
     },
     ToolSpec {
         id: ToolId::Find,
-        name: ToolName::Search,
+        names: &[ToolName::Search],
         family: Family::Search,
     },
     ToolSpec {
         id: ToolId::Ls,
-        name: ToolName::Search,
+        names: &[ToolName::Search],
         family: Family::Search,
     },
     ToolSpec {
         id: ToolId::Plan,
-        name: ToolName::Plan,
+        names: &[ToolName::Plan],
         family: Family::Plan,
     },
     ToolSpec {
         id: ToolId::Memory,
-        name: ToolName::MemoryWrite,
+        names: &[ToolName::MemoryWrite, ToolName::MemoryRecall],
         family: Family::Control,
     },
 ];
@@ -157,7 +157,7 @@ pub const TOOLS: &[ToolSpec] = &[
 /// `true` se a tool pertence à superfície fechada.
 #[must_use]
 pub fn is_registered(name: ToolName) -> bool {
-    TOOLS.iter().any(|spec| spec.name == name)
+    TOOLS.iter().any(|spec| spec.names.contains(&name))
 }
 
 #[cfg(test)]
@@ -187,9 +187,15 @@ mod tests {
     #[test]
     fn registered_names_and_foreign_names() {
         for spec in TOOLS {
-            assert!(is_registered(spec.name));
+            assert!(!spec.names.is_empty(), "tool sem comando de política");
+            for name in spec.names {
+                assert!(is_registered(*name));
+            }
         }
-        assert!(!is_registered(ToolName::MemoryRecall));
+        assert!(
+            is_registered(ToolName::MemoryRecall),
+            "a `memory` faz recall"
+        );
         assert!(!is_registered(ToolName::Compact));
         assert!(!is_registered(ToolName::Model));
     }

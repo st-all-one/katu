@@ -70,6 +70,30 @@ pub enum PreEditOutcome {
     },
 }
 
+/// Pedido de consulta (recall) à memória.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecallReq {
+    /// Consulta em linguagem natural (uma frase).
+    pub query: String,
+    /// Número máximo de resultados a devolver.
+    pub limit: usize,
+}
+
+/// Resultado de uma consulta: nota + afirmação + score.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecallHit {
+    /// Referência à nota.
+    pub note: NoteRef,
+    /// Afirmação.
+    pub statement: String,
+    /// Similaridade (pontos base).
+    pub score: Score,
+    /// Base do score (medido/inferido).
+    pub basis: Basis,
+    /// Âncora de código, quando aplicável.
+    pub anchor: Option<Anchor>,
+}
+
 /// Pedido de fim de sessão.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionEndReq {

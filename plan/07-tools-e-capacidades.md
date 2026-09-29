@@ -71,8 +71,10 @@ verificação recusa `SUCCESS` com erros (§38).
   §1.1 (Escrita `write`/`edit`/`move`/`trash`; Leitura `read`; Execução `bash`; Pesquisa
   `grep`/`find`/`ls`; Planeamento `plan`).
 - **Estado:** `katu_tools::registry` (`Family`/`ToolId`/`ToolSpec`/`TOOLS`/`is_registered`), com
-  `ToolName::Move` adicionado ao vocabulário de política. Testes: 10 tools, ids únicos, famílias
-  4/1/1/3/1, `is_registered` para tools estranhas. `xtask check-surface` chega em E14-T05.
+  `ToolName::Move` adicionado ao vocabulário de política. A tool `memory` (`Family::Control`,
+  E06-T10) resolve dois comandos via `ToolSpec.names` (`MemoryWrite`/`MemoryRecall`). Testes: 11
+  tools, ids únicos, famílias 4/1/1/3/1/1, `is_registered` para tools estranhas. `xtask
+  check-surface` chega em E14-T05.
 - **Aceite:** qualquer tool fora do conjunto mínimo exige uma decisão registada (filtro `00b` §4);
   `xtask check-surface` falha ao exceder o teto; nenhum registo sem teste de teardown (§44).
 
@@ -196,20 +198,21 @@ verificação recusa `SUCCESS` com erros (§38).
   sem aprovação humana; a política **não** trata `bash rm` como equivalente a `trash`, mas prefere
   `trash` quando a regra o exigir; `refs` antes de apagar e `undo_token` no retorno (DF12).
 
-### E06-T10 ◐ Tool `memory` (pedido explícito, policy-gated, secundária)
+### E06-T10 ☑ Tool `memory` (pedido explícito, policy-gated, secundária)
 - **Objetivos:** o modelo pode **solicitar explicitamente** gravar memória, mas os hooks/fases do
   protocolo continuam **prioritários** (a tool não os substitui nem contorna).
 - **Entregáveis:** tool `memory` (ex.: `memory.record`/`memory.search`) no **grupo de controlo**,
   fora das cinco famílias de codificação; a chamada passa pela **mesma** política e pelas mesmas
   pré-condições de fase (`pre_write`/dedup/âncora/`outcome`); a tool só **pede** — quem grava é a
   porta `Memory` (E03/E05).
-- **Estado:** a tool `memory` (`ToolId::Memory` → `ToolName::MemoryWrite`) está no novo
-  `Family::Control`, fora das cinco famílias de codificação; o gate continua no kernel
-  (`Session::memory_write` → `enforce_memory_write`: `pre_write` → capacidade → política) e o
-  executor `WriteNoteTool` devolve o envelope `memory.record`. Testes: registo no grupo de controlo,
-  escrita permitida com envelope, e duplicata **negada mesmo com a tool registada** (a tool não
-  contorna o `pre_write`). **Falta:** `memory.search`/recall — a porta `Memory` ainda não expõe busca
-  (E03/E04).
+- **Estado:** a tool `memory` (`ToolId::Memory`, `Family::Control`) resolve **dois** comandos de
+  política via `ToolSpec.names`: `record` (`ToolName::MemoryWrite`) e `search`/recall
+  (`ToolName::MemoryRecall`). O gate continua no kernel (`Session::memory_write` →
+  `enforce_memory_write`: `pre_write` → capacidade → política); os executores `WriteNoteTool`
+  (`memory.record`) e `RecallTool` (`memory.recall`) devolvem envelopes AI-first. A porta `Memory`
+  expõe `search` (`RecallReq`/`RecallHit`) e o `FakeMemory` responde com `with_hits`. Testes:
+  registo no grupo de controlo, escrita permitida com envelope, duplicata **negada mesmo com a tool
+  registada**, e o **loop completo** recall → write → close (E04-T08).
 - **Aceite:** usar a tool nunca contorna `pre_write`/dedup/âncora; uma gravação pedida pelo modelo
   sem âncora é negada tal como num hook; desligar a tool **não** desliga o enforcement (o protocolo
   continua pelos hooks/fases).

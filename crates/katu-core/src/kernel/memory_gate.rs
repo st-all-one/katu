@@ -53,6 +53,18 @@ pub fn memory_write_use(cwd: &ResolvedPath) -> ToolUse {
     }
 }
 
+/// Constrói o `ToolUse` resolvido de um recall de memória (E06-T10).
+#[must_use]
+pub fn memory_recall_use(cwd: &ResolvedPath) -> ToolUse {
+    ToolUse {
+        name: ToolName::MemoryRecall,
+        args: ToolArgs::Other,
+        resolved_paths: Vec::new(),
+        argv: None,
+        cwd: cwd.clone(),
+    }
+}
+
 /// Avalia e executa uma escrita de memória: `pre_write` → capacidade → política → efeito.
 ///
 /// # Errors

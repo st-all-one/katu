@@ -30,6 +30,8 @@ sem veredicto; controlo em falta = recusa.
 - `write::WriteNoteTool` (E05-T01/E06-T10): commit de nota; só é invocado depois de a política
   permitir; devolve o envelope `memory.record`. A tool `memory` só **pede** — o gate
   (`pre_write`/dedup/âncora) vive no kernel e não é contornável.
+- `recall::RecallTool` (E06-T10): consulta a porta `Memory` (`search`); devolve o envelope
+  `memory.recall` e marca `memory_recall` no log (pré-condição de `memory_write`).
 - Contenção **soft** (E07): caminhos canonicalizados, `argv` resolvido, autorização explícita.
 - `trash` → `.katu/trash` (recuperável; esvaziar exige humano) — E06-T09.
 

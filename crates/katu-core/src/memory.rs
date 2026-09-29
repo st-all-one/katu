@@ -3,18 +3,20 @@
 //! O contrato completo (`pre_write`, `pre_edit`, `session_end`, `status`) vive aqui, com tipos do
 //! katu: **nenhum tipo do `knudge-core`** aparece nesta API. A implementação in-process vive no
 //! binário (`katu/src/memory/`), isolada por `xtask check-layers`; o [`FakeMemory`] cobre os testes
-//! do kernel (E03-T05).
+//! do kernel (E03-T05) e a suíte [`assert_contract`] corre contra qualquer backend.
 
+mod conformance;
 mod error;
 mod fake;
 mod io;
 mod types;
 
+pub use conformance::assert_contract;
 pub use error::{MemoryError, MemoryErrorKind};
 pub use fake::FakeMemory;
 pub use io::{
-    Health, MemoryStatus, PreEditOutcome, PreEditReq, PreWriteOutcome, PreWriteReq,
-    SessionEndOutcome, SessionEndReq,
+    Health, MemoryStatus, PreEditOutcome, PreEditReq, PreWriteOutcome, PreWriteReq, RecallHit,
+    RecallReq, SessionEndOutcome, SessionEndReq,
 };
 pub use types::{Anchor, Basis, NoteRef, NoteType, Score, Status};
 
@@ -41,6 +43,12 @@ pub trait Memory: Send + Sync {
     /// # Errors
     /// [`MemoryError`] se o backend falhar.
     fn record(&self, req: &PreWriteReq) -> Result<NoteRef, MemoryError>;
+
+    /// Consulta (recall): devolve as notas mais próximas da consulta, por ordem de score.
+    ///
+    /// # Errors
+    /// [`MemoryError`] se o backend falhar ou o pedido for inválido.
+    fn search(&self, req: &RecallReq) -> Result<Vec<RecallHit>, MemoryError>;
 
     /// Finaliza a sessão: commit/sync e inferência do `outcome`.
     ///

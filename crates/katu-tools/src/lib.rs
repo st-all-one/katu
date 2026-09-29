@@ -13,6 +13,7 @@ pub mod move_file;
 pub mod outline;
 pub mod plan;
 pub mod read;
+pub mod recall;
 pub mod registry;
 pub mod search;
 pub mod trash;
