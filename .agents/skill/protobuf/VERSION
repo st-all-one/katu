@@ -1,0 +1,24 @@
+Protocol Buffers — v37 (linha 37.0-dev / main, 2026-07-09)
+Fonte: repositório oficial protocolbuffers/protobuf (TMP/protobuffer/protobuf_docs)
+
+protoc (compilador) .......... 37.0-dev
+Runtimes (37-dev):
+  C++ 7.37-dev · C# 3.37-dev · Java 4.37-dev · Python 7.37-dev
+  JavaScript 3.37-dev · Objective-C 5.37-dev · PHP 5.37-dev
+  Ruby 4.37-dev · Rust 0.37-dev · legacy Rust 4.37-dev
+
+Sintaxes:
+  proto2 · proto3 ....................... legadas (suportadas)
+  editions ............................. modelo atual (sem `syntax`)
+
+Editions conhecidas no descriptor (descriptor.proto):
+  EDITION_2023 (Edition Zero) · EDITION_2024 · EDITION_2026
+  EDITION_LEGACY=900 · EDITION_PROTO2=998 · EDITION_PROTO3=999
+  EDITION_MAX=0x7FFFFFFF
+
+Cobertura do guia:
+  fundamentos, sintaxe completa do .proto, editions/features,
+  tipos e números, wire format, presença de campos, geração de código,
+  tipos bem-conhecidos, ProtoJSON/TextFormat, gRPC, segurança,
+  performance, logs/observabilidade, testes/conformance, evolução de
+  contrato, boas práticas, troubleshooting, referência rápida.

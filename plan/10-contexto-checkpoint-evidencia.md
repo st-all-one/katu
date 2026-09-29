@@ -5,6 +5,9 @@
 >
 > **Decisões:** DF5, DF7. **Depende de:** E05.
 > **Gate do épico:** nenhum número sem base tipada; checkpoint validado contra schema.
+>
+> **Matemática.** Seleção de contexto submodular (F2) e compactação por informação (F3) em
+> [`19-otimizacao-profunda.md`](19-otimizacao-profunda.md) (E18).
 
 ---
 
@@ -17,6 +20,12 @@
   **determinístico original→substituto**, senão invalida o cache de prefixo do provider e custa
   mais do que poupa.
 - **Um único dono do teto de contexto** (a cicatriz dos 6 donos da compactação no maxima, §49.4).
+- **Reaproveitar o `rewind` do knudge?** O núcleo já monta o contexto de início de sessão com
+  orçamento aproximado em tokens (`D40`) e `context_id` endereçável para retomar bytes idênticos
+  (`D88`). Decidir explicitamente: (a) expor `rewind`/`context_id` pela porta `Memory` e **não**
+  construir um segundo montador de contexto — evitando a dualidade de motores do arags (§20); ou
+  (b) documentar por que o `assemble` do katu é distinto. Não deixar as duas implementações
+  coexistirem por inércia.
 
 ## 2. Checkpoint como artefacto de fase (§50.1, §51.8)
 
@@ -84,16 +93,28 @@ método de verificação imposto e nomeado; negativos visíveis.
 
 ---
 
+### E09-T07 ☐ Compactação da conversa como controlo do core
+- **Objetivos:** tornar "compactar conversa" (core §1.1 #9) operação de primeira classe — via
+  comando do utilizador e/ou gatilho do kernel no limite de fase/orçamento excedido — **nunca**
+  inline no hot path.
+- **Entregáveis:** porta `katu-context` (`assemble`/`compact`) com **mapeamento determinístico
+  original→substituto** (preserva o cache de prefixo do provider, §1 deste épico); um único dono
+  do teto de contexto (evita a cicatriz dos 6 donos, §49.4); recuperação obrigatória (o original
+  continua endereçável no log); `Metric` do ganho com base `provider_reported`/`inferred`.
+- **Aceite:** compactar não perde nenhuma mensagem reconstruível do log (`Model-visible ⟺ logged`);
+  o resultado é determinístico para o mesmo input; desligar a porta mantém o comportamento
+  original; nenhuma compactação silenciosa no caminho built-in (E12).
+
 ## Definition of Done
 
-- [ ] E09-T01…T06 concluídas.
+- [ ] E09-T01…T07 concluídas.
 - [ ] Checkpoint, gate e métricas validados por schema/zero-dep.
 - [ ] Nenhum número sem base e artefacto.
 - [ ] `cargo xtask check` e job `msrv` verdes.
 
 ## Não-objetivos
 
-- Compressão de contexto como função do núcleo: é **porta** (`katu-context`) desligada por
-  defeito, com recuperação obrigatória (E15/incremental).
+- Compressão **inline no hot path**: a compactação é capacidade do core (§1.1 #9), mas é **porta**
+  (`katu-context`) acionada off hot path, com recuperação obrigatória (E15/incremental).
 - `durable execution` completo: começar com snapshot atómico; event log durável só quando a
   retomada multi-sessão for real (§34, tensões).

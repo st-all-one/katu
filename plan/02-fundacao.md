@@ -33,9 +33,12 @@ Todos os entregáveis abaixo assumem e verificam:
 ## Tarefas
 
 ### E01-T01 ☐ Workspace e camadas
-- **Objetivo:** workspace `katu` com crates `katu-core`, `katu-policy`, `katu-memory`,
-  `katu-tools`, `katu-sandbox`, `katu-providers`, `katu-tui`, `katu` (binário) e `xtask`.
+- **Objetivo:** workspace `katu` com **6 crates + `xtask`** (`katu-core`, `katu-policy`,
+  `katu-tools`, `katu-providers`, `katu-tui`, `katu` binário) — menos peças, mesma fronteira.
 - **Entregáveis:** `Cargo.toml` do workspace; `src/lib.rs` de cada crate; `MODULE.md` por crate.
+- **Simplificação:** `katu-contain` é o módulo `contain` de `katu-tools`; a porta `Memory` vive em
+  `katu-core` (`katu_core::memory`) e o adaptador in-process do knudge vive no binário
+  (`katu/src/memory/`), isolado por `check-layers`.
 - **Aceite:** `cargo build` compila cada crate isolado; `katu-core`/`katu-policy`/`katu-tools`
   **não** dependem de nenhum crate de provider (firewall LLM-free, §21) — verificado por
   `xtask check-layers`.
@@ -100,18 +103,24 @@ Todos os entregáveis abaixo assumem e verificam:
 ### E01-T08 ☐ Política de memória e `unsafe`
 - **Objetivo:** manter a segurança de memória por construção.
 - **Entregáveis:** `#![forbid(unsafe_code)]` nos crates puros; `unsafe` só no sandbox/FFI com
-  `#[allow(unsafe_code)]` + `// SAFETY:`; proibir `Rc`/`RefCell` no núcleo (`disallowed_types`);
-  `try_reserve`/`Cow<'_, str>` onde couber; `O_NOFOLLOW`/canonicalização ao abrir ficheiros;
-  `Drop` determinístico (sem `mem::forget`).
-- **Aceite:** compila com `forbid(unsafe_code)`; Miri verde (E13); zero `unsafe` fora do
-  sandbox; symlink rejeitado.
+  `#[allow(unsafe_code)]` + `// SAFETY:`; `clippy.toml` com `disallowed_types` para
+  `Rc`/`Weak`/`RefCell`/`Cell`/`LinkedList` **e `HashMap`/`HashSet`** (determinismo — G8), e
+  `unwrap_used`/`expect_used`/`panic`/`todo`/`dbg_macro` negados em `src/`; indexação `[]` negada
+  (usar `.get()`); aritmética com `overflow-checks` (`checked_*`/`saturating_*`); todo `#[allow]`
+  exige `reason`; `try_reserve`/`Cow<'_, str>` onde couber; `O_NOFOLLOW`/canonicalização ao abrir
+  ficheiros; `Drop` determinístico (sem `mem::forget`).
+- **Fonte:** disciplina `D92` do `knudge-core`
+  (skill [`knudge/13`](../.agents/skill/knudge/13-arquitetura-e-qualidade.md)).
+- **Aceite:** compila com `forbid(unsafe_code)`; `clippy` verde com os `disallowed_types`; Miri
+  verde (E13); zero `unsafe` fora do sandbox; symlink rejeitado.
 
 ### E01-T09 ☐ Política de recursos e runtime mínimo
 - **Objetivo:** teto de memória/disco/tempo, sem runtime pesado.
 - **Entregáveis:** canal bounded + backpressure; pool limitado a `available_parallelism()`;
   timeouts tipados e retry/backoff só em operação idempotente; cap de corpo e de cache; decisão de
   runtime (**worker bloqueante por padrão**; `tokio` mínimo só se necessário); `spawn_blocking`
-  para o núcleo puro síncrono do knudge (ver [`04`](04-contrato-da-porta-memory.md)).
+  para o núcleo puro síncrono do knudge (ver [`04`](04-contrato-da-porta-memory.md)); inferência
+  local in-process (`llama.cpp`, E12-T09) roda no worker bloqueante, fora do caminho async.
 - **Aceite:** `cargo tree` sem `tokio full`; rajada acima do teto não estoura memória; I/O lento
   não trava o comando.
 

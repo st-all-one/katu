@@ -62,9 +62,10 @@ via PR, o revisor decide. **"Trampas a evitar, não mapas a seguir."**
 
 > **Este** é o documento onde vive a linhagem; o código não a duplica (§44).
 
-- **Regra:** toda decisão `DFxx` cita a referência que a sustenta; toda referência
-  (`_REF/*`, `proposal/*`) é **fonte**, nunca dependência de build.
-- **Aceite:** `_REF/` e `proposal/` fora do versionamento de build; nenhum crate depende deles.
+- **Regra:** toda decisão `DFxx` cita a referência que a sustenta; `_REF/*` é **pesquisa externa,
+  fora do projeto** — consulta e citação, nunca integração nem dependência.
+- **Aceite:** `_REF/` **não versionado** (gitignore) e fora do build; nenhum crate depende dele;
+  nenhum ficheiro do `plan/` o liga por caminho (só o nomeia).
 
 ---
 

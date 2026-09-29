@@ -20,14 +20,13 @@ Fase 2  E04  Kernel (loop possuído)  ─┐
         E05  MVK enforcement          ─┴─► ═══ GATE DE DECISÃO (passa/para) ═══
    ▼
    (só se E05 passar)
-Fase 3  E06  Tools/capacidades (write/read/exec/search + planning)
-        E07  Sandbox fail-closed
+Fase 3  E06  Tools/capacidades (write/read/edit/trash/exec/search + planning)
+        E07  Contenção determinística (soft)
 Fase 4  E09  Contexto/checkpoint/evidência (token-optimized)
 Fase 5  E10  TUI
-Fase 6  E11  Plugins/ABI
-Fase 7  E12  Providers
+Fase 6  E12  Providers
 Transversal  E13 testes · E14 governança · E15 performance
-Futuro (fora do escopo): E08 adaptador MCP
+Futuro (fora do escopo): E08 adaptador MCP · E11 plugins WASM · jail de SO (E17)
 ```
 
 **Por que esta ordem:** ao contrário do §67 da brainstorm (que propunha as 7 ADRs primeiro), este
@@ -46,8 +45,7 @@ E05 provar que a fiscalização da memória funciona e vale o esforço.
 | 3 | negação pelo executor; sem passthrough silencioso | E06-T07 + E07-T03 |
 | 4 | nenhum número sem base; artefactos validados; token medido | E09-T05 + E15-T02 |
 | 5 | terminal panic-safe; evidência no ecrã | E10-T01/T04 |
-| 6 | capacidades declaradas ∧ concedidas | E11-T02/T06 |
-| 7 | firewall LLM-free intacta | `xtask check-layers` |
+| 6 | firewall LLM-free intacta | `xtask check-layers` |
 
 ---
 
@@ -57,10 +55,10 @@ E05 provar que a fiscalização da memória funciona e vale o esforço.
 |---|---|---|---|---|---|
 | R1 | GDK alpha quebra API | alta | médio | pinar versão; vendorizar peças pequenas; isolar atrás de trait próprio | §8 |
 | R2 | Escopo "controle" vira produto inteiro | alta | **alto** | teto de superfície (E14-T05); kill criteria; MVK antes da escala | §8, §51.13 |
-| R3 | Sandbox cross-platform é caro | média | médio | Linux primeiro; fallback degradado **explícito** | §8, §51.13 |
+| R3 | Jail de SO cross-platform é caro | média | médio | **adiada** a feature futura (E17); no MVP contenção **soft** declarada | §8, §51.13 |
 | R4 | Performance regride por persistência | média | médio | benchmarks desde a Fase 1; gate de CI | §8, E15 |
 | R5 | Reimplementar commodity sem querer | média | alto | regra "commodity = dependência"; revisão por fase | §2 |
-| R6 | Segurança de plugin (código não confiável) | média | alto | capacidades + isolamento; nunca shell irrestrito | §8, E11 |
+| R6 | Segurança de plugin (código não confiável) | média | alto | **futuro** (E11 adiado); capacidades + isolamento quando retomar | §8, E11 |
 | R7 | As regras de memória não caberem no modelo | média | **alto** | é precisamente o gate E02-T07/E05 | §5 do README |
 | R8 | Acoplamento ao knudge (tipo vaza) | média | alto | porta com tipos do katu; teste de sanidade | §12–§13, E03-T06 |
 | R9 | Regressão silenciosa no enforcement | média | alto | teste invertido por regra (E13-T03) | §51.9 |

@@ -74,22 +74,26 @@ categoria; a lista `Enforced` vs `Advisory` é publicada e comparada com a esper
 
 ## DF4 — Fail-closed em todas as fronteiras ✅
 
-**Enunciado.** Sandbox com fiscalização relatada (`full`/`partial`); **nunca passthrough
-não-confinado silencioso**. Recuo para o original em dúvida. `unavailable` nega. Desconhecido não
-executa.
+**Enunciado.** Contenção **determinística (soft)** no MVP: política imposta na operação, caminhos
+canonicalizados, capacidades tipadas, `unavailable` nega, desconhecido não executa. **Nunca
+vendida como fronteira de segurança** — o katu corre global, como o utilizador. Recuo para o
+original em dúvida. A **jail de SO real** (bwrap + Landlock) é feature **futura** (E17).
 
 **Evidência a favor.** `caveman` (tabela de 10 recuos, §63); `dsh` (`partial`, `allowed-once`
-única concessão, `unavailable` nega, §43).
+única concessão, `unavailable` nega, §43); o **`ai-jail`** (pesquisa externa, fora do projeto)
+como referência da jail
+**futura** (bwrap + Landlock + seccomp + rlimits, projeto monotónico, egress filtrado, escapes).
 
 **Evidência contra.** O `maxima`: `--host` de primeira classe com um banner + `docker.sock` no
 agente (§49.7); o `open-keyboard`: chave zero silenciosa no `init` (§26).
 
-**Consequência.** Um controlo em falta vira `SandboxUnavailable`; a execução **não** acontece
-sem autorização explícita e registada. A garantia é declarada, não escondida.
+**Consequência.** Um controlo em falta vira `Denied`/`Unavailable` (contenção soft); a execução
+**não** acontece sem autorização explícita e registada. A garantia é declarada, não escondida.
 
-**Teste que trava.** `E07-T03`: com Landlock indisponível, o resultado é `SandboxUnavailable` e
-o comando **não** roda; a política confinada nunca cai para execução livre; `RunnerFailureRule`
-exige a conjunção (exit ≠ 0 **e** assinatura fatal).
+**Teste que trava.** `E07-T03`: com o controlo ausente (path não canonicalizável, `argv`
+desconhecido, `exit_code: null`, autorização em falta), a operação **não** corre
+(`Denied`/`Unavailable`); um teste afirma que a contenção é **soft**; `RunnerFailureRule` exige a
+conjunção (exit ≠ 0 **e** assinatura fatal).
 
 ---
 
@@ -160,6 +164,34 @@ gate falham o build.
 
 ---
 
+## DF8 — O provider built-in é first-party e é um endpoint de modelo ✅
+
+**Enunciado.** O caminho built-in de modelos é **nosso**: o gateway **`opencode go/zen`** (hot
+path, stateless) e o **`llama.cpp`** local (opcional). Todo o resto entra pelo **GDK**
+declarativo/out-of-process ou é **ativamente ignorado**. O seam é um **endpoint de modelo**,
+**nunca** o agente: a HttpApi (`/api/*`) do OpenCode **não** é substrato do loop. No built-in,
+**latência > compressão** (keep-alive/pooling, `TCP_NODELAY`/HTTP2, SSE incremental,
+`Accept-Encoding: identity`); a compressão do G6 continua a valer para o **input do modelo**. O
+modelo e o grau de pensamento são acionados pelo **utilizador**, nunca auto-escalados pelo agente.
+
+**Evidência a favor.** O gateway Zen/Go fala 4 dialetos compatíveis com SDKs conhecidos (Responses,
+Messages, chat/completions, Gemini) com API key e session affinity (`x-opencode-session`); o
+`llama.cpp` expõe `llama-server` HTTP compatível com OpenAI (L1) e FFI in-process (L2). O
+`goose-rs`/GDK cobre o resto sem escrevermos N adaptadores.
+
+**Evidência contra.** Quatro dialetos a normalizar; o GDK ainda é `0.1.0-alpha.11` (R1); a FFI do
+`llama.cpp` é `unsafe`. Nada disto é único ao katu — é custo conhecido e isolado no adaptador.
+
+**Consequência.** O built-in vive em `katu-providers` (`E12-T01/T06/T07/T08/T09/T10`); o resto é
+delegado e out-of-process; o modelo é **cliente** do plano de dados, não parte dele (firewall
+LLM-free). `katu-core`/`katu-policy`/`katu-tools` **não** dependem de nenhum crate de provider.
+
+**Teste que trava.** `E12-T01`: `xtask check-layers` falha se `core`/`policy`/`tools` importarem um
+provider. `E12-T07`: TTFT/throughput medidos com artefacto commitado (a latência do hot path é um
+número com base, não uma promessa — DF5).
+
+---
+
 ## Tabela de rastreabilidade rápida
 
 | Decisão | Épicos que a implementam | Teste canónico |
@@ -171,6 +203,7 @@ gate falham o build.
 | DF5 | E09, E15 | `E15-T02` |
 | DF6 | E03 | `E03-T06` |
 | DF7 | E14, E15 | `E14-T01` |
+| DF8 | E12 | `E12-T01`, `E12-T07` |
 
 ---
 
@@ -180,8 +213,15 @@ gate falham o build.
 |---|---|---|---|
 | OA1 | Persistência: JSONL append-only vs SQLite | E04 | **JSONL append-only** (o log é a verdade; índice derivado) |
 | OA2 | Semântica de negação: erro recuperável vs parada dura | E02 | **ambos**: `Denied` recuperável por default; `NeedsHuman` para irreversível |
-| OA3 | TUI: `crossterm` cru vs `ratatui` | E10 | `crossterm` cru com componentes próprios (controle fino) |
-| OA4 | Providers do MVP | E12 | **1** (o mais barato de integrar); amplitude é fase 8 |
-| OA5 | Sandbox cross-platform | E07 | Linux (landlock/seccomp) primeiro; fallback degradado explícito |
-| OA6 | Momento do WASM em plugins | E11 | **não no MVP**; fronteira de capacidades desenhada como se fosse |
+| OA3 | TUI: `crossterm` cru vs `ratatui` | E10 | **`ratatui` 0.30 + `crossterm` 0.29** (skill [`ratatui-tui`](../.agents/skill/ratatui-tui/SKILL.md): estado central, render puro, executor async); rever antes de E10-T01 |
+| OA4 | Providers do MVP | E12 | built-in first-party **`opencode go/zen`** (hot path) + **`llama.cpp`** (local, opcional); todo o resto via **GDK** ou ignorado ativamente |
+| OA5 | Contenção / jail | E07 → E17 | **soft agora** (E07: política imposta por operação, sem jail); **jail real depois** (E17: bwrap + Landlock + seccomp) |
+| OA6 | Momento do WASM em plugins | E11 (futuro) | **não no MVP**; o modelo de capacidades entra na política (E02); runtime de plugins deferido |
 | OA7 | Momento do adaptador MCP | E08 | **deferido**; fora do escopo atual (`00b` §7) |
+| OA8 | Semântica de commit na porta `Memory`: `session_end` vs método explícito | E03 | **`record`/`commit` explícito** (mapeia `write`/`update`/`task::submit`/`commit`); `session_end` = finalização/`sync`, não persistência de notas |
+| OA9 | Trade-off latência × compressão no provider built-in | E12 | **latência primeiro** (`opencode go/zen`), compressão off-path; orçamento medido em E12-T07 (negativo visível) |
+| OA10 | `llama.cpp`: in-process (FFI) vs `llama-server` HTTP | E12 | **L1 HTTP primeiro**; in-process (L2) só se a medição (E12-T07) justificar; FFI confinada atrás de feature |
+| OA11 | Lixeira (`trash`) como tool própria vs efeito de `write`/`rm` | E06 | **tool própria** `trash` → `.katu/trash` (recuperável); `bash rm` continua possível, mas a política prefere `trash` |
+| OA12 | Quem aciona modelo/grau de pensamento e mapeamento por provider | E12 | **utilizador** aciona (`set_model`/`set_thinking`); mapeamento por dialeto (effort/budget/tokens); agente **não** auto-escala |
+| OA13 | (Futuro E17) `bwrap` (binário externo) vs namespaces em Rust puro | E17 | **bwrap validado** (como o `ai-jail`): menos código sensível, correções upstream; Rust puro rejeitado |
+| OA14 | Extensões por **código** (Lua / `cdylib` Rust / WASM) vs regras **só-dados** | E11 (futuro) | **dados puros agora**; código só como plugin **WASM/out-of-process** com capacidades; Lua/Rust in-process **rejeitados** (DSL + determinismo + G7) |

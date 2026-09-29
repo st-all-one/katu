@@ -11,9 +11,41 @@
 ## 1. Definição
 
 > **O katu é um kernel agêntico mínimo, focado em código, que possui apenas o necessário para ser
-> útil — ler, escrever, executar, pesquisar ficheiros e planejar — com o knudge integrado como
-> memória do agente. É estrito, orientado a guardrails determinísticos e otimizado para tokens.
-> Tem um CLI e um TUI, e só.**
+> útil — ler, escrever, editar, mover para a lixeira do projeto (`.katu/trash`), executar com as
+> permissões do utilizador que o evocou, pesquisar ficheiros otimizadamente, registrar memória
+> (knudge), planejar, compactar a conversa e escolher o modelo e o grau de pensamento — com o
+> knudge integrado como memória do agente. É estrito, orientado a guardrails determinísticos e
+> otimizado para tokens. Tem um CLI e um TUI, e só.**
+
+### 1.1 O core (superfície exata)
+
+Este é o conjunto **completo** do MVP. Nada além disto entra sem passar o filtro do §4.
+
+| # | Capacidade | Forma | Onde |
+|---|---|---|---|
+| 1 | **Ler** ficheiros | tool `read` | E06-T03 |
+| 2 | **Escrever** ficheiros | tool `write` | E06-T03 |
+| 3 | **Editar** ficheiros | tool `edit` | E06-T03 |
+| 4 | **Mover para a lixeira** do projeto | tool `trash` → `.katu/trash` (recuperável) | E06-T09 |
+| 5 | **Executar** comandos | tool `bash`, **com as permissões do utilizador que evocou o processo** (nunca eleva) | E06-T04, E07 |
+| 6 | **Pesquisar** ficheiros otimizadamente | tools `grep`/`find`/`ls` (respeitam ignore, streaming, só o delta) | E06-T05 |
+| 7 | **Registrar memória** (knudge) | hooks/fases (**prioritários**) + tool `memory` policy-gated (pedido explícito) | E03, E05, E06-T10 |
+| 8 | **Planejar** | tool `plan` (artefacto de fase) | E06-T06 |
+| 9 | **Compactar a conversa** | comando/porta `katu-context` (off hot path, com recuperação) | E09-T07 |
+| 10 | **Alterar modelo e grau de pensamento** | controlo de runtime (`set_model` / `set_thinking`) | E12-T10 |
+
+**Distinção:** 1–6 e 8 são **tools** do modelo (superfície fechada, E06). 7, 9 e 10 são
+**capacidades do kernel** (portas/controlos) — o modelo **não** ganha superfície nova por causa
+delas (a tool `memory` de #7 é a exceção, policy-gated e secundária aos hooks/fases).
+
+**Fronteira de execução (MVP).** **Não há jail de SO ativo**: o katu é **global de facto** e corre
+como o utilizador que o evocou. A limitação vem das **travas determinísticas** (caminhos
+canonicalizados, capacidades, `RequireApproval`/`NeedsHuman`) — barreira **soft**, declarada, que
+**não** é fronteira de segurança. A jail real é feature **futura** (E17, [`18`](18-jail-futuro.md)).
+
+**A única parte que impõe fluxo é a máquina de estados** (E04). Todas as transições têm caminhos
+explícitos de `waiver`/`Refusal` — o katu não engessa o utilizador nem o modelo com muros
+silenciosos; saltar uma fase é uma decisão declarada e registada.
 
 ---
 
@@ -23,10 +55,10 @@
 |---|---|---|
 | **G1** | **Kernel mínimo.** Núcleo pequeno, puro e possuído — a política é o kernel, não um acessório. | `xtask check-surface`; ficheiros ≤ 300 linhas; núcleo sem dependências de provider |
 | **G2** | **Foco em código.** Tudo serve o fluxo de editar, executar e verificar código. Sem features laterais. | Toda capacidade nova passa o filtro do §4 |
-| **G3** | **Conjunto mínimo de capacidades:** escrever, ler, executar, pesquisar ficheiros e planejar. Nada mais. | A superfície de tools é exatamente essas 5 famílias; extras são `deferred` explícitos |
+| **G3** | **Conjunto mínimo de capacidades:** o **core** do §1.1 — ler/escrever/editar/lixeira, executar, pesquisar, memória, planejar, compactar, modelo/pensamento. Nada mais. | A superfície de **tools** são as famílias fechadas do §1.1; memória/compaction/modelo são **controlos do kernel**; extras são `deferred` explícitos |
 | **G4** | **knudge integrado como memória.** O knudge **não** é plugin opcional: é a memória do agente, in-process. | E03 (porta + adaptador in-process); `Memory` nunca desligada em produção |
 | **G5** | **Guardrails determinísticos e estritos.** Regras avaliadas sobre factos, com bloqueio duro e evidência. | E02/E05; nenhuma regra `Enforced` sem teste pelo caminho real |
-| **G6** | **Otimizado para tokens.** Só o delta chega ao modelo; orçamento de contexto; medir o custo por turno. | E09 (orçamento) + E15 (medição); `Metric` com base tipada |
+| **G6** | **Otimizado para tokens.** Só o delta chega ao modelo; orçamento de contexto; medir o custo por turno. | E09 (orçamento) + E15 (medição); `Metric` com base tipada. No caminho built-in (`opencode go/zen`), latência precede compressão (E12) |
 | **G7** | **Duas superfícies e só: CLI e TUI.** Nenhum servidor, nenhum protocolo de rede, nenhum endpoint. | `katu` (CLI) + `katu-tui`; nenhuma crate de servidor/RPC no grafo |
 | **G8** | **Fortemente testado e determinístico.** Nada de `SystemTime::now()` no hot path; ordem canônica; replay. | E13 (caminho real + guards invertidos); Miri/geiger; proptest |
 | **G9** | **Fiel à filosofia do knudge; evitar os erros do arags.** Núcleo puro + portas, artefacto-texto como verdade, sem plataforma. | §5 abaixo; `check-surface`; nenhuma dualidade de backend |
@@ -40,10 +72,11 @@
 | **MCP no escopo atual** | É uma **ideia futura**, opcional. O katu integra o knudge in-process; a porta `Memory` mantém a opção aberta, mas nada de MCP agora (§7). |
 | Servidor, daemon, RPC, rede | O arags provou que a plataforma maior que o agente é negativa líquida (§20). |
 | Multi-utilizador, auth, papéis, quórum | Camada social antes do segundo utilizador. |
-| Web, desktop, Electron, mobile | Fora do fluxo de codificação no terminal. |
-| Plugins/WASM | O **modelo** de capacidades entra; o runtime de plugins é futuro (§12). |
-| Múltiplos providers, inferência local, voz | Amplitude é commodity; no MVP, **um** provider (§13). |
-| Compressão de contexto no núcleo | Porta desligada por defeito, com recuperação obrigatória (§61). |
+| Web, desktop, Electron, mobile, voz, imagem, browser | Fora do fluxo de codificação no terminal (G2/G7). |
+| Plugins/WASM | O **modelo** de capacidades já entra na política (E02); o plugin host/ABI é **futuro**, fora do plano principal (E11, [`12`](12-plugins-e-abi.md)). |
+| Reimplementar providers, OAuth, gateways de plataforma | Os built-in são só o gateway `opencode go/zen` e o `llama.cpp` local; os demais vêm do **GDK/declarativo** ou são **ativamente ignorados** (§13). |
+| Compressão **inline no hot path** | A compactação é um controlo do core (§1.1 #9), mas corre **off hot path**, como porta com recuperação obrigatória (§61). |
+| Jail de SO real no MVP | É feature **futura** (E17), pós-MVP; no MVP a contenção é **soft** e declarada (E07). |
 | Servir de "mais um agente de codificação" genérico | Sem o knudge integrado, o katu não se justifica (§53). |
 
 ---
@@ -52,7 +85,7 @@
 
 Uma capacidade/feature só entra se responder **sim** a todas:
 
-1. Serve diretamente um dos cinco mínimos (G3)?
+1. Serve diretamente um item do **core** (G3/§1.1)?
 2. Aumenta a utilidade para **código** (G2)?
 3. Pode ser determinística e testada pelo caminho real (G8)?
 4. Não abre uma nova superfície fora de CLI+TUI (G7)?
@@ -100,8 +133,8 @@ O knudge é integrado **in-process** (linka `knudge-core`) — é a memória do 
 sidecar. A porta `Memory` com **tipos do katu** mantém a substituibilidade (DF6):
 
 ```
-katu-memory
-   └── adapter in-process  → knudge-core        (PRIMÁRIO, no escopo)
+katu-core::memory (porta, tipos do katu)
+   └── adapter in-process  → knudge-core        (PRIMÁRIO, no escopo; vive no binário `katu`)
    └── adapter mcp         → knudge-mcp / kd    (FUTURO, fora do escopo)
 ```
 

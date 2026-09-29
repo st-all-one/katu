@@ -1,0 +1,12 @@
+# Template: /projects/personal/.gitconfig-personal  (copie para o path do includeIf)
+# Identidade e credencial ISOLADAS do contexto "pessoal".
+[user]
+    name  = Seu Nome
+    email = seu.email.pessoal@gmail.com
+    signingkey = ~/.ssh/id_ed25519_pessoal.pub
+[gpg "ssh"]
+    allowedSignersFile = ~/.ssh/allowed_signers
+[credential]
+    helper = osxkeychain              # ajuste ao seu SO (cache/manager)
+[url "git@github.com-pessoal:"]
+    insteadOf = https://github.com/    # push/pull roteia para a conta pessoal

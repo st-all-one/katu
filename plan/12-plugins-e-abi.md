@@ -1,11 +1,44 @@
-# E11 — Plugin host e ABI
+# E11 — (FUTURO) Plugin host e ABI
 
-> **Fase 7.** Extensibilidade **com poder limitado e explícito** (§0, tese item 3). Só depois de o
-> núcleo estar estável.
+> **Status: deferido — fora do plano principal.** O plugin host **não** é necessário para controlar
+> a IA: o seam de controlo é a **política** (E02), que é **dado**. Isto é maquinaria pesada (ABI
+> carimbada, manifests, pontos de extensão) e só se justifica **depois** de o produto geral estar
+> estável — a lição do `dsh` (§46.1).
 >
-> **Decisões:** DF2, DF4, DF6, DF7. **Depende de:** E06.
-> **Gate do épico:** o plugin **declara** capacidades; o host exige a **conjunção** declarado ∧
+> **Decisões:** DF2, DF4, DF6, DF7. **Depende de:** E06 (se um dia retomar).
+> **Gate (se retomar):** o plugin **declara** capacidades; o host exige a **conjunção** declarado ∧
 > concedido; **erro como política**, sem caminho alternativo.
+>
+> O **modelo** de capacidades já está no plano principal (E02: `Capability`, `Decision`); o que
+> fica deferido é o **runtime** de plugins. Retomar exige decisão registada e consumidor **atual**
+> (filtro `00b` §4).
+
+---
+
+## Extensões por código (a ideia "rule = script") — análise
+
+Três níveis, do mais seguro ao mais perigoso:
+
+1. **Regra (dados)** — decisão **pura** sobre factos tipados (E02). Determinística, auditável, com
+   exemplo negativo e teste de caminho real. É o **único** nível que pode ser `Enforced`.
+2. **Check determinístico** — um comando/processo que produz **evidência** para o gate de
+   verificação (E09-T03). *Linter personalizado* cai aqui: contrato estável (exit/artefacto),
+   capability-gated, sem estado escondido.
+3. **Hook/plugin (efeito colateral)** — reage a `ToolCall`/eventos e faz I/O (*fluxo de criação de
+   arquivos*, *envio de log para endpoint*). **Nunca** é uma regra; corre **WASM/out-of-process**,
+   com capacidades (incl. `Net`), opt-in, e os efeitos entram no log (`Model-visible ⟺ logged`).
+
+**Lua?** É interpretável e sandboxável (`mlua`/Luau), mas é um **DSL novo** dentro do kernel —
+precisamente o risco que [`00-tese`](00-tese-e-escopo.md) §4 rejeita (postmortem `!!js` do `dsh`) —
+e um predicado Turing-completo **não** é uma regra pura. Se se quiser linguagem, o encaixe certo é
+**Lua/Luau compilado para WASM** dentro deste host de plugins, **nunca** dentro do `evaluate`.
+
+**Rust em runtime?** `rustc` + `cdylib` + `dlopen` exige toolchain, quebra o binário único (G7),
+não isola e acopla o MSRV 1.97.0 — é **pior** que Lua. Código arbitrário quer **isolamento** → WASM.
+
+**Regra de ouro:** `evaluate(facts, rules) -> Decision` permanece **total e sem I/O**. Se precisa de
+I/O ou de estado, **não é uma regra — é um hook**. Manter essa fronteira preserva o replay, a
+auditoria (DF3) e o determinismo (G8). Ver **OA14**.
 
 ---
 

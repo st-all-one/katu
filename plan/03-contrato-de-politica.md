@@ -34,7 +34,7 @@ pub enum Phase { Task, KnowledgeConsulted, Planned, Implemented, Verified, Persi
 
 /// Capacidades concedidas no contexto corrente (DF2, DF4).
 pub enum Capability {
-    ReadPath(PathRoot), WritePath(PathRoot), Exec(ExecSpec),
+    ReadPath(PathRoot), WritePath(PathRoot), DeletePath(PathRoot), Exec(ExecSpec),
     Net(HostSet), SpawnPty, McpSession(SessionId),
 }
 
@@ -52,7 +52,7 @@ pub struct Rule {
 }
 
 pub enum Enforcement {
-    DenyCommand, DenyWrite, RequireBefore(Phase), RequireAfter(ToolName),
+    DenyCommand, DenyWrite, DenyDelete, RequireBefore(Phase), RequireAfter(ToolName),
     Budget(BudgetCap), Advisory,
 }
 
@@ -68,10 +68,29 @@ pub enum Decision {
 **Regras de fronteira:**
 
 1. O motor é **puro**: `fn evaluate(facts: &Facts, rules: &RuleSet) -> Decision`. Sem I/O.
-2. Uma regra `DenyCommand`/`DenyWrite` **só é aceite** se o motor conseguir demonstrar **um
-   comando/ficheiro que ela nega** (§51.7). Sem exemplo negativo → vira `Advisory` e é rotulada.
+2. Uma regra `DenyCommand`/`DenyWrite`/`DenyDelete` **só é aceite** se o motor conseguir
+   demonstrar **um comando/ficheiro que ela nega** (§51.7). Sem exemplo negativo → vira `Advisory`
+   e é rotulada.
 3. `Evidence` é estruturada (`file:line`, facto, argumento, `rule_id`), nunca prosa (§29).
 4. Regras com `expires_at` vencido entram em revisão (default 90 dias, §31).
+5. **Sem jail no MVP; escopo global com travas.** O motor avalia capacidades sobre o host inteiro
+   (o katu corre como o utilizador). Fora do workspace e caminhos sensíveis são
+   `RequireApproval`/`NeedsHuman` por regra — não bloqueio de kernel; a jail real é futura (E17).
+
+## Vocabulário fechado e versionado
+
+O vocabulário do motor é **fechado por segurança** e **mínimo**: `RuleScope`
+(`Path | Command | Phase | Budget`) e `Enforcement` (7 variantes) são a superfície **inteira**. Não
+há expressões livres, callbacks nem DSL — uma regra é **dado**, e o seu poder é exatamente o que os
+tipos permitem.
+
+- **Versão:** `POLICY_VOCAB_VERSION` (inteiro) viaja com o `RuleSet`; o motor **recusa** carregar
+  uma versão de vocabulário desconhecida (fail-closed).
+- **Alargar** (novo `RuleScope`/`Enforcement`) é uma **decisão de kernel registada** (ADR em E14,
+  com teste e exemplo negativo) — **nunca** configuração de utilizador. É o mesmo princípio que
+  remete código arbitrário para plugin futuro (E11, OA14).
+- **Critério de suficiência:** o vocabulário mínimo cobre o protocolo de memória (E02-T07). O que
+  não couber indica ou que a regra está mal formulada, ou que o pedido pertence a um plugin.
 
 ---
 
@@ -84,9 +103,10 @@ pub enum Decision {
 
 ### E02-T02 ☐ Tipos de regra e de veredicto
 - **Entregáveis:** `Rule`, `RuleScope`, `Enforcement`, `Severity`, `RuleCategory`, `Decision`,
-  `Evidence`, `Waiver`, `RuleExamples`.
+  `Evidence`, `Waiver`, `RuleExamples`, `PolicyVocab` (`POLICY_VOCAB_VERSION`).
 - **Aceite:** round-trip TOML/JSON de `Rule` preserva ordem canônica; `#[non_exhaustive]` nos
-  enums públicos; `Decision` não constrói estado inválido.
+  enums públicos; `Decision` não constrói estado inválido; o motor **recusa** um `RuleSet` com
+  `POLICY_VOCAB_VERSION` desconhecida (fail-closed).
 
 ### E02-T03 ☐ Motor `evaluate` puro
 - **Entregáveis:** avaliador determinístico, com ordem de custo crescente (§32): allowlist →

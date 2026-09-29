@@ -1,83 +1,117 @@
-# E07 — Sandbox e fail-closed
+# E07 — Contenção determinística (soft) e fail-closed
 
-> **Fase 3.** A contenção real de execução (DF4). A negação in-process é semântica; um comando
-> pode escapar. Aqui fecha-se o segundo lado do bloqueio (§4 da brainstorm).
+> **Fase 3.** No **MVP não há jail de SO**. O katu corre **global de facto** — vê o host como o
+> utilizador que o evocou — e o que limita a IA são as **travas determinísticas**: a política de
+> E02 imposta **na operação** (caminhos canonicalizados, capacidades tipadas,
+> `Allow`/`Deny`/`RequireApproval`/`NeedsHuman`), a execução como o utilizador, `argv` resolvido,
+> timeouts e recusa onde falta um controlo.
+>
+> Isto é uma barreira **soft e declarada**: **não** é fronteira de segurança contra código
+> arbitrário. A **jail real** (bwrap + Landlock + seccomp) é feature futura, fora do plano
+> principal — ver [`18-jail-futuro.md`](18-jail-futuro.md) e o **`ai-jail`** (pesquisa externa,
+> fora do projeto).
 >
 > **Decisões:** DF4. **Depende de:** E05 (e idealmente E06).
-> **Gate do épico:** **nunca passthrough não-confinado silencioso**; fiscalização relatada.
+> **Gate do épico:** nenhuma operação sensível passa sem veredicto; controlo em falta = recusa; a
+> limitação é **declarada** (soft), nunca vendida como fronteira de segurança.
 
 ---
 
-## Modelo (do `dsh`, §43)
+## Modelo
 
 ```rust
-pub enum SandboxMode { ReadOnly, WorkspaceWrite, FullAccess }
-pub enum SandboxEnforcement { Full, Partial }
+/// No MVP só existe contenção soft. `Unconfined` = global, como o utilizador.
+pub enum Containment { Soft, Unconfined }
+
+/// Nível de garantia honestamente relatado. No MVP é sempre `Soft`.
+pub enum SandboxEnforcement { Soft, Full, Partial }  // Full/Partial só com a jail futura (E17)
 ```
+
+**Regra zero — global por omissão, com travas.** O katu corre com os privilégios do utilizador e
+acesso ao host; **não** confina por kernel. A limitação vem da política: caminhos canonicalizados,
+`Capability::{ReadPath, WritePath, DeletePath, Exec, Net}`, regras determinísticas e
+`RequireApproval`/`NeedsHuman` para o que sai do workspace ou toca caminhos sensíveis.
 
 Regras:
 
-1. **Só `ReadOnly` e `WorkspaceWrite` chegam a um provider.** `FullAccess` exige autorização
-   explícita e registada — nunca um banner (`--host` do maxima, §49.7).
-2. **A fiscalização é um facto relatado, não uma promessa.** `Partial` = um backend ou ABI de
-   kernel antigo governa só um subconjunto; quem exige garantia absoluta tem de rejeitar.
-3. **A política é por chamada**, não fixada no provider; um retry escalado aprovado é uma **nova**
-   chamada com política mais larga.
-4. **`denialSignatures` são o dialeto do backend** (EROFS no bwrap, EACCES no Landlock, EPERM no
-   Seatbelt) — usar a **união** só entre backends efetivamente presentes.
-5. **`RunnerFailureRule` exige conjunção**: exit ≠ 0 **e** assinatura fatal numa linha de stderr,
-   após remover por igualdade exata as linhas informativas. Exit sozinho nunca prova falha.
+1. **Sem jail no MVP.** Nenhuma promessa de isolamento de SO. `SandboxEnforcement` é `Soft` e a UI
+   di-lo claramente; "modo sem isolamento" não é de primeira classe nem escondido num banner.
+2. **A política é imposta na operação** (§45.20): quem executa consulta o veredicto; a negação
+   ocorre no executor, não num wrapper.
+3. **Caminhos canonicalizados antes de decidir** (`realpath`/`openat2`-style onde barato): `..` e
+   symlinks resolvem-se **antes** do veredicto; o motor nunca infere acesso a partir de path relativo.
+4. **Sensíveis são `deny`-by-default (soft).** `.ssh`, `.aws`, `.gnupg`, `.docker`, `.env`/segredos,
+   dotfiles de credenciais: regra determinística nega por omissão; acesso exige `RequireApproval`.
+5. **Fora do workspace = `RequireApproval`/`NeedsHuman`.** Ver/ler/escrever/executar fora da área de
+   trabalho corrente (e qualquer `Capability::Net`) passa por **autorização explícita** no CLI/TUI —
+   *soft*, registada com `override_reason`+`granted_by`. (Com a jail futura isto vira `PathGrant` de
+   kernel; hoje é só política.)
+6. **A execução herda o utilizador que evocou o processo.** `uid/gid` do utilizador do katu — nunca
+   `sudo`/setuid, nunca elevação; se a política pedir mais do que o utilizador tem, é
+   `Denied`/`Unavailable`, não escalada.
+7. **`argv` resolvido e `cwd` fixado antes da política**; inspetor de `argv`
+   (`interpreter -c/-e` = shell com passos extra); timeout de wall-clock com kill do **process
+   group**.
+8. **Controlo em falta = recusa (fail-closed).** Não consigo canonicalizar? Não sei o `argv`? Não há
+   `exit_code`? Ambíguo? → `Denied`/`Unavailable`; desconhecido não executa.
+9. **Honestidade obrigatória (documentada e testada).** As travas soft só vinculam as **tools do
+   katu** e os comandos lançados com `argv` conhecido; `bash script.sh` (ou qualquer binário)
+   continua a poder fazer tudo o que o utilizador pode. Isto é afirmado no produto, nos logs e nos
+   testes — nunca omitido.
 
 ---
 
 ## Tarefas
 
-### E07-T01 ☐ Port de sandbox e modos
-- **Entregáveis:** `Sandbox` port; mapeamento `SandboxMode` → política; `FullAccess` fora do port.
-- **Aceite:** pedir `FullAccess` sem autorização devolve `NeedsHuman{missing_control}`; nenhum
-  caminho faz execução livre implícita.
+### E07-T01 ☐ Port de contenção e modos
+- **Entregáveis:** `Containment` port (`Soft`/`Unconfined`); mapeamento para a política;
+  `SandboxEnforcement::Soft` sempre relatado; gancho para a jail futura (E17) sem a implementar.
+- **Aceite:** a UI e os logs dizem `soft`; nenhum caminho promete isolamento de SO; ligar a jail
+  futura sem implementação devolve `Unavailable`, não execução livre.
 
-### E07-T02 ☐ Backend Linux (landlock/seccomp) primeiro
-- **Entregáveis:** implementação para Linux com relatório de fiscalização (`full`/`partial`).
-- **Aceite:** sob política confinada, escrita fora do workspace falha; o relatório diz `full` ou
-  `partial` conforme o ABI detetado.
+### E07-T02 ☐ Canonicalização, capacidades e inspetor de argv
+- **Entregáveis:** resolução canónica de paths (`..`, symlink) **antes** do veredicto; inspetor de
+  `argv`/`cwd`/interpretador; `Capability::Exec`; nenhuma decisão por regex sobre a string.
+- **Aceite:** `cd x && rm`, `bash -c`, `find -delete`, `r''m` avaliados sobre factos; symlink para
+  fora é negado **na política**; o golden de E02-T05 cobre estes casos.
 
-### E07-T03 ☐ **Gate do épico:** indisponibilidade = recusa
-- **Objetivo:** provar fail-closed de verdade.
-- **Entregáveis:** teste que força `SandboxUnavailable` (ex.: Landlock indisponível).
-- **Aceite (gate):** com o controlo ausente, o comando **não** roda; resultado `Unavailable` com o
-  `ControlId` exato. Uma política confinada **nunca** cai para execução livre.
+### E07-T03 ☐ **Gate do épico:** controlo em falta = recusa + honestidade
+- **Objetivo:** provar fail-closed onde há controlo, e honestidade onde não há.
+- **Entregáveis:** testes de recusa (path não canonicalizável, `argv` desconhecido, `exit_code`
+  `null`, autorização ausente para fora do workspace) e um teste que afirma `soft`/não-fronteira.
+- **Aceite (gate):** com o controlo ausente, a operação **não** corre (`Denied`/`Unavailable` com o
+  `ControlId` exato); nenhuma operação sensível passa sem veredicto; os testes provam que a
+  contenção é **soft** (um comando fora do controlo do katu não é detido) — a limitação fica visível.
 
-### E07-T04 ☐ `RunnerFailureRule` conjuntivo
-- **Entregáveis:** análise de stderr que exige conjunção + exclusões exatas; desconhecido =
-  falha-fechada (§43, postmortem 0004).
-- **Aceite:** um aviso benigno com prefixo partilhado **não** é confundido com falha; teste com o
-  caso real do prefixo `landlock-run:`.
+### E07-T04 ☐ Padrões defensivos de execução
+- **Entregáveis:** scrub de env (`*KEY*`/`*SECRET*`/`*TOKEN*`/`*PASSWORD*`); ficheiros temporários
+  em diretório privado `0700`, nomes aleatórios, abertura exclusiva `wx`/`0600`; unlink de links
+  (`lstat`); outcomes ortogonais (`timedOut`/`signal`/`exitCode` independentes); dispose atinge
+  quiescência (fechar antes de matar, esperar filhos).
+- **Aceite:** cada padrão tem teste próprio; env com segredo plantado não chega ao filho (§43.6);
+  `timeout` mata o grupo inteiro.
 
-### E07-T05 ☐ Path jail e inspetor de argv
-- **Entregáveis:** jail por `realpath`/`openat2`-style (bloqueia symlink escape); inspetor de argv
-  (`interpreter -c/-e` = shell com passos extra); timeout de wall-clock com kill do **process
-  group**.
-- **Aceite:** symlink para fora é negado; `timeout` mata o grupo inteiro; `SandboxResult` é
-  estruturado (`denied`/`timed_out`/`truncated` + razão).
-
-### E07-T06 ☐ Padrões defensivos obrigatórios
-- **Entregáveis:** outcomes ortogonais (`timedOut`/`signal`/`exitCode` independentes); dispose
-  atinge quiescência (fechar listeners antes de matar, esperar filhos); scrub de env
-  (`*KEY*`/`*SECRET*`/`*TOKEN*`/`*PASSWORD*`); ficheiros temporários em diretório privado `0700`,
-  nomes aleatórios, abertura exclusiva `wx`/`0600`; unlink de links (`lstat`).
-- **Aceite:** cada padrão tem teste próprio; env com segredo plantado não chega ao filho (§43.6).
+### E07-T05 ☐ Autorização soft fora do workspace e caminhos sensíveis
+- **Entregáveis:** regras determinísticas: sensíveis `deny`-by-default; acesso a path/comando fora
+  do workspace → `RequireApproval`/`NeedsHuman`; autorização interativa no CLI/TUI registada com
+  `override_reason`+`granted_by`; `Capability::Net` idem.
+- **Aceite:** ler `.ssh`/`.env` sem autorização é `Denied`; um pedido aprovado fica no log e na UI;
+  a autorização não é herdada por um comando subsequente.
 
 ---
 
 ## Definition of Done
 
-- [ ] E07-T01…T06 concluídas.
-- [ ] Zero passthrough não-confinado silencioso (teste).
-- [ ] Fiscalização relatada (`full`/`partial`) exposta na UI e nos logs.
+- [ ] E07-T01…T05 concluídas.
+- [ ] Nenhuma operação sensível sem veredicto; controlo em falta = recusa.
+- [ ] Contenção **soft** declarada na UI, nos logs e testada (não é fronteira de segurança).
 - [ ] `cargo xtask check` e job `msrv` verdes.
 
 ## Não-objetivos
 
-- macOS/Windows: fallback **degradado explícito** (não fingir paridade). Registar como dívida.
-- Container/Docker como requisito: o sandbox é de SO, não um daemon (§51.12).
+- **Jail de SO real (bwrap/Landlock/seccomp/namespaces/egress filtrado):** feature **futura**,
+  pós-MVP, fora do plano principal — ver [`18-jail-futuro.md`](18-jail-futuro.md) e o **`ai-jail`**
+  (pesquisa externa, fora do projeto). No MVP **não** se implementa.
+- macOS/Windows: sem fallback degradado por agora (não há jail para degradar); registar quando E17
+  arrancar.
+- Container/Docker como requisito: seria da jail futura, não do MVP.

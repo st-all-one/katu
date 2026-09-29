@@ -1,0 +1,28 @@
+gRPC — Core 57 / C++ 1.85-dev (main, 2026)
+Fonte: repositório oficial grpc/grpc (TMP/protobuffer/grpc_docs)
+
+Versões do repositório:
+  CORE_VERSION = 57.0.0
+  CPP_VERSION  = 1.85.0-dev
+  Bazel        = 8.7.0
+
+Protocolos:
+  gRPC sobre HTTP/2 (RFC 7540) .......... principal
+  gRPC sobre HTTP/3 (QUIC) ............. suportado em implementações modernas
+  gRPC-Web .............................. navegador (proxy/transcoding)
+  Connect ............................... HTTP/1.1, HTTP/2 e gRPC
+
+Cobertura do guia:
+  modelo RPC e 4 padrões de streaming, protocolo HTTP/2 no fio e gRPC-Web,
+  serviços/contrato/codegen, status codes e erros ricos, metadata/deadlines/
+  cancelamento/wait-for-ready, flow control, interceptors, TLS/mTLS e auth,
+  reflection/health checking, compressão, keepalive, connection backoff,
+  load balancing/naming/service config/xDS, observabilidade e performance,
+  testes/interop, versionamento, operação e troubleshooting.
+
+Implementação por stack (implementacao/):
+  Rust (tonic), Go (grpc-go), Dart/Flutter (grpc), TypeScript (Connect/grpc-js),
+  web moderna (Connect-Web/gRPC-Web), PHP 7.2 + Laravel 5.5 (cliente),
+  PHP 8.4 + Laravel 12 (RoadRunner/Octane).
+
+Skill irmã: ../protobuf_guide/ (contrato .proto, wire format, editions).

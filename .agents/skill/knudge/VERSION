@@ -1,0 +1,19 @@
+knudge — v0.5.2 (CLI `kd`, schema 2, superfície v3 / D209)
+Fonte: TMP/knudge (repo oficial st-all-one/knudge, tag v0.5.2)
+Binários: `kd` (CLI) + `knudge-mcp` (servidor MCP sobre stdio)
+
+Rust ................................ 1.97+ (edição 2024)
+Schema .............................. SCHEMA_VERSION = 2 (claims/ontologia/proveniência)
+Supersurface ........................ 14 verbos (+ help), superfície v3 (D209)
+Núcleo embutível .................... `knudge-core` publicável + fachada `Knudge`/`KnudgeBuilder` (D214)
+Índice derivado ..................... INDEX_FORMAT = retrieval-v4 (stemming PT, D206)
+Embedding default ................... granite-embedding-97m-multilingual-r2 (384d)
+Protocolo MCP ....................... 2025-06-18 (suporta 2025-03-26 / 2024-11-05)
+
+Cobertura do guia:
+  fundamentos e filosofia, ciclo ask→write→task→sync, superfície da CLI,
+  modelo de dados e contrato TOON, escrita/dedup, busca/ranking (BM25+RRF),
+  grafo/ontologia/TMS, tarefas/planos/flow, handoff/rewind, manutenção/saúde/
+  ciclo de vida e confiança, configuração/git, embeddings/worker, MCP,
+  arquitetura/portas/determinismo, testes/qualidade, troubleshooting,
+  incorporação do núcleo (fachada D214 / `wiki/integration/`), referência rápida.

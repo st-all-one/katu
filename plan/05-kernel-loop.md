@@ -83,6 +83,13 @@ Pré-condições verificáveis (a imposição, não a prosa — §51.2):
 - **Aceite:** orçamento excedido = recusa, nunca "corta a evidência" (§29); o checkpoint valida
   contra schema; um único dono do teto de contexto (§51.8).
 
+> **Prior art — skill [`rlm`](../.agents/skill/rlm/SKILL.md).** O `pi-rlm` demonstra guardas de
+> recursão que valem para qualquer laço limitado: tetos (`maxDepth`/`maxNodes`/`maxBranching`/
+> `concurrency`), deteção de ciclo por linhagem normalizada, degradação graciosa em níveis e
+> estado event-sourced para replay/live. O katu **não** adota delegação recursiva a sub-LLMs
+> (fora de G3 e de [`00b` §3](00b-objetivos.md)); reusa só o padrão de teto/paragem e de
+> replay a partir do log (que já é E04-T02/T04).
+
 ### E04-T08 ☐ Loop e sessão
 - **Entregáveis:** laço que consome eventos e aplica transições; retoma a partir do log.
 - **Aceite:** um teste conduz o loop do início ao fim com um `FakeMemory` e um provider fake;

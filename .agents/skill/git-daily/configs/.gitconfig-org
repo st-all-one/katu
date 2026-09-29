@@ -1,0 +1,12 @@
+# Template: /projects/org/.gitconfig-org  (copie para o path do includeIf)
+# Identidade e credencial ISOLADAS do contexto "org" (ex.: OSS/terceiro).
+[user]
+    name  = Nome Na Org
+    email = voce@organizacao.org
+    signingkey = ~/.ssh/id_ed25519_org.pub
+[gpg "ssh"]
+    allowedSignersFile = ~/.ssh/allowed_signers
+[credential]
+    helper = cache --timeout=3600      # token da org, isolado dos demais
+[url "git@github.com-org:"]
+    insteadOf = https://github.com/    # push/pull roteia para a conta da org

@@ -1,8 +1,10 @@
 # E03 — Porta `Memory` + adaptador in-process (knudge)
 
-> **Fase 1.** Define a porta `Memory` com **tipos do katu** (DF6) e o adaptador **in-process**
-> sobre `knudge-core` — o knudge é a memória do agente (G4), não um sidecar. A porta mantém a
-> opção MCP viva, mas o MCP fica **fora do escopo atual** (`00b` §7, [`09`](09-adaptador-knudge.md)).
+> **Fase 1.** Define a **porta `Memory`** com tipos do katu (DF6) — um módulo de `katu-core`
+> (`katu_core::memory`) — e o adaptador **in-process** sobre `knudge-core` (o knudge é a memória do
+> agente, G4), que vive no binário `katu` (`katu/src/memory/`) e é isolado por `check-layers`. A
+> porta mantém a opção MCP viva, mas o MCP fica **fora do escopo atual** (`00b` §7,
+> [`09`](09-adaptador-knudge.md)).
 >
 > **Decisões:** DF6, G4. **Depende de:** E01.
 > **Gate do épico:** o contrato é substituível — trocar de in-process para outro adaptador muda
@@ -27,9 +29,47 @@ Do §12–§13 da brainstorm — regras que mantêm a dependência **substituív
 
 ## Pré-requisito externo
 
-- `knudge-core` disponível como dependência (publicado em `0.x` ou git-dep pinada). O katu
-  **não** implementa o motor de memória; apenas o liga e fiscaliza o seu uso (§11).
+- `knudge-core = "0.5"` (v0.5.2) publicado, ou git-dep pinada. O katu **não** implementa o motor
+  de memória; apenas o liga e fiscaliza o seu uso (§11). Fonte da verdade de integração:
+  [`knudge/wiki/integration/`](../knudge/wiki/integration/README.md).
 - MSRV alinhado: knudge e katu em **Rust 1.97.0** (edição 2024) — coerente com o ponto inflexível.
+
+---
+
+## Alinhamento com o `knudge-core` (v0.5.2)
+
+O guia de integração do núcleo ([`knudge/wiki/integration/`](../knudge/wiki/integration/README.md))
+documenta a API real que o adaptador vai traduzir. Restrições a incorporar:
+
+- **Versão e disciplina.** `knudge-core = "0.5"` (v0.5.2); MSRV 1.97.0/edição 2024;
+  `#![forbid(unsafe_code)]`, sem panic — a mesma disciplina de `D92`.
+- **`Knudge` não é `Sync` nem `Clone`.** Segura o estado da sessão: o adaptador **não** guarda um
+  `Knudge` compartilhado; reabre `Store`/`WriteContext` por thread ou protege com `Mutex`
+  (combina com E03-T04).
+- **Layout injetado (`D214`).** Default `.knudge` (`KnudgeBuilder::knowledge_dir`, `Project::at`);
+  não há chave de config. Se o katu embute e o `kd` opera no projeto, ambos têm de usar o **mesmo**
+  `knowledge_dir`.
+- **Leitura tolerante × escrita estrita + `behavior.strict`.** O núcleo devolve resultado parcial
+  + `warnings[]` (`R33`) e, com `strict = true`, o aviso vira `Error`. O adaptador fixa `strict`
+  explicitamente — senão validações *soft* (âncora/slots/claims) passam silenciosas.
+- **A persistência é por nota.** `write::write(&ctx, &draft, &thresholds)` faz dedup + decisão
+  atómica e devolve `WriteAction::{Created, Merged, Rejected, Unchanged, Updated}`; `task::submit`
+  cria tarefas/epics (`write` recusa, `D93`); `store::commit` grava nota+evento (`D20/D21`). O
+  `knudge_session_end` do MCP é **hint**, não commit. → Ponto em aberto **OA8**.
+- **Dedup.** `create_below = 0.75` / `merge_below = 0.92` vêm de `[dedup]`; o `≥ 0.92` da política
+  é esse limiar traduzido, não uma constante nova.
+- **Fecho por evidência.** `health::close_task(&ctx, id, &[CheckOutcome], actor)` **exige** evidência
+  e infere o `outcome`; é o caminho de E05-T04.
+- **Hook nativo.** `ports::HookRunner` valida/muta o `Draft` antes da gravação (mapeamento
+  `hooks.pre_record` na borda): *defense-in-depth* com o enforcement do loop (DF1).
+- **Portas e fakes espelháveis.** `Clock`/`Rng`/`Fs`/`Env`/`Git`/`HookRunner`/`Logger`/`Embedder`
+  com fakes (`FixedClock`, `SeqRng`, `MemFs`, `FaultyFs`, `FakeGit`, `FakeEmbedder`,
+  `RecordingLogger`) — a mesma forma nas portas do katu permite reusar a disciplina (`D65`).
+- **Embeddings opcionais.** Sem provedor, o recall usa lexical + âncoras; o `Embedder` é porta
+  plugável (`D79`). Provider de LLM (E12) ≠ embedder.
+- **Erros e exit codes.** `ErrorKind` é o contrato (`NotFound`/3, `InvalidInput`/2, `Conflict`/4,
+  `Io`/5, `Timeout`/6, `Config`/7, `Schema`/8, `UnsafeBlocked`/9, `Internal`/70; `retryable()` só
+  em `Timeout`). Preservar `kind()`; o CLI pode reusar a tabela.
 
 ---
 
@@ -61,18 +101,20 @@ pub enum MemoryErrorKind { Unavailable, Timeout, Invalid, Internal }
 
 ## Tarefas
 
-### E03-T01 ☐ Tipos do katu
-- **Entregáveis:** `Memory`, `PreWriteReq/Outcome`, `PreEditReq/Outcome`, `SessionEndReq/Outcome`,
-  `MemoryStatus`, `NoteRef`, `Anchor`, `Score`, `MemoryError`.
-- **Aceite:** `xtask check-layers` falha se `knudge-core` aparecer fora do módulo do adaptador;
-  nenhum tipo do knudge na API pública.
+### E03-T01 ☐ Porta e tipos do katu (em `katu-core`)
+- **Entregáveis:** módulo `katu_core::memory` com `Memory`, `PreWriteReq/Outcome`,
+  `PreEditReq/Outcome`, `SessionEndReq/Outcome`, `MemoryStatus`, `NoteRef`, `Anchor`, `Score`,
+  `MemoryError`.
+- **Aceite:** `xtask check-layers` falha se `knudge-core` aparecer fora do módulo do adaptador
+  (`katu/src/memory/`); nenhum tipo do knudge na API pública.
 
-### E03-T02 ☐ Adaptador in-process (primário)
-- **Entregáveis:** dependência `knudge-core` (git/`0.x` pinada); feature `memory-in-process`;
-  tradução de tipos katu ↔ knudge com proptest de round-trip; sem perda silenciosa (lacunas
-  explícitas `None`, §15.3).
+### E03-T02 ☐ Adaptador in-process (primário, no binário)
+- **Entregáveis:** no binário `katu` (`src/memory/`): dependência `knudge-core = "0.5"` (v0.5.2) ou
+  git-dep pinada; feature `memory-in-process`; montagem via fachada `KnudgeBuilder` (adaptadores
+  `std` + `Project` + config); tradução de tipos katu ↔ knudge com proptest de round-trip; `behavior.strict` fixado (avisos *soft* do knudge promovidos a erro); sem perda
+  silenciosa (lacunas explícitas `None`, §15.3).
 - **Aceite:** o adaptador cumpre a suíte de conformidade; nenhum tipo do knudge vaza para a API
-  pública; `cargo tree` mostra `knudge-core` **apenas** no módulo do adaptador.
+  pública; `cargo tree` mostra `knudge-core` **apenas** em `katu/src/memory/`.
 
 ### E03-T03 ☐ Construtor à moda `build_with_transport()`
 - **Entregáveis:** `build_with_memory(adapter)` (molde do `HttpTransport` do open-mtr, §16);
@@ -94,8 +136,8 @@ pub enum MemoryErrorKind { Unavailable, Timeout, Invalid, Internal }
 
 ### E03-T06 ☐ **Gate do épico:** substituibilidade
 - **Objetivo:** provar DF6 com um teste de sanidade.
-- **Entregáveis:** uma ADR (em E14) e um script `xtask check-memory-swap` que compila o kernel
-  **uma vez com `memory-in-process`** e **outra com feature desligada** (ligando `FakeMemory`).
+- **Entregáveis:** uma ADR (em E14) e um script `xtask check-memory-swap` que compila o binário
+  **uma vez com `memory-in-process`** e **outra com a feature desligada** (`FakeMemory`).
 - **Aceite (gate):** as duas compilações diferem **só** no adaptador; nenhum ficheiro do kernel
   muda. Este é o "se amanhã voltarmos ao MCP, quantos ficheiros mudam?" (§13).
 

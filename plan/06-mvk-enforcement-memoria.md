@@ -26,7 +26,7 @@ plataforma antes de provar o seu motivo.
 ## Escopo do slice (deliberadamente mínimo)
 
 ```
-katu (binário) ── katu-core (E04) ── katu-policy (E02) ── katu-memory (E03, in-process knudge)
+katu (binário) ── katu-core (E04, porta Memory) ── katu-policy (E02) ── in-process knudge (E03)
                      │
                      └── 1 provider (fake ou o mais barato de integrar)
                      └── 2 tools: write (completa) e read (mínima)
@@ -44,6 +44,13 @@ compressão de contexto. Nada disso entra antes do gate.
 2. **Âncora obrigatória.** Nota sobre código sem `--anchor` é `Deny` (ou `RequireBefore`).
 3. **Evidência para fechar tarefa.** `Close` sem `--outcome` é `Refusal`.
 4. **Uma afirmação por nota.** `Deny` para nota multi-afirmação.
+
+> **Fonte no `knudge-core` v0.5:** o `≥ 0.92` é o `merge_below` de `[dedup]` (`create_below`
+> 0.75) e vive na config, não na política; `close_task` **exige** evidência e infere o `outcome`
+> da severidade; `behavior.strict = true` promove avisos *soft* (âncora/slots/claims) a erro. O
+> enforcement do katu (DF1) é *defense-in-depth* com o hook `pre_record` do knudge
+> (`ports::HookRunner`) — a memória valida o `Draft`, o loop fiscaliza a transição. Ver
+> [`knudge/wiki/integration/`](../knudge/wiki/integration/README.md).
 
 ---
 

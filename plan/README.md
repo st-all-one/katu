@@ -35,9 +35,10 @@ decisão registada (`DF` nova) e um commit próprio.
 
 **Objetivos e definição canónicos:** [`00b-objetivos.md`](00b-objetivos.md). Em uma frase:
 
-> **O katu é um kernel agêntico mínimo, focado em código, com write/read/exec/search/planning
-> como únicas capacidades, o knudge integrado in-process como memória, guardrails determinísticos,
-> otimizado para tokens, com CLI e TUI — e só.**
+> **O katu é um kernel agêntico mínimo, focado em código, com write/read/edit/trash/exec/search/
+> planning como as únicas capacidades de tool e com memória/compactação/modelo como controlos do
+> kernel; o knudge integrado in-process como memória, guardrails determinísticos, otimizado para
+> tokens, com CLI e TUI — e só.**
 
 Do §11 e §66.3 da brainstorm:
 
@@ -87,14 +88,14 @@ justifica (§53).
 | **2 — Núcleo vertical (MVK)** | E04 Kernel: loop possuído, estado, log | [`05-kernel-loop.md`](05-kernel-loop.md) | E02, E03 | replay determinístico |
 | | E05 **MVK: enforcement da memória** | [`06-mvk-enforcement-memoria.md`](06-mvk-enforcement-memoria.md) | E04 | **gate de decisão** (ver §5) |
 | **3 — Capacidades** | E06 Tools, capacidades e `ToolOutcome` | [`07-tools-e-capacidades.md`](07-tools-e-capacidades.md) | E05 | negação pelo executor |
-| | E07 Sandbox e fail-closed | [`08-sandbox-fail-closed.md`](08-sandbox-fail-closed.md) | E05 | sem passthrough silencioso |
+| | E07 Contenção determinística (soft) e fail-closed | [`08-sandbox-fail-closed.md`](08-sandbox-fail-closed.md) | E05 | controlo em falta = recusa; honestidade soft |
 | **4 — Contexto e evidência** | E09 Contexto, checkpoint, evidência | [`10-contexto-checkpoint-evidencia.md`](10-contexto-checkpoint-evidencia.md) | E05 | artefactos validados |
 | **6 — UX** | E10 TUI focada em codificação | [`11-tui-e-ux.md`](11-tui-e-ux.md) | E09 | panic-safe + evidência no ecrã |
-| **7 — Extensibilidade** | E11 Plugin host e ABI | [`12-plugins-e-abi.md`](12-plugins-e-abi.md) | E06 | capacidades declaradas/concedidas |
 | **8 — Amplitude** | E12 Camada de providers | [`13-providers.md`](13-providers.md) | E05 | firewall LLM-free |
 | **Transversal** | E13 Testes e qualidade | [`14-testes-e-qualidade.md`](14-testes-e-qualidade.md) | todas | por regra, teste real |
 | | E14 Governança e superfície | [`15-governanca-superficie.md`](15-governanca-superficie.md) | todas | teto de superfície |
 | | E15 Performance e benchmarks | [`16-performance-benchmarks.md`](16-performance-benchmarks.md) | E05 | números com artefacto |
+| | E18 Otimização profunda (matemática, info, estatística) | [`19-otimizacao-profunda.md`](19-otimizacao-profunda.md) | E05 | fórmula + artefacto + teste; adotar-ou-reverter |
 | **Gestão** | E16 Roadmap, riscos e kill criteria | [`17-roadmap-riscos.md`](17-roadmap-riscos.md) | — | revisão por fase |
 
 ### Futuro (fora do escopo atual)
@@ -102,10 +103,11 @@ justifica (§53).
 | Épico | Documento | Estado |
 |---|---|---|
 | E08 Adaptador MCP (`knudge-mcp`) — segunda implementação da porta `Memory` | [`09-adaptador-knudge.md`](09-adaptador-knudge.md) | **deferido**; a porta mantém a opção aberta (DF6, G4, G7) |
-| Plugins WASM, múltiplos providers, compressão de contexto no núcleo | [`12`](12-plugins-e-abi.md), [`13`](13-providers.md), [`10`](10-contexto-checkpoint-evidencia.md) | deferidos por [`00b`](00b-objetivos.md) §3 |
+| E11 Plugin host e ABI (WASM); reimplementar providers; compressão inline no hot path | [`12`](12-plugins-e-abi.md), [`13`](13-providers.md), [`10`](10-contexto-checkpoint-evidencia.md) | **futuro/fora do plano principal**; o seam de regras é a política (E02) |
+| E17 Jail de SO real (bwrap/Landlock/seccomp) | [`18-jail-futuro.md`](18-jail-futuro.md) | **futuro pós-MVP**; contenção **soft** agora (E07) |
 
 **MVK (mínimo que prova a tese) = Fase 0 + 1 + 2.** Tudo o resto é incremental e **condicional ao
-gate de decisão de E05**. O que não serve os cinco mínimos de [`00b`](00b-objetivos.md) §2 fica
+gate de decisão de E05**. O que não serve o core de [`00b`](00b-objetivos.md) §1.1 fica
 `deferred` com razão registada.
 
 ---
@@ -118,12 +120,11 @@ E01 ──┬── E02 ──┐
                                   │                  ║
                                   ├── E06 ── E07      ║
                                   ├── E09 ── E10      ║
-                                  ├── E11 (via E06)   ║
                                   └── E12             ║
-                                                     ╠══ E13, E14, E15 (transversais)
+                                                     ╠══ E13, E14, E15, E18 (transversais)
                                                      ╚══ E16 (revisão por fase)
 
-Futuro (fora do escopo atual): E08 adaptador MCP · plugins WASM · múltiplos providers
+Futuro (fora do escopo atual): E08 adaptador MCP · E11 plugins WASM · múltiplos providers · jail de SO (E17)
 ```
 
 ---

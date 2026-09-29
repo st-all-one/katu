@@ -1,0 +1,235 @@
+# ============================================================================
+# .gitconfig.example — configurações globais recomendadas
+# Fonte: dossiê git_guide/ (autenticidade, segurança, performance, manutenibilidade)
+# Comentários em português. Copie para ~/.gitconfig e ajuste paths/identidade.
+# Regra geral: commits atômicos, assinar tudo, nunca reescrever histórico publicado,
+# nunca cometer segredos, recuperar via reflog antes de expurgar.
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# [user] — identidade PADRÃO (fallback quando nenhuma regra condicional casa)
+# Entra no hash do commit; mantenha correta. Veja "GESTÃO MULTI-CONTA" abaixo.
+# ----------------------------------------------------------------------------
+[user]
+    name  = Seu Nome Padrão
+    email = seu.email.padrao@gmail.com
+    # Chave para assinatura (veja seção [gpg] abaixo)
+    # signingkey = ABCDE1234567890
+
+# ----------------------------------------------------------------------------
+# [init] — padrões de novo repositório
+# ----------------------------------------------------------------------------
+[init]
+    defaultBranch = main          # evita o nome legado "master"
+
+# ============================================================================
+# GESTÃO DE IDENTIDADE POR PASTA (multi-conta elegante)
+# ----------------------------------------------------------------------------
+# `includeIf "gitdir:/caminho/"` aplica o arquivo SÓ quando o repositório está
+# DENTRO de /caminho. Regras:
+#   • O trailing slash é OBRIGATÓRIO (senão casa prefixo de nome).
+#   • ~ é aceito:  gitdir:~/projects/job/
+#   • Casam com o .git do repo, não o pwd; então coloque seus clones em
+#     /projects/job/<repo>, /projects/org/<repo>, /projects/personal/<repo>.
+# Assim, commits em cada pasta usam e-mail/assinatura/credencial próprios,
+# sem trocar manualmente — e o [user] acima é o fallback global.
+# ============================================================================
+[includeIf "gitdir:/projects/job/"]
+    path = /projects/job/.gitconfig-job
+[includeIf "gitdir:/projects/org/"]
+    path = /projects/org/.gitconfig-org
+[includeIf "gitdir:/projects/personal/"]
+    path = /projects/personal/.gitconfig-personal
+
+# ---- Conteúdo típico de cada arquivo incluído (ex.: /projects/job/.gitconfig-job) ----
+#   [user]
+#       name  = Nome No Trabalho
+#       email = voce@empresa.com
+#   [user]
+#       signingkey = ~/.ssh/id_ed25519_trabalho.pub   # chave do contexto
+#   [credential]
+#       helper = cache --timeout=3600                  # token isolado do trabalho
+#   [url "git@github.com-trabalho:"]
+#       insteadOf = https://github.com/                # roteia SSH por conta
+#
+# (Veja os templates em git_guide/configs/.gitconfig-{job,org,personal}.)
+
+# ----------------------------------------------------------------------------
+# [core] — comportamento base
+# ----------------------------------------------------------------------------
+[core]
+    editor        = vim            # ou nano, code --wait, etc.
+    quotepath      = false         # exibe nomes acentuados/UTF-8 corretamente
+    # excludesfile  = ~/.gitignore_global   # ignore global de artefatos pessoais
+    untrackedCache = true          # acelera `status`/`checkout` (perf)
+    commitGraph    = true          # usa commit-graph para consultas rápidas
+    multiPackIndex = true          # índice único de packs (perf)
+    # fsmonitor     = true          # usa fsmonitor--daemon (Win/macOS com Watchman; Linux opcional)
+    # hooksPath     = ~/.config/git/hooks   # hooks compartilhados (ex.: pre-commit de scan de segredos)
+    # autocrlf     = input         # Linux/macOS; use "true" no Windows (CRLF)
+
+# ----------------------------------------------------------------------------
+# AUTENTICIDADE — assinatura de commits, tags e pushes
+# ----------------------------------------------------------------------------
+[commit]
+    gpgSign = true                 # assina TODOS os commits (não precisa de -S)
+[tag]
+    gpgSign            = true      # assina tags anotadas
+    forceSignAnnotated = true      # obriga assinatura em tags anotadas
+[push]
+    gpgSign = if-asked            # assina o push quando o servidor pede
+    default = simple              # só envia o branch atual com nome igual
+    autoSetupRemote = true        # cria tracking automático no primeiro push
+[log]
+    showSignature = true          # mostra verificação de assinatura em `git log`
+
+# --- Escolha UMA forma de assinatura: SSH (recomendado, simples) ou OpenPGP ---
+# Opção A: SSH (git 2.34+)
+[gpg]
+    format = ssh
+[user]
+    # signingkey = ~/.ssh/id_ed25519.pub
+[gpg "ssh"]
+    allowedSignersFile = ~/.ssh/allowed_signers
+#   # allowedSignersFile mapeia identidade→chave pública, ex.:
+#   #   voce@exemplo.com ssh-ed25519 AAAA... /home/voce/.ssh/id_ed25519.pub
+
+# Opção B: OpenPGP (comente a Opção A para usar)
+# [gpg]
+#     format    = openpgp
+#     program   = gpg                 # ou gpg2
+# [user]
+#     signingkey = ABCDE1234567890
+
+# ----------------------------------------------------------------------------
+# SEGURANÇA — credenciais, transferências e isolamento
+# ----------------------------------------------------------------------------
+# ESTRATÉGIA MULTI-CONTA (várias contas no MESMO host, ex.: 2 GitHub):
+#   1) SSH (recomendado): cada .gitconfig-<ctx> define user.signingkey + roteia
+#      por Host alias do ~/.ssh/config via `url.<>.insteadOf` (ver bloco acima).
+#      Ex. ~/.ssh/config:
+#        Host github-trabalho
+#            HostName github.com
+#            IdentityFile ~/.ssh/id_ed25519_trabalho
+#            IdentitiesOnly yes
+#        Host github-pessoal
+#            HostName github.com
+#            IdentityFile ~/.ssh/id_ed25519_pessoal
+#            IdentitiesOnly yes
+#   2) HTTPS: separe os tokens por CONTEXTO para não colidir no helper global.
+#      Nunca use "store" (plaintext). Prefira cache por tempo ou manager, e,
+#      para contas distintas no mesmo host, escopo por URL:
+#        [credential "https://github.com/trabalho-user"]
+#            helper = cache --timeout=3600
+#        [credential "https://github.com/pessoal-user"]
+#            helper = osxkeychain
+#      Combine com `credential.useHttpPath=true` se precisar distinguir por repo.
+# Helper PADÃO (comente conforme seu SO). Os por-contexto ficam nos includes.
+# ----------------------------------------------------------------------------
+[credential]
+    # Linux (memória, expira):
+    # helper = cache --timeout=3600
+    # macOS:
+    # helper = osxkeychain
+    # Windows:
+    # helper = manager
+    # NÃO use "store" (grava plaintext em ~/.git-credentials)
+
+[protocol]
+    file.allow = user              # bloqueia clone/local de caminhos fora do repositório
+
+[transfer]
+    fsckObjects  = true            # verifica objetos recebidos (anti-spoofing)
+[fetch]
+    fsckObjects  = true
+    prune        = true            # remove refs de tracking obsoletas (não acumula lixo)
+    writeCommitGraph = true        # mantém commit-graph atualizado (perf)
+    # replaceRefs = false          # ignora replace-refs de terceiros (anti-injeção)
+
+# [safe] — só descomente se precisar abrir repo de outro dono (use com cuidado)
+# [safe]
+#     directory = /caminho/do/repo
+
+# ----------------------------------------------------------------------------
+# MANUTENIBILIDADE — rebase, merge, blame, recovery
+# ----------------------------------------------------------------------------
+[pull]
+    rebase = true                  # pull = fetch + rebase (história linear, sem merge espúrio)
+    # ff = only                   # alternativa: só fast-forward (recusa caso contrário)
+[rebase]
+    autoSquash        = true       # aplica --fixup/--squash automaticamente
+    abbreviateCommands = true      # todo-list enxuta
+[rerere]
+    enabled = true                 # reusa resolução de conflito (após 1ª vez)
+    # autoupdate = false          # mantenha revisão manual das resoluções
+[merge]
+    conflictStyle = diff3          # mostra base comum (crucial p/ depurar conflitos)
+[blame]
+    ignoreRevsFile = .git-blame-ignore-revs   # ignora reformas bulk em `git blame`
+[branch]
+    sort = -committerdate          # `git branch` ordenado por mais recente
+[status]
+    showStash = true               # mostra stashes em `git status` (git 2.27+)
+[advice]
+    detachedHead = false           # reduz ruído ao estar em HEAD destacado
+
+# ----------------------------------------------------------------------------
+# PERFORMANCE — GC, maintenance e protocolo
+# ----------------------------------------------------------------------------
+[gc]
+    cruftPacks = true              # separa objetos expirados em cruft pack
+[maintenance]
+    strategy = incremental         # `git maintenance run` faz limpezas leves
+[feature]
+    # manyFiles    = true          # otimizações p/ repositórios grandes
+    # experimental = true          # habilita melhorias de performance estáveis
+[diff]
+    algorithm  = histogram         # diff melhor para código que myers padrão
+    renameLimit = 5000
+[merge]
+    renameLimit = 5000
+
+# ----------------------------------------------------------------------------
+# USABILIDADE — cores, paginação e autocorrect
+# ----------------------------------------------------------------------------
+[color]
+    ui = auto
+[help]
+    autocorrect = 20               # após 2s, roda o comando corrigido (20 = decissegundos)
+[interactive]
+    singleKey = true               # tecla única em prompts interativos (sem Enter)
+[core]
+    pager = delta                  # render rico; requer `delta` instalado
+    # se não usar delta, comente a linha acima (pager padrão `less` é suficiente)
+[delta]
+    navigate = true
+    side-by-side = true
+    line-numbers = true
+
+# ----------------------------------------------------------------------------
+# ALIASES — atalhos seguros e informativos (ver git_guide/08-aliases-e-flags.md)
+# ----------------------------------------------------------------------------
+[alias]
+    # status / inspeção
+    st = status -sb
+    lg = log --graph --abbrev-commit --decorate --format=format:\"%C(bold blue)%h%C(reset) - %C(bold green)(%ar)%C(reset) %C(white)%s%C(reset) %C(dim white)- %an%C(reset)%C(bold yellow)%d%C(reset)\" --all
+    ll = log --oneline --graph --decorate
+    # stage / commit
+    a  = add
+    ap = add -p
+    c  = commit -S -s -v           # assina + signoff + mostra diff no editor
+    ca = commit -S -s -v --amend
+    # sincronização
+    ft  = fetch -p
+    rb  = rebase -i --autosquash
+    rbm = rebase --rebase-merges
+    # push seguro
+    pp  = push --follow-tags
+    ppf = push --force-with-lease  # NUNCA use -f/--force
+    # investigação / bugs
+    bi  = bisect start
+    bl  = blame -w -M -C -C --ignore-revs-file .git-blame-ignore-revs
+    pick = log -S                  # uso: git pick "simbolo" -- <path>
+    unstage = restore --staged
+    # recuperação
+    rl  = reflog
