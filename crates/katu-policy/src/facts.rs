@@ -57,6 +57,8 @@ pub enum ToolName {
     Write,
     /// Edição.
     Edit,
+    /// Mover/renomear.
+    Move,
     /// Lixo recuperável.
     Trash,
     /// Execução de comando.
@@ -102,6 +104,13 @@ pub enum ToolArgs {
     Edit {
         /// Caminho alvo.
         path: ResolvedPath,
+    },
+    /// Mover/renomear um caminho.
+    Move {
+        /// Origem.
+        from: ResolvedPath,
+        /// Destino.
+        to: ResolvedPath,
     },
     /// Envio para o lixo.
     Trash {

@@ -109,6 +109,18 @@ fn flow_map_is_inline() {
 }
 
 #[test]
+fn flow_map_stays_inline() {
+    let doc = map(vec![(
+        "page",
+        Value::flow(vec![
+            ("total".to_string(), Value::int(1)),
+            ("truncated".to_string(), Value::bool(false)),
+        ]),
+    )]);
+    assert_eq!(emit(&doc), "page: {total: 1, truncated: false}\n");
+}
+
+#[test]
 fn output_never_contains_null() {
     let doc = map(vec![
         ("present", Value::str("x")),

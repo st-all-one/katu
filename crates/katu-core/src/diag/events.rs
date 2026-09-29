@@ -61,6 +61,7 @@ catalog! {
     (TOOL_READ, "tool.read", "Leitura via tool."),
     (TOOL_WRITE, "tool.write", "Escrita via tool."),
     (TOOL_EDIT, "tool.edit", "Edição via tool."),
+    (TOOL_MOVE, "tool.move", "Movimento/renomeação via tool."),
     (TOOL_SEARCH, "tool.search", "Busca (ripgrep/índice)."),
     (TOOL_TRASH, "tool.trash", "Movimento para o lixo recuperável."),
     (CONTAIN_CHECK, "contain.check", "Verificação de contenção (traps suaves)."),

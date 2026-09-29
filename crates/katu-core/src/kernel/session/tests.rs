@@ -4,7 +4,7 @@ use crate::kernel::Message;
 use crate::kernel::budget::BudgetCap;
 use crate::kernel::event::{CallId, Event};
 use crate::kernel::log::read_records;
-use crate::kernel::pipeline::Tool;
+use crate::kernel::pipeline::{Tool, ToolOutput};
 use crate::kernel::state::RefusalReason;
 use crate::ports::MemFs;
 use katu_policy::{
@@ -23,9 +23,9 @@ impl Tool for Probe {
         ToolName::Write
     }
 
-    fn execute(&self, _use_: &ToolUse) -> ToolOutcome {
+    fn execute(&self, _use_: &ToolUse) -> ToolOutput {
         self.calls.fetch_add(1, Ordering::SeqCst);
-        ToolOutcome::Ok
+        ToolOutput::ok()
     }
 }
 

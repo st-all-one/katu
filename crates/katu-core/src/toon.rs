@@ -29,6 +29,11 @@ pub enum Value {
     Float(f64),
     /// Booleano.
     Bool(bool),
+    /// Mapa **inline** (`{k: v, …}`), mesmo aninhado — para `page`/`cost` compactos.
+    Flow(Vec<(String, Self)>),
+    /// Texto multilinha emitido como **bloco literal** (sem escapes) — para conteúdo de código.
+    /// Em *flow* cai para string citada; JSON serializa como string.
+    Block(String),
 }
 
 impl Value {
@@ -65,6 +70,18 @@ impl Value {
     pub const fn bool(value: bool) -> Self {
         Self::Bool(value)
     }
+
+    /// Constrói um bloco literal (conteúdo de código, sem escapes).
+    #[must_use]
+    pub fn block(text: impl Into<String>) -> Self {
+        Self::Block(text.into())
+    }
+
+    /// Constrói um mapa **inline** (renderizado em *flow*).
+    #[must_use]
+    pub const fn flow(entries: Vec<(String, Self)>) -> Self {
+        Self::Flow(entries)
+    }
 }
 
 /// Emite um documento TOON canónico (termina em `\n`).
@@ -96,6 +113,13 @@ fn emit_map(out: &mut String, entries: &[(String, Value)], indent: usize) {
             } else {
                 push_scalar(out, indent, key, &emit_flow(value));
             }
+        } else if let Value::Block(text) = value {
+            push_indent(out, indent);
+            out.push_str(key);
+            out.push_str(": |\n");
+            emit_block(out, text, indent.saturating_add(2));
+        } else if let Value::Flow(entries) = value {
+            push_scalar(out, indent, key, &emit_flow_map(entries));
         } else {
             push_scalar(out, indent, key, &emit_flow(value));
         }
@@ -123,6 +147,14 @@ fn emit_list_block(out: &mut String, items: &[Value], indent: usize) {
     }
 }
 
+fn emit_block(out: &mut String, text: &str, indent: usize) {
+    for line in text.lines() {
+        push_indent(out, indent);
+        out.push_str(line);
+        out.push('\n');
+    }
+}
+
 fn emit_flow(value: &Value) -> String {
     match value {
         Value::Str(text) => {
@@ -132,6 +164,7 @@ fn emit_flow(value: &Value) -> String {
                 quote(text)
             }
         }
+        Value::Block(text) => quote(text),
         Value::Int(number) => number.to_string(),
         Value::Float(number) => format!("{number}"),
         Value::Bool(flag) => flag.to_string(),
@@ -139,14 +172,16 @@ fn emit_flow(value: &Value) -> String {
             let parts: Vec<String> = items.iter().map(emit_flow).collect();
             format!("[{}]", parts.join(", "))
         }
-        Value::Map(entries) => {
-            let parts: Vec<String> = entries
-                .iter()
-                .map(|(key, value)| format!("{key}: {}", emit_flow(value)))
-                .collect();
-            format!("{{{}}}", parts.join(", "))
-        }
+        Value::Map(entries) | Value::Flow(entries) => emit_flow_map(entries),
     }
+}
+
+fn emit_flow_map(entries: &[(String, Value)]) -> String {
+    let parts: Vec<String> = entries
+        .iter()
+        .map(|(key, value)| format!("{key}: {}", emit_flow(value)))
+        .collect();
+    format!("{{{}}}", parts.join(", "))
 }
 
 fn push_indent(out: &mut String, indent: usize) {
@@ -171,8 +206,9 @@ fn push_scalar(out: &mut String, indent: usize, key: &str, flow: &str) {
 
 fn is_empty(value: &Value) -> bool {
     match value {
-        Value::Map(entries) => entries.is_empty(),
+        Value::Map(entries) | Value::Flow(entries) => entries.is_empty(),
         Value::List(items) => items.is_empty(),
+        Value::Block(text) => text.is_empty(),
         _ => false,
     }
 }
@@ -235,3 +271,27 @@ fn quote(text: &str) -> String {
 
 #[cfg(test)]
 mod tests;
+
+use serde::ser::{Serialize, SerializeMap, Serializer};
+
+impl Serialize for Value {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::Map(entries) | Self::Flow(entries) => {
+                let mut map = serializer.serialize_map(Some(entries.len()))?;
+                for (key, value) in entries {
+                    map.serialize_entry(key, value)?;
+                }
+                map.end()
+            }
+            Self::List(items) => serializer.collect_seq(items),
+            Self::Str(text) | Self::Block(text) => serializer.serialize_str(text),
+            Self::Int(number) => serializer.serialize_i64(*number),
+            Self::Float(number) => serializer.serialize_f64(*number),
+            Self::Bool(flag) => serializer.serialize_bool(*flag),
+        }
+    }
+}

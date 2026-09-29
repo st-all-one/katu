@@ -90,7 +90,7 @@ fn capabilities_for(outcome: &PreWriteOutcome) -> Vec<Capability> {
 mod tests {
     use super::{MemoryWriteRequest, enforce_memory_write, memory_write_use};
     use crate::error::ToolOutcome;
-    use crate::kernel::pipeline::Tool;
+    use crate::kernel::pipeline::{Tool, ToolOutput};
     use crate::kernel::state::State;
     use crate::memory::{FakeMemory, NoteRef, NoteType, PreWriteReq, Score};
     use katu_policy::{ResolvedPath, RuleId, RuleSet, ToolName, ToolUse};
@@ -108,9 +108,9 @@ mod tests {
             ToolName::MemoryWrite
         }
 
-        fn execute(&self, _use_: &ToolUse) -> ToolOutcome {
+        fn execute(&self, _use_: &ToolUse) -> ToolOutput {
             self.calls.fetch_add(1, Ordering::SeqCst);
-            ToolOutcome::Ok
+            ToolOutput::ok()
         }
     }
 

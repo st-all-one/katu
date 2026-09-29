@@ -6,5 +6,9 @@
 
 #![forbid(unsafe_code)]
 
+pub mod edit;
+pub mod outline;
 pub mod read;
+pub mod registry;
 pub mod write;
+pub mod write_file;

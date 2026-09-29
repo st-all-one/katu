@@ -66,10 +66,13 @@ verificação recusa `SUCCESS` com erros (§38).
 
 ## Tarefas
 
-### E06-T01 ☐ Registry de tools fechado
+### E06-T01 ☑ Registry de tools fechado
 - **Entregáveis:** registo tipado, namespace estável e ordem canônica; lista exata das famílias de
   §1.1 (Escrita `write`/`edit`/`move`/`trash`; Leitura `read`; Execução `bash`; Pesquisa
   `grep`/`find`/`ls`; Planeamento `plan`).
+- **Estado:** `katu_tools::registry` (`Family`/`ToolId`/`ToolSpec`/`TOOLS`/`is_registered`), com
+  `ToolName::Move` adicionado ao vocabulário de política. Testes: 10 tools, ids únicos, famílias
+  4/1/1/3/1, `is_registered` para tools estranhas. `xtask check-surface` chega em E14-T05.
 - **Aceite:** qualquer tool fora do conjunto mínimo exige uma decisão registada (filtro `00b` §4);
   `xtask check-surface` falha ao exceder o teto; nenhum registo sem teste de teardown (§44).
 
@@ -82,9 +85,15 @@ verificação recusa `SUCCESS` com erros (§38).
   solta), reusando o mesmo tipo de erro do validador de checkpoint (E09-T02).
 - **Aceite:** o CI falha se um schema violar as regras; o erro de validação de exemplo é testado.
 
-### E06-T03 ☐ Escrita e leitura (`write`, `read`, `edit`)
+### E06-T03 ◐ Escrita e leitura (`write`, `read`, `edit`)
 - **Entregáveis:** argumentos tipados, paths resolvidos, output determinístico; truncagem
   **determinística**; deltas (só o que mudou) como regra de contexto (§18).
+- **Estado:** `read` com **views** `full`/`range`/`outline`/`summary`/`symbol` (heurística Rust-first
+  em `katu_tools::outline`; `diff` ainda indisponível) devolve `ToolReport` com `id`/`hash`/`loc`/
+  `page`/`next`; `write` (`write_file`) só para ficheiros **novos** (existentes → `Unavailable`);
+  `edit` otimista com `write_atomic_if` (CAS), `dry-run` e `Unavailable{stale}`/`ambiguous`.
+  Truncagem determinística (linhas/bytes) testada. **Falta:** view `diff`, tree-sitter (gated) e
+  a matriz multibyte exata de §45.22.
 - **Views e envelope (DF12):** `read` aceita `view=outline|summary|symbol|diff|full` (default
   `summary`), devolvendo o **envelope** com `id`/`hash`/`loc`/`truncated`/`next`; `symbol` devolve
   só o range. A estrutura sai de uma **heurística leve** (Rust-first); tree-sitter fica gated por
@@ -96,6 +105,8 @@ verificação recusa `SUCCESS` com erros (§38).
 - **Aceite:** propriedade: output canónico (ordenação estável, sem `HashMap`); teste de truncagem
   em limites minúsculos, exatos, chunks únicos enormes e multibyte (§45.22); teste de `Stale`
   (edição externa entre a leitura e a escrita não é perdida); round-trip `view=full` = bytes lidos.
+- **Estado (aceite):** round-trip `full` = bytes lidos testado; truncagem determinística testada;
+  `Stale`/ambíguo/`dry-run` testados; falta a matriz multibyte de §45.22.
 
 ### E06-T04 ☐ Execução (`bash`) com argv resolvido e capacidades
 - **Entregáveis:** execução que resolve `argv` e `cwd` **antes** da política; `Capability::Exec`;
@@ -169,10 +180,15 @@ verificação recusa `SUCCESS` com erros (§38).
   nenhuma referência fica pendurada (a busca após o `move` encontra o caminho novo); o índice não
   serve o caminho antigo.
 
-### E06-T12 ☐ Formato AI-first (envelope + TOON + JSON)
+### E06-T12 ☑ Formato AI-first (envelope + TOON + JSON)
 - **Entregáveis:** `ToolReport` tipado; emissor **TOON** próprio em `katu-core::toon` (canónico,
   sem `null`, vazios omitidos, ordem canónica, zero deps); `format=json`/`--json` como alternativa;
   `cost` (bytes/tokens estimados/ms) com base DF5; IDs content-addressed estáveis.
+- **Estado:** `katu_core::toon` (com `Block` literal e `Flow` inline, `Serialize` para JSON) +
+  `katu_core::report` (`ToolReport`/`Page`/`Cost`/`content_id`/`content_hash`). O envelope é
+  transportado por `ToolOutput`/`Dispatch::report()` (o `Tool` trait devolve estado + payload).
+  Golden + proptest do TOON; TOON/JSON coerentes; vazios omitidos. A flag `--json` do CLI reusa o
+  `to_json` numa fase de wiring.
 - **Aceite:** golden + proptest do emissor (determinismo byte-a-byte); o mesmo `ToolReport` em TOON
   e JSON reconstrói a mesma informação; nenhum campo vazio/`null` é emitido; o JSON é válido.
 

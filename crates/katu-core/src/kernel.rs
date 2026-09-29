@@ -29,7 +29,8 @@ pub use memory_gate::{
     MemoryWriteError, MemoryWriteRequest, enforce_memory_write, memory_write_use,
 };
 pub use pipeline::{
-    Dispatch, DispatchRequest, Effect, Tool, dispatch, dispatch_with, facts_for, facts_from,
+    Dispatch, DispatchRequest, Effect, Tool, ToolOutput, dispatch, dispatch_with, facts_for,
+    facts_from,
 };
 pub use project::{Message, Snapshot, derive_messages, snapshot, state_of};
 pub use session::{CallContext, Session, SessionError};

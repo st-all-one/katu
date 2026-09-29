@@ -5,7 +5,7 @@
 
 use katu_core::diag::{Level, events};
 use katu_core::error::ToolOutcome;
-use katu_core::kernel::Tool;
+use katu_core::kernel::{Tool, ToolOutput};
 use katu_core::memory::{Memory, PreWriteReq};
 use katu_policy::{ControlId, ToolName, ToolUse};
 
@@ -22,15 +22,15 @@ impl Tool for WriteNoteTool<'_> {
         ToolName::MemoryWrite
     }
 
-    fn execute(&self, _use_: &ToolUse) -> ToolOutcome {
+    fn execute(&self, _use_: &ToolUse) -> ToolOutput {
         let _span = katu_core::span!(Level::Trace, events::TOOL_WRITE);
         match self.memory.record(&self.req) {
-            Ok(_) => ToolOutcome::Ok,
-            Err(err) if err.retryable() => ToolOutcome::Timeout,
-            Err(_) => ToolOutcome::Unavailable {
+            Ok(_) => ToolOutput::ok(),
+            Err(err) if err.retryable() => ToolOutput::outcome(ToolOutcome::Timeout),
+            Err(_) => ToolOutput::outcome(ToolOutcome::Unavailable {
                 control: ControlId::new("memory"),
                 rule_id: None,
-            },
+            }),
         }
     }
 }
@@ -63,7 +63,7 @@ mod tests {
             memory: &memory,
             req: request(),
         };
-        assert_eq!(tool.execute(&use_()?), ToolOutcome::Ok);
+        assert_eq!(tool.execute(&use_()?).outcome, ToolOutcome::Ok);
         assert_eq!(memory.recorded(), 1);
         Ok(())
     }
@@ -76,7 +76,7 @@ mod tests {
             req: request(),
         };
         assert!(matches!(
-            tool.execute(&use_()?),
+            tool.execute(&use_()?).outcome,
             ToolOutcome::Unavailable { .. }
         ));
         assert_eq!(memory.recorded(), 0);

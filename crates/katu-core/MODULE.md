@@ -40,6 +40,8 @@ função, o log é a fonte da verdade.
   `ArtifactRef`; um número sem artefacto não fundamenta decisão; a base não muda numa agregação.
 - Formato AI-first [`toon`](src/toon.rs) (DF12/E06-T12): emissor **TOON** canónico (zero deps) para a
   saída das tools ao modelo — sem `null`, vazios omitidos, ordem canónica; JSON é a alternativa.
+- Envelope [`report`](src/report.rs) (DF12/E06-T12): `ToolReport`/`Page`/`Cost`, ids
+  content-addressed e hash; renderiza em TOON ou JSON. Transportado por `ToolOutput`.
 
 ## Fronteira
 

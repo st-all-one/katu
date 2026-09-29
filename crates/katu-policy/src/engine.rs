@@ -101,7 +101,7 @@ impl Rule {
 
 /// `true` se a tool escreve conteúdo.
 fn is_write_tool(tool: ToolName) -> bool {
-    matches!(tool, ToolName::Write | ToolName::Edit)
+    matches!(tool, ToolName::Write | ToolName::Edit | ToolName::Move)
 }
 
 /// Nome estável de uma tool.
@@ -110,6 +110,7 @@ fn tool_name(tool: ToolName) -> &'static str {
         ToolName::Read => "read",
         ToolName::Write => "write",
         ToolName::Edit => "edit",
+        ToolName::Move => "move",
         ToolName::Trash => "trash",
         ToolName::Exec => "exec",
         ToolName::Search => "search",

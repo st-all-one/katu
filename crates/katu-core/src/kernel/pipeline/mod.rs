@@ -6,27 +6,66 @@
 
 use crate::diag::{Level, events};
 use crate::error::ToolOutcome;
+use crate::report::ToolReport;
 use katu_policy::{
     Capability, ControlId, Decision, Facts, PolicyError, RuleSet, ToolName, ToolUse, evaluate,
 };
 
 use super::state::State;
 
+/// Resultado de uma execução de tool: estado + payload (envelope, DF12).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ToolOutput {
+    /// Estado (Ok/Partial/Denied/…).
+    pub outcome: ToolOutcome,
+    /// Envelope de sucesso (opcional; ausente em recusas).
+    pub report: Option<ToolReport>,
+}
+
+impl ToolOutput {
+    /// Saída sem payload.
+    #[must_use]
+    pub const fn outcome(outcome: ToolOutcome) -> Self {
+        Self {
+            outcome,
+            report: None,
+        }
+    }
+
+    /// Saída `Ok` sem payload.
+    #[must_use]
+    pub const fn ok() -> Self {
+        Self {
+            outcome: ToolOutcome::Ok,
+            report: None,
+        }
+    }
+
+    /// Saída `Ok` com envelope.
+    #[must_use]
+    pub fn report(report: ToolReport) -> Self {
+        Self {
+            outcome: ToolOutcome::Ok,
+            report: Some(report),
+        }
+    }
+}
+
 /// Efeito observado de um pedido de tool.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum Effect {
     /// A tool correu (o efeito pode ainda ser `Denied` por contenção, E07).
     Ran {
-        /// Efeito da operação.
-        outcome: ToolOutcome,
+        /// Saída da operação (estado + envelope), boxed para manter o enum pequeno.
+        output: Box<ToolOutput>,
     },
     /// A política recusou: **nada** correu.
     Skipped,
 }
 
 /// Resultado do pipeline: veredicto + efeito.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Dispatch {
     /// Veredicto da política.
     pub decision: Decision,
@@ -45,8 +84,17 @@ impl Dispatch {
     #[must_use]
     pub fn outcome(&self) -> ToolOutcome {
         match &self.effect {
-            Effect::Ran { outcome } => outcome.clone(),
+            Effect::Ran { output } => output.outcome.clone(),
             Effect::Skipped => skipped_outcome(&self.decision),
+        }
+    }
+
+    /// Envelope de sucesso, quando a tool correu e o produziu (DF12/E06-T12).
+    #[must_use]
+    pub fn report(&self) -> Option<&ToolReport> {
+        match &self.effect {
+            Effect::Ran { output } => output.report.as_ref(),
+            Effect::Skipped => None,
         }
     }
 }
@@ -83,7 +131,7 @@ pub trait Tool {
     fn name(&self) -> ToolName;
 
     /// Executa o pedido. Só é chamada quando a política permite.
-    fn execute(&self, use_: &ToolUse) -> ToolOutcome;
+    fn execute(&self, use_: &ToolUse) -> ToolOutput;
 }
 
 /// Monta os factos que a política avalia, a partir do estado do kernel.
@@ -166,10 +214,12 @@ pub fn dispatch_with(request: DispatchRequest<'_>) -> Result<Dispatch, PolicyErr
     };
     if decision.is_allow() {
         crate::event!(Level::Debug, events::POLICY_ALLOW);
-        let outcome = request.tool.execute(request.use_);
+        let output = request.tool.execute(request.use_);
         Ok(Dispatch {
             decision,
-            effect: Effect::Ran { outcome },
+            effect: Effect::Ran {
+                output: Box::new(output),
+            },
         })
     } else {
         crate::event!(Level::Warn, events::POLICY_DENY);

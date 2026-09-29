@@ -1,4 +1,4 @@
-use super::{Tool, dispatch};
+use super::{Tool, ToolOutput, dispatch};
 use crate::error::ToolOutcome;
 use crate::kernel::State;
 use katu_policy::{
@@ -17,9 +17,9 @@ impl Tool for CountingTool {
         ToolName::Write
     }
 
-    fn execute(&self, _use_: &ToolUse) -> ToolOutcome {
+    fn execute(&self, _use_: &ToolUse) -> ToolOutput {
         self.calls.fetch_add(1, Ordering::SeqCst);
-        self.outcome.clone()
+        ToolOutput::outcome(self.outcome.clone())
     }
 }
 
