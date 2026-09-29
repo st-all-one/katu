@@ -2,6 +2,8 @@
 
 use crate::read::ReadBudget;
 
+pub(super) use crate::lang::{language, len_u64, to_i64};
+
 /// Linhas `[start, end]` (1-based), já clampeadas.
 pub(super) fn slice<'a>(lines: &[&'a str], start: u32, end: u32) -> Vec<&'a str> {
     let skip = usize::try_from(start.saturating_sub(1)).unwrap_or(0);
@@ -56,26 +58,4 @@ pub(super) fn flags(lines: &[&str]) -> Vec<(u32, &'static str)> {
     }
     found.truncate(16);
     found
-}
-
-pub(super) fn language(path: &str) -> &'static str {
-    match path.rsplit('.').next() {
-        Some("rs") => "rust",
-        Some("py") => "python",
-        Some("js") => "javascript",
-        Some("ts") => "typescript",
-        Some("go") => "go",
-        Some("toml") => "toml",
-        Some("json") => "json",
-        Some("md") => "markdown",
-        _ => "text",
-    }
-}
-
-pub(super) fn to_i64(value: u64) -> i64 {
-    i64::try_from(value).unwrap_or(i64::MAX)
-}
-
-pub(super) fn len_u64(value: usize) -> u64 {
-    u64::try_from(value).unwrap_or(u64::MAX)
 }

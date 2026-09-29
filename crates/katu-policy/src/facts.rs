@@ -83,6 +83,19 @@ pub enum ToolName {
     Thinking,
 }
 
+/// Modo da busca (E06-T05).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum SearchMode {
+    /// Conteúdo (`grep`).
+    Grep,
+    /// Nomes de ficheiro (`find`).
+    Find,
+    /// Mapa semântico de um diretório (`ls`).
+    Ls,
+}
+
 /// Argumentos tipados por tool (nunca `String` crua).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "kind")]
@@ -128,6 +141,10 @@ pub enum ToolArgs {
     Search {
         /// Raiz da busca.
         root: ResolvedPath,
+        /// Padrão de conteúdo ou nome (vazio em [`SearchMode::Ls`]).
+        query: String,
+        /// Modo da busca.
+        mode: SearchMode,
     },
     /// Planeamento.
     Plan,

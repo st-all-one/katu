@@ -116,7 +116,7 @@ verificação recusa `SUCCESS` com erros (§38).
   de E02-T05 cobre estes casos; `Deny` = efeito não ocorre; o filho herda o utilizador e nenhum
   caminho eleva privilégio.
 
-### E06-T05 ☐ Pesquisa de ficheiros (`grep`, `find`, `ls`)
+### E06-T05 ☑ Pesquisa de ficheiros (`grep`, `find`, `ls`)
 - **Entregáveis:** busca canónica com filtro de escopo e truncagem; **otimizada**: respeita
   `.gitignore`/ignore configurável, varredura em streaming (sem carregar o ficheiro inteiro) e
   paralela quando possível; resultado como **ponteiro** quando grande (só o delta chega ao modelo,
@@ -125,6 +125,13 @@ verificação recusa `SUCCESS` com erros (§38).
   (`s_*`) com tipo de linha (código/comentário/string/import/teste), `path:line:preview`,
   **informação negativa** ("0 outros callers"), relevância e `next`. `find` ranqueia por relevância
   à tarefa; `ls` devolve **mapa semântico** (linguagem, loc, exports, testes) — nunca `ls -la`.
+- **Estado:** `SearchTool` (`tool.search`) com `SearchMode::{Grep,Find,Ls}`; varredura recursiva
+  determinística (`walk`, ordem canónica, profundidade 16, teto de 4096 ficheiros, dotfiles e
+  `.gitignore` simples ignorados); `grep` classifica a linha (code/comment/import/string/test),
+  clusteriza pelo símbolo mais interior (`outline`) e devolve informação negativa; `find` ranqueia
+  por nome (3 exato / 2 contém / 1 no caminho) e `ls` dá o mapa semântico (lang/loc/symbols/
+  exports/tests). Varrredura **ficheiro-a-ficheiro** com teto (não carrega o repositório inteiro);
+  motor ripgrep, streaming intra-ficheiro e paralelismo ficam **gated por medição** (E15/E18).
 - **Aceite:** output ordenado estavelmente; limite de resultados aplicado; teste com path fora do
   escopo é negado; um repositório grande é pesquisado sem pico de memória; dois `grep` iguais dão
   bytes iguais (determinismo).
@@ -173,9 +180,13 @@ verificação recusa `SUCCESS` com erros (§38).
 
 ---
 
-### E06-T11 ☐ Mover/renomear (`move`, atómico)
+### E06-T11 ☑ Mover/renomear (`move`, atómico)
 - **Entregáveis:** `move` atómico (`rename`) sob escopo, sujeito à política; invalida o índice/cache
   do caminho antigo e do novo; devolve o novo `id`/`hash`; em lote, atualiza referências uma vez.
+- **Estado:** `Fs::rename` (porta; `fs.rename`) + `MoveFileTool` (`tool.move`); recusa destino
+  existente (`Unavailable{exists}`) e origem ausente (`Unavailable{missing}`); devolve `from_id`/
+  `to_id`/`hash` e `next: read <to_id>`. Testes: move+relatório, não-sobrescrita, origem ausente e
+  `MemFs::rename`. Índice/cache e referências em lote chegam com E07/E09 (não há índice no MVP).
 - **Aceite:** `move` de ficheiro sob escopo funciona e é reversível; `move` fora do escopo é negado;
   nenhuma referência fica pendurada (a busca após o `move` encontra o caminho novo); o índice não
   serve o caminho antigo.

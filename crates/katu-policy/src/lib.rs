@@ -49,7 +49,9 @@ pub use audit::{Activity, AuditIssue, AuditReport, ExampleCoverage, RuleSummary,
 pub use decision::{ApprovalRequest, ControlId, Decision, Evidence, Reason};
 pub use error::PolicyError;
 pub use evaluate::evaluate;
-pub use facts::{BudgetState, Capability, Facts, Phase, Timestamp, ToolArgs, ToolName, ToolUse};
+pub use facts::{
+    BudgetState, Capability, Facts, Phase, SearchMode, Timestamp, ToolArgs, ToolName, ToolUse,
+};
 pub use paths::{ResolvedArgv, ResolvedPath};
 pub use rule::{
     BudgetCap, Enforcement, Rule, RuleCategory, RuleExamples, RuleId, RuleScope, RuleSet, Severity,

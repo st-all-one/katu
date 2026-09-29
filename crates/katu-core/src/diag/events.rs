@@ -32,6 +32,7 @@ catalog! {
     // -- Sistema de ficheiros (borda) ----------------------------------------
     (FS_READ, "fs.read", "Leitura de um ficheiro."),
     (FS_WRITE, "fs.write", "Escrita atómica de um ficheiro."),
+    (FS_RENAME, "fs.rename", "Movimento/renomeação atómica de um caminho."),
     (FS_LIST, "fs.list", "Listagem de um diretório (ordem canónica)."),
     (FS_STAT, "fs.stat", "Metadados de um ficheiro (mtime)."),
 

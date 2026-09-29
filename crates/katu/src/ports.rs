@@ -103,6 +103,15 @@ impl Fs for StdFs {
         path.exists()
     }
 
+    fn is_dir(&self, path: &Path) -> bool {
+        path.is_dir()
+    }
+
+    fn rename(&self, from: &Path, to: &Path) -> Result<(), FsError> {
+        let _span = katu_core::span!(Level::Trace, events::FS_RENAME);
+        fs::rename(from, to).map_err(|err| FsError::from_io(&err))
+    }
+
     fn mtime(&self, path: &Path) -> Result<Timestamp, FsError> {
         let _span = katu_core::span!(Level::Trace, events::FS_STAT);
         let meta = fs::metadata(path).map_err(|err| FsError::from_io(&err))?;

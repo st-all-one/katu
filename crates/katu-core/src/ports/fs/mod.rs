@@ -1,6 +1,6 @@
 //! Porta de sistema de ficheiros (`Fs`) e a *fake* determinística [`MemFs`].
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
@@ -60,8 +60,17 @@ pub trait Fs: Send + Sync {
     /// Anexa bytes ao fim de um ficheiro (cria se não existir), de forma durável.
     fn append(&self, path: &Path, bytes: &[u8]) -> Result<(), FsError>;
 
+    /// Move/renomeia atomicamente `from` → `to` (o conteúdo **não** muda).
+    ///
+    /// Semântica POSIX: substitui `to` se já existir. O executor `move` verifica a existência do
+    /// destino antes, para nunca sobrescrever (fail-closed).
+    fn rename(&self, from: &Path, to: &Path) -> Result<(), FsError>;
+
     /// `true` se o caminho existe.
     fn exists(&self, path: &Path) -> bool;
+
+    /// `true` se o caminho é um diretório.
+    fn is_dir(&self, path: &Path) -> bool;
 
     /// Modificação (*mtime*) do caminho.
     fn mtime(&self, path: &Path) -> Result<Timestamp, FsError>;
@@ -167,6 +176,31 @@ impl Fs for MemFs {
     fn exists(&self, path: &Path) -> bool {
         let inner = lock(&self.inner);
         inner.files.contains_key(path)
+            || inner
+                .files
+                .keys()
+                .any(|key| key.starts_with(path) && key != path)
+    }
+
+    fn is_dir(&self, path: &Path) -> bool {
+        let inner = lock(&self.inner);
+        !inner.files.contains_key(path)
+            && inner
+                .files
+                .keys()
+                .any(|key| key.starts_with(path) && key != path)
+    }
+
+    fn rename(&self, from: &Path, to: &Path) -> Result<(), FsError> {
+        let mut inner = lock(&self.inner);
+        let Some(mut entry) = inner.files.remove(from) else {
+            return Err(FsError::NotFound);
+        };
+        let next = inner.clock_ms.saturating_add(1);
+        inner.clock_ms = next;
+        entry.mtime = Timestamp::from_millis(next);
+        inner.files.insert(to.to_path_buf(), entry);
+        Ok(())
     }
 
     fn mtime(&self, path: &Path) -> Result<Timestamp, FsError> {
@@ -180,91 +214,17 @@ impl Fs for MemFs {
 
     fn list_dir(&self, path: &Path) -> Result<Vec<PathBuf>, FsError> {
         let inner = lock(&self.inner);
-        let mut entries: Vec<PathBuf> = inner
-            .files
-            .keys()
-            .filter(|candidate| candidate.parent() == Some(path))
-            .cloned()
-            .collect();
-        entries.sort();
-        Ok(entries)
+        let mut entries: BTreeSet<PathBuf> = BTreeSet::new();
+        for key in inner.files.keys() {
+            if let Ok(rest) = key.strip_prefix(path)
+                && let Some(first) = rest.components().next()
+            {
+                entries.insert(path.join(first.as_os_str()));
+            }
+        }
+        Ok(entries.into_iter().collect())
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{Fs, FsError, MemFs};
-    use std::path::{Path, PathBuf};
-
-    #[test]
-    fn memfs_roundtrip() -> Result<(), FsError> {
-        let fs = MemFs::new();
-        let path = PathBuf::from("/a.txt");
-        fs.write_atomic(&path, b"hi")?;
-        assert!(fs.exists(&path));
-        assert_eq!(fs.read(&path)?, b"hi".to_vec());
-        Ok(())
-    }
-
-    #[test]
-    fn memfs_missing_is_not_found() {
-        let fs = MemFs::new();
-        assert_eq!(fs.read(Path::new("/nope")), Err(FsError::NotFound));
-    }
-
-    #[test]
-    fn memfs_lists_in_canonical_order() -> Result<(), FsError> {
-        let fs = MemFs::new();
-        fs.write_atomic(Path::new("/dir/b"), b"b")?;
-        fs.write_atomic(Path::new("/dir/a"), b"a")?;
-        let entries = fs.list_dir(Path::new("/dir"))?;
-        assert_eq!(
-            entries,
-            vec![PathBuf::from("/dir/a"), PathBuf::from("/dir/b")]
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn memfs_mtime_advances_monotonically() -> Result<(), FsError> {
-        let fs = MemFs::new();
-        let first = Path::new("/first");
-        let second = Path::new("/second");
-        fs.write_atomic(first, b"1")?;
-        fs.write_atomic(second, b"2")?;
-        assert!(fs.mtime(second)? > fs.mtime(first)?);
-        Ok(())
-    }
-
-    #[test]
-    fn memfs_cas_writes_only_on_match() -> Result<(), FsError> {
-        let fs = MemFs::new();
-        let path = Path::new("/f");
-        fs.write_atomic(path, b"one")?;
-        fs.write_atomic_if(path, b"two", b"one")?;
-        assert_eq!(fs.read(path)?, b"two".to_vec());
-        Ok(())
-    }
-
-    #[test]
-    fn memfs_cas_refuses_stale_and_keeps_content() -> Result<(), FsError> {
-        let fs = MemFs::new();
-        let path = Path::new("/f");
-        fs.write_atomic(path, b"one")?;
-        assert_eq!(
-            fs.write_atomic_if(path, b"two", b"OLD"),
-            Err(FsError::Stale)
-        );
-        assert_eq!(fs.read(path)?, b"one".to_vec());
-        Ok(())
-    }
-
-    #[test]
-    fn memfs_cas_refuses_missing() {
-        let fs = MemFs::new();
-        assert_eq!(
-            fs.write_atomic_if(Path::new("/missing"), b"x", b""),
-            Err(FsError::Stale)
-        );
-    }
-}
+mod tests;
