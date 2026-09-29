@@ -9,6 +9,10 @@ publish.workspace = true
 
 [dependencies]
 katu-policy.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
 
 [features]
 default = []

@@ -41,6 +41,7 @@ catalog! {
     (KERNEL_TRANSITION, "kernel.transition", "Transição de estado (guardas + efeitos)."),
     (KERNEL_REFUSAL, "kernel.refusal", "Recusa determinística (fail-closed)."),
     (KERNEL_STOP, "kernel.stop", "Critério de paragem atingido."),
+    (LOCK_RECOVERED, "lock.recovered", "Mutex recuperado de poison (um panic a segurar o lock)."),
     (LOG_APPEND, "log.append", "Anexação ao log (fonte da verdade)."),
     (LOG_REPLAY, "log.replay", "Reconstrução do estado a partir do log."),
 

@@ -23,6 +23,10 @@ publish = false
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# CLI
+clap = { version = "4", features = ["derive"] }
+# dados versionados (E02/E14/tooling)
+toml = "0.8"
 # crates internos
 katu-core = { path = "crates/katu-core" }
 katu-policy = { path = "crates/katu-policy" }

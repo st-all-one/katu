@@ -1,0 +1,11 @@
+# Camadas do katu (E01-T05) — fonte de verdade do firewall **LLM-free**.
+#
+# `forbidden` = crates que este crate NÃO pode declarar em `[dependencies]`.
+# O binário `katu` é a borda e pode depender de tudo; `knudge-core` é a memória
+# externa (adaptador só no binário).
+#
+# Verificado por `xtask check-layers` e por `xtask check-diag` (ver `ARCHITECTURE.md`).
+[layers]
+katu-core = ["katu-tools", "katu-providers", "katu-tui", "knudge-core"]
+katu-policy = ["katu-core", "katu-tools", "katu-providers", "katu-tui", "knudge-core"]
+katu-tools = ["katu-providers", "katu-tui", "knudge-core"]

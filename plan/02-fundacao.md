@@ -32,7 +32,7 @@ Todos os entregáveis abaixo assumem e verificam:
 
 ## Tarefas
 
-### E01-T01 ☐ Workspace e camadas
+### E01-T01 ☑ Workspace e camadas
 - **Objetivo:** workspace `katu` com **6 crates + `xtask`** (`katu-core`, `katu-policy`,
   `katu-tools`, `katu-providers`, `katu-tui`, `katu` binário) — menos peças, mesma fronteira.
 - **Entregáveis:** `Cargo.toml` do workspace; `src/lib.rs` de cada crate; `MODULE.md` por crate.
@@ -44,15 +44,15 @@ Todos os entregáveis abaixo assumem e verificam:
   `xtask check-layers`.
 - **Rust 1.97.0+:** `cargo build` verde no job `msrv`.
 
-### E01-T02 ☐ Ports determinísticos
-- **Objetivo:** traits `Clock`, `Rng`, `Fs`, `Env`, `Logger` no núcleo; impls reais nos
-  adaptadores; fakes no núcleo para teste.
+### E01-T02 ☑ Ports determinísticos
+- **Objetivo:** traits `Clock`, `Rng`, `Fs`, `Env` no núcleo; impls reais nos adaptadores; fakes no
+  núcleo para teste. (O port `Logger` foi substituído por `diag` — uma só superfície, DF9/E19.)
 - **Entregáveis:** traits + impls; fakes (`FixedClock`, `SeqRng`, `MemFs`, `NullLogger`).
 - **Aceite:** o núcleo compila sem dependências de SO/terminal; um teste do núcleo usa só fakes e
   é reprodutível byte a byte; nenhuma chamada a `SystemTime::now()`/`HashMap`-sem-ordem fora dos
   ports (reforçado por `disallowed-methods` no `clippy.toml`).
 
-### E01-T03 ☐ Gate de qualidade, perfil e supply chain
+### E01-T03 ☑ Gate de qualidade, perfil e supply chain
 - **Objetivo:** travar estilo, disciplina e cadeia de dependências antes de crescer o código.
 - **Entregáveis:** `rustfmt.toml` (`edition = "2024"`, `max_width = 100`); `clippy.toml` (rigor
   máximo, `msrv = "1.97"`); `[workspace.lints]` com `unsafe_code = "deny"`, `unwrap_used`,
@@ -65,23 +65,27 @@ Todos os entregáveis abaixo assumem e verificam:
   gate de linhas + `cargo tree`; `clippy.toml` aplicado.
 - **Rust 1.97.0+:** `clippy.toml` declara `msrv = "1.97"`; o gate roda também no job `msrv`.
 
-### E01-T04 ☐ Esqueleto do binário `katu`
-- **Objetivo:** `main.rs` mínimo com parsing de subcomandos (stub), envelope `--json`
-  (`{success, command, error}`), exit codes e EPIPE → exit 0.
+### E01-T04 ☑ Esqueleto do binário `katu`
+- **Objetivo:** `main.rs` com parsing de subcomandos (`clap`), envelope `--json`
+  (`{success, command, error?, data?}`), exit codes e EPIPE → exit 0.
+- **Estado:** implementado (`crates/katu/src/{cli,report}.rs`); testes de ponta a ponta em
+  `crates/katu/tests/cli.rs`. Só há `version`/`doctor` (stub) — o resto é E04+.
 - **Entregáveis:** `katu` com `clap`; tratamento de pipe fechado.
 - **Aceite:** `katu --help`; `katu --json` devolve envelope; `katu ... | head -1` sai com 0.
 
-### E01-T05 ☐ Documento de arquitetura e grafo de camadas
+### E01-T05 ☑ Documento de arquitetura e grafo de camadas
 - **Objetivo:** registar a separação kernel/política/adaptadores e o grafo de dependências.
-- **Entregáveis:** `ARCHITECTURE.md` (camadas + ports + mapa de módulos); `layers.toml` (equivalente
-  ao `tach.toml` do docling, §36) com `depends_on` permitidas por crate.
+- **Estado:** `ARCHITECTURE.md` + `layers.toml` (fonte de verdade lida por `xtask check-layers`);
+  `xtask check-crate-coverage` garante `MODULE.md` por crate; `xtask check-docs` valida links.
 - **Aceite:** `xtask check-layers` falha se `katu-core` importar `katu-providers`, se
   `katu-policy` importar `katu-tui`, etc.; `xtask check-crate-coverage` falha se algum módulo
   ficar fora das camadas.
 
-### E01-T06 ☐ Modelo de erro e envelope de máquina
+### E01-T06 ☑ Modelo de erro e envelope de máquina
 - **Objetivo:** definir a taxonomia de erro **antes** de a espalhar pelo código (cf. `ToolOutcome`
   do docling, §38).
+- **Estado:** implementado em `katu-core::error`: `Error` (encadeável, `#[source]`), `ErrorKind`
+  (`as_str` + `exit_code`), `ToolOutcome`, `OutcomeError`, `lock_recover` (poison + aviso diag).
 - **Entregáveis:** `enum Error` no núcleo com `thiserror` (`#[from]`, `#[source]`),
   `#[non_exhaustive]`, `Send + Sync + 'static`; `ErrorKind` estável (`not_found`, `invalid_input`,
   `conflict`, `io`, `timeout`, `config`, `schema`, `unsafe_blocked`, `unavailable`, `internal`);
@@ -91,8 +95,11 @@ Todos os entregáveis abaixo assumem e verificam:
 - **Aceite:** `source()` encadeia; nada de `Box<dyn Error>` na API do núcleo; todo erro de I/O
   carrega `path`/`id`; a invariante "nunca `Ok` com erros pendurados" tem teste.
 
-### E01-T07 ☐ Logging, observabilidade e redação
+### E01-T07 ◐ Logging, observabilidade e redação
 - **Objetivo:** logs úteis que **nunca** quebram o pipe nem vazam segredo.
+- **Estado:** o port `Logger`/`tracing` foi substituído por `diag` (logs **sempre estruturados**,
+  catálogo de eventos, custo zero por defeito — DF9/E19); stdout=dados/stderr=logs garantido pelo
+  envelope. **Falta** a redação por allowlist (corpos, `[secrets]`, tokens) no sink.
 - **Entregáveis:** impl do port `Logger` com `tracing` + `tracing-subscriber` (`EnvFilter`);
   regra **stdout = dados / stderr = logs**; níveis documentados; `#[instrument]` nas operações;
   campos estruturados; redação por allowlist (corpos, `[secrets]`, `Authorization`, tokens);
@@ -116,6 +123,7 @@ Todos os entregáveis abaixo assumem e verificam:
 
 ### E01-T09 ☐ Política de recursos e runtime mínimo
 - **Objetivo:** teto de memória/disco/tempo, sem runtime pesado.
+- **Estado:** adiado até haver I/O real (E04+); nenhum runtime assíncrono ainda.
 - **Entregáveis:** canal bounded + backpressure; pool limitado a `available_parallelism()`;
   timeouts tipados e retry/backoff só em operação idempotente; cap de corpo e de cache; decisão de
   runtime (**worker bloqueante por padrão**; `tokio` mínimo só se necessário); `spawn_blocking`
@@ -124,7 +132,10 @@ Todos os entregáveis abaixo assumem e verificam:
 - **Aceite:** `cargo tree` sem `tokio full`; rajada acima do teto não estoura memória; I/O lento
   não trava o comando.
 
-### E01-T10 ☐ `xtask` e CI em camadas
+### E01-T10 ◐ `xtask` e CI em camadas
+- **Estado:** `xtask` com `check-layers`/`check-crate-coverage`/`check-diag`/`check-docs`; workflows
+  `pr-fast`, `pr-msrv` (Rust 1.97.0 exato), `ci`. **Falta** um único `cargo xtask check` que corra
+  tudo (hoje é `make check`).
 - **Objetivo:** um único ponto de entrada para os gates, local e em CI (o `extension_cli` do zed,
   §57.2).
 - **Entregáveis:** `cargo xtask` com `check` (fmt+clippy+test+linhas+layers), `check-layers`,

@@ -2,11 +2,11 @@
 
 CARGO ?= cargo
 
-.PHONY: check fmt clippy test build file-length layers diag clean \
+.PHONY: check fmt clippy test build file-length layers diag docs clean \
         deny audit machete typos miri instrument ci
 
-## Portão completo local: formatação, lints, testes, camadas, diag e tamanho de arquivo.
-check: fmt clippy test layers diag file-length
+## Portão completo local: formatação, lints, testes, camadas, diag, docs e tamanho de arquivo.
+check: fmt clippy test layers diag docs file-length
 
 ## Verifica formatação sem alterar.
 fmt:
@@ -36,6 +36,10 @@ layers:
 ## Logs só estruturados (DF9/E19): nenhuma macro de texto livre fora do sink.
 diag:
 	$(CARGO) run -q -p xtask -- check-diag
+
+## Documentação: todos os links de `*.md` resolvem (E01-T05).
+docs:
+	$(CARGO) run -q -p xtask -- check-docs
 
 clean:
 	$(CARGO) clean

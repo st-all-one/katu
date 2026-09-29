@@ -96,21 +96,29 @@ tipos permitem.
 
 ## Tarefas
 
-### E02-T01 ☐ Tipos de facto e de capacidade
+### E02-T01 ☑ Tipos de facto e de capacidade
 - **Entregáveis:** `ToolUse`, `ResolvedPath`, `ResolvedArgv`, `Phase`, `Capability`, `Facts`.
+- **Estado:** `katu-policy/src/{paths,facts}.rs`; `ResolvedPath` só constrói via `from_canonical`
+  (absoluto + normalizado); proptest mostra que `../` é resolvido antes do veredicto. A resolução de
+  symlinks fica no kernel (porta `Fs`) — o tipo é o invariante pós-resolução.
 - **Aceite:** `ResolvedPath` só é construível a partir de canonicalização (construtor privado);
   proptest mostra que `../` e symlink são resolvidos antes de qualquer veredicto.
 
-### E02-T02 ☐ Tipos de regra e de veredicto
+### E02-T02 ☑ Tipos de regra e de veredicto
 - **Entregáveis:** `Rule`, `RuleScope`, `Enforcement`, `Severity`, `RuleCategory`, `Decision`,
   `Evidence`, `Waiver`, `RuleExamples`, `PolicyVocab` (`POLICY_VOCAB_VERSION`).
+- **Estado:** `katu-policy/src/{rule,decision}.rs`; round-trip TOML preserva as regras;
+  `#[non_exhaustive]` nos enums públicos; `RuleSet::from_toml` **recusa** vocabulário desconhecido
+  (fail-closed).
 - **Aceite:** round-trip TOML/JSON de `Rule` preserva ordem canônica; `#[non_exhaustive]` nos
   enums públicos; `Decision` não constrói estado inválido; o motor **recusa** um `RuleSet` com
   `POLICY_VOCAB_VERSION` desconhecida (fail-closed).
 
-### E02-T03 ☐ Motor `evaluate` puro
-- **Entregáveis:** avaliador determinístico, com ordem de custo crescente (§32): allowlist →
-  regex **sobre factos estruturados, nunca texto** → recência → orçamento.
+### E02-T03 ☑ Motor `evaluate` puro
+- **Entregáveis:** avaliador determinístico, com ordem de custo crescente (§32): âmbito → casamento
+  → orçamento. O veredicto de maior `rank` vence (`Allow < RequireApproval < Deny < NeedsHuman`).
+- **Estado:** `katu-policy/src/{engine,evaluate}.rs`; testes de negação, dependência, orçamento,
+  severidade e fail-closed; `evaluate` não toca `Clock`/`Fs`/`Rng`.
 - **Aceite:** mesmo input → mesmo veredicto (proptest); nenhuma chamada a `Clock`/`Fs`/`Rng`;
   tempos medidos em microssegundos para um `RuleSet` de 30 regras.
 

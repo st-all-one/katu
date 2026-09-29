@@ -1,7 +1,7 @@
 //! `katu` — binário: CLI, composição e adaptador in-process do `knudge`.
 //!
-//! E01 define o esqueleto, os adaptadores das portas e o diagnóstico estruturado; o wiring real
-//! chega com E04 (kernel). Toda a operação de topo abre um `span!` (DF9/E19).
+//! E01 define o esqueleto, os adaptadores das portas, o modelo de erro e o diagnóstico estruturado;
+//! o wiring real chega com E04 (kernel). Toda a operação de topo abre um `span!` (DF9/E19).
 
 #![forbid(unsafe_code)]
 #![allow(
@@ -9,21 +9,28 @@
     reason = "binário: sem API externa; os módulos internos usam pub(crate)"
 )]
 
+mod cli;
+
 #[cfg(feature = "profile")]
 mod diag;
 
 #[allow(dead_code, reason = "adaptadores ligados ao kernel em E04")]
 mod ports;
 
+mod report;
+
 use std::process::ExitCode;
 
+use clap::Parser;
 use katu_core::diag::{Level, events};
 
 fn main() -> ExitCode {
     #[cfg(feature = "profile")]
     setup_diag();
     let _span = katu_core::span!(Level::Info, events::KATU_RUN);
-    ExitCode::SUCCESS
+    let cli = cli::Cli::parse();
+    let report = cli::execute(&cli);
+    ExitCode::from(report::emit(&report, cli.json))
 }
 
 /// Instala o diagnóstico estruturado quando `KATU_INSTRUMENT` o pede (DF9/E19).
