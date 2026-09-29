@@ -192,6 +192,31 @@ número com base, não uma promessa — DF5).
 
 ---
 
+## DF9 — Instrumentação transversal on-demand, custo zero por defeito ✅
+
+**Enunciado.** **Toda** operação do katu abre um `span!` (log estruturado + métrica de tempo) e
+pode emitir `event!`. Os registos são **sempre estruturados**: identificador estável + campos
+tipados; nunca texto livre interpolado. O consumo é um `Sink` plugável. O custo é **zero** quando a
+instrumentação é compilada fora (`feature = "instrument"`, off por defeito); com a feature, é uma
+leitura atómica *relaxed* + ramo até ser ligada em runtime (`KATU_INSTRUMENT=1`). A instrumentação
+**nunca** entra no log de sessão nem no contexto do modelo.
+
+**Evidência a favor.** O E18/E15 medem; sem instrumentação densa e barata, otimizar é adivinhar (os
+falsos positivos que o §65 proíbe). O exemplo do `knudge` mostra o valor do recorte micro + e2e —
+que exige instrumentação fina e determinística.
+
+**Evidência contra.** Instrumentação espalhada pode degradar e poluir; mitigação: macros *no-op*
+compiladas fora, ativação explícita e revisão do teto de superfície (E14).
+
+**Consequência.** `katu-core::diag` (porta `Sink` + macros `span!`/`event!`); o binário instala o
+sink só quando pedido; todos os épicos instrumentam as suas operações. DF9 é pré-condição do
+E15/E18 e substitui o port `Logger` (uma só superfície de diagnóstico).
+
+**Teste que trava.** `E19-T01`: com a feature ligada, spans/eventos são registados; desligada,
+**zero** registos e o caminho ativo não é compilado (o build por defeito não contém `diag::active`).
+
+---
+
 ## Tabela de rastreabilidade rápida
 
 | Decisão | Épicos que a implementam | Teste canónico |
@@ -204,6 +229,7 @@ número com base, não uma promessa — DF5).
 | DF6 | E03 | `E03-T06` |
 | DF7 | E14, E15 | `E14-T01` |
 | DF8 | E12 | `E12-T01`, `E12-T07` |
+| DF9 | E19, E15, E18 | `E19-T01`, `make instrument` |
 
 ---
 

@@ -96,6 +96,7 @@ justifica (§53).
 | | E14 Governança e superfície | [`15-governanca-superficie.md`](15-governanca-superficie.md) | todas | teto de superfície |
 | | E15 Performance e benchmarks | [`16-performance-benchmarks.md`](16-performance-benchmarks.md) | E05 | números com artefacto |
 | | E18 Otimização profunda (matemática, info, estatística) | [`19-otimizacao-profunda.md`](19-otimizacao-profunda.md) | E05 | fórmula + artefacto + teste; adotar-ou-reverter |
+| | E19 Instrumentação transversal (logs estruturados + métricas) | [`20-instrumentacao-transversal.md`](20-instrumentacao-transversal.md) | E01 | zero eventos desligada; `make instrument` |
 | **Gestão** | E16 Roadmap, riscos e kill criteria | [`17-roadmap-riscos.md`](17-roadmap-riscos.md) | — | revisão por fase |
 
 ### Futuro (fora do escopo atual)
@@ -121,7 +122,7 @@ E01 ──┬── E02 ──┐
                                   ├── E06 ── E07      ║
                                   ├── E09 ── E10      ║
                                   └── E12             ║
-                                                     ╠══ E13, E14, E15, E18 (transversais)
+                                                     ╠══ E13, E14, E15, E18, E19 (transversais)
                                                      ╚══ E16 (revisão por fase)
 
 Futuro (fora do escopo atual): E08 adaptador MCP · E11 plugins WASM · múltiplos providers · jail de SO (E17)

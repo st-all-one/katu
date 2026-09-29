@@ -11,6 +11,11 @@ publish.workspace = true
 name = "katu"
 path = "src/main.rs"
 
+[features]
+default = []
+# Instrumentação transversal (DF9/E19): compila o caminho ativo e o sink de `stderr`.
+profile = ["katu-core/instrument"]
+
 [dependencies]
 katu-core.workspace = true
 katu-policy.workspace = true

@@ -10,5 +10,10 @@ publish.workspace = true
 [dependencies]
 katu-policy.workspace = true
 
+[features]
+default = []
+# Instrumentação transversal (DF9/E19). OFF por defeito: custo literalmente zero.
+instrument = []
+
 [lints]
 workspace = true

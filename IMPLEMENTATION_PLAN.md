@@ -27,6 +27,7 @@ São escolhas **arquiteturais** que, adiadas, viram retrabalho. Entram no *desig
 | **Confiança Beta-Bernoulli + Wilson** (E18-T06) | E02-T04 | define `Enforced` vs `Advisory` por evidência, não por fé |
 | **Cargo profiles/lints/workspace** | E01 | `[profile.release]`, `[workspace.lints]`, resolver 2, 6 crates + `xtask` |
 | **Harness de medição (measure-first)** | E15-T01/T02 ∥ E01 | o exemplo 19 começou pelo harness; sem baseline não há A/B |
+| **Instrumentação transversal `diag`** (DF9) | E01/E19-T01 | logs estruturados + métrica de tempo, custo zero por defeito; sem ela, E15/E18 otimizam às cegas |
 | **Firewall LLM-free** (`katu-core`/`policy`/`tools` sem provider) | E01 | `xtask check-layers` desde o primeiro commit |
 
 ---
@@ -79,6 +80,8 @@ Futuro (só após valor provado): E08 MCP · E11 plugins WASM · E17 jail de SO
   `Alternatives considered`, `policy/` versionado, `check-docs`.
 - **E15-T01/T02** ([`16`](plan/16-performance-benchmarks.md)) — harness e **portão de publicação de
   números** (DF5). **Mede antes de otimizar.**
+- **E19-T01** ([`20`](plan/20-instrumentacao-transversal.md)) — **instrumentação transversal**
+  (`katu-core::diag`): logs estruturados + métrica de tempo, custo zero por defeito (DF9).
 - **E18-T01** ([`19`](plan/19-otimizacao-profunda.md)) — **contrato de determinismo numérico**:
   entra como restrição de design de E02/E04.
 - **E16** ([`17`](plan/17-roadmap-riscos.md)) — contínuo (riscos, kill criteria).
@@ -208,3 +211,4 @@ Tudo o resto é incremental e **condicional ao gate de E05**.
 | E16 Gestão | [`17-roadmap-riscos.md`](plan/17-roadmap-riscos.md) | contínuo |
 | E17 Jail *(futuro)* | [`18-jail-futuro.md`](plan/18-jail-futuro.md) | — |
 | E18 Otimização profunda | [`19-otimizacao-profunda.md`](plan/19-otimizacao-profunda.md) | 0–7 |
+| E19 Instrumentação transversal | [`20-instrumentacao-transversal.md`](plan/20-instrumentacao-transversal.md) | 0,7 |

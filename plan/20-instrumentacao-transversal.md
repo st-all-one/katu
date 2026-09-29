@@ -1,0 +1,124 @@
+# E19 — Instrumentação transversal (logs estruturados + métricas de tempo)
+
+> **Transversal — não é fase.** Regra de projeto: **toda** operação do katu abre um `span!` de log
+> estruturado e métrica de tempo, **on-demand** e de **custo zero por defeito**. Existe para que
+> possamos medir cada ponto mínimo do projeto e evitar otimizações cegas e falsos positivos.
+>
+> **Decisões:** DF9 (e alimenta DF5/E15/E18). **Depende de:** E01.
+> **Gate do épico:** desligada, **zero** registos e **zero** custo (o caminho ativo não é
+> compilado); ligada, todo span tem início, fim e duração.
+>
+> **Fonte de método:** o exemplo do `knudge`
+> ([`knudge/plan/implementation/19_performance_reforma_cli.md`](../knudge/plan/implementation/19_performance_reforma_cli.md))
+> — medir antes, A/B, adotar-ou-reverter.
+
+---
+
+## 1. Princípio
+
+- **Logs sempre estruturados.** Um registo é um **identificador estável** (`policy.deny`,
+  `tool.call`, `provider.ttft`) + **campos tipados**; **nunca** texto livre interpolado. Todo o
+  dado variável vai para campos.
+- **Métrica de tempo integrada.** Cada `span!` regista início e fim com duração em nanossegundos.
+- **Custo zero por defeito.** Sem `feature = "instrument"`, `span!`/`event!` são *no-op* e o caminho
+  ativo **não existe** no binário. Sem a flag de runtime, não altera bytes, não faz I/O, não
+  bloqueia.
+- **On-demand.** Com a feature, liga-se em runtime (`KATU_INSTRUMENT=1`) e afina-se o nível
+  (`set_level`); desligado, é uma leitura atómica *relaxed* + ramo.
+- **Diagnóstico, não plano de dados.** Nunca entra no log de sessão nem no contexto do modelo
+  (`Model-visible ⟺ logged` intacto).
+
+## 2. Contrato (`katu-core::diag`)
+
+```rust
+pub enum Level { Error, Warn, Info, Debug, Trace }   // thresholds
+pub enum Value<'a> { Str(&'a str), Int(i64), Uint(u64), Bool(bool) }
+pub enum Kind { Event, SpanStart, SpanEnd }
+
+pub struct Record<'a> {
+    pub level: Level,
+    pub event: &'static str,
+    pub kind: Kind,
+    pub duration_nanos: Option<u128>,
+    pub fields: &'a [(&'static str, Value<'a>)],
+}
+
+pub trait Sink: Send + Sync { fn record(&self, record: &Record<'_>); }
+```
+
+Instalação (borda, no binário): `install(Arc<dyn Sink>)`; controlo: `set_enabled(bool)`,
+`set_level(Level)`; leitura: `enabled()`, `current_level()`.
+
+**Uso padrão** (a regra para todo o código):
+
+```rust
+use katu_core::diag::Level;
+
+fn operacao(n: usize) -> Result<(), Error> {
+    let _span = katu_core::span!(Level::Info, "operacao", "n" => n);
+    katu_core::event!(Level::Debug, "operacao.passo", "ok" => true);
+    // …
+    Ok(())
+}
+```
+
+- Identificadores **estáveis** e **namespaced** (`<subsistema>.<ação>`), nunca mensagens.
+- A duração vive no `Kind::SpanEnd`; agrega-se fora do processo (p50/p95/p99), sem tocar no código.
+
+## 3. Como medir sem interferir
+
+- **Recorte micro + e2e** (lição do `knudge`): os ganhos podem existir só numa escala. O sink
+  agregador (§tarefas) dá histogramas por `event`; o E15 cruza com o e2e.
+- **Determinismo**: o caminho de diagnóstico usa um relógio monotónico **local** e não escreve
+  estado observável. O resultado do programa é idêntico com a instrumentação ligada ou desligada —
+  e isso é um teste.
+- **Consistência**: um `fingerprint` determinístico por operação permite detetar divergência entre
+  execuções (mesma entrada → mesma impressão) — o par da métrica de tempo.
+
+## Tarefas
+
+### E19-T01 ☑ Mecanismo base: porta `Sink` + macros + feature
+- **Entregáveis:** `katu-core::diag` (`Level`, `Value`, `Kind`, `Record`, `Sink`, `Span`); macros
+  `span!`/`event!`; `feature = "instrument"` (off por defeito); adapter de `stderr` no binário
+  (`--features profile`); `make instrument`.
+- **Aceite:** ligada, spans/eventos são registados (teste); desligada, `Span` é *zero-sized* e
+  `enabled() == false`; build por defeito **não** compila `diag::active`.
+- **Estado:** implementado (`diag/mod.rs`, `diag/active.rs`, `diag/disabled.rs`).
+
+### E19-T02 ☐ Sink agregador (histogramas) + dump
+- **Entregáveis:** sink que agrega contagens e durações por `event` (min/p50/p95/p99/max) e
+  descarrega em `.katu/diag/*.jsonl` (ou `stderr`) sob pedido; sem alocação no caminho quente
+  além do registo.
+- **Aceite:** os números saem com base tipada (DF5) e artefacto; o dump é determinístico por ordem
+  canônica de `event`.
+
+### E19-T03 ☐ Instrumentar o caminho crítico por épico
+- **Entregáveis:** `span!` em cada operação do kernel (E04), política (E02), tools/contenção
+  (E06/E07), memória (E03), contexto (E09) e providers (E12); nomes estáveis, campos tipados.
+- **Aceite:** `xtask` verifica que cada módulo de produção tem spans (cobertura mínima); nenhum
+  `println!`/texto livre em log.
+
+### E19-T04 ☐ Consistência (fingerprint determinístico)
+- **Entregáveis**: `diag::fingerprint!` que acumula um hash determinístico do estado/resultado de
+  uma operação; comparável entre execuções.
+- **Aceite:** mesma entrada → mesma impressão; o teste falha se a impressão mudar sem mudança de
+  código (deteta não-determinismo).
+
+### E19-T05 ☐ Gate no CI
+- **Entregáveis:** `make instrument` no job de CI (clippy + testes com a feature).
+- **Aceite:** `clippy -D warnings` verde com `instrument`/`profile`; o teste "zero quando desligado"
+  e o teste "regista quando ligado" correm ambos.
+
+## Definition of Done
+
+- [ ] Toda operação de produção abre um `span!` com nome estável.
+- [ ] Logs **só** estruturados (identificador + campos); zero texto livre.
+- [ ] Custo zero por defeito provado por build (sem `diag::active`) e por teste.
+- [ ] `make check` e `make instrument` verdes; `xtask check` verde em Rust 1.97.0.
+
+## Não-objetivos
+
+- Instrumentação que altera o plano de dados (log de sessão/contexto do modelo).
+- Custo no caminho quente quando desligada (a feature **não** existe no binário por defeito).
+- Recolha de segredos: campos nunca carregam corpos/credenciais (redação no sink, E01-T07).
+- Substituir o E15/E18: E19 **instrumenta**; E15/E18 **medem e otimizam**.

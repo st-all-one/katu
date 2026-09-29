@@ -114,7 +114,7 @@ crates de provider. O modelo é cliente do plano de dados, não parte dele.
 
 ---
 
-## 6. As oito decisões fundacionais
+## 6. As nove decisões fundacionais
 
 Estão detalhadas (com evidência e teste que as trava) em
 [`01-decisoes-fundacionais.md`](01-decisoes-fundacionais.md). Resumo:
@@ -129,6 +129,7 @@ Estão detalhadas (com evidência e teste que as trava) em
 | DF6 | **Uma capacidade, um provedor** | Porta `Memory` com tipos do katu; sem legado em paralelo |
 | DF7 | **Conhecimento e política são artefactos** | Versionados e gate-verificados; ADRs com alternativas |
 | DF8 | **O provider built-in é first-party e é um endpoint de modelo** | `opencode go/zen` + `llama.cpp`; resto GDK; latência > compressão; o modelo é cliente, não substrato |
+| DF9 | **Instrumentação transversal on-demand** | Logs sempre estruturados + métrica de tempo; custo zero por defeito (`feature = "instrument"`) |
 
 ---
 

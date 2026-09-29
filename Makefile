@@ -3,7 +3,7 @@
 CARGO ?= cargo
 
 .PHONY: check fmt clippy test build file-length layers clean \
-        deny audit machete typos miri ci
+        deny audit machete typos miri instrument ci
 
 ## Portão completo local: formatação, lints, testes, camadas e tamanho de arquivo.
 check: fmt clippy test layers file-length
@@ -78,6 +78,12 @@ miri:
 	else \
 		echo "miri ausente; pule (rustup +nightly component add miri)"; \
 	fi
+
+## Instrumentação transversal (DF9/E19): compila e linta com a feature ligada.
+instrument:
+	$(CARGO) clippy -p katu-core --features instrument --all-targets -- -D warnings
+	$(CARGO) clippy -p katu --features profile --all-targets -- -D warnings
+	$(CARGO) test -p katu-core --features instrument
 
 ## Portão do CI: check + extras disponíveis.
 ci: check deny audit machete typos miri
