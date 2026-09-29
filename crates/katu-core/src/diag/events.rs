@@ -69,6 +69,7 @@ catalog! {
     (TOOL_PLAN, "tool.plan", "Validação/registo de um plano."),
     (CONTAIN_CHECK, "contain.check", "Verificação de contenção (traps suaves)."),
     (CONTAIN_DENY, "contain.deny", "Contenção negou a operação."),
+    (CONTAIN_MODE, "contain.mode", "Modo de contenção relatado (soft; honestidade obrigatória)."),
 
     // -- Memória -------------------------------------------------------------
     (MEMORY_READ, "memory.read", "Leitura da porta de memória."),

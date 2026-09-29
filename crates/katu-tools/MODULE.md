@@ -36,3 +36,5 @@ sem veredicto; controlo em falta = recusa.
 - Depende de `katu-policy`/`katu-core`; **não** depende de `katu-providers`/`katu-tui` nem de
   `knudge-core`.
 - Honestidade: soft **não** é fronteira de segurança (a jail real é E17/futura).
+- Testes de imposição: `tests/enforcement.rs` (E06-T08: cada tool negada por `dispatch` não produz
+  efeito) e `tests/containment_gate.rs` (E07-T03: controlo em falta = recusa; soft não confina).

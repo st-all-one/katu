@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod containment;
 pub mod diag;
 pub mod error;
 pub mod evidence;

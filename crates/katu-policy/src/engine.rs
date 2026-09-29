@@ -187,12 +187,26 @@ fn delete_capability_covers(facts: &Facts, path: &ResolvedPath) -> bool {
         .any(|cap| matches!(cap, Capability::DeletePath { root } if path.is_under(root)))
 }
 
-/// `true` se o comando foi nominalmente concedido (destranca `DenyCommand`).
+/// `true` se o comando foi concedido (destranca `DenyCommand`).
+///
+/// `Capability::Command` é nominal (concede a tool inteira); `Capability::Exec { program }` só
+/// destranca um `argv` **verificável** e não destrutivo cujo programa casa exatamente (E07-T02).
 fn command_capability(facts: &Facts, tool: ToolName) -> bool {
-    facts
-        .capabilities
-        .iter()
-        .any(|cap| matches!(cap, Capability::Command { tool: granted } if *granted == tool))
+    facts.capabilities.iter().any(|cap| match cap {
+        Capability::Command { tool: granted } => *granted == tool,
+        Capability::Exec { program } => {
+            tool == ToolName::Exec && exec_program_covers(facts, program)
+        }
+        _ => false,
+    })
+}
+
+/// `true` se `program` concede o `argv` corrente e este é **verificável** (não opaco/destrutivo).
+fn exec_program_covers(facts: &Facts, program: &str) -> bool {
+    facts.tool.argv.as_ref().is_some_and(|argv| {
+        let inspection = crate::inspect(argv);
+        inspection.program == program && inspection.is_plain()
+    })
 }
 
 #[cfg(test)]

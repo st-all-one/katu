@@ -212,6 +212,51 @@ fn capability_unlocks_write_and_exec() -> Result<(), PolicyError> {
 }
 
 #[test]
+fn exec_program_capability_rejects_opaque_and_destructive() -> Result<(), PolicyError> {
+    let rules = rules()?;
+
+    // Capacidade por programa destranca um comando simples e verificável.
+    let mut plain = exec_facts("ls", &["-la"])?;
+    plain.capabilities.push(Capability::Exec {
+        program: "ls".to_string(),
+    });
+    assert!(evaluate(&plain, &rules)?.is_allow());
+
+    // … mas não destranca um interpretador com código inline (opaco).
+    let mut opaque = exec_facts("bash", &["-c", "rm -rf /"])?;
+    opaque.capabilities.push(Capability::Exec {
+        program: "bash".to_string(),
+    });
+    assert!(matches!(evaluate(&opaque, &rules)?, Decision::Deny { .. }));
+
+    // … nem `find -delete` (destrutivo).
+    let mut destructive = exec_facts("find", &[".", "-delete"])?;
+    destructive.capabilities.push(Capability::Exec {
+        program: "find".to_string(),
+    });
+    assert!(matches!(
+        evaluate(&destructive, &rules)?,
+        Decision::Deny { .. }
+    ));
+
+    // … nem `find -exec` (comando aninhado).
+    let mut nested = exec_facts("find", &[".", "-exec", "rm", "{}", ";"])?;
+    nested.capabilities.push(Capability::Exec {
+        program: "find".to_string(),
+    });
+    assert!(matches!(evaluate(&nested, &rules)?, Decision::Deny { .. }));
+
+    // … e o programa casa exatamente (sem normalizar quotes): `r''m` != `rm`.
+    let mut evasion = exec_facts("r''m", &["-rf", "/"])?;
+    evasion.capabilities.push(Capability::Exec {
+        program: "rm".to_string(),
+    });
+    assert!(matches!(evaluate(&evasion, &rules)?, Decision::Deny { .. }));
+
+    Ok(())
+}
+
+#[test]
 fn argv_text_never_changes_the_verdict() -> Result<(), PolicyError> {
     let rules = rules()?;
     let samples = [

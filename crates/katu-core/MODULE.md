@@ -37,6 +37,9 @@ função, o log é a fonte da verdade.
 - Diagnóstico transversal [`diag`](src/diag/mod.rs) (DF9/E19): log estruturado + métrica de tempo,
   custo zero por defeito; catálogo de eventos em [`diag::events`](src/diag/events.rs); sink
   agregador de percentis em `diag::aggregate` (E19-T02).
+- Contenção determinística [`containment`](src/containment.rs) (E07-T01): `Containment` (`Soft` por
+  omissão), `SandboxEnforcement` (sempre `Soft` no MVP), `ContainmentStatus`/`announce`
+  (`contain.mode`) e o gancho `Jail`/`NoJail` (jail futura E17; `Full`/`Partial` ⇒ `Unavailable`).
 - Evidência tipada [`evidence`](src/evidence.rs) (DF5/E09-T05): `Metric`/`EvidenceBasis`/
   `ArtifactRef`; um número sem artefacto não fundamenta decisão; a base não muda numa agregação.
 - Plano tipado [`plan`](src/plan.rs) (E06-T06): `Plan`/`ScopeContract`/`Feature`/`FeatureStatus`;

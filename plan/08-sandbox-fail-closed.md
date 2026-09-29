@@ -63,22 +63,41 @@ Regras:
 
 ## Tarefas
 
-### E07-T01 ☐ Port de contenção e modos
+### E07-T01 ☑ Port de contenção e modos
 - **Entregáveis:** `Containment` port (`Soft`/`Unconfined`); mapeamento para a política;
   `SandboxEnforcement::Soft` sempre relatado; gancho para a jail futura (E17) sem a implementar.
+- **Estado:** `katu_core::containment`: `Containment` (`Soft` por omissão; `enforces_policy`),
+  `SandboxEnforcement` (`Soft`/`Full`/`Partial`, `is_kernel_isolated`) e `ContainmentStatus::mvp`.
+  `announce` emite `contain.mode` (honestidade: `soft`, `kernel_isolated=false`). O gancho `Jail`
+  com `NoJail`: pedir `Full`/`Partial` devolve `ContainmentError::Unavailable` (fail-closed),
+  nunca execução livre.
 - **Aceite:** a UI e os logs dizem `soft`; nenhum caminho promete isolamento de SO; ligar a jail
   futura sem implementação devolve `Unavailable`, não execução livre.
 
-### E07-T02 ☐ Canonicalização, capacidades e inspetor de argv
+### E07-T02 ◐ Canonicalização, capacidades e inspetor de argv
 - **Entregáveis:** resolução canónica de paths (`..`, symlink) **antes** do veredicto; inspetor de
   `argv`/`cwd`/interpretador; `Capability::Exec`; nenhuma decisão por regex sobre a string.
+- **Estado:** `..`/`.` são normalizados lexicalmente em `ResolvedPath` (E02-T01). O inspetor
+  `katu_policy::inspect` classifica o `argv` por igualdade de strings
+  (`ProgramKind::{Command, Interpreter, InlineInterpreter}`), flags inline (`-c`/`-e`/`--eval`),
+  aninhadas (`find -exec`) e destrutivas (`find -delete`), com `is_opaque`/`is_plain`.
+  `Capability::Exec { program }` passa a destrancar `DenyCommand { Exec }` **só** para um `argv`
+  verificável (não opaco/destrutivo) com o programa exato — `bash -c`, `find -delete`,
+  `find -exec` e `r''m` continuam negados (golden E02-T05). **Falta:** resolução de **symlink** via
+  porta `Fs`; o ponto de integração é a resolução do tool call (E12).
 - **Aceite:** `cd x && rm`, `bash -c`, `find -delete`, `r''m` avaliados sobre factos; symlink para
   fora é negado **na política**; o golden de E02-T05 cobre estes casos.
 
-### E07-T03 ☐ **Gate do épico:** controlo em falta = recusa + honestidade
+### E07-T03 ◐ **Gate do épico:** controlo em falta = recusa + honestidade
 - **Objetivo:** provar fail-closed onde há controlo, e honestidade onde não há.
 - **Entregáveis:** testes de recusa (path não canonicalizável, `argv` desconhecido, `exit_code`
   `null`, autorização ausente para fora do workspace) e um teste que afirma `soft`/não-fronteira.
+- **Estado:** `crates/katu-tools/tests/containment_gate.rs`: vocabulário desconhecido ⇒ `dispatch`
+  falha e a tool não corre; `argv` ausente ⇒ `Unavailable` sem execução; path relativo ⇒ não
+  canonicalizável; `exit_code: null` ⇒ bloqueia avançar (kernel, E06-T07); a jail futura
+  (`NoJail.acquire(Full)`) falha-fechado; e o teste de **honestidade** prova que um comando fora das
+  tools do katu corre (a contenção é soft). **Falta:** autorização ausente para fora do workspace
+  (E07-T05).
 - **Aceite (gate):** com o controlo ausente, a operação **não** corre (`Denied`/`Unavailable` com o
   `ControlId` exato); nenhuma operação sensível passa sem veredicto; os testes provam que a
   contenção é **soft** (um comando fora do controlo do katu não é detido) — a limitação fica visível.

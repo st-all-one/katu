@@ -10,6 +10,8 @@ O **motor de política** do katu: avalia factos tipados e devolve um veredicto d
 - Tipos de facto: `ToolUse`, `ResolvedPath`, `ResolvedArgv`, `Capability`, `Phase`, `Facts`.
 - Tipos de regra: `Rule`, `RuleScope`, `Enforcement`, `RuleCategory`, `Decision`, `Evidence`.
 - `evaluate(facts, rules) -> Decision` — **puro**, sem relógio, sem FS, sem regex sobre texto.
+- `inspect(argv) -> ArgvInspection` — inspetor de `argv` determinístico (E07-T02): interpretadores,
+  código inline, flags destrutivas/aninhadas; sem regex.
 - `audit(rules, now) -> AuditReport` — categorias (`Enforced`/`Advisory`), exemplos negativos,
   duplicados e enunciados vazios (E02-T04).
 - Vocabulário **fechado e versionado** (`POLICY_VOCAB_VERSION`).
@@ -17,15 +19,19 @@ O **motor de política** do katu: avalia factos tipados e devolve um veredicto d
 ## Semântica de negação (OA15)
 
 `DenyWrite`/`DenyDelete`/`DenyCommand` são **portas falha-fechado**: disparam salvo se o contexto
-tiver a `Capability` correspondente (`WritePath`/`DeletePath`/`Command`). O motor não lê prosa nem
-calcula similaridade; as pré-condições semânticas (dedup ≥ 0.92, âncora, uma afirmação) chegam como
-**capacidade** concedida pelo adaptador de memória (E03). O motor mantém-se determinístico.
+tiver a `Capability` correspondente (`WritePath`/`DeletePath`/`Command`). `Capability::Exec {
+program }` é mais fino: só destranca `DenyCommand { Exec }` para um `argv` **verificável** (não
+opaco/destrutivo) cujo programa casa exatamente — `bash -c`, `find -delete`, `find -exec` e
+`r''m` continuam negados. O motor não lê prosa nem calcula similaridade; as pré-condições
+semânticas (dedup ≥ 0.92, âncora, uma afirmação) chegam como **capacidade** concedida pelo
+adaptador de memória (E03). O motor mantém-se determinístico.
 
 ## Mapa de módulos
 
 | Módulo | Conteúdo |
 |---|---|
 | `paths` | `ResolvedPath`/`ResolvedArgv` + normalização lexical (construtor privado) |
+| `argv` | `inspect`/`ArgvInspection`/`ProgramKind` — inspetor determinístico de `argv` (E07-T02) |
 | `facts` | `Phase`, `ToolName` (inclui operações de memória), `ToolArgs`, `ToolUse`, `Capability`, `BudgetState`, `Facts` |
 | `rule` | `Rule`, `RuleScope`, `Enforcement`, `Severity`, `RuleCategory`, `Waiver`, `RuleExamples`, `RuleSet` (TOML, fail-closed) |
 | `decision` | `Decision`, `Evidence`, `Reason`, `ApprovalRequest`, `ControlId` |

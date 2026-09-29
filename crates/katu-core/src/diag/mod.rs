@@ -128,6 +128,10 @@ pub trait Sink: Send + Sync {
     fn record(&self, record: &Record<'_>);
 }
 
+/// Serializa testes que mexem no sink global (evita corridas entre testes).
+#[cfg(all(test, feature = "instrument"))]
+pub(crate) static INSTRUMENT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// Guarda RAII de um span instrumentado.
 ///
 /// Larga o span ao sair do escopo, registando a duração. Quando a instrumentação está compilada
@@ -239,55 +243,5 @@ macro_rules! event {
     };
 }
 
-#[cfg(all(test, feature = "instrument"))]
-mod active_tests {
-    use super::{Kind, Level, Record, Sink, events, install, set_enabled, set_level};
-    use std::sync::{Arc, Mutex};
-
-    #[derive(Default)]
-    struct Recorder {
-        records: Mutex<Vec<(&'static str, Kind)>>,
-    }
-
-    impl Sink for Recorder {
-        fn record(&self, record: &Record<'_>) {
-            self.records
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .push((record.event, record.kind));
-        }
-    }
-
-    #[test]
-    fn records_span_and_event() {
-        let recorder = Arc::new(Recorder::default());
-        install(recorder.clone());
-        set_level(Level::Trace);
-        set_enabled(true);
-        {
-            let _span = crate::span!(Level::Info, events::KATU_RUN, "n" => 1_u64);
-            crate::event!(Level::Debug, events::TOOL_OK, "ok" => true);
-        }
-        let records = recorder
-            .records
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        assert_eq!(records.len(), 3);
-        assert_eq!(records.first().map(|r| r.1), Some(Kind::SpanStart));
-        assert_eq!(records.get(1).map(|r| r.1), Some(Kind::Event));
-        assert_eq!(records.get(2).map(|r| r.1), Some(Kind::SpanEnd));
-        set_enabled(false);
-    }
-}
-
-#[cfg(all(test, not(feature = "instrument")))]
-mod zero_cost_tests {
-    use super::{Level, events};
-    use std::hint::black_box;
-
-    #[test]
-    fn instrumentation_is_off_by_default() {
-        assert!(!black_box(super::enabled()));
-        let _span = crate::span!(Level::Info, events::KATU_RUN, "k" => black_box(1_u64));
-    }
-}
+#[cfg(test)]
+mod tests;
