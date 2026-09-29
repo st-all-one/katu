@@ -86,6 +86,12 @@ catalog! {
     (VERIFY_REPORT, "verify.report", "Relatório do gate de verificação determinístico (E09)."),
     (SCOPE_MERGE, "scope.merge", "Merge de contratos de escopo por menor privilégio (E09-T04)."),
 
+    // -- Custo (E09-T06) -----------------------------------------------------
+    (COST_CHECK, "cost.check", "Verificação das camadas do cost governor."),
+    (COST_REFUSE, "cost.refuse", "Recusa do cost governor (camada + causa)."),
+    (COST_KILL, "cost.kill", "Kill switch engatado (corta tudo)."),
+    (COST_REENABLE, "cost.reenable", "Kill switch reaberto com autorização separada."),
+
     // -- Persistência --------------------------------------------------------
     (STORE_LOAD, "store.load", "Carregamento do estado persistido."),
     (STORE_SAVE, "store.save", "Gravação do estado persistido."),

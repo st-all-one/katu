@@ -125,11 +125,21 @@ método de verificação imposto e nomeado; negativos visíveis.
 - **Aceite:** build falha se um valor publicado não tiver base; a linha negativa do benchmark
   permanece.
 
-### E09-T06 ☐ Cost governor
+### E09-T06 ◐ Cost governor
 - **Entregáveis:** camadas (`max_tokens`, orçamento por task, cap por ferramenta, `max_turns`,
   janelas rolantes, velocidade financeira, kill switch com re-enable separado).
-- **Aceite:** um loop patológico é cortado pelo teto por ferramenta **antes** do teto global;
-  kill switch testado.
+- **Estado:** `katu_core::kernel::cost` implementa `CostGovernor` com as camadas avaliadas por
+  precedência `KillSwitch → PerTool → RollingWindow → FinancialVelocity → Global` (o teto **por
+  ferramenta** dispara **antes** do global). `CostCaps` agrega `global: BudgetCap`
+  (tokens/turnos/chamadas/tempo = orçamento por task), `per_tool`, `rolling` e `velocity`;
+  `CostCharge` traz `now_millis` (as camadas temporais só correm com relógio). O kill switch
+  (`trip`) só reabre com `Reenable` (motivo + autor não vazios — o agente não assina).
+  `from_events` reconstrói o uso global e por ferramenta; a recusa nunca altera o uso (§29).
+  Emite `cost.check`/`cost.refuse`/`cost.kill`/`cost.reenable`.
+- **Falta:** ligar o governor ao `Session`/loop (passar o relógio de `CallContext` às camadas
+  temporais).
+- **Aceite:** loop patológico cortado pelo teto por ferramenta **antes** do global; kill switch
+  testado (engata → recusa; re-enable separado → reabre).
 
 ---
 

@@ -22,6 +22,9 @@ função, o log é a fonte da verdade.
     política → efeito).
   - `kernel::memory_gate` — `enforce_memory_write` (E05-T01): `pre_write` → capacidade → política.
   - `kernel::budget` — `Budget`/`BudgetCap`/`BudgetGate` (único dono do teto de contexto).
+  - `kernel::cost` — `CostGovernor` (E09-T06): camadas `KillSwitch → PerTool → RollingWindow →
+    FinancialVelocity → Global`, kill switch com `Reenable` assinado (o agente não assina) e
+    reconstrução `from_events`; teto por ferramenta antes do global.
   - `kernel::bus` — `EventBus` (observadores + waterfall com a regra "tem de chamar `next`").
   - `kernel::checkpoint` — `Checkpoint` tipado (schema v1, validador zero-dep `validate`,
     `write_atomic`); erros agregados em `Issue { path, message }` (OA19/E09-T02).

@@ -9,6 +9,7 @@
 pub mod budget;
 pub mod bus;
 pub mod checkpoint;
+pub mod cost;
 mod event;
 mod log;
 mod memory_gate;
@@ -21,6 +22,10 @@ mod step;
 pub use budget::{Budget, BudgetCap, BudgetGate, BudgetRefusal, Charge};
 pub use bus::{EventBus, HandlerError, HandlerResult, Middleware, Next, Observer};
 pub use checkpoint::{CHECKPOINT_SCHEMA_VERSION, Checkpoint, CheckpointError, checkpoint_path};
+pub use cost::{
+    CostCaps, CostCharge, CostGovernor, CostLayer, CostRefusal, KillSwitch, Reenable,
+    ReenableError, RollingWindowCap, VelocityCap, cost_charge_for,
+};
 pub use event::{CallId, Event};
 pub use log::{
     LOG_SCHEMA_VERSION, Log, LogError, LogErrorKind, LogRecord, read_records, session_path,
