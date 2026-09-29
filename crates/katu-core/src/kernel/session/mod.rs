@@ -20,6 +20,7 @@ use super::step::step;
 use crate::diag::{Level, events};
 use crate::error::ToolOutcome;
 use crate::ports::{Fs, FsError};
+use crate::verify::VerificationReport;
 use katu_policy::{PolicyError, ResolvedPath, RuleSet, ToolUse};
 
 /// Erro de uma operação de sessão.
@@ -179,6 +180,17 @@ impl<'a> Session<'a> {
     /// [`SessionError`] se o evento não puder ser logado.
     pub fn set_workspace(&mut self, root: &ResolvedPath) -> Result<(), SessionError> {
         self.apply(&Event::WorkspaceSet { root: root.clone() })
+    }
+
+    /// Regista o relatório do gate de verificação (E09-T03): exigido para transitar para
+    /// `Phase::Verified`. O evento fica no log (auditável).
+    ///
+    /// # Errors
+    /// [`SessionError`] se o evento não puder ser logado.
+    pub fn record_verification(&mut self, report: &VerificationReport) -> Result<(), SessionError> {
+        self.apply(&Event::VerificationRecorded {
+            report: report.clone(),
+        })
     }
 
     /// Executa uma **escrita de memória** pela ordem §42, com o gate de E05: loga o pedido, corre

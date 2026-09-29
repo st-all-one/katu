@@ -10,10 +10,12 @@ função, o log é a fonte da verdade.
 - `State`, `Event`, `Refusal`, pipeline de tool call, log append-only.
   - `kernel::state` — `State`, `CallStatus`, `Refusal`/`RefusalReason`, `next_phase`/`can_transition`,
     `State::waivers` (exceções explícitas), `State::plan` (E06-T06), `State::last_command`
-    (E06-T07) e `State::workspace` (raiz do workspace, E07-T05); `UnmetPrecondition` (E05-T02/T04).
+    (E06-T07), `State::workspace` (raiz do workspace, E07-T05) e `State::verification`
+    (relatório do gate, E09-T03); `UnmetPrecondition` (E05-T02/T04).
   - `kernel::event` — `Event`, `CallId`, `Event::kind` (`Waiver`, `PlanRecorded`, `CommandRecorded`,
-    `WorkspaceSet`).
-  - `kernel::step` — `step(State, Event) -> Result<State, Refusal>` (puro) + pré-condições de fase.
+    `WorkspaceSet`, `VerificationRecorded`).
+  - `kernel::step` — `step(State, Event) -> Result<State, Refusal>` (puro) + pré-condições de fase
+    (`Verified` exige relatório não bloqueado, E09-T03).
   - `kernel::log` — `Log`/`LogRecord` append-only JSONL (`session.v1.jsonl`) sobre a porta `Fs`.
   - `kernel::project` — `derive_messages`, `state_of`, `snapshot` (projeções puras).
   - `kernel::pipeline` — `Tool`, `facts_for`/`facts_from`, `dispatch`/`dispatch_with` (facto →
@@ -24,7 +26,8 @@ função, o log é a fonte da verdade.
   - `kernel::checkpoint` — `Checkpoint` tipado (schema v1, validador zero-dep `validate`,
     `write_atomic`); erros agregados em `Issue { path, message }` (OA19/E09-T02).
   - `kernel::session` — `Session`/`CallContext` (loop mínimo: valida transição + orçamento antes de
-    gravar; `tool_call` e `memory_write` pela ordem §42; `verify`/`messages`/`fork`).
+    gravar; `tool_call` e `memory_write` pela ordem §42; `set_workspace`/`record_verification`;
+    `verify`/`messages`/`fork`).
 - `derive_messages`/`snapshot` — projeções puras.
 - Porta [`memory::Memory`](src/memory.rs) (tipos do katu, DF6), com submódulos:
   - `memory::types` — `NoteType`, `Status`, `Basis`, `NoteRef`, `Anchor`, `Score` (pontos base,
@@ -49,6 +52,9 @@ função, o log é a fonte da verdade.
 - Contexto com orçamento [`context`](src/context.rs) (E09-T01): `ContextBudget`/`Context`/`assemble`
   (prime determinístico + sufixo de mensagens do log; `Model-visible ⟺ logged`) e `prime()`
   (`PRIME_VERSION = 1`); tokens por estimativa determinística (`bytes/4`).
+- Gate de verificação [`verify`](src/verify/mod.rs) (E09-T03): `verify` **puro** (escopo/feedback/
+  cobertura, zero LLM), `VerificationReport`/`Check`/`CheckStatus`, `--strict` promove warns a
+  blocks; `Override` **assinado** (`reason`+`overridden_by`) registado em `overrides.jsonl`.
 - Plano tipado [`plan`](src/plan.rs) (E06-T06): `Plan`/`ScopeContract`/`Feature`/`FeatureStatus`;
   `validate` (schema + "≤ 1 `in_progress`") e `allows` (globs; proibido vence). O kernel exige um
   plano registado para `Phase::Planned`.

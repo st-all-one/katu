@@ -3,9 +3,21 @@ use crate::kernel::Message;
 use crate::kernel::event::{CallId, Event};
 use crate::kernel::session::{CallContext, Session};
 use crate::ports::MemFs;
+use crate::verify::{CheckStatus, VERIFICATION_SCHEMA_VERSION, VerificationReport};
 use katu_policy::{Phase, RuleSet};
 use std::path::Path;
 use std::sync::atomic::AtomicUsize;
+
+/// Relatório de verificação que passa (E09-T03).
+fn verification_report() -> VerificationReport {
+    VerificationReport {
+        schema_version: VERIFICATION_SCHEMA_VERSION,
+        checks: Vec::new(),
+        status: CheckStatus::Pass,
+        coverage_bps: 10_000,
+        strict: false,
+    }
+}
 
 #[test]
 fn checkpoint_survives_reopen_at_phase_boundary() -> Result<(), Box<dyn std::error::Error>> {
@@ -38,24 +50,7 @@ fn full_loop_verifies_and_messages_come_from_the_log() -> Result<(), Box<dyn std
     session.apply(&Event::UserMessage {
         text: "faz isto".into(),
     })?;
-
-    let probe = Probe {
-        calls: AtomicUsize::new(0),
-    };
-    let allow = RuleSet {
-        vocab: 2,
-        rules: Vec::new(),
-    };
-    let outcome = session.tool_call(
-        CallId::new("c1"),
-        &use_write("/work/src/lib.rs")?,
-        CallContext {
-            rules: &allow,
-            now_millis: 0,
-            tool: &probe,
-        },
-    )?;
-    assert!(outcome.ran());
+    run_allowed_tool(&mut session)?;
     session.apply(&Event::AssistantMessage {
         text: "feito".into(),
     })?;
@@ -64,6 +59,7 @@ fn full_loop_verifies_and_messages_come_from_the_log() -> Result<(), Box<dyn std
         reason: "teste do loop completo".into(),
     })?;
     session.apply(&Event::PlanRecorded { plan: plan() })?;
+    session.record_verification(&verification_report())?;
     for to in [
         Phase::KnowledgeConsulted,
         Phase::Planned,
@@ -94,6 +90,28 @@ fn full_loop_verifies_and_messages_come_from_the_log() -> Result<(), Box<dyn std
     let reopened = Session::open(&fs, dir)?;
     reopened.verify()?;
     assert_eq!(reopened.messages()?, messages);
+    Ok(())
+}
+
+/// Executa uma tool call permitida no loop de teste (evita ruído no corpo do teste).
+fn run_allowed_tool(session: &mut Session<'_>) -> Result<(), Box<dyn std::error::Error>> {
+    let probe = Probe {
+        calls: AtomicUsize::new(0),
+    };
+    let allow = RuleSet {
+        vocab: 2,
+        rules: Vec::new(),
+    };
+    let outcome = session.tool_call(
+        CallId::new("c1"),
+        &use_write("/work/src/lib.rs")?,
+        CallContext {
+            rules: &allow,
+            now_millis: 0,
+            tool: &probe,
+        },
+    )?;
+    assert!(outcome.ran());
     Ok(())
 }
 

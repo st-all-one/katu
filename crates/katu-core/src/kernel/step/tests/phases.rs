@@ -1,4 +1,4 @@
-use super::{complete, plan, read_tool, step, tool};
+use super::{complete, pass_report, plan, read_tool, step, tool};
 use crate::feedback::CommandRecord;
 use crate::kernel::event::Event;
 use crate::kernel::state::{RefusalReason, State};
@@ -12,6 +12,12 @@ fn happy_path_reaches_closed() -> Result<(), Box<dyn std::error::Error>> {
     state = complete(&state, "c0", read_tool()?)?;
     state = complete(&state, "c1", tool()?)?;
     state = step(&state, &Event::PlanRecorded { plan: plan() })?;
+    state = step(
+        &state,
+        &Event::VerificationRecorded {
+            report: pass_report(),
+        },
+    )?;
     for to in [
         Phase::KnowledgeConsulted,
         Phase::Planned,
@@ -206,6 +212,12 @@ fn closed_requires_outcome() -> Result<(), Box<dyn std::error::Error>> {
         },
     )?;
     state = step(&state, &Event::PlanRecorded { plan: plan() })?;
+    state = step(
+        &state,
+        &Event::VerificationRecorded {
+            report: pass_report(),
+        },
+    )?;
     for to in [
         Phase::KnowledgeConsulted,
         Phase::Planned,

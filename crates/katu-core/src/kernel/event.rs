@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::ToolOutcome;
 use crate::feedback::CommandRecord;
 use crate::plan::Plan;
+use crate::verify::VerificationReport;
 use katu_policy::{Phase, ResolvedPath, ToolUse};
 
 /// Identificador de um pedido de tool (correlaciona `ToolCall` ↔ `ToolResult`).
@@ -94,6 +95,11 @@ pub enum Event {
         /// Raiz canonicalizada.
         root: ResolvedPath,
     },
+    /// Relatório do gate de verificação registado (E09-T03). Evento de controlo.
+    VerificationRecorded {
+        /// Relatório determinístico.
+        report: VerificationReport,
+    },
     /// Fim de um turno.
     TurnEnd {
         /// Número do turno.
@@ -116,6 +122,7 @@ impl Event {
             Self::PlanRecorded { .. } => "plan_recorded",
             Self::CommandRecorded { .. } => "command_recorded",
             Self::WorkspaceSet { .. } => "workspace_set",
+            Self::VerificationRecorded { .. } => "verification_recorded",
             Self::TurnEnd { .. } => "turn_end",
         }
     }

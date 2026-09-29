@@ -19,6 +19,7 @@ pub mod ports;
 pub mod report;
 pub mod toon;
 pub mod validate;
+pub mod verify;
 
 /// Versão do vocabulário de política que o kernel respeita (E02).
 pub use katu_policy::POLICY_VOCAB_VERSION;

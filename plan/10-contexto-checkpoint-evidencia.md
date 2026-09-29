@@ -81,11 +81,21 @@ método de verificação imposto e nomeado; negativos visíveis.
   mantém a recusa dedicada `SchemaVersion`. `CheckpointError::Invalid` passa a carregar `Issues`.
 - **Aceite:** checkpoint corrompido falha a validação; escrita é atómica sob crash simulado.
 
-### E09-T03 ☐ Gate de verificação determinístico
+### E09-T03 ◐ Gate de verificação determinístico
 - **Entregáveis:** `verification_report.json` = função determinística sobre (regras, escopo,
   feedback, diff); zero LLM; um único caminho de relatório; `block` não sobreponível pelo agente —
   só por humano com `override_reason` + `overridden_by`; *coverage floor*; `--strict` promove
   warns a blocks (§31).
+- **Estado:** `katu-core::verify` implementa `verify(input) -> VerificationReport` (puro, sem I/O,
+  sem LLM): verificações de escopo (`scope.forbidden` bloqueia; `scope.allowed` avisa), feedback
+  (`feedback.timeout`/`feedback.ambiguous` bloqueiam; `feedback.exit` avisa) e `coverage` (piso em
+  pontos base, E18-T01); `--strict` promove `Warn`→`Block`; `Override::new` exige `reason` e
+  `overridden_by` (o agente não assina) e `append_override` regista em `overrides.jsonl`
+  (append-only); `save` grava o relatório atomicamente. Emite o span `verify.report`.
+  O kernel exige agora um relatório **não bloqueado** para `→ Verified` (`State::verification`,
+  `Event::VerificationRecorded`, `Session::record_verification`; teste
+  `verified_requires_a_non_blocked_report`). **Falta:** o pedido interativo de override
+  (CLI/TUI, E10).
 - **Aceite:** o gate nunca chama um LLM; override é assinado e registado (`overrides.jsonl`).
 
 ### E09-T04 ☐ Scope contracts e `feature_list`

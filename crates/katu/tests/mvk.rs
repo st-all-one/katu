@@ -11,6 +11,7 @@ use katu_core::kernel::{CallId, Event, MemoryWriteRequest, RefusalReason, Sessio
 use katu_core::memory::{FakeMemory, NoteRef, NoteType, PreWriteReq, Score};
 use katu_core::plan::{Feature, FeatureStatus, Plan, ScopeContract};
 use katu_core::ports::MemFs;
+use katu_core::verify::{CheckStatus, VERIFICATION_SCHEMA_VERSION, VerificationReport};
 use katu_policy::{
     BudgetState, Capability, Decision, Facts, Phase, ResolvedPath, RuleSet, ToolArgs, ToolName,
     ToolUse, evaluate,
@@ -20,6 +21,17 @@ use std::path::Path;
 
 /// Regras reais do protocolo, versionadas no repositório.
 const MEMORY_POLICY: &str = include_str!("../../../policy/memory.toml");
+
+/// Relatório de verificação que passa (E09-T03), para as transições de teste.
+fn verification_report() -> VerificationReport {
+    VerificationReport {
+        schema_version: VERIFICATION_SCHEMA_VERSION,
+        checks: Vec::new(),
+        status: CheckStatus::Pass,
+        coverage_bps: 10_000,
+        strict: false,
+    }
+}
 
 /// Resultado de um teste (sem `unwrap`/`expect`).
 type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
@@ -189,6 +201,9 @@ fn close_without_outcome_is_refused() -> TestResult<()> {
         reason: "sem consulta aplicável".into(),
     })?;
     session.apply(&Event::PlanRecorded { plan: plan() })?;
+    session.apply(&Event::VerificationRecorded {
+        report: verification_report(),
+    })?;
     for to in [
         Phase::KnowledgeConsulted,
         Phase::Planned,

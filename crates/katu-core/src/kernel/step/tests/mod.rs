@@ -3,6 +3,7 @@ use crate::error::ToolOutcome;
 use crate::kernel::event::{CallId, Event};
 use crate::kernel::state::{CallStatus, Refusal, RefusalReason, State};
 use crate::plan::{Feature, FeatureStatus, Plan, ScopeContract};
+use crate::verify::{CheckStatus, VERIFICATION_SCHEMA_VERSION, VerificationReport};
 use katu_policy::{Evidence, Phase, ResolvedPath, RuleId, ToolArgs, ToolName, ToolUse};
 
 /// Plano mínimo válido (E06-T06).
@@ -51,6 +52,17 @@ fn read_tool() -> Result<ToolUse, katu_policy::PolicyError> {
     })
 }
 
+/// Relatório de verificação que passa (E09-T03), para as transições de teste.
+fn pass_report() -> VerificationReport {
+    VerificationReport {
+        schema_version: VERIFICATION_SCHEMA_VERSION,
+        checks: Vec::new(),
+        status: CheckStatus::Pass,
+        coverage_bps: 10_000,
+        strict: false,
+    }
+}
+
 /// Executa uma tool com sucesso, devolvendo o estado resultante.
 fn complete(state: &State, id: &str, tool: ToolUse) -> Result<State, Refusal> {
     let call = CallId::new(id);
@@ -71,6 +83,7 @@ fn complete(state: &State, id: &str, tool: ToolUse) -> Result<State, Refusal> {
 }
 
 mod phases;
+mod verification;
 #[test]
 fn illegal_transition_is_refused() {
     let state = State::initial();

@@ -6,6 +6,7 @@ use crate::diag::{Level, events};
 use crate::error::ToolOutcome;
 use crate::feedback::{CommandRecord, CommandStatus};
 use crate::plan::Plan;
+use crate::verify::VerificationReport;
 use katu_policy::{Phase, ResolvedPath, ToolName, ToolUse};
 
 /// Aplica um evento ao estado, devolvendo o novo estado ou uma [`Refusal`].
@@ -29,6 +30,7 @@ pub fn step(state: &State, event: &Event) -> Result<State, Refusal> {
         Event::PlanRecorded { plan } => Ok(plan_recorded(state, plan)),
         Event::CommandRecorded { record } => Ok(command_recorded(state, record)),
         Event::WorkspaceSet { root } => Ok(workspace_set(state, root)),
+        Event::VerificationRecorded { report } => Ok(verification_recorded(state, report)),
         Event::TurnEnd { turn } => turn_end(state, *turn),
     }
 }
@@ -109,6 +111,13 @@ fn workspace_set(state: &State, root: &ResolvedPath) -> State {
     next
 }
 
+/// Regista o relatório do gate de verificação (E09-T03).
+fn verification_recorded(state: &State, report: &VerificationReport) -> State {
+    let mut next = state.clone();
+    next.verification = Some(report.clone());
+    next
+}
+
 /// Muda de fase, validando a forma do caminho único e a pré-condição da fase destino.
 fn phase_transition(state: &State, to: Phase, outcome: Option<&str>) -> Result<State, Refusal> {
     if !can_transition(state.phase, to) {
@@ -145,6 +154,10 @@ fn satisfies_precondition(state: &State, to: Phase, outcome: Option<&str>) -> bo
                 || state.completed_tools.contains(&ToolName::MemoryRecall)
         }
         Phase::Planned => state.plan.is_some(),
+        Phase::Verified => state
+            .verification
+            .as_ref()
+            .is_some_and(|report| !report.is_blocked()),
         Phase::Closed => outcome.is_some_and(|evidence| !evidence.trim().is_empty()),
         _ => true,
     }

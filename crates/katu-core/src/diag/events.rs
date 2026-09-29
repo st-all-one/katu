@@ -83,6 +83,7 @@ catalog! {
     (CONTEXT_BUILD, "context.build", "Construção do contexto do modelo."),
     (CONTEXT_TRIM, "context.trim", "Recorte/seleção de contexto."),
     (CONTEXT_CHECKPOINT, "context.checkpoint", "Checkpoint de evidência."),
+    (VERIFY_REPORT, "verify.report", "Relatório do gate de verificação determinístico (E09)."),
 
     // -- Persistência --------------------------------------------------------
     (STORE_LOAD, "store.load", "Carregamento do estado persistido."),

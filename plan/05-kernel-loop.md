@@ -40,6 +40,11 @@ Pré-condições verificáveis (a imposição, não a prosa — §51.2):
 | `→ Persisted` | `session_end` da memória devolveu `Ok` |
 | `→ Closed` | tarefa sem `outcome` **é recusada** |
 
+> **Imposição (E04/E09).** `→ KnowledgeConsulted`, `→ Planned`, `→ Verified` e `→ Closed` são
+> impostas pelo `step` (`State::completed_tools`/`State::plan`/`State::verification`/`outcome`);
+> a ambiguidade do último comando (§31) bloqueia **qualquer** avanço. `→ Persisted` (via
+> `session_end`) fica para o adaptador de memória (E03).
+
 ---
 
 ## Tarefas

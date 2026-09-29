@@ -8,6 +8,7 @@ use super::event::CallId;
 use crate::error::ToolOutcome;
 use crate::feedback::CommandStatus;
 use crate::plan::Plan;
+use crate::verify::VerificationReport;
 use katu_policy::{BudgetState, Capability, Phase, ResolvedPath, ToolName, ToolUse};
 
 /// Estado de um pedido de tool (pendente ou concluído).
@@ -55,6 +56,9 @@ pub struct State {
     /// Raiz do workspace (E07-T05): concede ler/escrever **só** sob ela; fora exige autorização.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workspace: Option<ResolvedPath>,
+    /// Relatório do gate de verificação (E09-T03); exigido para transitar para [`Phase::Verified`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verification: Option<VerificationReport>,
 }
 
 impl State {
@@ -73,6 +77,7 @@ impl State {
             plan: None,
             last_command: None,
             workspace: None,
+            verification: None,
         }
     }
 }
