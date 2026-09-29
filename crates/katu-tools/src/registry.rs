@@ -18,6 +18,8 @@ pub enum Family {
     Search,
     /// Planeamento: `plan`.
     Plan,
+    /// Controlo: `memory` (pedido explícito, policy-gated; E06-T10).
+    Control,
 }
 
 impl Family {
@@ -30,6 +32,7 @@ impl Family {
             Self::Exec => "exec",
             Self::Search => "search",
             Self::Plan => "plan",
+            Self::Control => "control",
         }
     }
 }
@@ -57,6 +60,8 @@ pub enum ToolId {
     Ls,
     /// Planeamento.
     Plan,
+    /// Memória (pedido explícito, policy-gated).
+    Memory,
 }
 
 impl ToolId {
@@ -74,6 +79,7 @@ impl ToolId {
             Self::Find => "find",
             Self::Ls => "ls",
             Self::Plan => "plan",
+            Self::Memory => "memory",
         }
     }
 }
@@ -141,6 +147,11 @@ pub const TOOLS: &[ToolSpec] = &[
         name: ToolName::Plan,
         family: Family::Plan,
     },
+    ToolSpec {
+        id: ToolId::Memory,
+        name: ToolName::MemoryWrite,
+        family: Family::Control,
+    },
 ];
 
 /// `true` se a tool pertence à superfície fechada.
@@ -156,8 +167,8 @@ mod tests {
     use std::collections::BTreeSet;
 
     #[test]
-    fn surface_is_exactly_the_ten_tools() {
-        assert_eq!(TOOLS.len(), 10);
+    fn surface_is_exactly_the_eleven_tools() {
+        assert_eq!(TOOLS.len(), 11);
         let ids: BTreeSet<&str> = TOOLS.iter().map(|spec| spec.id.as_str()).collect();
         assert_eq!(ids.len(), TOOLS.len(), "ids duplicados");
     }
@@ -170,6 +181,7 @@ mod tests {
         assert_eq!(count(Family::Exec), 1);
         assert_eq!(count(Family::Search), 3);
         assert_eq!(count(Family::Plan), 1);
+        assert_eq!(count(Family::Control), 1);
     }
 
     #[test]

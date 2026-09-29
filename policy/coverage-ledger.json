@@ -27,6 +27,21 @@
       "rule_id": "mem-outcome-before-close"
     },
     {
+      "coverage_id": "containment.sensitive_read",
+      "state": "covered",
+      "rule_id": "contain-sensitive-read"
+    },
+    {
+      "coverage_id": "containment.write_outside_workspace",
+      "state": "covered",
+      "rule_id": "contain-write-outside-workspace"
+    },
+    {
+      "coverage_id": "containment.read_outside_workspace",
+      "state": "covered",
+      "rule_id": "contain-read-outside-workspace"
+    },
+    {
       "coverage_id": "sandbox.host_escape",
       "state": "deferred",
       "reason": "jail de SO real é E17 (futuro); o MVP usa travas soft determinísticas (E07)"

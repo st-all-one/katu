@@ -4,6 +4,7 @@
 //! aqui avaliamos a política e só depois executamos. Um `Deny`/`RequireApproval`/`NeedsHuman`
 //! **não** executa — o teste prova a negação **pelo executor** (a [`Tool`] não é invocada).
 
+use crate::containment::workspace_capabilities;
 use crate::diag::{Level, events};
 use crate::error::ToolOutcome;
 use crate::report::ToolReport;
@@ -148,11 +149,15 @@ pub fn facts_from(
     now_millis: u64,
     capabilities: &[Capability],
 ) -> Facts {
+    let mut granted = capabilities.to_vec();
+    if let Some(root) = &state.workspace {
+        granted.extend(workspace_capabilities(root));
+    }
     Facts {
         now_millis,
         phase: state.phase,
         tool: use_.clone(),
-        capabilities: capabilities.to_vec(),
+        capabilities: granted,
         budget: state.budget,
         completed: state.completed_tools.clone(),
     }

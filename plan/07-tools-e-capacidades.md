@@ -195,13 +195,20 @@ verificação recusa `SUCCESS` com erros (§38).
   sem aprovação humana; a política **não** trata `bash rm` como equivalente a `trash`, mas prefere
   `trash` quando a regra o exigir; `refs` antes de apagar e `undo_token` no retorno (DF12).
 
-### E06-T10 ☐ Tool `memory` (pedido explícito, policy-gated, secundária)
+### E06-T10 ◐ Tool `memory` (pedido explícito, policy-gated, secundária)
 - **Objetivos:** o modelo pode **solicitar explicitamente** gravar memória, mas os hooks/fases do
   protocolo continuam **prioritários** (a tool não os substitui nem contorna).
 - **Entregáveis:** tool `memory` (ex.: `memory.record`/`memory.search`) no **grupo de controlo**,
   fora das cinco famílias de codificação; a chamada passa pela **mesma** política e pelas mesmas
   pré-condições de fase (`pre_write`/dedup/âncora/`outcome`); a tool só **pede** — quem grava é a
   porta `Memory` (E03/E05).
+- **Estado:** a tool `memory` (`ToolId::Memory` → `ToolName::MemoryWrite`) está no novo
+  `Family::Control`, fora das cinco famílias de codificação; o gate continua no kernel
+  (`Session::memory_write` → `enforce_memory_write`: `pre_write` → capacidade → política) e o
+  executor `WriteNoteTool` devolve o envelope `memory.record`. Testes: registo no grupo de controlo,
+  escrita permitida com envelope, e duplicata **negada mesmo com a tool registada** (a tool não
+  contorna o `pre_write`). **Falta:** `memory.search`/recall — a porta `Memory` ainda não expõe busca
+  (E03/E04).
 - **Aceite:** usar a tool nunca contorna `pre_write`/dedup/âncora; uma gravação pedida pelo modelo
   sem âncora é negada tal como num hook; desligar a tool **não** desliga o enforcement (o protocolo
   continua pelos hooks/fases).

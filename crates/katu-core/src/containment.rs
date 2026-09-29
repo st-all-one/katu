@@ -12,6 +12,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::diag::{Level, events};
+use katu_policy::{Capability, ResolvedPath};
 
 /// Modo de contenção efetivo. No MVP só existe contenção **soft**.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -108,6 +109,15 @@ impl ContainmentStatus {
     pub const fn kernel_isolated(self) -> bool {
         self.enforcement.is_kernel_isolated()
     }
+}
+
+/// Capacidades por omissão do workspace (E07-T05): ler e escrever **só** sob a raiz.
+///
+/// São derivadas da raiz (não guardadas no log): a política destranca o que está sob a raiz e
+/// exige autorização para o resto. Sem workspace definido, não há concessão — falha fechado.
+#[must_use]
+pub fn workspace_capabilities(root: &ResolvedPath) -> Vec<Capability> {
+    vec![Capability::Workspace { root: root.clone() }]
 }
 
 /// Emite o modo de contenção no diagnóstico (E07-T01). Honestidade obrigatória: diz

@@ -103,7 +103,7 @@ fn rule(scope: RuleScope, enforcement: Enforcement) -> Rule {
 
 fn rules() -> Result<RuleSet, PolicyError> {
     Ok(RuleSet {
-        vocab: 1,
+        vocab: 2,
         rules: vec![
             rule(
                 RuleScope::Path {

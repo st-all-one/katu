@@ -197,7 +197,7 @@ mod tests {
     #[test]
     fn enforced_without_negative_example_is_flagged() {
         let rules = RuleSet {
-            vocab: 1,
+            vocab: 2,
             rules: vec![rule("r1", RuleCategory::Enforced, deny_exec())],
         };
         let report = audit(&rules, 0);
@@ -214,7 +214,7 @@ mod tests {
         let mut rule = rule("r1", RuleCategory::Enforced, deny_exec());
         rule.examples.negative = vec!["exec bash".to_string()];
         let rules = RuleSet {
-            vocab: 1,
+            vocab: 2,
             rules: vec![rule],
         };
         let report = audit(&rules, 0);
@@ -227,7 +227,7 @@ mod tests {
         first.statement = String::new();
         let second = rule("dup", RuleCategory::Advisory, Enforcement::Advisory);
         let rules = RuleSet {
-            vocab: 1,
+            vocab: 2,
             rules: vec![first, second],
         };
         let report = audit(&rules, 0);
@@ -248,7 +248,7 @@ mod tests {
     #[test]
     fn advisory_enforcement_in_enforced_category_is_flagged() {
         let rules = RuleSet {
-            vocab: 1,
+            vocab: 2,
             rules: vec![rule("r1", RuleCategory::Enforced, Enforcement::Advisory)],
         };
         let report = audit(&rules, 0);

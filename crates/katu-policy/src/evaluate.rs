@@ -91,7 +91,7 @@ mod tests {
     fn denies_write_under_root() -> Result<(), PolicyError> {
         let root = ResolvedPath::from_canonical("/work/secrets")?;
         let rules = RuleSet {
-            vocab: 1,
+            vocab: 2,
             rules: vec![rule(
                 "no-secrets",
                 RuleScope::Path { root: root.clone() },
@@ -107,7 +107,7 @@ mod tests {
     fn allows_write_outside_root() -> Result<(), PolicyError> {
         let root = ResolvedPath::from_canonical("/work/secrets")?;
         let rules = RuleSet {
-            vocab: 1,
+            vocab: 2,
             rules: vec![rule(
                 "no-secrets",
                 RuleScope::Path { root: root.clone() },
@@ -122,7 +122,7 @@ mod tests {
     #[test]
     fn critical_require_after_denies() -> Result<(), PolicyError> {
         let rules = RuleSet {
-            vocab: 1,
+            vocab: 2,
             rules: vec![rule(
                 "need-verify",
                 RuleScope::Command {
@@ -151,7 +151,7 @@ mod tests {
         );
         require.severity = Severity::Warn;
         let rules = RuleSet {
-            vocab: 1,
+            vocab: 2,
             rules: vec![require],
         };
         let facts = write_facts("/work/x")?;
@@ -165,7 +165,7 @@ mod tests {
     #[test]
     fn budget_exhausted_needs_human() -> Result<(), PolicyError> {
         let rules = RuleSet {
-            vocab: 1,
+            vocab: 2,
             rules: vec![rule(
                 "budget",
                 RuleScope::Budget {
@@ -199,7 +199,7 @@ mod tests {
         );
         deny.severity = Severity::Warn;
         let rules = RuleSet {
-            vocab: 1,
+            vocab: 2,
             rules: vec![deny],
         };
         let facts = write_facts("/work/x")?;
@@ -213,7 +213,7 @@ mod tests {
     #[test]
     fn evaluation_is_deterministic() -> Result<(), PolicyError> {
         let rules = RuleSet {
-            vocab: 1,
+            vocab: 2,
             rules: Vec::new(),
         };
         let facts = facts_for(ToolName::Read, ToolArgs::Plan, "/work/x")?;

@@ -24,7 +24,7 @@
 //!     budget: BudgetState::default(),
 //!     completed: BTreeSet::new(),
 //! };
-//! let rules = RuleSet { vocab: 1, rules: Vec::new() };
+//! let rules = RuleSet { vocab: 2, rules: Vec::new() };
 //! assert!(evaluate(&facts, &rules)?.is_allow());
 //! # Ok(())
 //! # }
@@ -43,6 +43,7 @@ mod engine;
 mod error;
 mod evaluate;
 mod facts;
+mod glob;
 mod paths;
 mod rule;
 
@@ -54,6 +55,7 @@ pub use evaluate::evaluate;
 pub use facts::{
     BudgetState, Capability, Facts, Phase, SearchMode, Timestamp, ToolArgs, ToolName, ToolUse,
 };
+pub use glob::matches_glob;
 pub use paths::{ResolvedArgv, ResolvedPath};
 pub use rule::{
     BudgetCap, Enforcement, Rule, RuleCategory, RuleExamples, RuleId, RuleScope, RuleSet, Severity,
@@ -63,7 +65,7 @@ pub use rule::{
 /// Versão do vocabulário de regras (`POLICY_VOCAB_VERSION`).
 ///
 /// O motor recusa um `RuleSet` com uma versão desconhecida (fail-closed, E02).
-pub const POLICY_VOCAB_VERSION: u32 = 1;
+pub const POLICY_VOCAB_VERSION: u32 = 2;
 
 #[cfg(test)]
 mod tests {
@@ -73,6 +75,6 @@ mod tests {
     #[test]
     fn vocab_version_is_tracked() {
         let version = black_box(POLICY_VOCAB_VERSION);
-        assert_eq!(version, 1);
+        assert_eq!(version, 2);
     }
 }

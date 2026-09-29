@@ -20,7 +20,7 @@ use super::step::step;
 use crate::diag::{Level, events};
 use crate::error::ToolOutcome;
 use crate::ports::{Fs, FsError};
-use katu_policy::{PolicyError, RuleSet, ToolUse};
+use katu_policy::{PolicyError, ResolvedPath, RuleSet, ToolUse};
 
 /// Erro de uma operação de sessão.
 #[derive(Debug, thiserror::Error)]
@@ -170,6 +170,15 @@ impl<'a> Session<'a> {
             outcome: result,
         })?;
         Ok(outcome)
+    }
+
+    /// Define a raiz do workspace (E07-T05): a partir daqui a política concede ler/escrever sob a
+    /// raiz e exige autorização fora dela. O evento fica no log (auditável).
+    ///
+    /// # Errors
+    /// [`SessionError`] se o evento não puder ser logado.
+    pub fn set_workspace(&mut self, root: &ResolvedPath) -> Result<(), SessionError> {
+        self.apply(&Event::WorkspaceSet { root: root.clone() })
     }
 
     /// Executa uma **escrita de memória** pela ordem §42, com o gate de E05: loga o pedido, corre

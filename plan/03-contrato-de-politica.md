@@ -84,12 +84,14 @@ pub enum Decision {
 ## Vocabulário fechado e versionado
 
 O vocabulário do motor é **fechado por segurança** e **mínimo**: `RuleScope`
-(`Path | Command | Phase | Budget`) e `Enforcement` (7 variantes) são a superfície **inteira**. Não
-há expressões livres, callbacks nem DSL — uma regra é **dado**, e o seu poder é exatamente o que os
-tipos permitem.
+(`Path | Command | Phase | Budget`) e `Enforcement` são a superfície **inteira**. Não há expressões
+livres, callbacks nem DSL — uma regra é **dado**, e o seu poder é exatamente o que os tipos
+permitem. Na **v2** (ADR 0003, E07-T05), `Enforcement` cresce de 7 para 9: `DenyRead { root }` e
+`DenySensitiveRead { globs }` (sensíveis por componente, sem regex); `Capability::Workspace`
+distingue o grant implícito da raiz do grant explícito (`ReadPath`/`WritePath`, aprovação).
 
 - **Versão:** `POLICY_VOCAB_VERSION` (inteiro) viaja com o `RuleSet`; o motor **recusa** carregar
-  uma versão de vocabulário desconhecida (fail-closed).
+  uma versão de vocabulário desconhecida (fail-closed). Atual: **2**.
 - **Alargar** (novo `RuleScope`/`Enforcement`) é uma **decisão de kernel registada** (ADR em E14,
   com teste e exemplo negativo) — **nunca** configuração de utilizador. É o mesmo princípio que
   remete código arbitrário para plugin futuro (E11, OA14).

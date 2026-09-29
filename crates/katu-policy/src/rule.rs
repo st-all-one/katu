@@ -73,7 +73,7 @@ pub enum BudgetCap {
     Execs(u32),
 }
 
-/// Forma de aplicação de uma regra (vocabulário **fechado**, 7 variantes).
+/// Forma de aplicação de uma regra (vocabulário **fechado**, 9 variantes).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -87,6 +87,18 @@ pub enum Enforcement {
     DenyWrite {
         /// Raiz protegida.
         root: ResolvedPath,
+    },
+    /// Nega a leitura sob uma raiz.
+    DenyRead {
+        /// Raiz protegida.
+        root: ResolvedPath,
+    },
+    /// Nega a leitura de caminhos **sensíveis** (glob por componente), salvo `ReadPath` explícito.
+    ///
+    /// O workspace **não** destranca: `.ssh`/`.env` exigem autorização explícita (E07-T05).
+    DenySensitiveRead {
+        /// Globs aplicados a cada componente do caminho.
+        globs: Vec<String>,
     },
     /// Nega o envio para lixo sob uma raiz.
     DenyDelete {
@@ -251,7 +263,7 @@ mod tests {
     pub(crate) fn sample_rules() -> Result<RuleSet, PolicyError> {
         let root = ResolvedPath::from_canonical("/work/secrets")?;
         Ok(RuleSet {
-            vocab: 1,
+            vocab: 2,
             rules: vec![Rule {
                 id: RuleId::from("no-write-secrets"),
                 statement: "não escrever em segredos".to_string(),

@@ -8,7 +8,7 @@ use super::event::CallId;
 use crate::error::ToolOutcome;
 use crate::feedback::CommandStatus;
 use crate::plan::Plan;
-use katu_policy::{BudgetState, Capability, Phase, ToolName, ToolUse};
+use katu_policy::{BudgetState, Capability, Phase, ResolvedPath, ToolName, ToolUse};
 
 /// Estado de um pedido de tool (pendente ou concluído).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -52,6 +52,9 @@ pub struct State {
     /// Estado do último comando (E06-T07); `exit_code: null` bloqueia avançar (§31).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_command: Option<CommandStatus>,
+    /// Raiz do workspace (E07-T05): concede ler/escrever **só** sob ela; fora exige autorização.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace: Option<ResolvedPath>,
 }
 
 impl State {
@@ -69,6 +72,7 @@ impl State {
             budget: BudgetState::default(),
             plan: None,
             last_command: None,
+            workspace: None,
         }
     }
 }

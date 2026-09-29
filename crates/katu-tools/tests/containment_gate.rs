@@ -37,7 +37,7 @@ fn exec_use(argv: &[&str]) -> Result<ToolUse, PolicyError> {
 
 fn allow_all() -> RuleSet {
     RuleSet {
-        vocab: 1,
+        vocab: 2,
         rules: Vec::new(),
     }
 }
@@ -114,7 +114,7 @@ fn soft_containment_does_not_confine_the_host() -> TestResult<()> {
 
     // Dentro das tools do katu, a política nega e o comando não corre.
     let rules = RuleSet {
-        vocab: 1,
+        vocab: 2,
         rules: vec![Rule {
             id: RuleId::from("deny-exec"),
             statement: "nega exec".to_string(),

@@ -6,6 +6,9 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Correspondência glob determinística, partilhada com o motor de política (vocabulário v2).
+pub use katu_policy::matches_glob;
+
 /// Estado de uma feature do plano.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -178,29 +181,9 @@ impl std::fmt::Display for PlanError {
 
 impl std::error::Error for PlanError {}
 
-/// Correspondência glob simples: `*` = qualquer sequência, `?` = um caractere.
-#[must_use]
-pub fn matches_glob(pattern: &str, path: &str) -> bool {
-    let pattern: Vec<char> = pattern.chars().collect();
-    let path: Vec<char> = path.chars().collect();
-    glob(&pattern, &path)
-}
-
-fn glob(pattern: &[char], path: &[char]) -> bool {
-    let Some(&head) = pattern.first() else {
-        return path.is_empty();
-    };
-    let rest = pattern.get(1..).unwrap_or_default();
-    match head {
-        '*' => (0..=path.len()).any(|skip| glob(rest, path.get(skip..).unwrap_or_default())),
-        '?' => !path.is_empty() && glob(rest, path.get(1..).unwrap_or_default()),
-        other => path.first() == Some(&other) && glob(rest, path.get(1..).unwrap_or_default()),
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{Feature, FeatureStatus, Plan, PlanError, ScopeContract, matches_glob};
+    use super::{Feature, FeatureStatus, Plan, PlanError, ScopeContract};
 
     fn contract() -> ScopeContract {
         ScopeContract::new(
@@ -253,14 +236,6 @@ mod tests {
             feature("F2", FeatureStatus::InProgress),
         ]);
         assert_eq!(plan.validate(), Err(PlanError::MultipleInProgress));
-    }
-
-    #[test]
-    fn glob_matches_prefix_and_suffix() {
-        assert!(matches_glob("src/**", "src/a/b.rs"));
-        assert!(matches_glob("*.md", "README.md"));
-        assert!(matches_glob("**/secrets/**", "a/secrets/x"));
-        assert!(!matches_glob("src/**", "docs/a.md"));
     }
 
     #[test]

@@ -6,7 +6,7 @@ use crate::diag::{Level, events};
 use crate::error::ToolOutcome;
 use crate::feedback::{CommandRecord, CommandStatus};
 use crate::plan::Plan;
-use katu_policy::{Phase, ToolName, ToolUse};
+use katu_policy::{Phase, ResolvedPath, ToolName, ToolUse};
 
 /// Aplica um evento ao estado, devolvendo o novo estado ou uma [`Refusal`].
 ///
@@ -28,6 +28,7 @@ pub fn step(state: &State, event: &Event) -> Result<State, Refusal> {
         Event::Waiver { transition, .. } => Ok(waiver(state, *transition)),
         Event::PlanRecorded { plan } => Ok(plan_recorded(state, plan)),
         Event::CommandRecorded { record } => Ok(command_recorded(state, record)),
+        Event::WorkspaceSet { root } => Ok(workspace_set(state, root)),
         Event::TurnEnd { turn } => turn_end(state, *turn),
     }
 }
@@ -98,6 +99,13 @@ fn plan_recorded(state: &State, plan: &Plan) -> State {
 fn command_recorded(state: &State, record: &CommandRecord) -> State {
     let mut next = state.clone();
     next.last_command = Some(record.status());
+    next
+}
+
+/// Define a raiz do workspace (E07-T05); a partir daqui a política sabe o que é "fora".
+fn workspace_set(state: &State, root: &ResolvedPath) -> State {
+    let mut next = state.clone();
+    next.workspace = Some(root.clone());
     next
 }
 

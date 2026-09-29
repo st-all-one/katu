@@ -187,6 +187,14 @@ pub enum Capability {
         /// Raiz concedida.
         root: ResolvedPath,
     },
+    /// Acesso ao workspace (concedido automaticamente a partir de `State::workspace`).
+    ///
+    /// Distinto de [`Capability::ReadPath`]/[`Capability::WritePath`], que são **explícitos**
+    /// (aprovação humana): um caminho sensível exige o explícito, nunca só o workspace (E07-T05).
+    Workspace {
+        /// Raiz do workspace.
+        root: ResolvedPath,
+    },
     /// Executar um programa.
     Exec {
         /// Programa permitido.

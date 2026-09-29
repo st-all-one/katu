@@ -2,7 +2,7 @@ use super::{complete, plan, read_tool, step, tool};
 use crate::feedback::CommandRecord;
 use crate::kernel::event::Event;
 use crate::kernel::state::{RefusalReason, State};
-use katu_policy::{Phase, ToolName};
+use katu_policy::{Phase, ResolvedPath, ToolName};
 
 #[test]
 fn happy_path_reaches_closed() -> Result<(), Box<dyn std::error::Error>> {
@@ -182,6 +182,17 @@ fn ambiguous_command_blocks_advance() -> Result<(), Box<dyn std::error::Error>> 
         },
     )?;
     assert_eq!(allowed.phase, Phase::Planned);
+    Ok(())
+}
+
+#[test]
+fn workspace_set_is_recorded() -> Result<(), Box<dyn std::error::Error>> {
+    let root = ResolvedPath::from_canonical("/work")?;
+    let state = step(
+        &State::initial(),
+        &Event::WorkspaceSet { root: root.clone() },
+    )?;
+    assert_eq!(state.workspace.as_ref(), Some(&root));
     Ok(())
 }
 

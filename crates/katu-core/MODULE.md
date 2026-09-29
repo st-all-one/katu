@@ -9,9 +9,10 @@ função, o log é a fonte da verdade.
 
 - `State`, `Event`, `Refusal`, pipeline de tool call, log append-only.
   - `kernel::state` — `State`, `CallStatus`, `Refusal`/`RefusalReason`, `next_phase`/`can_transition`,
-    `State::waivers` (exceções explícitas), `State::plan` (E06-T06) e `State::last_command`
-    (E06-T07); `UnmetPrecondition` (E05-T02/T04).
-  - `kernel::event` — `Event`, `CallId`, `Event::kind` (`Waiver`, `PlanRecorded`, `CommandRecorded`).
+    `State::waivers` (exceções explícitas), `State::plan` (E06-T06), `State::last_command`
+    (E06-T07) e `State::workspace` (raiz do workspace, E07-T05); `UnmetPrecondition` (E05-T02/T04).
+  - `kernel::event` — `Event`, `CallId`, `Event::kind` (`Waiver`, `PlanRecorded`, `CommandRecorded`,
+    `WorkspaceSet`).
   - `kernel::step` — `step(State, Event) -> Result<State, Refusal>` (puro) + pré-condições de fase.
   - `kernel::log` — `Log`/`LogRecord` append-only JSONL (`session.v1.jsonl`) sobre a porta `Fs`.
   - `kernel::project` — `derive_messages`, `state_of`, `snapshot` (projeções puras).
@@ -39,7 +40,9 @@ função, o log é a fonte da verdade.
   agregador de percentis em `diag::aggregate` (E19-T02).
 - Contenção determinística [`containment`](src/containment.rs) (E07-T01): `Containment` (`Soft` por
   omissão), `SandboxEnforcement` (sempre `Soft` no MVP), `ContainmentStatus`/`announce`
-  (`contain.mode`) e o gancho `Jail`/`NoJail` (jail futura E17; `Full`/`Partial` ⇒ `Unavailable`).
+  (`contain.mode`), `workspace_capabilities` (E07-T05: `Capability::Workspace { root }` — grant
+  implícito da raiz, distinto do `ReadPath`/`WritePath` explícito) e o gancho
+  `Jail`/`NoJail` (jail futura E17; `Full`/`Partial` ⇒ `Unavailable`).
 - Evidência tipada [`evidence`](src/evidence.rs) (DF5/E09-T05): `Metric`/`EvidenceBasis`/
   `ArtifactRef`; um número sem artefacto não fundamenta decisão; a base não muda numa agregação.
 - Plano tipado [`plan`](src/plan.rs) (E06-T06): `Plan`/`ScopeContract`/`Feature`/`FeatureStatus`;

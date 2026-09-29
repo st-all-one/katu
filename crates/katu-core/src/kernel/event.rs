@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::ToolOutcome;
 use crate::feedback::CommandRecord;
 use crate::plan::Plan;
-use katu_policy::{Phase, ToolUse};
+use katu_policy::{Phase, ResolvedPath, ToolUse};
 
 /// Identificador de um pedido de tool (correlaciona `ToolCall` ↔ `ToolResult`).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -89,6 +89,11 @@ pub enum Event {
         /// Registo redigido + truncado.
         record: CommandRecord,
     },
+    /// Raiz do workspace definida (E07-T05). Evento de controlo.
+    WorkspaceSet {
+        /// Raiz canonicalizada.
+        root: ResolvedPath,
+    },
     /// Fim de um turno.
     TurnEnd {
         /// Número do turno.
@@ -110,6 +115,7 @@ impl Event {
             Self::Waiver { .. } => "waiver",
             Self::PlanRecorded { .. } => "plan_recorded",
             Self::CommandRecorded { .. } => "command_recorded",
+            Self::WorkspaceSet { .. } => "workspace_set",
             Self::TurnEnd { .. } => "turn_end",
         }
     }

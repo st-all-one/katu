@@ -6,7 +6,9 @@
 use katu_core::diag::{Level, events};
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::{Tool, ToolOutput};
-use katu_core::memory::{Memory, PreWriteReq};
+use katu_core::memory::{Memory, NoteRef, PreWriteReq};
+use katu_core::report::ToolReport;
+use katu_core::toon::Value;
 use katu_policy::{ControlId, ToolName, ToolUse};
 
 /// Executor do commit de uma nota pré-validada.
@@ -25,7 +27,7 @@ impl Tool for WriteNoteTool<'_> {
     fn execute(&self, _use_: &ToolUse) -> ToolOutput {
         let _span = katu_core::span!(Level::Trace, events::TOOL_WRITE);
         match self.memory.record(&self.req) {
-            Ok(_) => ToolOutput::ok(),
+            Ok(note) => ToolOutput::report(record_report(&note)),
             Err(err) if err.retryable() => ToolOutput::outcome(ToolOutcome::Timeout),
             Err(_) => ToolOutput::outcome(ToolOutcome::Unavailable {
                 control: ControlId::new("memory"),
@@ -33,6 +35,15 @@ impl Tool for WriteNoteTool<'_> {
             }),
         }
     }
+}
+
+/// Envelope AI-first do commit de memória (DF12).
+fn record_report(note: &NoteRef) -> ToolReport {
+    let data = Value::map(vec![(
+        "note".to_string(),
+        Value::str(note.as_str().to_string()),
+    )]);
+    ToolReport::new("memory.record", data).with_id(note.as_str().to_string())
 }
 
 #[cfg(test)]
@@ -63,8 +74,12 @@ mod tests {
             memory: &memory,
             req: request(),
         };
-        assert_eq!(tool.execute(&use_()?).outcome, ToolOutcome::Ok);
+        let output = tool.execute(&use_()?);
+        assert_eq!(output.outcome, ToolOutcome::Ok);
         assert_eq!(memory.recorded(), 1);
+        let report = output.report.as_ref().ok_or("sem envelope")?;
+        assert_eq!(report.kind, "memory.record");
+        assert!(report.to_toon().contains("memory.record"), "{report:?}");
         Ok(())
     }
 

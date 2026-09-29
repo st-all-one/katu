@@ -8,7 +8,7 @@ sem veredicto; controlo em falta = recusa.
 ## Responsabilidade
 
 - Superfície fechada de tools (§1.1): `read`/`write`/`edit`/`move`/`trash`/`bash`/`grep`/`find`/`ls`
-  + `plan` — registada em `registry` (E06-T01).
+  + `plan` + `memory` (grupo de **controlo**, E06-T10) — registada em `registry` (E06-T01).
 - Forma AI-first (DF12): cada tool devolve um `ToolReport` (`katu_core::report`) renderizado em
   **TOON** ao modelo (JSON como alternativa).
 - `read` (E06-T03): views `full`/`range`/`outline`/`summary`/`symbol`; estrutura por `outline`
@@ -27,7 +27,9 @@ sem veredicto; controlo em falta = recusa.
 - `outline` (E06-T03): scanner heurístico de símbolos (Rust-first), sem tree-sitter.
 - `plan` (E06-T06): `PlanTool` valida o plano tipado (`katu_core::plan`) e devolve `plan.validate`
   ou `Unavailable{control}` acionável.
-- `write::WriteNoteTool` (E05-T01): commit de nota; só é invocado depois de a política permitir.
+- `write::WriteNoteTool` (E05-T01/E06-T10): commit de nota; só é invocado depois de a política
+  permitir; devolve o envelope `memory.record`. A tool `memory` só **pede** — o gate
+  (`pre_write`/dedup/âncora) vive no kernel e não é contornável.
 - Contenção **soft** (E07): caminhos canonicalizados, `argv` resolvido, autorização explícita.
 - `trash` → `.katu/trash` (recuperável; esvaziar exige humano) — E06-T09.
 

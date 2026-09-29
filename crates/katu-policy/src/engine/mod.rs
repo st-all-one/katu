@@ -41,6 +41,14 @@ impl Rule {
             Enforcement::DenyWrite { root } => write_hit(facts, root)
                 .filter(|path| !write_capability_covers(facts, path))
                 .map(|path| self.evidence(path.as_str(), "escrita sob raiz negada sem capacidade")),
+            Enforcement::DenyRead { root } => read_hit(facts, root)
+                .filter(|path| !read_capability_covers(facts, path))
+                .map(|path| self.evidence(path.as_str(), "leitura sob raiz negada sem capacidade")),
+            Enforcement::DenySensitiveRead { globs } => sensitive_read_hit(facts, globs)
+                .filter(|path| !explicit_read_capability_covers(facts, path))
+                .map(|path| {
+                    self.evidence(path.as_str(), "caminho sensível negado sem autorização")
+                }),
             Enforcement::DenyDelete { root } => delete_hit(facts, root)
                 .filter(|path| !delete_capability_covers(facts, path))
                 .map(|path| {
@@ -68,6 +76,8 @@ impl Rule {
         match &self.enforcement {
             Enforcement::DenyCommand { .. }
             | Enforcement::DenyWrite { .. }
+            | Enforcement::DenyRead { .. }
+            | Enforcement::DenySensitiveRead { .. }
             | Enforcement::DenyDelete { .. }
             | Enforcement::RequireBefore { .. }
             | Enforcement::RequireAfter { .. } => self.severity_verdict(evidence),
@@ -102,6 +112,14 @@ impl Rule {
 /// `true` se a tool escreve conteúdo.
 fn is_write_tool(tool: ToolName) -> bool {
     matches!(tool, ToolName::Write | ToolName::Edit | ToolName::Move)
+}
+
+/// `true` se a tool lê conteúdo diretamente (`read`).
+///
+/// A busca (`grep`/`find`/`ls`) fica para o chamador decidir — o `ToolUse` de leitura tem de
+/// trazer os caminhos resolvidos para a política os poder avaliar (E07-T05).
+fn is_read_tool(tool: ToolName) -> bool {
+    tool == ToolName::Read
 }
 
 /// Nome estável de uma tool.
@@ -159,6 +177,59 @@ fn write_hit<'a>(facts: &'a Facts, root: &ResolvedPath) -> Option<&'a ResolvedPa
         .find(|path| path.is_under(root))
 }
 
+/// Primeiro caminho sob `root`, quando a tool lê.
+fn read_hit<'a>(facts: &'a Facts, root: &ResolvedPath) -> Option<&'a ResolvedPath> {
+    if !is_read_tool(facts.tool.name) {
+        return None;
+    }
+    facts
+        .tool
+        .resolved_paths
+        .iter()
+        .find(|path| path.is_under(root))
+}
+
+/// Primeiro caminho cujo **componente** casa um glob sensível.
+fn sensitive_read_hit<'a>(facts: &'a Facts, globs: &[String]) -> Option<&'a ResolvedPath> {
+    if !is_read_tool(facts.tool.name) {
+        return None;
+    }
+    facts
+        .tool
+        .resolved_paths
+        .iter()
+        .find(|path| path_has_sensitive_component(path, globs))
+}
+
+/// `true` se algum componente do caminho casa um dos globs.
+fn path_has_sensitive_component(path: &ResolvedPath, globs: &[String]) -> bool {
+    path.as_str().split('/').any(|component| {
+        globs
+            .iter()
+            .any(|glob| crate::matches_glob(glob, component))
+    })
+}
+
+/// `true` se uma capacidade de leitura cobre o caminho (destranca `DenyRead`).
+///
+/// Aceita o workspace (implícito) **ou** um `ReadPath` explícito.
+fn read_capability_covers(facts: &Facts, path: &ResolvedPath) -> bool {
+    facts.capabilities.iter().any(|cap| match cap {
+        Capability::ReadPath { root } | Capability::Workspace { root } => path.is_under(root),
+        _ => false,
+    })
+}
+
+/// `true` se um `ReadPath` **explícito** cobre o caminho (destranca `DenySensitiveRead`).
+///
+/// O workspace **não** conta: sensíveis exigem autorização explícita (E07-T05).
+fn explicit_read_capability_covers(facts: &Facts, path: &ResolvedPath) -> bool {
+    facts
+        .capabilities
+        .iter()
+        .any(|cap| matches!(cap, Capability::ReadPath { root } if path.is_under(root)))
+}
+
 /// Primeiro caminho sob `root`, quando a tool envia para o lixo.
 fn delete_hit<'a>(facts: &'a Facts, root: &ResolvedPath) -> Option<&'a ResolvedPath> {
     if facts.tool.name != ToolName::Trash {
@@ -173,10 +244,10 @@ fn delete_hit<'a>(facts: &'a Facts, root: &ResolvedPath) -> Option<&'a ResolvedP
 
 /// `true` se uma capacidade de escrita cobre o caminho (destranca `DenyWrite`).
 fn write_capability_covers(facts: &Facts, path: &ResolvedPath) -> bool {
-    facts
-        .capabilities
-        .iter()
-        .any(|cap| matches!(cap, Capability::WritePath { root } if path.is_under(root)))
+    facts.capabilities.iter().any(|cap| match cap {
+        Capability::WritePath { root } | Capability::Workspace { root } => path.is_under(root),
+        _ => false,
+    })
 }
 
 /// `true` se uma capacidade de apagar cobre o caminho (destranca `DenyDelete`).
@@ -210,71 +281,4 @@ fn exec_program_covers(facts: &Facts, program: &str) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::Rule;
-    use crate::error::PolicyError;
-    use crate::facts::{BudgetState, Facts, Phase, Timestamp, ToolArgs, ToolName, ToolUse};
-    use crate::paths::ResolvedPath;
-    use crate::rule::{
-        Enforcement, RuleCategory, RuleExamples, RuleId, RuleScope, Severity, Waiver,
-    };
-    use std::collections::BTreeSet;
-
-    fn deny_write_rule(root: ResolvedPath) -> Rule {
-        Rule {
-            id: RuleId::from("no-write-secrets"),
-            statement: "não escrever em segredos".to_string(),
-            scope: RuleScope::Path { root: root.clone() },
-            enforcement: Enforcement::DenyWrite { root },
-            severity: Severity::Critical,
-            category: RuleCategory::Enforced,
-            expires_at: None,
-            waiver: None,
-            examples: RuleExamples::default(),
-        }
-    }
-
-    fn facts(path: &str) -> Result<Facts, PolicyError> {
-        let resolved = ResolvedPath::from_canonical(path)?;
-        Ok(Facts {
-            now_millis: 0,
-            phase: Phase::Task,
-            tool: ToolUse {
-                name: ToolName::Write,
-                args: ToolArgs::Write {
-                    path: resolved.clone(),
-                    bytes: 1,
-                },
-                resolved_paths: vec![resolved.clone()],
-                argv: None,
-                cwd: resolved,
-            },
-            capabilities: Vec::new(),
-            budget: BudgetState::default(),
-            completed: BTreeSet::new(),
-        })
-    }
-
-    #[test]
-    fn expired_rule_is_inactive() -> Result<(), PolicyError> {
-        let root = ResolvedPath::from_canonical("/work/secrets")?;
-        let mut rule = deny_write_rule(root);
-        rule.expires_at = Some(Timestamp::from_millis(0));
-        let facts = facts("/work/secrets/token")?;
-        assert!(rule.applies(&facts).is_none());
-        Ok(())
-    }
-
-    #[test]
-    fn waived_rule_is_inactive() -> Result<(), PolicyError> {
-        let root = ResolvedPath::from_canonical("/work/secrets")?;
-        let mut rule = deny_write_rule(root);
-        rule.waiver = Some(Waiver {
-            reason: "exceção temporária".to_string(),
-            expires_at: None,
-        });
-        let facts = facts("/work/secrets/token")?;
-        assert!(rule.applies(&facts).is_none());
-        Ok(())
-    }
-}
+mod tests;

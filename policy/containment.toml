@@ -1,0 +1,39 @@
+# E07-T05 — contenção **soft** determinística: sensíveis negados por default e acesso fora do
+# workspace sob aprovação. Vocabulário v2 (`deny_read`, `deny_sensitive_read`).
+#
+# A contenção é **declarada e soft** (§00b): não é fronteira de segurança. A jail de SO real é E17.
+# `Capability::Workspace` (derivada de `State::workspace`) destranca o normal dentro da raiz;
+# `Capability::ReadPath`/`WritePath` são **explícitos** (aprovação humana, E10).
+
+vocab = 2
+
+# 1. Sensíveis: negados por default, mesmo **dentro** do workspace. Só um `ReadPath` explícito
+#    destranca (o workspace não conta) — `DenySensitiveRead`.
+[[rules]]
+id = "contain-sensitive-read"
+statement = "Caminhos sensíveis (chaves/segredos) são negados por default e exigem autorização explícita"
+scope = { path = { root = "/" } }
+enforcement = { deny_sensitive_read = { globs = [".ssh", ".env", ".env.*", "id_rsa", "id_rsa.*", "id_ed25519", "*.pem", "*.key", ".aws", ".gnupg", ".netrc", ".npmrc", "credentials"] } }
+severity = "critical"
+category = "enforced"
+examples = { negative = ["read ~/.ssh/id_rsa sem autorização"], positive = ["read src/main.rs"] }
+
+# 2. Escrita fora do workspace → aprovação (warn); dentro, a capacidade `Workspace` destranca.
+[[rules]]
+id = "contain-write-outside-workspace"
+statement = "Escrever fora do workspace exige aprovação"
+scope = { path = { root = "/" } }
+enforcement = { deny_write = { root = "/" } }
+severity = "warn"
+category = "enforced"
+examples = { negative = ["write /etc/hosts fora do workspace"], positive = ["write src/x.rs dentro do workspace"] }
+
+# 3. Leitura fora do workspace → aprovação (warn); dentro, a capacidade `Workspace` destranca.
+[[rules]]
+id = "contain-read-outside-workspace"
+statement = "Ler fora do workspace exige aprovação"
+scope = { path = { root = "/" } }
+enforcement = { deny_read = { root = "/" } }
+severity = "warn"
+category = "enforced"
+examples = { negative = ["read /etc/passwd fora do workspace"], positive = ["read src/x.rs dentro do workspace"] }

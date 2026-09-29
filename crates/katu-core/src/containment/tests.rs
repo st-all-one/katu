@@ -1,4 +1,8 @@
-use super::{Containment, ContainmentError, ContainmentStatus, Jail, NoJail, SandboxEnforcement};
+use super::{
+    Containment, ContainmentError, ContainmentStatus, Jail, NoJail, SandboxEnforcement,
+    workspace_capabilities,
+};
+use katu_policy::{Capability, ResolvedPath};
 
 #[test]
 fn mvp_is_soft_and_not_isolated() {
@@ -55,5 +59,23 @@ fn status_serializes_honestly() -> Result<(), Box<dyn std::error::Error>> {
     let json = serde_json::to_string(&ContainmentStatus::mvp())?;
     assert!(json.contains("\"mode\":\"soft\""), "{json}");
     assert!(json.contains("\"enforcement\":\"soft\""), "{json}");
+    Ok(())
+}
+
+#[test]
+fn workspace_capabilities_cover_only_the_root() -> Result<(), Box<dyn std::error::Error>> {
+    let root = ResolvedPath::from_canonical("/work")?;
+    let caps = workspace_capabilities(&root);
+    let inside = ResolvedPath::from_canonical("/work/src/main.rs")?;
+    let outside = ResolvedPath::from_canonical("/etc/passwd")?;
+    assert!(
+        caps.iter()
+            .any(|cap| { matches!(cap, Capability::Workspace { root } if inside.is_under(root)) })
+    );
+    assert!(
+        !caps
+            .iter()
+            .any(|cap| { matches!(cap, Capability::Workspace { root } if outside.is_under(root)) })
+    );
     Ok(())
 }

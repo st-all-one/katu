@@ -117,10 +117,21 @@ Regras:
 - **Aceite:** cada padrão tem teste próprio; env com segredo plantado não chega ao filho (§43.6);
   `timeout` mata o grupo inteiro.
 
-### E07-T05 ☐ Autorização soft fora do workspace e caminhos sensíveis
+### E07-T05 ◐ Autorização soft fora do workspace e caminhos sensíveis
 - **Entregáveis:** regras determinísticas: sensíveis `deny`-by-default; acesso a path/comando fora
   do workspace → `RequireApproval`/`NeedsHuman`; autorização interativa no CLI/TUI registada com
   `override_reason`+`granted_by`; `Capability::Net` idem.
+- **Estado:** a **raiz do workspace** existe no kernel (`State::workspace`, `Event::WorkspaceSet`,
+  `Session::set_workspace`); `facts_from` deriva `Capability::Workspace { root }`
+  (`containment::workspace_capabilities`). O vocabulário subiu a **v2** (ADR 0003):
+  `Enforcement::DenyRead { root }` (destrancado por `ReadPath` **ou** `Workspace`) e
+  `Enforcement::DenySensitiveRead { globs }` (só `ReadPath` explícito — o workspace **não** conta).
+  `policy/containment.toml` traz `contain-sensitive-read` (critical: `.ssh`/`.env`/chaves) e
+  `contain-{read,write}-outside-workspace` (warn → `RequireApproval`). Testes:
+  `katu-policy/tests/containment.rs` (matriz real) e
+  `pipeline::tests::sensitive_read_is_denied_even_with_a_workspace`. **Falta:** o fluxo interativo
+  de autorização (`override_reason`+`granted_by`, CLI/TUI E10 — hoje fica `Unavailable{approval}`),
+  `Capability::Net`, e popular `resolved_paths` na busca (`grep`/`find`) para o motor a avaliar.
 - **Aceite:** ler `.ssh`/`.env` sem autorização é `Denied`; um pedido aprovado fica no log e na UI;
   a autorização não é herdada por um comando subsequente.
 

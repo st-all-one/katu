@@ -46,8 +46,8 @@ Pré-condições verificáveis (a imposição, não a prosa — §51.2):
 
 ### E04-T01 ☑ Estado e eventos tipados
 - **Entregáveis:** `State`, `Event` (`TurnStart`, `UserMessage`, `ToolCall`, `ToolResult`,
-  `AssistantMessage`, `PhaseTransition`, `Waiver`, `PlanRecorded`, `CommandRecorded`, `TurnEnd`),
-  `Refusal`.
+  `AssistantMessage`, `PhaseTransition`, `Waiver`, `PlanRecorded`, `CommandRecorded`,
+  `WorkspaceSet`, `TurnEnd`), `Refusal`.
 - **Estado:** `kernel/{state,event,step}.rs`; `State` usa `BTreeMap`/`BTreeSet`; a transição
   `step(&State, &Event)` é pura; a forma do caminho único está em `next_phase`/`can_transition`.
 - **Aceite:** `State` é `Clone`/`Eq`/`Serialize`; nenhum campo é `HashMap` sem ordem canônica.
