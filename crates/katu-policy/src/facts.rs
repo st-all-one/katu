@@ -63,8 +63,14 @@ pub enum ToolName {
     Exec,
     /// Busca.
     Search,
-    /// Memória.
-    Memory,
+    /// Memória: consulta (recall).
+    MemoryRecall,
+    /// Memória: gravação de nota.
+    MemoryWrite,
+    /// Memória: registo de `outcome`.
+    MemoryOutcome,
+    /// Memória: fecho de tarefa.
+    MemoryClose,
     /// Planeamento.
     Plan,
     /// Compactação.
@@ -114,11 +120,6 @@ pub enum ToolArgs {
         /// Raiz da busca.
         root: ResolvedPath,
     },
-    /// Operação de memória.
-    Memory {
-        /// Operação (dedup, anchor, outcome, …).
-        op: String,
-    },
     /// Planeamento.
     Plan,
     /// Outro (payload opaco).
@@ -164,6 +165,11 @@ pub enum Capability {
     Exec {
         /// Programa permitido.
         program: String,
+    },
+    /// Executar um comando/tool nominal (destranca regras `DenyCommand`).
+    Command {
+        /// Comando concedido.
+        tool: ToolName,
     },
     /// Aceder a um host.
     Net {

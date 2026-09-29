@@ -122,42 +122,60 @@ tipos permitem.
 - **Aceite:** mesmo input → mesmo veredicto (proptest); nenhuma chamada a `Clock`/`Fs`/`Rng`;
   tempos medidos em microssegundos para um `RuleSet` de 30 regras.
 
-### E02-T04 ☐ Categorias e auditoria de regras
+### E02-T04 ☑ Categorias e auditoria de regras
 - **Entregáveis:** `xtask policy:audit` que lista `Enforced` vs `Advisory`; falha se houver texto
   de instrução sem categoria; regras sem exemplo negativo não podem ser `Enforced`.
-- **Aceite:** `E02-T04` tem teste próprio; o relatório é comparado com o esperado (DF3).
+- **Estado:** `katu-policy/src/audit.rs` (`audit` puro + `AuditIssue` com `Display`) e
+  `xtask policy:audit` (corre todos os `policy/*.toml`, sai ≠ 0 com problemas). `category` é campo
+  **sem default** — omiti-lo é erro de parse (é o "texto de instrução sem categoria").
+- **Aceite:** teste próprio (`AuditIssue` para `Enforced` sem exemplo, id duplicado, enunciado
+  vazio, `Advisory` em categoria `Enforced`); verificado a **falhar** com regressão injetada.
 
-### E02-T05 ☐ Golden de veredictos e proptests
+### E02-T05 ☑ Golden de veredictos e proptests
 - **Entregáveis:** golden com matriz de factos (`../`, symlink, `bash -c`, `&&`, `find -delete`,
   `docker run`, `python -c`), cada um com `Allow`/`Deny`/`RequireApproval` esperado.
+- **Estado:** `crates/katu-policy/tests/golden.rs`. Casos de **fronteira** (`/work/secrets2`,
+  `/work/secrets/../public/x`) só dão a resposta certa com tipos; os casos `exec` provam que o
+  **texto do `argv` não muda o veredicto**. A resolução de symlink é do kernel (o facto chega
+  pré-resolvido), logo testa-se a invariante pós-resolução; o proptest de `../` vive em `paths.rs`.
 - **Aceite:** o golden falha se alguém trocar o motor por regex sobre string (DF2).
 
-### E02-T06 ☐ Gate de cobertura de regras (ledger)
+### E02-T06 ☑ Gate de cobertura de regras (ledger)
 - **Entregáveis:** `coverage-ledger.json` de regras: cada regra com `coverage_id` canónico e
   estado explícito (`covered` | `not_applicable` | `deferred`), nos moldes do security-audit (§28).
-- **Aceite:** nenhuma superfície fica sem regra nem sem decisão explícita; validador zero-dep
-  (`xtask ledger:validate`) rejeita duplicados/colisões de `coverage_id`.
+- **Estado:** `policy/coverage-ledger.json` + `xtask ledger:validate` (zero-dep além de
+  `serde_json`): `coverage_id` únicos, `covered` exige `rule_id`, não-coberto exige `reason`, e o
+  conjunto `covered` tem de ser **exatamente** o das regras `Enforced` de `policy/*.toml`.
+- **Aceite:** nenhuma superfície fica sem regra nem sem decisão explícita; o validador rejeita
+  duplicados/colisões e regras sem cobertura (verificado a falhar com regressão).
 
-### E02-T07 ☐ **Gate do épico:** as regras do knudge cabem
+### E02-T07 ☑ **Gate do épico:** as regras do knudge cabem
 - **Objetivo:** provar que o protocolo de memória é expressável.
 - **Entregáveis:** `policy/memory.toml` com, no mínimo:
   - `deny write` quando `pre_write` aponta duplicata ≥ 0.92 → `DenyWrite`;
   - exigir `--anchor` em nota sobre código → `RequireBefore`/validação de argumento;
   - exigir `--outcome` antes de fechar tarefa → `RequireAfter`/pré-condição de fase;
   - uma afirmação por nota → `DenyWrite`.
-- **Aceite (gate):** todas as regras acima são `Enforced` com exemplo negativo que nega; a lista
-  `Advisory` resultante está **vazia** para o protocolo de memória. Se alguma não for
-  expressável, o épico **não passa** e o projeto entra em revisão (§5 do README).
-- **Rastreabilidade:** §11, §12, §51.7.
+- **Estado:** `policy/memory.toml` (5 regras `Enforced`, sem `Advisory`) + `tests/memory_policy.rs`.
+  O modelo é o de **OA15**: as operações são comandos nominais (`memory_recall`/`memory_write`/
+  `memory_outcome`/`memory_close`); as regras `deny_command` são **portas falha-fechado**
+  destravadas pela `Capability::Command`, que o adaptador (E03) só concede quando o `pre_write`
+  passa (sem duplicata ≥ 0.92, com âncora, uma afirmação). "Escrever sem buscar" e "fechar sem
+  outcome" são `RequireAfter` nativos. As verificações semânticas **não** vivem no motor puro (não
+  há regex): chegam como capacidade; o motor mantém-se determinístico.
+- **Aceite (gate):** todas as regras são `Enforced` com exemplo negativo que nega; a lista
+  `Advisory` do protocolo está **vazia** (teste `memory_policy_is_all_enforced_and_advisory_free`).
+- **Rastreabilidade:** §11, §12, §51.7; decisão registada em [`01`](01-decisoes-fundacionais.md)
+  OA15.
 
 ---
 
 ## Definition of Done
 
-- [ ] E02-T01…T07 concluídas.
-- [ ] `xtask policy:audit` e `xtask ledger:validate` verdes.
-- [ ] As regras de memória da `policy/memory.toml` são todas `Enforced` com teste.
-- [ ] `cargo xtask check` e job `msrv` verdes.
+- [x] E02-T01…T07 concluídas.
+- [x] `xtask policy:audit` e `xtask ledger:validate` verdes.
+- [x] As regras de memória da `policy/memory.toml` são todas `Enforced` com teste.
+- [x] `cargo xtask check` e job `msrv` verdes.
 
 ## Não-objetivos
 

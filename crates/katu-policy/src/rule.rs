@@ -147,15 +147,19 @@ pub struct Waiver {
 
 /// Exemplos da regra: **o negativo é obrigatório** para `Enforced` (§51.7).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RuleExamples {
     /// Um comando/caminho que a regra **nega**.
+    #[serde(default)]
     pub negative: Vec<String>,
     /// Um que ela permite.
+    #[serde(default)]
     pub positive: Vec<String>,
 }
 
 /// Regra como dado versionado (DF3, DF7).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Rule {
     /// Identificador.
     pub id: RuleId,
@@ -170,10 +174,13 @@ pub struct Rule {
     /// Categoria.
     pub category: RuleCategory,
     /// Expiração (revisão por default a 90 dias).
+    #[serde(default)]
     pub expires_at: Option<Timestamp>,
     /// Exceção explícita.
+    #[serde(default)]
     pub waiver: Option<Waiver>,
     /// Exemplos.
+    #[serde(default)]
     pub examples: RuleExamples,
 }
 
@@ -199,6 +206,7 @@ impl Rule {
 
 /// Conjunto de regras versionado.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RuleSet {
     /// Versão do vocabulário (`POLICY_VOCAB_VERSION`).
     pub vocab: u32,

@@ -36,6 +36,7 @@
     reason = "módulos internos usam pub(crate); a API pública é a reexportação em `lib.rs`"
 )]
 
+mod audit;
 mod decision;
 mod engine;
 mod error;
@@ -44,6 +45,7 @@ mod facts;
 mod paths;
 mod rule;
 
+pub use audit::{Activity, AuditIssue, AuditReport, ExampleCoverage, RuleSummary, audit};
 pub use decision::{ApprovalRequest, ControlId, Decision, Evidence, Reason};
 pub use error::PolicyError;
 pub use evaluate::evaluate;

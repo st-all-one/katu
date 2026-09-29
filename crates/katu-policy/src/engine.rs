@@ -3,7 +3,7 @@
 //! Os helpers são puros; nada de I/O. A evidência é sempre estruturada.
 
 use crate::decision::{ApprovalRequest, ControlId, Decision, Evidence, Reason};
-use crate::facts::{BudgetState, Facts, Phase, ToolName};
+use crate::facts::{BudgetState, Capability, Facts, Phase, ToolName};
 use crate::paths::ResolvedPath;
 use crate::rule::{BudgetCap, Enforcement, Rule, RuleScope, Severity};
 
@@ -39,14 +39,19 @@ impl Rule {
         }
         match &self.enforcement {
             Enforcement::DenyWrite { root } => write_hit(facts, root)
-                .map(|argument| self.evidence(&argument, "escrita sob raiz negada")),
+                .filter(|path| !write_capability_covers(facts, path))
+                .map(|path| self.evidence(path.as_str(), "escrita sob raiz negada sem capacidade")),
             Enforcement::DenyDelete { root } => delete_hit(facts, root)
-                .map(|argument| self.evidence(&argument, "envio para lixo sob raiz negada")),
-            Enforcement::DenyCommand { tool } => facts
-                .tool
-                .name
-                .eq(tool)
-                .then(|| self.evidence(tool_name(*tool), "tool negada")),
+                .filter(|path| !delete_capability_covers(facts, path))
+                .map(|path| {
+                    self.evidence(
+                        path.as_str(),
+                        "envio para lixo sob raiz negada sem capacidade",
+                    )
+                }),
+            Enforcement::DenyCommand { tool } => (facts.tool.name == *tool
+                && !command_capability(facts, *tool))
+            .then(|| self.evidence(tool_name(*tool), "comando negado sem capacidade")),
             Enforcement::RequireBefore { phase } => (facts.phase < *phase)
                 .then(|| self.evidence(phase_name(facts.phase), "fase anterior obrigatória")),
             Enforcement::RequireAfter { tool } => (!facts.completed.contains(tool))
@@ -111,7 +116,10 @@ fn tool_name(tool: ToolName) -> &'static str {
         ToolName::Trash => "trash",
         ToolName::Exec => "exec",
         ToolName::Search => "search",
-        ToolName::Memory => "memory",
+        ToolName::MemoryRecall => "memory_recall",
+        ToolName::MemoryWrite => "memory_write",
+        ToolName::MemoryOutcome => "memory_outcome",
+        ToolName::MemoryClose => "memory_close",
         ToolName::Plan => "plan",
         ToolName::Compact => "compact",
         ToolName::Model => "model",
@@ -142,34 +150,51 @@ fn budget_exceeded(state: BudgetState, cap: BudgetCap) -> bool {
 }
 
 /// Primeiro caminho sob `root`, quando a tool escreve.
-fn write_hit(facts: &Facts, root: &ResolvedPath) -> Option<String> {
-    is_write_tool(facts.tool.name)
-        .then(|| {
-            facts
-                .tool
-                .resolved_paths
-                .iter()
-                .find(|path| path.is_under(root))
-        })
-        .flatten()
-        .map(|path| path.as_str().to_string())
+fn write_hit<'a>(facts: &'a Facts, root: &ResolvedPath) -> Option<&'a ResolvedPath> {
+    if !is_write_tool(facts.tool.name) {
+        return None;
+    }
+    facts
+        .tool
+        .resolved_paths
+        .iter()
+        .find(|path| path.is_under(root))
 }
 
 /// Primeiro caminho sob `root`, quando a tool envia para o lixo.
-fn delete_hit(facts: &Facts, root: &ResolvedPath) -> Option<String> {
+fn delete_hit<'a>(facts: &'a Facts, root: &ResolvedPath) -> Option<&'a ResolvedPath> {
+    if facts.tool.name != ToolName::Trash {
+        return None;
+    }
     facts
         .tool
-        .name
-        .eq(&ToolName::Trash)
-        .then(|| {
-            facts
-                .tool
-                .resolved_paths
-                .iter()
-                .find(|path| path.is_under(root))
-        })
-        .flatten()
-        .map(|path| path.as_str().to_string())
+        .resolved_paths
+        .iter()
+        .find(|path| path.is_under(root))
+}
+
+/// `true` se uma capacidade de escrita cobre o caminho (destranca `DenyWrite`).
+fn write_capability_covers(facts: &Facts, path: &ResolvedPath) -> bool {
+    facts
+        .capabilities
+        .iter()
+        .any(|cap| matches!(cap, Capability::WritePath { root } if path.is_under(root)))
+}
+
+/// `true` se uma capacidade de apagar cobre o caminho (destranca `DenyDelete`).
+fn delete_capability_covers(facts: &Facts, path: &ResolvedPath) -> bool {
+    facts
+        .capabilities
+        .iter()
+        .any(|cap| matches!(cap, Capability::DeletePath { root } if path.is_under(root)))
+}
+
+/// `true` se o comando foi nominalmente concedido (destranca `DenyCommand`).
+fn command_capability(facts: &Facts, tool: ToolName) -> bool {
+    facts
+        .capabilities
+        .iter()
+        .any(|cap| matches!(cap, Capability::Command { tool: granted } if *granted == tool))
 }
 
 #[cfg(test)]

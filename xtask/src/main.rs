@@ -4,11 +4,22 @@
 //! - `check-layers` — firewall LLM-free (fonte: `layers.toml`);
 //! - `check-crate-coverage` — cada crate tem `MODULE.md`;
 //! - `check-diag` — logs só estruturados (nenhuma macro de texto livre fora do sink);
-//! - `check-docs` — todos os links de `*.md` resolvem.
+//! - `check-docs` — todos os links de `*.md` resolvem;
+//! - `policy:audit` — regras `Enforced`/`Advisory` coerentes (E02-T04);
+//! - `ledger:validate` — ledger de cobertura consistente com `policy/` (E02-T06).
 //!
 //! Runbook: `make check`.
 
 #![forbid(unsafe_code)]
+#![allow(
+    clippy::redundant_pub_crate,
+    reason = "binário: sem API externa; os módulos internos usam pub(crate)"
+)]
+
+mod diag;
+mod ledger;
+mod policy;
+mod walk;
 
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
@@ -18,17 +29,14 @@ use std::process::ExitCode;
 
 use serde::Deserialize;
 
+use diag::check_diag;
+use walk::collect_by_extension;
+
 /// Firewall de camadas carregado de `layers.toml`.
 #[derive(Debug, Deserialize)]
 struct Layers {
     layers: BTreeMap<String, Vec<String>>,
 }
-
-/// Macros de saída de texto livre proibidas no caminho de produção.
-const FORBIDDEN_OUTPUT_MACROS: &[&str] = &["eprintln!", "eprint!", "println!", "print!", "dbg!"];
-
-/// Únicos ficheiros onde escrever texto é legítimo (a borda de diagnóstico).
-const DIAG_ALLOWED: &[&str] = &["crates/katu/src/diag.rs"];
 
 /// Documentos de markdown com links a verificar (raiz).
 const DOC_ROOTS: &[&str] = &["README.md", "ARCHITECTURE.md", "IMPLEMENTATION_PLAN.md"];
@@ -37,15 +45,19 @@ const DOC_ROOTS: &[&str] = &["README.md", "ARCHITECTURE.md", "IMPLEMENTATION_PLA
 fn main() -> ExitCode {
     let mut args = std::env::args().skip(1);
     let task = args.next();
+    let rest: Vec<String> = args.collect();
     let result = match task.as_deref() {
         Some("check-layers") => check_layers(),
         Some("check-crate-coverage") => check_crate_coverage(),
         Some("check-diag") => check_diag(),
         Some("check-docs") => check_docs(),
+        Some("policy:audit") => policy::policy_audit(&rest),
+        Some("ledger:validate") => ledger::ledger_validate(&rest),
         Some(other) => Err(format!("tarefa desconhecida: {other}")),
-        None => {
-            Err("uso: xtask <check-layers|check-crate-coverage|check-diag|check-docs>".to_string())
-        }
+        None => Err(
+            "uso: xtask <check-layers|check-crate-coverage|check-diag|check-docs|policy:audit|ledger:validate>"
+                .to_string(),
+        ),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -103,36 +115,6 @@ fn check_crate_coverage() -> Result<(), String> {
     }
 }
 
-/// Garante que os logs são **só estruturados** (`katu_core::diag`): nenhuma macro de saída de texto
-/// livre em `crates/*/src`, fora do sink de diagnóstico.
-fn check_diag() -> Result<(), String> {
-    let mut files = Vec::new();
-    collect_by_extension(Path::new("crates"), "rs", &mut files)?;
-    let mut violations: Vec<String> = Vec::new();
-    for file in files {
-        let rel = file.to_string_lossy().replace('\\', "/");
-        if DIAG_ALLOWED.contains(&rel.as_str()) {
-            continue;
-        }
-        let source =
-            fs::read_to_string(&file).map_err(|err| format!("lendo {}: {err}", file.display()))?;
-        for (index, line) in source.lines().enumerate() {
-            if let Some(mac) = forbidden_output(line) {
-                let line_no = index.saturating_add(1);
-                violations.push(format!("{rel}:{line_no}: {mac}"));
-            }
-        }
-    }
-    if violations.is_empty() {
-        Ok(())
-    } else {
-        Err(format!(
-            "check-diag falhou (logs estruturados via `katu_core::diag`; só o sink escreve):\n  {}",
-            violations.join("\n  ")
-        ))
-    }
-}
-
 /// Garante que todos os links relativos em `*.md` resolvem para um caminho existente.
 fn check_docs() -> Result<(), String> {
     let mut files: Vec<PathBuf> = DOC_ROOTS.iter().map(PathBuf::from).collect();
@@ -180,45 +162,6 @@ fn markdown_links(source: &str) -> Vec<String> {
         .collect()
 }
 
-/// Recolhe recursivamente ficheiros com a extensão dada sob `dir`.
-fn collect_by_extension(dir: &Path, extension: &str, out: &mut Vec<PathBuf>) -> Result<(), String> {
-    let entries = fs::read_dir(dir).map_err(|err| format!("lendo {}: {err}", dir.display()))?;
-    for entry in entries {
-        let entry = entry.map_err(|err| format!("lendo entrada: {err}"))?;
-        let path = entry.path();
-        if path.is_dir() {
-            collect_by_extension(&path, extension, out)?;
-        } else if path.extension().and_then(OsStr::to_str) == Some(extension) {
-            out.push(path);
-        }
-    }
-    Ok(())
-}
-
-/// Devolve a macro de saída proibida encontrada na linha (ignorando comentários).
-fn forbidden_output(line: &str) -> Option<&'static str> {
-    let code = strip_line_comment(line);
-    for mac in FORBIDDEN_OUTPUT_MACROS {
-        if code.contains(*mac) {
-            return Some(*mac);
-        }
-    }
-    None
-}
-
-/// Corta o comentário de fim de linha (sem confundir `https://` com `//`).
-fn strip_line_comment(line: &str) -> &str {
-    let mut prev_whitespace = true;
-    let mut chars = line.char_indices().peekable();
-    while let Some((index, ch)) = chars.next() {
-        if ch == '/' && prev_whitespace && matches!(chars.peek(), Some((_, '/'))) {
-            return line.get(..index).unwrap_or(line);
-        }
-        prev_whitespace = ch.is_whitespace();
-    }
-    line
-}
-
 /// Lê o `Cargo.toml` de um crate do workspace.
 fn read_manifest(krate: &str) -> Result<String, String> {
     let path = manifest_path(krate);
@@ -241,7 +184,7 @@ fn depends_on(manifest: &str, dep: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{depends_on, forbidden_output, markdown_links, strip_line_comment};
+    use super::{depends_on, markdown_links};
 
     #[test]
     fn detects_dependency_edges() {
@@ -253,27 +196,6 @@ mod tests {
     fn ignores_unrelated_names() {
         let manifest = "[package]\nname = \"katu-core\"\n";
         assert!(!depends_on(manifest, "katu-tools"));
-    }
-
-    #[test]
-    fn flags_output_macros() {
-        assert_eq!(forbidden_output("    eprintln!(\"x\");"), Some("eprintln!"));
-        assert_eq!(forbidden_output("let x = dbg!(1);"), Some("dbg!"));
-    }
-
-    #[test]
-    fn ignores_comments_and_urls() {
-        assert_eq!(forbidden_output("// usa eprintln! para depurar"), None);
-        assert_eq!(forbidden_output("let url = \"https://x\";"), None);
-        assert_eq!(strip_line_comment("code(); // eprintln!"), "code(); ");
-    }
-
-    #[test]
-    fn ignores_structured_paths() {
-        assert_eq!(
-            forbidden_output("katu_core::event!(Level::Info, ev);"),
-            None
-        );
     }
 
     #[test]
