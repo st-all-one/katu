@@ -102,11 +102,18 @@ Regras:
   `ControlId` exato); nenhuma operação sensível passa sem veredicto; os testes provam que a
   contenção é **soft** (um comando fora do controlo do katu não é detido) — a limitação fica visível.
 
-### E07-T04 ☐ Padrões defensivos de execução
+### E07-T04 ◐ Padrões defensivos de execução
 - **Entregáveis:** scrub de env (`*KEY*`/`*SECRET*`/`*TOKEN*`/`*PASSWORD*`); ficheiros temporários
   em diretório privado `0700`, nomes aleatórios, abertura exclusiva `wx`/`0600`; unlink de links
   (`lstat`); outcomes ortogonais (`timedOut`/`signal`/`exitCode` independentes); dispose atinge
   quiescência (fechar antes de matar, esperar filhos).
+- **Estado:** o scrub de env (`ExecTool::scrub_env`) e os outcomes ortogonais (`exit_code`/
+  `signal`/`timed_out`) já vêm de E06-T04. A escrita atómica do `StdFs` é agora **endurecida**:
+  temporário exclusivo (`O_EXCL`) com `0600` e nome imprevisível (`.<pid>.<n>.tmp`) — um symlink
+  plantado no caminho do temporário é **recusado** (teste `atomic_write_refuses_a_planted_symlink`),
+  o que também cobre o `lstat`/não-seguir-links. **Falta:** diretório de *scratch* privado `0700`,
+  kill do **process group** no timeout e quiescência do dispose (dependem de `rustix`/libc, vedado
+  por `#![forbid(unsafe_code)]` — decisão de dependência pendente).
 - **Aceite:** cada padrão tem teste próprio; env com segredo plantado não chega ao filho (§43.6);
   `timeout` mata o grupo inteiro.
 
