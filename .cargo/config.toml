@@ -1,0 +1,11 @@
+# Configuração local do Cargo (Onda 0). Sem `rustflags` globais: o binário
+# distribuído não usa `target-cpu=native` (portabilidade) — só medição local.
+
+[alias]
+c = "check"
+b = "build"
+t = "test"
+cl = "clippy"
+
+[net]
+git-fetch-with-cli = true

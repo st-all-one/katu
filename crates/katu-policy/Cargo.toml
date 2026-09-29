@@ -1,0 +1,11 @@
+[package]
+name = "katu-policy"
+description = "E02 — motor de política do katu: factos tipados → veredicto determinístico."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

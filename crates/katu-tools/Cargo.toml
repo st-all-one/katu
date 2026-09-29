@@ -1,0 +1,15 @@
+[package]
+name = "katu-tools"
+description = "E06/E07 — ferramentas, capacidades e contenção soft do katu."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+katu-policy.workspace = true
+katu-core.workspace = true
+
+[lints]
+workspace = true
