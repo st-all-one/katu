@@ -36,7 +36,7 @@ registada e auditável por `xtask check-surface` (filtro de [`00b`](00b-objetivo
 
 > **Planejar = backlog do knudge, não um segundo motor** (skill
 > [`knudge/07`](../.agents/skill/knudge/07-tarefas-e-planejamento.md) e
-> [`06_tarefas_e_handoff`](../knudge/wiki/integration/06_tarefas_e_handoff.md)). A hierarquia
+> [`06_tarefas_e_handoff`](../crates/knudge/wiki/integration/06_tarefas_e_handoff.md)). A hierarquia
 > `epic ⊃ {issue ⊃ task | task}` (pai único, profundidade ≤ 4), a máquina de `status`, o
 > `outcome`/evidência do fecho, o WBS (`task graph`), o fluxo/caminho crítico (`task flow`) e o
 > `task plan --template feature|bug|refactor` são **views derivadas da memória**, nunca um banco

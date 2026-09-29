@@ -25,6 +25,23 @@ impl Fs for StdFs {
         fs::read(path).map_err(|err| FsError::from_io(&err))
     }
 
+    fn canonicalize(&self, path: &Path) -> Result<PathBuf, FsError> {
+        let _span = katu_core::span!(Level::Trace, events::FS_STAT);
+        match fs::canonicalize(path) {
+            Ok(canonical) => Ok(canonical),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                // A folha pode não existir (ficheiro novo): resolve o ancestral e junta o nome.
+                let parent = path.parent().ok_or(FsError::NotFound)?;
+                let canonical = fs::canonicalize(parent).map_err(|err| FsError::from_io(&err))?;
+                Ok(match path.file_name() {
+                    Some(name) => canonical.join(name),
+                    None => canonical,
+                })
+            }
+            Err(err) => Err(FsError::from_io(&err)),
+        }
+    }
+
     fn write_atomic(&self, path: &Path, bytes: &[u8]) -> Result<(), FsError> {
         let _span = katu_core::span!(Level::Trace, events::FS_WRITE);
         write_bytes_atomic(path, bytes)

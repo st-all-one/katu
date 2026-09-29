@@ -7,8 +7,8 @@
 ## 0. Snapshot
 
 - **6 crates + `xtask`**: `katu-policy`, `katu-core`, `katu-tools`, `katu` (bin), `katu-providers`*, `katu-tui`*.
-- **339 testes** · catálogo de instrumentação **62 ids** · **11 tools** · **8 regras** (5 memória + 3 contenção) · **4 ADRs**.
-- `make check` verde (fmt + clippy `-D warnings` + testes + `check-layers` + `check-diag` + `check-docs` + `policy:audit` + `gate:bench` + file-length ≤300) · `make instrument` verde.
+- **367 testes** · catálogo de instrumentação **62 ids** · **11 tools** · **8 regras** (5 memória + 3 contenção) · **4 ADRs**.
+- `make check` verde (fmt + clippy `-D warnings` + testes + `check-layers` + `check-diag` + `check-schemas` + `check-docs` + `policy:audit` + `gate:bench` + file-length ≤300) · `make instrument` verde.
 - **O MVK passou** ([ADR 0001](docs/adr/0001-mvk-gate-aprovado.md)); o kernel (E04) e a política (E02) estão completos.
 
 \* `katu-providers` e `katu-tui` são **stubs vazios**.
@@ -18,10 +18,10 @@
 - Kernel event-sourced: `step` puro, log append-only, `derive_messages`/`state_of`/`snapshot`, `Session::verify()` (`Model-visible ⟺ logged`).
 - Política pura (`evaluate`), vocabulário fechado v2, ledger de cobertura, auditoria.
 - Gate de memória pelo caminho real (recall → write → close) e cost governor ligado ao `Session`.
-- Tools: read (6 views), write, edit (CAS + dry-run + `Stale`), move, trash, bash (scrub + timeout), grep/find/ls, plan, memory (record + recall).
+- Tools: read (6 views), write, edit (CAS + dry-run + `Stale`), move, trash, bash (scrub + timeout), grep/find/ls, plan, memory (record + recall). **Linter de schema** (`katu-tools::schema`) imposto por `xtask check-schemas`.
 - Contexto: `assemble` + prime (+`--long`), compactação determinística opt-in, gate de verificação, scope contracts.
-- Contenção soft: sensíveis negados, fora do workspace → aprovação, busca como leitura, `Capability::Net`.
-- Instrumentação transversal zero-custo (DF9).
+- Contenção soft: sensíveis negados, fora do workspace → aprovação, busca como leitura, `Capability::Net`; **symlink resolvido via porta `Fs` antes do veredicto** (`katu-tools::resolve`).
+- Instrumentação transversal zero-custo (DF9): **redação por allowlist** no sink (E01-T07), **fingerprint determinístico** (`fingerprint!`, E19-T04) e **filtro por subsistema** (E19-T06).
 
 ---
 
@@ -29,7 +29,7 @@
 
 | Tarefa | Estado | Pendência |
 |---|---|---|
-| **E01-T07** | ◐ | Rotação/observabilidade de logs. |
+| **E01-T07** | ☑ | Redação por allowlist no sink (E01-T07); rotação de ficheiro fica deliberadamente gated (nunca apaga automaticamente). |
 | **E01-T08** | ☐ | Política de memória e `unsafe` (documento/decisão). |
 | **E01-T09** | ☐ | Política de recursos e runtime mínimo. |
 | **E01-T10** | ◐ | `xtask` e CI em camadas (fecho). |
@@ -39,11 +39,11 @@
 | **E03-T05** | ◐ | Suíte de conformidade existe; falta correr contra o adaptador in-process. |
 | **E03-T06** | ☐ | Gate de substituibilidade (`check-memory-swap`). |
 | **E03-T07** | ☐ | Memória como invariante (produção sempre com memória; fail-closed no arranque). |
-| **E06-T02** | ☐ | Tool-schema linter (reusa `validate::Issue`). |
-| **E06-T03** | ◐ | Matriz multibyte (§45.22); `read.diff` sem `base` ligado; `edit.hunks` fixo. |
+| **E06-T02** | ☑ | Linter de schema (`katu-tools::schema`) + `xtask check-schemas` em `make check`. |
+| **E06-T03** | ☑ | Matriz multibyte (§45.22); `edit.hunks`/`added`/`removed` reais; chunk único truncado em limite UTF-8. `read.diff` sem `base` é integração CLI (§3.2). |
 | **E06-T07** | ◐ | Rotação do registo de comando (→ E01-T07). |
-| **E07-T02** | ◐ | Resolução de symlinks. |
-| **E07-T03** | ◐ | Gate do épico: autorização de workspace. |
+| **E07-T02** | ☑ | Symlink resolvido via porta `Fs` (`Fs::canonicalize` + `katu-tools::resolve`) antes do veredicto; `StdFs`/`MemFs` com teste de escape. |
+| **E07-T03** | ☑ | Gate do épico: autorização ausente fora do workspace recusada; symlink para fora negado na política. |
 | **E07-T05** | ◐ | **Autorização interativa** (`override_reason`+`granted_by`) — CLI/TUI (E10). |
 | **E09-T03** | ◐ | Override interativo (CLI/TUI); kernel `→ Verified` feito. |
 | **E09-T04** | ◐ | Carregar `scope_contract.json`/`feature_list.json` no arranque (CLI). |
@@ -57,7 +57,8 @@
 | **E15-T03…T06** | ☐ | Tabela de recuo, determinismo de prefixo, instrumentação do prefixo (`✂`), negativos. |
 | **E18-T01…T10** | ☐ | **Otimização profunda (matemática/info/estatística): 0%.** |
 | **E19-T03** | ◐ | Instrumentar o caminho crítico por épico (cresce com o código). |
-| **E19-T04** | ☐ | Consistência (fingerprint determinístico). |
+| **E19-T04** | ☑ | Fingerprint determinístico (`diag::fingerprint!`) com golden. |
+| **E19-T06** | ☑ | Filtro de nível por subsistema (`KATU_INSTRUMENT_FILTER`/`set_filter`). |
 | **E19-T05** | ◐ | Gate no CI (fecho). |
 | **E19-T06** | ☐ | Filtro de nível por subsistema (OA18). |
 | **E08 · E11 · E17** | ⏸️ | Futuro (MCP, plugins WASM, jail de SO). |
@@ -70,7 +71,7 @@
 
 1. **Sem loop acionável (E10).** O binário só faz `version`/`doctor`. Não há driver do kernel nem TUI.
 2. **Sem provider (E12).** `katu-providers` é stub; não há LLM.
-3. **Sem memória real (E03-T02).** Só `FakeMemory`; o adaptador in-process do `knudge-core` não está ligado — **bloqueado** por dep (path `knudge/crates/knudge-core`, fora do registry).
+3. **Sem memória real (E03-T02).** Só `FakeMemory`; o adaptador in-process do `knudge-core` não está ligado — **bloqueado** por dep (path `crates/knudge/crates/knudge-core`, fora do registry).
 
 ### 3.2 Integração CLI/TUI (lógica já feita no core)
 
@@ -85,9 +86,6 @@ Nenhuma fórmula implementada: contexto submodular+MMR (T02), compactação por 
 
 ### 3.4 Dívida técnica concreta
 
-- `edit.patch` devolve `hunks: 1` **fixo**, sem o delta real.
-- Campo `cost` do `ToolReport` **nunca é preenchido**.
-- `content_id` = 8 hex (32 bits) — colisões a escala.
 - Emissor TOON concatena `String` (sem `fmt::Write`) — irrelevante sem perfil.
 - Process-group kill / cgroup **deferido** para E17 ([ADR 0004](docs/adr/0004-sem-ffi-kill-grupo-e17.md)).
 - **Nenhum número de tokens/latência publicado** (regra: nada sem artefacto — E15/E18).
@@ -100,7 +98,7 @@ Nenhuma fórmula implementada: contexto submodular+MMR (T02), compactação por 
 2. **E12-T01/T05** — port `Provider` + provider fake (desbloqueia testes de loop reais).
 3. **E03-T02** — adaptador in-process do knudge (memória real; decisão de dep pendente).
 4. **E15-T01 + E18-T10** — harness de medição antes de qualquer otimização.
-5. Fechos: **E06-T02/T03**, **E07-T02/T03**, **E01-T07**.
+5. Fechos core/policy/tools: **E06-T02/T03**, **E07-T02/T03**, **E01-T07**, **E19-T04/T06** — ✅; faltam **E06-T07** (rotação gated), **E03-T06/T07** (bloqueados em E03-T02) e a integração de `read.diff`/CLI.
 
 ## 5. Regras que não se quebram
 

@@ -95,7 +95,7 @@ fn content_id_is_stable_and_prefixed() {
     let first = content_id("f", b"hello");
     assert_eq!(first, content_id("f", b"hello"));
     assert!(first.starts_with("f_"));
-    assert_eq!(first.len(), 10);
+    assert_eq!(first.len(), 18);
     assert_ne!(first, content_id("f", b"world"));
     assert_eq!(content_hash(b"x").len(), 16);
 }

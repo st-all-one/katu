@@ -28,7 +28,7 @@ Cada meta tem um **artefacto** (saída crua commitada) e a base de evidência ti
 > derivar `Index`/`Graph` a cada consulta em vez de uma passada por invalidação, varrer o projeto
 > sem `Project::ignored_dirs`, drenar embeddings no caminho quente, ou não reusar o índice
 > persistido (`.idx/`). Ver
-> [`knudge/wiki/integration/13_performance_e_otimizacao.md`](../knudge/wiki/integration/13_performance_e_otimizacao.md).
+> [`knudge/wiki/integration/13_performance_e_otimizacao.md`](../crates/knudge/wiki/integration/13_performance_e_otimizacao.md).
 > O benchmark do katu mede a **integração** (uma passada, filtros antes do BM25, `rewind` com
 > orçamento) e não redescobre essas regras.
 

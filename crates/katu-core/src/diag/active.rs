@@ -1,7 +1,7 @@
 //! Instrumentação ativa (`feature = "instrument"`), ligada em runtime.
 
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 
 use super::{Kind, Level, Record, Sink, Value};
@@ -9,6 +9,9 @@ use super::{Kind, Level, Record, Sink, Value};
 static ENABLED: AtomicBool = AtomicBool::new(false);
 static LEVEL: AtomicU8 = AtomicU8::new(level_to_u8(Level::Info));
 static SINK: OnceLock<Arc<dyn Sink>> = OnceLock::new();
+
+/// Prefixo de subsistema ativo (E19-T06); `None` = todos.
+static FILTER: Mutex<Option<Box<str>>> = Mutex::new(None);
 
 /// Codifica um nível num `u8` (sem `as`).
 const fn level_to_u8(level: Level) -> u8 {
@@ -65,9 +68,33 @@ pub fn current_level() -> Level {
     level_from_u8(LEVEL.load(Ordering::Relaxed))
 }
 
+/// Restringe a emissão a eventos cujo id começa pelo prefixo (E19-T06); vazio limpa o filtro.
+pub fn set_filter(prefix: &str) {
+    let mut filter = FILTER
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    *filter = if prefix.is_empty() {
+        None
+    } else {
+        Some(prefix.into())
+    };
+}
+
+/// `true` se `event` passa o filtro de subsistema vigente.
+#[must_use]
+pub fn filter_allows(event: &str) -> bool {
+    let filter = FILTER
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    match filter.as_deref() {
+        None => true,
+        Some(prefix) => event.starts_with(prefix),
+    }
+}
+
 /// Regista um evento estruturado, se a instrumentação estiver ligada e dentro do nível.
 pub fn record(level: Level, event: &'static str, fields: &[(&'static str, Value<'_>)]) {
-    if !enabled() || level > current_level() {
+    if !enabled() || level > current_level() || !filter_allows(event) {
         return;
     }
     emit(&Record {
@@ -95,7 +122,7 @@ pub(super) fn begin(
     event: &'static str,
     fields: &[(&'static str, Value<'_>)],
 ) -> Option<Active> {
-    if !enabled() || level > current_level() {
+    if !enabled() || level > current_level() || !filter_allows(event) {
         return None;
     }
     emit(&Record {

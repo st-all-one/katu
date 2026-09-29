@@ -14,6 +14,9 @@ use katu_core::report::{ToolReport, content_hash, content_id};
 use katu_core::toon::Value;
 use katu_policy::{ControlId, ResolvedPath, ToolArgs, ToolName, ToolUse};
 
+use crate::diff::{Diff, unified};
+use crate::lang::to_i64;
+
 /// Executor de um patch otimista.
 pub struct EditFileTool<'a> {
     /// Porta de ficheiros.
@@ -49,30 +52,54 @@ impl Tool for EditFileTool<'_> {
         let id = content_id("f", path.as_str().as_bytes());
         let old_hash = content_hash(&current);
         let new_hash = content_hash(updated.as_bytes());
+        let delta = unified(text.as_ref(), updated.as_str(), 3);
+        let patch = Patch {
+            path,
+            id: &id,
+            old_hash: &old_hash,
+            new_hash: &new_hash,
+            delta: &delta,
+        };
         if self.dry_run {
-            return ToolOutput::report(report("edit.dry-run", path, &id, &old_hash, &new_hash));
+            return ToolOutput::report(report("edit.dry-run", &patch));
         }
         match self
             .fs
             .write_atomic_if(Path::new(path.as_str()), updated.as_bytes(), &current)
         {
-            Ok(()) => ToolOutput::report(report("edit.patch", path, &id, &old_hash, &new_hash)),
+            Ok(()) => ToolOutput::report(report("edit.patch", &patch)),
             Err(FsError::Stale) => unavailable("stale"),
             Err(_) => unavailable("write"),
         }
     }
 }
 
-fn report(
-    kind: &'static str,
-    path: &ResolvedPath,
-    id: &str,
-    old_hash: &str,
-    new_hash: &str,
-) -> ToolReport {
+/// Campos do relatório de um patch (agrupa os argumentos; `report` fica com um só).
+#[derive(Clone, Copy)]
+struct Patch<'a> {
+    path: &'a ResolvedPath,
+    id: &'a str,
+    old_hash: &'a str,
+    new_hash: &'a str,
+    delta: &'a Diff,
+}
+
+fn report(kind: &'static str, patch: &Patch<'_>) -> ToolReport {
+    let Patch {
+        path,
+        id,
+        old_hash,
+        new_hash,
+        delta,
+    } = *patch;
     let data = Value::map(vec![
         ("path".to_string(), Value::str(path.as_str())),
-        ("hunks".to_string(), Value::int(1)),
+        (
+            "hunks".to_string(),
+            Value::int(to_i64(u64::try_from(delta.hunks.len()).unwrap_or(u64::MAX))),
+        ),
+        ("added".to_string(), Value::int(i64::from(delta.added))),
+        ("removed".to_string(), Value::int(i64::from(delta.removed))),
         ("old_hash".to_string(), Value::str(old_hash)),
         ("new_hash".to_string(), Value::str(new_hash)),
         ("breaking".to_string(), Value::bool(false)),
@@ -172,6 +199,26 @@ mod tests {
             tool(&fs, false).execute(&use_()?).outcome,
             ToolOutcome::Unavailable { .. }
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn noop_patch_reports_the_real_delta() -> Result<(), Box<dyn std::error::Error>> {
+        let fs = MemFs::new();
+        fs.write_atomic(std::path::Path::new(PATH), b"fn a() { let x = 1; }\n")?;
+        let tool = EditFileTool {
+            fs: &fs,
+            old: "let x = 1;".to_string(),
+            new: "let x = 1;".to_string(),
+            dry_run: false,
+        };
+        let output = tool.execute(&use_()?);
+        let report = output.report.ok_or("sem relatório")?;
+        let rendered = report.to_toon();
+        // O delta é real: `hunks` não é um literal; sem alteração, são zero.
+        assert!(rendered.contains("hunks: 0\n"), "{rendered}");
+        assert!(rendered.contains("added: 0\n"), "{rendered}");
+        assert!(rendered.contains("removed: 0\n"), "{rendered}");
         Ok(())
     }
 }

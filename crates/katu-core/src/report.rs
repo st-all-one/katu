@@ -192,10 +192,10 @@ pub fn fingerprint(bytes: &[u8]) -> u64 {
     hash
 }
 
-/// Id content-addressed com prefixo (`f_`/`s_`/…), 8 hex estáveis.
+/// Id content-addressed com prefixo (`f_`/`s_`/…), 16 hex estáveis (64 bits — sem colisões a escala).
 #[must_use]
 pub fn content_id(prefix: &str, seed: &[u8]) -> String {
-    format!("{prefix}_{:08x}", fingerprint(seed) & 0xFFFF_FFFF)
+    format!("{prefix}_{:016x}", fingerprint(seed))
 }
 
 /// Hash de conteúdo em 16 hex.

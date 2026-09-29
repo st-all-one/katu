@@ -9,7 +9,7 @@
 > compilado); ligada, todo span tem início, fim e duração.
 >
 > **Fonte de método:** o exemplo do `knudge`
-> ([`knudge/plan/implementation/19_performance_reforma_cli.md`](../knudge/plan/implementation/19_performance_reforma_cli.md))
+> ([`knudge/plan/implementation/19_performance_reforma_cli.md`](../crates/knudge/plan/implementation/19_performance_reforma_cli.md))
 > — medir antes, A/B, adotar-ou-reverter.
 
 ---

@@ -50,7 +50,7 @@ compressão de contexto. Nada disso entra antes do gate.
 > da severidade; `behavior.strict = true` promove avisos *soft* (âncora/slots/claims) a erro. O
 > enforcement do katu (DF1) é *defense-in-depth* com o hook `pre_record` do knudge
 > (`ports::HookRunner`) — a memória valida o `Draft`, o loop fiscaliza a transição. Ver
-> [`knudge/wiki/integration/`](../knudge/wiki/integration/README.md).
+> [`knudge/wiki/integration/`](../crates/knudge/wiki/integration/README.md).
 
 ---
 

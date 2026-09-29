@@ -10,9 +10,9 @@
 > teste que a trava**; cada frente é **adotada ou revertida** por medição (§0.3); toda a aritmética
 > é **determinística** (§0.2).
 >
-> **Fontes.** Modelos de referência: [`knudge/wiki/specs/matematica.md`](../knudge/wiki/specs/matematica.md)
+> **Fontes.** Modelos de referência: [`knudge/wiki/specs/matematica.md`](../crates/knudge/wiki/specs/matematica.md)
 > (só a *forma* — RRF, Beta/Wilson, FSRS, KL/JS, PageRank/PPR, Louvain, MinHash, PERT). Método:
-> [`knudge/plan/implementation/19_performance_reforma_cli.md`](../knudge/plan/implementation/19_performance_reforma_cli.md)
+> [`knudge/plan/implementation/19_performance_reforma_cli.md`](../crates/knudge/plan/implementation/19_performance_reforma_cli.md)
 > (medir → A/B → adotar-ou-reverter, bytes idênticos, rejeições registadas). Engenharia:
 > [`../.agents/skill/rust/SKILL.md`](../.agents/skill/rust/SKILL.md).
 

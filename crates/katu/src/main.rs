@@ -38,7 +38,7 @@ fn main() -> ExitCode {
 fn setup_diag() {
     use std::sync::Arc;
 
-    use katu_core::diag::{Sink, install};
+    use katu_core::diag::{Sink, install, set_filter};
     use katu_core::ports::Env;
 
     let _span = katu_core::span!(Level::Info, events::KATU_SETUP);
@@ -49,5 +49,8 @@ fn setup_diag() {
     if requested {
         let sink: Arc<dyn Sink> = Arc::new(diag::StderrSink);
         install(sink);
+        if let Some(prefix) = env.var("KATU_INSTRUMENT_FILTER") {
+            set_filter(&prefix);
+        }
     }
 }

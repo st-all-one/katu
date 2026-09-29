@@ -1,6 +1,8 @@
 use super::{Tool, ToolOutput, dispatch};
 use crate::error::ToolOutcome;
 use crate::kernel::State;
+use crate::report::ToolReport;
+use crate::toon::Value;
 use katu_policy::{
     Enforcement, PolicyError, ResolvedPath, Rule, RuleCategory, RuleExamples, RuleId, RuleScope,
     RuleSet, Severity, ToolArgs, ToolName, ToolUse,
@@ -27,6 +29,19 @@ fn tool() -> CountingTool {
     CountingTool {
         calls: AtomicUsize::new(0),
         outcome: ToolOutcome::Ok,
+    }
+}
+
+/// Tool que devolve um envelope, para provar que o custo advisory é preenchido na borda.
+struct ReportingTool;
+
+impl Tool for ReportingTool {
+    fn name(&self) -> ToolName {
+        ToolName::Write
+    }
+
+    fn execute(&self, _use_: &ToolUse) -> ToolOutput {
+        ToolOutput::report(ToolReport::new("write.file", Value::str("ok")))
     }
 }
 
@@ -213,5 +228,25 @@ fn normal_read_inside_the_workspace_is_allowed() -> Result<(), PolicyError> {
     )?;
     assert!(result.ran(), "leitura normal dentro do workspace");
     assert_eq!(tool.calls.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
+#[test]
+fn dispatch_fills_the_advisory_cost() -> Result<(), Box<dyn std::error::Error>> {
+    let rules = RuleSet {
+        vocab: 2,
+        rules: Vec::new(),
+    };
+    let result = dispatch(
+        &State::initial(),
+        &use_write("/work/src/main.rs")?,
+        &rules,
+        0,
+        &ReportingTool,
+    )?;
+    let report = result.report().ok_or("sem relatório")?;
+    let cost = report.cost.ok_or("custo não preenchido")?;
+    assert!(cost.bytes > 0, "{cost:?}");
+    assert!(cost.tokens_est > 0, "{cost:?}");
     Ok(())
 }

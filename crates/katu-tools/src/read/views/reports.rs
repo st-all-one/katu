@@ -13,13 +13,14 @@ use super::helpers::{clip, flags, imports, language, len_u64, slice, to_i64};
 pub(super) fn full(lines: &[&str], meta: &Meta<'_>, budget: ReadBudget) -> ToolReport {
     let (text, truncated) = clip(lines, budget);
     let shown = len_u64(text.lines().count());
+    // Sem conteúdo mostrado não há paginação possível: evita um cursor que não avança.
     let page = Page {
-        cursor: truncated.then_some(shown.saturating_add(1)),
+        cursor: (truncated && shown > 0).then_some(shown.saturating_add(1)),
         total: meta.loc,
         truncated,
     };
     let mut next = Vec::new();
-    if truncated {
+    if truncated && shown > 0 {
         next.push(format!("read {}@{}", meta.id, shown.saturating_add(1)));
     }
     let data = Value::map(vec![

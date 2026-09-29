@@ -22,6 +22,12 @@
 
 pub mod events;
 
+/// Impressão determinística de estado/resultado (E19-T04).
+pub mod fingerprint;
+
+/// Redação de segredos no caminho de diagnóstico (E01-T07).
+pub mod redact;
+
 /// Sink agregador de contagens e durações por evento (E19-T02).
 #[cfg(feature = "instrument")]
 pub mod aggregate;
@@ -42,7 +48,7 @@ pub enum Level {
 }
 
 /// Valor de um campo estruturado (sem alocação).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Value<'a> {
     /// Texto.
     Str(&'a str),
@@ -175,7 +181,9 @@ mod active;
 mod disabled;
 
 #[cfg(feature = "instrument")]
-pub use active::{current_level, enabled, install, record, set_enabled, set_level};
+pub use active::{
+    current_level, enabled, filter_allows, install, record, set_enabled, set_filter, set_level,
+};
 
 #[cfg(feature = "instrument")]
 pub use aggregate::{AggregatingSink, EventSummary};
@@ -241,6 +249,27 @@ macro_rules! event {
     ($level:expr, $event:expr, $($rest:tt)*) => {
         $crate::diag::noop_event($level, $event)
     };
+}
+
+/// Impressão determinística de uma sequência de fragmentos (E19-T04).
+///
+/// Mesma entrada → mesmo hex de 64 bits; os fragmentos são prefixados com o comprimento, pelo que
+/// a fronteira entre eles não é ambígua.
+///
+/// ```
+/// let a = katu_core::fingerprint!("a", "bc");
+/// assert_eq!(a, katu_core::fingerprint!("a", "bc"));
+/// assert_ne!(a, katu_core::fingerprint!("ab", "c"));
+/// ```
+#[macro_export]
+macro_rules! fingerprint {
+    ($($part:expr),* $(,)?) => {{
+        let mut fp = $crate::diag::fingerprint::Fingerprint::new();
+        $(
+            fp.write_fragment($part);
+        )*
+        fp.hex()
+    }};
 }
 
 #[cfg(test)]

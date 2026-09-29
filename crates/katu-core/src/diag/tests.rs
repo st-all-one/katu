@@ -7,7 +7,8 @@ use std::sync::{Arc, Mutex};
 use crate::containment::{ContainmentStatus, announce};
 #[cfg(feature = "instrument")]
 use crate::diag::{
-    INSTRUMENT_LOCK, Kind, Level, Record, Sink, events, install, set_enabled, set_level,
+    INSTRUMENT_LOCK, Kind, Level, Record, Sink, events, filter_allows, install, set_enabled,
+    set_filter, set_level,
 };
 #[cfg(not(feature = "instrument"))]
 use crate::diag::{Level, enabled, events};
@@ -63,4 +64,17 @@ fn instrumentation_is_off_by_default() {
 
     assert!(!black_box(enabled()));
     let _span = crate::span!(Level::Info, events::KATU_RUN, "k" => black_box(1_u64));
+}
+
+#[cfg(feature = "instrument")]
+#[test]
+fn filter_limits_events_by_subsystem() {
+    let _guard = INSTRUMENT_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    set_filter("provider.");
+    assert!(filter_allows("provider.ttft"));
+    assert!(!filter_allows("policy.deny"));
+    set_filter("");
+    assert!(filter_allows("policy.deny"));
 }

@@ -6,7 +6,7 @@
 
 use katu_core::containment::{ContainmentStatus, Jail, NoJail, SandboxEnforcement};
 use katu_core::error::ToolOutcome;
-use katu_core::kernel::{State, dispatch};
+use katu_core::kernel::{State, Tool, ToolOutput, dispatch};
 use katu_core::ports::{Env, ExecRequest, FakeEnv, MemProcess, Process};
 use katu_policy::{
     Enforcement, PolicyError, ResolvedArgv, ResolvedPath, Rule, RuleCategory, RuleExamples, RuleId,
@@ -99,6 +99,49 @@ fn kernel_mode_is_soft_and_no_jail_fails_closed() {
         NoJail.acquire(SandboxEnforcement::Full).is_err(),
         "a jail futura não está implementada: pedir `Full` tem de falhar-fechado"
     );
+}
+
+#[test]
+fn authorization_missing_outside_the_workspace_is_refused() -> TestResult<()> {
+    // E07-T03/T05: sem capacidade explícita, ler fora do workspace pede aprovação — e a tool não
+    // corre. A autorização interativa (CLI/TUI, E10) é a única forma de a conceder.
+    const CONTAINMENT: &str = include_str!("../../../policy/containment.toml");
+
+    struct NoopRead;
+    impl Tool for NoopRead {
+        fn name(&self) -> ToolName {
+            ToolName::Read
+        }
+        fn execute(&self, _use_: &ToolUse) -> ToolOutput {
+            ToolOutput::ok()
+        }
+    }
+
+    let target = path("/etc/passwd")?;
+    let use_ = ToolUse {
+        name: ToolName::Read,
+        args: ToolArgs::Read {
+            path: target.clone(),
+        },
+        resolved_paths: vec![target.clone()],
+        argv: None,
+        cwd: target,
+    };
+    let state = State {
+        workspace: Some(path("/work")?),
+        ..State::initial()
+    };
+    let rules = RuleSet::from_toml(CONTAINMENT)?;
+    let dispatch = dispatch(&state, &use_, &rules, 0, &NoopRead)?;
+    assert!(
+        !dispatch.ran(),
+        "fora do workspace sem autorização não corre"
+    );
+    assert!(matches!(
+        dispatch.outcome(),
+        ToolOutcome::Unavailable { .. }
+    ));
+    Ok(())
 }
 
 #[test]

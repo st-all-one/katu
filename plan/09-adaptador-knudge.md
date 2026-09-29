@@ -8,7 +8,7 @@
 > **Estado:** ⏸️ `deferred` — nenhuma tarefa ativa.
 >
 > Ver [`00b-objetivos.md`](00b-objetivos.md) §7, [`04-contrato-da-porta-memory.md`](04-contrato-da-porta-memory.md)
-> e o guia de integração do núcleo ([`knudge/wiki/integration/`](../knudge/wiki/integration/README.md)).
+> e o guia de integração do núcleo ([`knudge/wiki/integration/`](../crates/knudge/wiki/integration/README.md)).
 
 ---
 
@@ -48,7 +48,7 @@ escrever MCP.**
 ### E08-T01 ⏸️ Cliente MCP stdio
 - Mapear as 4 tools **de hint** do `knudge-mcp` (`knudge_pre_write`, `knudge_pre_edit`,
   `knudge_session_end`, `knudge_status`; ver
-  [`usage/17_mcp`](../knudge/wiki/usage/17_mcp.md)) para a porta; framing; timeout; reconexão
+  [`usage/17_mcp`](../crates/knudge/wiki/usage/17_mcp.md)) para a porta; framing; timeout; reconexão
   explícita.
 - **Limite conhecido:** o MCP arranca em `mcp.observation_mode = true` (aprende por N sessões
   antes de emitir hints) e devolve **ponteiros**, não corpos. Um gate de enforcement **não** pode

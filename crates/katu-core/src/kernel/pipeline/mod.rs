@@ -7,7 +7,7 @@
 use crate::containment::workspace_capabilities;
 use crate::diag::{Level, events};
 use crate::error::ToolOutcome;
-use crate::report::ToolReport;
+use crate::report::{Cost, ToolReport};
 use katu_policy::{
     Capability, ControlId, Decision, Facts, PolicyError, RuleSet, ToolName, ToolUse, evaluate,
 };
@@ -223,7 +223,7 @@ pub fn dispatch_with(request: DispatchRequest<'_>) -> Result<Dispatch, PolicyErr
         Ok(Dispatch {
             decision,
             effect: Effect::Ran {
-                output: Box::new(output),
+                output: Box::new(with_estimated_cost(output)),
             },
         })
     } else {
@@ -233,6 +233,24 @@ pub fn dispatch_with(request: DispatchRequest<'_>) -> Result<Dispatch, PolicyErr
             effect: Effect::Skipped,
         })
     }
+}
+
+/// Preenche o custo **advisory** (bytes/tokens estimados) do envelope quando a tool não o fez.
+///
+/// O custo nunca decide nada (DF5): é uma heurística para o modelo orçamentar a leitura. Os bytes
+/// contam a renderização TOON e os tokens são estimados a 4 bytes/token.
+fn with_estimated_cost(mut output: ToolOutput) -> ToolOutput {
+    if let Some(report) = output.report.as_mut()
+        && report.cost.is_none()
+    {
+        let bytes = u64::try_from(report.to_toon().len()).unwrap_or(u64::MAX);
+        report.cost = Some(Cost {
+            bytes,
+            ms: 0,
+            tokens_est: bytes.div_ceil(4),
+        });
+    }
+    output
 }
 
 #[cfg(test)]

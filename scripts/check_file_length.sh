@@ -12,7 +12,11 @@ while IFS= read -r -d '' file; do
         printf 'ERRO: %s tem %d linhas (limite %d)\n' "$file" "$lines" "$limit" >&2
         status=1
     fi
-done < <(find crates xtask -type f -name '*.rs' -path '*/src/*' -print0)
+done < <(find crates xtask \
+    -path 'crates/knudge' -prune -o \
+    -type f -name '*.rs' -path '*/src/*' -print0)
+# `crates/knudge` é um submódulo (workspace aninhado) com o seu próprio gate; fica em `crates/`
+# apenas por organização e resolve-se sozinho — não é medido aqui.
 
 if ((status == 0)); then
     printf 'file-length: ok (limite %d)\n' "$limit"

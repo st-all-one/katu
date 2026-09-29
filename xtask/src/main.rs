@@ -4,6 +4,7 @@
 //! - `check-layers` — firewall LLM-free (fonte: `layers.toml`);
 //! - `check-crate-coverage` — cada crate tem `MODULE.md`;
 //! - `check-diag` — logs só estruturados (nenhuma macro de texto livre fora do sink);
+//! - `check-schemas` — schema das tools válido (E06-T02);
 //! - `check-docs` — todos os links de `*.md` resolvem;
 //! - `gate:bench` — nenhum número publicado sem base e artefacto (DF5/E15-T02);
 //! - `policy:audit` — regras `Enforced`/`Advisory` coerentes (E02-T04);
@@ -22,6 +23,7 @@ mod diag;
 mod docs;
 mod ledger;
 mod policy;
+mod schemas;
 mod walk;
 
 use std::collections::BTreeMap;
@@ -53,13 +55,14 @@ fn main() -> ExitCode {
         Some("check-layers") => check_layers(),
         Some("check-crate-coverage") => check_crate_coverage(),
         Some("check-diag") => check_diag(),
+        Some("check-schemas") => schemas::check_schemas(),
         Some("check-docs") => check_docs(),
         Some("gate:bench") => bench::gate_bench(&rest),
         Some("policy:audit") => policy::policy_audit(&rest),
         Some("ledger:validate") => ledger::ledger_validate(&rest),
         Some(other) => Err(format!("tarefa desconhecida: {other}")),
         None => Err(
-            "uso: xtask <check-layers|check-crate-coverage|check-diag|check-docs|gate:bench|policy:audit|ledger:validate>"
+            "uso: xtask <check-layers|check-crate-coverage|check-diag|check-schemas|check-docs|gate:bench|policy:audit|ledger:validate>"
                 .to_string(),
         ),
     };
@@ -104,7 +107,7 @@ fn check_crate_coverage() -> Result<(), String> {
     for entry in entries {
         let entry = entry.map_err(|err| format!("lendo entrada: {err}"))?;
         let path = entry.path();
-        if path.is_dir() && !path.join("MODULE.md").exists() {
+        if path.is_dir() && !walk::is_foreign_root(&path) && !path.join("MODULE.md").exists() {
             let name = path.file_name().and_then(OsStr::to_str).unwrap_or("?");
             missing.push(name.to_string());
         }

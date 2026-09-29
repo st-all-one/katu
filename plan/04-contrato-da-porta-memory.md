@@ -31,14 +31,14 @@ Do §12–§13 da brainstorm — regras que mantêm a dependência **substituív
 
 - `knudge-core = "0.5"` (v0.5.2) publicado, ou git-dep pinada. O katu **não** implementa o motor
   de memória; apenas o liga e fiscaliza o seu uso (§11). Fonte da verdade de integração:
-  [`knudge/wiki/integration/`](../knudge/wiki/integration/README.md).
+  [`knudge/wiki/integration/`](../crates/knudge/wiki/integration/README.md).
 - MSRV alinhado: knudge e katu em **Rust 1.97.0** (edição 2024) — coerente com o ponto inflexível.
 
 ---
 
 ## Alinhamento com o `knudge-core` (v0.5.2)
 
-O guia de integração do núcleo ([`knudge/wiki/integration/`](../knudge/wiki/integration/README.md))
+O guia de integração do núcleo ([`knudge/wiki/integration/`](../crates/knudge/wiki/integration/README.md))
 documenta a API real que o adaptador vai traduzir. Restrições a incorporar:
 
 - **Versão e disciplina.** `knudge-core = "0.5"` (v0.5.2); MSRV 1.97.0/edição 2024;

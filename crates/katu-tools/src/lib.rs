@@ -16,6 +16,8 @@ pub mod plan;
 pub mod read;
 pub mod recall;
 pub mod registry;
+pub mod resolve;
+pub mod schema;
 pub mod search;
 pub mod trash;
 pub mod write;

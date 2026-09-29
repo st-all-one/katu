@@ -8,6 +8,8 @@ mod views;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod truncation_tests;
 
 use std::path::Path;
 

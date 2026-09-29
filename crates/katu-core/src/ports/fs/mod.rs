@@ -1,7 +1,7 @@
 //! Porta de sistema de ficheiros (`Fs`) e a *fake* determinística [`MemFs`].
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
 use super::clock::Timestamp;
@@ -46,6 +46,12 @@ impl std::error::Error for FsError {}
 pub trait Fs: Send + Sync {
     /// Lê um ficheiro inteiro.
     fn read(&self, path: &Path) -> Result<Vec<u8>, FsError>;
+
+    /// Resolve **symlinks** e `.`/`..` de `path` (E07-T02), **antes** do veredicto de política.
+    ///
+    /// A folha pode não existir (ex.: `write` de um ficheiro novo): resolve-se o ancestral
+    /// existente e junta-se o nome final. Um ciclo ou profundidade excessiva é `Io` (fail-closed).
+    fn canonicalize(&self, path: &Path) -> Result<PathBuf, FsError>;
 
     /// Escreve atomicamente: temporário → `fsync` → `rename`.
     fn write_atomic(&self, path: &Path, bytes: &[u8]) -> Result<(), FsError>;
@@ -93,8 +99,12 @@ struct Entry {
 #[derive(Debug, Default)]
 struct Inner {
     files: BTreeMap<PathBuf, Entry>,
+    links: BTreeMap<PathBuf, PathBuf>,
     clock_ms: u64,
 }
+
+/// Profundidade máxima de resolução de symlinks (fail-closed contra ciclos).
+const MAX_SYMLINKS: u8 = 40;
 
 /// Sistema de ficheiros em memória, para testes determinísticos.
 #[derive(Debug, Default)]
@@ -108,6 +118,12 @@ impl MemFs {
     pub fn new() -> Self {
         Self::default()
     }
+
+    /// Regista um symlink `link` → `target` (auxiliar de teste, E07-T02).
+    pub fn symlink(&self, link: &Path, target: &Path) {
+        let mut inner = lock(&self.inner);
+        inner.links.insert(link.to_path_buf(), target.to_path_buf());
+    }
 }
 
 /// Bloqueia um `Mutex`, recuperando o valor mesmo que o lock esteja envenenado.
@@ -115,6 +131,21 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// Normaliza lexicalmente um caminho (resolve `.`/`..`, sem tocar no SO).
+fn normalize(path: &Path) -> PathBuf {
+    let mut out = PathBuf::from("/");
+    for component in path.components() {
+        match component {
+            Component::RootDir | Component::CurDir | Component::Prefix(_) => {}
+            Component::ParentDir => {
+                out.pop();
+            }
+            Component::Normal(part) => out.push(part),
+        }
+    }
+    out
 }
 
 impl Fs for MemFs {
@@ -125,6 +156,37 @@ impl Fs for MemFs {
             .get(path)
             .map(|entry| entry.bytes.clone())
             .ok_or(FsError::NotFound)
+    }
+
+    fn canonicalize(&self, path: &Path) -> Result<PathBuf, FsError> {
+        let inner = lock(&self.inner);
+        let mut current = normalize(path);
+        for _ in 0..MAX_SYMLINKS {
+            let mut acc = PathBuf::from("/");
+            let mut replaced = false;
+            for component in current.components() {
+                if let Component::Normal(part) = component {
+                    acc.push(part);
+                    if let Some(target) = inner.links.get(&acc) {
+                        let base = acc.parent().unwrap_or_else(|| Path::new("/"));
+                        current = if target.is_absolute() {
+                            target.clone()
+                        } else {
+                            base.join(target)
+                        };
+                        replaced = true;
+                        break;
+                    }
+                }
+            }
+            if !replaced {
+                return Ok(current);
+            }
+            current = normalize(&current);
+        }
+        Err(FsError::Io(
+            "demasiados níveis de symlink (ciclo?)".to_string(),
+        ))
     }
 
     fn write_atomic(&self, path: &Path, bytes: &[u8]) -> Result<(), FsError> {

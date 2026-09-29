@@ -6,7 +6,7 @@ CARGO ?= cargo
         deny audit machete typos miri instrument ci
 
 ## Portão completo local: formatação, lints, testes, camadas, diag, docs, política e tamanho.
-check: fmt clippy test layers diag docs policy bench file-length
+check: fmt clippy test layers diag schemas docs policy bench file-length
 
 ## Verifica formatação sem alterar.
 fmt:
@@ -36,6 +36,10 @@ layers:
 ## Logs só estruturados (DF9/E19): nenhuma macro de texto livre fora do sink.
 diag:
 	$(CARGO) run -q -p xtask -- check-diag
+
+## Schema das tools válido (E06-T02): nomes, descrições, enums e anti-poisoning.
+schemas:
+	$(CARGO) run -q -p xtask -- check-schemas
 
 ## Documentação: todos os links de `*.md` resolvem (E01-T05).
 docs:
