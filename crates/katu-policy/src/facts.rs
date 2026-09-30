@@ -6,6 +6,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::paths::{ResolvedArgv, ResolvedPath};
 
+mod tool_name;
+
+pub use tool_name::ToolName;
+
 /// Instante em milissegundos desde a época (relógio do kernel, injetado nos factos).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -58,67 +62,6 @@ impl Phase {
             Self::Verified => "verified",
             Self::Persisted => "persisted",
             Self::Closed => "closed",
-        }
-    }
-}
-
-/// Nome de tool (vocabulário fechado; novas tools = decisão de kernel).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum ToolName {
-    /// Leitura.
-    Read,
-    /// Escrita.
-    Write,
-    /// Edição.
-    Edit,
-    /// Mover/renomear.
-    Move,
-    /// Lixo recuperável.
-    Trash,
-    /// Execução de comando.
-    Exec,
-    /// Busca.
-    Search,
-    /// Memória: consulta (recall).
-    MemoryRecall,
-    /// Memória: gravação de nota.
-    MemoryWrite,
-    /// Memória: registo de `outcome`.
-    MemoryOutcome,
-    /// Memória: fecho de tarefa.
-    MemoryClose,
-    /// Planeamento.
-    Plan,
-    /// Compactação.
-    Compact,
-    /// Modelo (controlo do utilizador).
-    Model,
-    /// Thinking (controlo do utilizador).
-    Thinking,
-}
-
-impl ToolName {
-    /// Nome estável (`snake_case`) — vocabulário do modelo, do log e do registo.
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Read => "read",
-            Self::Write => "write",
-            Self::Edit => "edit",
-            Self::Move => "move",
-            Self::Trash => "trash",
-            Self::Exec => "exec",
-            Self::Search => "search",
-            Self::MemoryRecall => "memory_recall",
-            Self::MemoryWrite => "memory_write",
-            Self::MemoryOutcome => "memory_outcome",
-            Self::MemoryClose => "memory_close",
-            Self::Plan => "plan",
-            Self::Compact => "compact",
-            Self::Model => "model",
-            Self::Thinking => "thinking",
         }
     }
 }

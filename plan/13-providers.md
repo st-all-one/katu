@@ -53,6 +53,32 @@ Quatro dialetos a normalizar no adaptador (mapeados pelo `@ai-sdk/*` de referên
 `Provider.Settings { timeout, chunkTimeout, compaction, transport }`). Não confundir com a
 **HttpApi v2** do agente OpenCode (`/api/*`), que é outro alvo (notas de pesquisa, fora do projeto).
 
+### Prior art (`pi` / `goose`) — o que fazem com o opencode
+
+Ambos tratam o opencode como **gateway OpenAI-compatible** com o mesmo truque de afinidade:
+
+- **`pi`** (`_REF/pi/packages/ai`): cada modelo do catálogo declara o seu `api`
+  (`openai-completions`, `openai-responses`, `anthropic-messages`, `google-generative-ai`) e todos
+  são embrulhados por `withOpenCodeSessionHeader` (põe `x-opencode-session` a partir de
+  `sessionId`). O pedido `chat/completions` leva `stream_options.include_usage`, `prompt_cache_key`
+  (cache de prefixo) e cabeçalhos de afinidade (`session_id`, `x-client-request-id`,
+  `x-session-affinity`). O retry (`utils/provider-retry.ts`) espelha os SDKs: `408/409/429/5xx`,
+  respeita `x-should-retry` e `retry-after-ms`/`retry-after`, exponencial com jitter e teto (60 s);
+  erros de conta/quota do opencode Go/free-tier (`GoUsageLimitError`, `FreeUsageLimitError`,
+  "Monthly usage limit reached", "available balance", `insufficient_quota`) são **permanentes**.
+- **`goose`** (`_REF/goose/crates/goose-providers`): opencode entra por **definição declarativa**
+  (`definitions/opencode_go.json`/`opencode_zen.json`): `engine: openai`, `base_url` zen/go,
+  `api_key_env: OPENCODE_API_KEY`, `session_id_header_override: x-opencode-session` e catálogo de
+  modelos com `context_limit`/`preserves_thinking`. O `ProviderRetry`
+  (`goose-provider-types/src/retry.rs`) faz 3 tentativas, exponencial com jitter, honrando
+  `Retry-After`; o `http_status.rs` normaliza erros e extrai `retry_after_seconds` do corpo.
+
+**Adotado no katu:** o mesmo seam (`engine: openai` + `x-opencode-session`), o retry classificado
+com `x-should-retry`/`Retry-After` e os limites do opencode como permanentes, e o `usage` robusto
+(`prompt_tokens_details.cached_tokens` ?? `prompt_cache_hit_tokens`). **Por adotar:** catálogo de
+modelos com dialeto por modelo (E12-T06/T10), `prompt_cache_key` para famílias OpenAI e a via
+declarativa GDK (E12-T02).
+
 ---
 
 ## Princípios
@@ -86,11 +112,14 @@ Quatro dialetos a normalizar no adaptador (mapeados pelo `@ai-sdk/*` de referên
 
 ## Tarefas
 
-### E12-T01 ☐ Port `Provider` e adaptador built-in
+### E12-T01 ◐ Port `Provider` e adaptador built-in
 - **Entregáveis:** trait `Provider` (streaming normalizado, tool calling, contagem de custo/tokens);
   adaptador **built-in `opencode go/zen`** como provider por omissão do MVP — o hot path de E12-T06;
   o `llama.cpp` local é o segundo built-in (E12-T08/T09); os demais providers ficam para E12-T02
   (GDK).
+- **Estado:** porta em `katu_core::provider` (núcleo sem dependência de provider) e adaptadores em
+  `katu-providers`; built-in `opencode` e `llama` pelo dialeto `chat/completions`. O fake cobre o
+  loop sem rede. Os dialetos extra são E12-T06.
 - **Aceite:** o núcleo compila com a feature do provider desligada; `xtask check-layers` falha se
   um crate de provider entrar em `core`/`policy`/`tools`.
 
@@ -102,48 +131,64 @@ Quatro dialetos a normalizar no adaptador (mapeados pelo `@ai-sdk/*` de referên
 - **Aceite:** trocar a fonte de commodity muda só o adaptador; nenhum tipo externo na API do katu;
   o caminho built-in (`opencode go/zen`) **não** passa pelo GDK.
 
-### E12-T03 ☐ Custo/tokens e tiers
+### E12-T03 ◐ Custo/tokens e tiers
 - **Entregáveis:** contabilização por chamada; seleção de tier pela política; `Metric` com base de
   evidência (`provider_reported` quando vier do provider, `inferred` quando estimado).
+- **Estado:** `TokenUsage` (input/output/cached/reasoning) com base `provider_reported`; `PriceTable`
+  em micro-USD com `unpriced` quando não há preço (DF5). Falta ligar ao `Metric`/seleção de tier.
 - **Aceite:** custo reportado usa a base correta; `unpriced` para modelo sem preço público; nunca
   inventar preço (DF5).
 
-### E12-T04 ☐ Timeout, retry e cancelamento
+### E12-T04 ☑ Timeout, retry e cancelamento
 - **Entregáveis:** timeout tipado; retry/backoff só em operação idempotente; cancelamento que
   atinge quiescência (§43).
 - **Nota (OA17):** se surgir uma cadeia de fallback entre providers, o "primeiro que responde
   vence" usa um despacho `bail` no event bus — **só** com consumidor real (não antecipar).
+- **Estado:** timeout de ligação/resposta no transporte e cancelamento imediato
+  (`ProviderSink -> Flow::Break` fecha a ligação). Retry classificado (`408`/`409`/`429`/`5xx` ou
+  `x-should-retry`), honrando `Retry-After`, **só antes do primeiro delta** (depois duplicaria
+  texto); limites de conta/quota do opencode são permanentes.
 - **Aceite:** provider que trava é cancelado sem vazar tarefa; retry não duplica efeito.
 
-### E12-T05 ☐ Testes com provider fake e snapshot
+### E12-T05 ◐ Testes com provider fake e snapshot
 - **Entregáveis:** provider fake determinístico para o loop (E04/E05); replay de sessão gravada
   sem chave; política explícita "inference is cheap here — não racionar" nos e2e com chave.
+- **Estado:** `FakeProvider` (turnos guionados) e `MockTransport` (SSE canónico) cobrem o caminho
+  sem rede; e2e com chave **auto-*skip*** (`KATU_OPENCODE_KEY`/`KATU_LLAMA_URL`). Falta ligar o
+  fake ao loop de turnos com tool execution (E10).
 - **Aceite:** todo teste de loop corre sem rede; o e2e com chave auto-*skip* sem credencial.
 
-### E12-T06 ☐ Adaptador built-in `opencode go/zen` (hot path)
+### E12-T06 ◐ Adaptador built-in `opencode go/zen` (hot path)
 - **Entregáveis:** cliente dos quatro dialetos do gateway (`zen/v1/{responses,messages,
   chat/completions,models/<id>}` e `zen/go/v1/…`) normalizados no trait `Provider`; transporte
   HTTP/SSE **e** WebSocket; keep-alive/pooling, `TCP_NODELAY`/HTTP2, sem `Accept-Encoding`,
   `chunkTimeout` próprio; header `x-opencode-session` para afinidade; streaming incremental por
   delta (texto parcial) e tool calls **completas** (paridade com `MessageStream` do GDK);
   cancelamento imediato; zero re-encode; reconexão explícita.
+- **Estado:** `chat/completions` ponta-a-ponta (SSE incremental, tool calls completas,
+  `x-opencode-session`, keep-alive/`TCP_NODELAY`, sem compressão); `responses`/`messages`/`google`
+  e WebSocket explícitos `Unsupported`.
 - **Aceite:** TTFT dentro do orçamento (E12-T07); nenhum buffer integral da resposta; cancelar
   interrompe o stream e não vaza conexão/tarefa; a sessão mantém afinidade via
   `x-opencode-session`.
 
-### E12-T07 ☐ Benchmark de comunicação e orçamento de latência
+### E12-T07 ◐ Benchmark de comunicação e orçamento de latência
 - **Entregáveis:** `criterion`/`hyperfine` **por dialeto** (Responses/Anthropic/chat/Google) e
   **por transporte** (HTTP/SSE vs WebSocket); métricas de **TTFT**, tokens/s, overhead por turno
   e bytes de rede; `Metric` com base tipada (DF5) — tokens `provider_reported` quando vierem do
   provider, `inferred` quando estimados.
+- **Estado:** instrumento dev-only `xtask provider-smoke` mede TTFT/total/usage contra o built-in
+  e o `llama-server`; falta o artefacto commitado e o gate de regressão.
 - **Aceite:** artefacto commitado por número; regressão > X% falha o gate (E15); a linha em que a
   compressão teria poupado bytes mas foi preterida pela latência fica **visível** (negativo/
   `unpriced`), conforme DF5.
 
-### E12-T08 ☐ Provider local `llama.cpp` via `llama-server` (L1)
+### E12-T08 ☑ Provider local `llama.cpp` via `llama-server` (L1)
 - **Entregáveis:** `llama-server` tratado como provider OpenAI-compatible (mesmo trait, sem
   exceções); configuração de endpoint/modelo; health/readiness; mesmo caminho de política,
   budget e benchmark. Sem `unsafe`.
+- **Estado:** `Llama` sobre o mesmo `chat/completions`, `GET /health` e smoke real com
+  Qwen2.5-Coder-1.5B Q4_K_M (TTFT ~55 ms em CPU, 12 threads).
 - **Aceite:** funciona offline; o mesmo teste de provider fake corre contra ele; `xtask check-layers`
   mantém o núcleo sem dependência de inferência local.
 

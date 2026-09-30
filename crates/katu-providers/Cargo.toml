@@ -9,6 +9,13 @@ publish.workspace = true
 
 [dependencies]
 katu-core.workspace = true
+katu-policy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+# Transporte bloqueante (sem runtime assíncrono; E01-T09). `rustls`, sem compressão de
+# transporte: o hot path pede `Accept-Encoding: identity`.
+ureq = { version = "3", default-features = false, features = ["rustls"] }
 
 [lints]
 workspace = true
