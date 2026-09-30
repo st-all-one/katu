@@ -6,6 +6,7 @@
   "default_max_tokens_field": "max_completion_tokens",
   "default_reasoning": true,
   "default_prompt_cache": true,
+  "default_prompt_cache_retention": "24h",
   "models": [
     {"name": "gpt-5.5", "context_limit": 400000},
     {"name": "gpt-5.5-mini", "context_limit": 400000},

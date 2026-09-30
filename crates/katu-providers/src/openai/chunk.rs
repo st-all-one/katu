@@ -20,7 +20,25 @@ pub(crate) struct Choice {
 pub(crate) struct Delta {
     pub(crate) content: Option<Value>,
     pub(crate) reasoning_content: Option<String>,
+    /// Variante usada por alguns gateways (`OpenCode`/`chutes.ai`).
+    pub(crate) reasoning: Option<String>,
+    /// Outra variante (`OpenAI` Responses-like gateways).
+    pub(crate) reasoning_text: Option<String>,
     pub(crate) tool_calls: Option<Vec<ToolCallDelta>>,
+}
+
+impl Delta {
+    /// Texto de raciocínio, aceitando as três variantes conhecidas de campo.
+    pub(crate) fn reasoning(&self) -> Option<&str> {
+        [
+            self.reasoning_content.as_deref(),
+            self.reasoning.as_deref(),
+            self.reasoning_text.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        .find(|text| !text.is_empty())
+    }
 }
 
 #[derive(Debug, Deserialize)]

@@ -95,9 +95,9 @@ impl ChatDecoder {
         }
         for choice in &chunk.choices {
             if let Some(delta) = &choice.delta {
-                if let Some(text) = delta.reasoning_content.as_deref().filter(|t| !t.is_empty())
+                if let Some(text) = delta.reasoning().map(str::to_string)
                     && matches!(
-                        self.announce(sink, ProviderEvent::Thinking(text.to_string())),
+                        self.announce(sink, ProviderEvent::Thinking(text)),
                         Flow::Break
                     )
                 {

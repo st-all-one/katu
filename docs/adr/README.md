@@ -32,6 +32,7 @@
 | [0010](0010-porta-memory-e-substituibilidade.md) | Memória de primeira classe e substituível (porta `Memory` + adaptador knudge) | aceite |
 | [0011](0011-porta-provider-e-builtin-opencode.md) | Porta `Provider` e built-in `opencode go/zen` sobre transporte bloqueante | aceite |
 | [0012](0012-catalogo-dialetos-e-providers-declarativos.md) | Catálogo de dialetos e providers declarativos | aceite |
+| [0013](0013-cache-de-prefixo-e-compressao-de-pedido.md) | Cache de prefixo por modelo e compressão de pedido (medida) | aceite |
 
 ## Template
 

@@ -116,6 +116,7 @@ impl<T: Transport> Provider for Llama<T> {
                 api_key: None,
                 session: None,
                 session_header: None,
+                affinity_headers: &[],
                 entry: None,
                 reasoning_format: self.config.reasoning_format.as_deref(),
                 max_tokens: self.config.max_tokens,

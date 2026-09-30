@@ -75,6 +75,67 @@ fn encode_request_uses_provider_defaults() -> Result<(), Box<dyn std::error::Err
 }
 
 #[test]
+fn tool_call_message_has_null_content() -> Result<(), Box<dyn std::error::Error>> {
+    use std::path::PathBuf;
+
+    use katu_core::kernel::{CallId, Message};
+    use katu_policy::{ResolvedPath, SearchMode, ToolArgs, ToolName, ToolUse};
+
+    let cwd = ResolvedPath::from_canonical(PathBuf::from("/work"))?;
+    let tool = ToolUse {
+        name: ToolName::Search,
+        args: ToolArgs::Search {
+            root: cwd.clone(),
+            query: "x".to_string(),
+            mode: SearchMode::Find,
+        },
+        resolved_paths: Vec::new(),
+        argv: None,
+        cwd,
+    };
+    let mut request = request("m");
+    request.system = None;
+    request.messages = vec![Message::ToolCall {
+        call: CallId::new("call_1"),
+        tool,
+    }];
+    let body = super::encode_request(&request, &super::EncodeOptions::default())?;
+    let value: serde_json::Value = serde_json::from_str(&body)?;
+    let message = value
+        .get("messages")
+        .and_then(|value| value.as_array())
+        .and_then(|messages| messages.first())
+        .ok_or("sem mensagem")?;
+    assert_eq!(message.get("role"), Some(&json!("assistant")));
+    assert_eq!(message.get("content"), Some(&serde_json::Value::Null));
+    assert_eq!(
+        message
+            .get("tool_calls")
+            .and_then(|calls| calls.as_array())
+            .and_then(|calls| calls.first())
+            .and_then(|call| call.get("function"))
+            .and_then(|function| function.get("name")),
+        Some(&json!("find"))
+    );
+    Ok(())
+}
+
+#[test]
+fn delta_reasoning_accepts_all_field_variants() -> Result<(), Box<dyn std::error::Error>> {
+    for case in [
+        r#"{"reasoning_content":"a"}"#,
+        r#"{"reasoning":"b"}"#,
+        r#"{"reasoning_text":"c"}"#,
+    ] {
+        let delta: super::chunk::Delta = serde_json::from_str(case)?;
+        assert!(delta.reasoning().is_some());
+    }
+    let empty: super::chunk::Delta = serde_json::from_str("{}")?;
+    assert!(empty.reasoning().is_none());
+    Ok(())
+}
+
+#[test]
 fn tool_names_match_the_registry() -> Result<(), Box<dyn std::error::Error>> {
     use std::path::PathBuf;
 

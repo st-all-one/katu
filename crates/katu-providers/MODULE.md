@@ -21,16 +21,23 @@ A camada de **providers**: o caminho built-in first-party é nosso; o resto é c
   (E12-T05), sem rede.
 - **Transporte.** [`transport`](src/transport.rs) define `Transport` com `MockTransport` (testes)
   e [`http`](src/http.rs) o `UreqTransport` real: bloqueante, `TCP_NODELAY`, *pooling*,
-  `Accept-Encoding: identity` (sem compressão de transporte — latência primeiro, E12-T06).
+  `Accept-Encoding: identity` (sem compressão de resposta — latência primeiro, E12-T06). O gzip do
+  **pedido** é opt-in (`with_request_compression`) e fica **desligado**: os endpoints built-in
+  rejeitam-no (opencode `401`, llama `415`; ADR 0013). `warm()` pré-aquece a ligação.
 - **Catálogo e despacho.** [`catalog`](src/catalog.rs) mapeia `model → {dialect, context_limit,
-  max_tokens_field, prompt_cache, reasoning}`; [`engine`](src/engine.rs) constrói o endpoint por
-  dialeto (auth/afinidade) e despacha.
+  max_tokens_field, prompt_cache, prompt_cache_retention, reasoning}`; [`engine`](src/engine.rs)
+  constrói o endpoint por dialeto (auth + afinidade: `x-opencode-session` e `affinity_headers`) e
+  despacha.
 - **Streaming.** [`sse`](src/sse.rs) é um parser SSE incremental; [`wire`](src/wire.rs) é o driver
   comum (retry só antes do primeiro evento, captura de erro, contagem de chunks).
   [`openai`](src/openai.rs) (`chat/completions`), [`responses`](src/responses.rs) e
-  [`anthropic`](src/anthropic.rs) (`messages`) normalizam texto, thinking e tool calls
-  **completas**; `usage` com base `provider_reported`; preços [`usage`](src/usage.rs) devolvem
-  `unpriced` sem tabela (DF5).
+  [`anthropic`](src/anthropic.rs) (`messages`) normalizam texto, thinking (aceita `reasoning_content`
+  /`reasoning`/`reasoning_text`) e tool calls **completas**; o `chat/completions` serializa direto
+  (sem árvore `Value`); `usage` com base `provider_reported`; preços [`usage`](src/usage.rs)
+  devolvem `unpriced` sem tabela (DF5).
+- **Cache de prefixo (por modelo).** `prompt_cache`/`prompt_cache_retention` vêm do catálogo; o
+  `prompt_cache_key` deriva da sessão. Medido em `deepseek-v4.1-flash` (2.º turno `cached=896/1004`;
+  ADR 0013).
 - **Erros.** [`error`](src/error.rs) normaliza a mensagem (`error.message`/`message`/`detail`) e
   retira credenciais/*query* de `URL`s antes de logar; [`retry`](src/retry.rs) respeita
   `x-should-retry`, `Retry-After` (segundos/ms/data) e classifica limites de conta como
@@ -48,5 +55,6 @@ delegados. A HttpApi v2 do agente OpenCode **não** é o seam.
 
 - É **cliente** do plano de dados, não substrato do loop.
 - `katu-core`/`katu-policy`/`katu-tools` nunca dependem deste crate.
-- Dialetos `google` e WebSocket/HTTP2 são explicitamente `Unsupported` até E12-T06; `responses` e
-  `messages` estão implementados mas ainda sem validação ao vivo (ADR 0012).
+- Dialetos `google` e WebSocket/HTTP2 são explicitamente `Unsupported`: o `ureq` 3 é HTTP/1.1 e a
+  troca de stack não se justifica para um só stream (`responses`/`messages` estão implementados mas
+  sem validação ao vivo; ADR 0012/0013).

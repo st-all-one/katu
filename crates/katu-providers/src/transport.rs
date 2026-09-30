@@ -20,6 +20,9 @@ pub enum Method {
     Post,
 }
 
+/// Cabeçalhos na ordem de envio.
+pub type Headers = Vec<(String, String)>;
+
 /// Pedido HTTP mínimo.
 #[derive(Debug, Clone)]
 pub struct HttpRequest {
@@ -28,20 +31,24 @@ pub struct HttpRequest {
     /// URL absoluta.
     pub url: String,
     /// Cabeçalhos na ordem de envio.
-    pub headers: Vec<(String, String)>,
+    pub headers: Headers,
     /// Corpo (ausente em `GET`).
-    pub body: Option<String>,
+    pub body: Option<Vec<u8>>,
 }
 
 impl HttpRequest {
     /// Pedido `POST` com corpo JSON.
     #[must_use]
-    pub fn post(url: impl Into<String>, body: String, headers: Vec<(String, String)>) -> Self {
+    pub fn post(
+        url: impl Into<String>,
+        body: impl Into<Vec<u8>>,
+        headers: Vec<(String, String)>,
+    ) -> Self {
         Self {
             method: Method::Post,
             url: url.into(),
             headers,
-            body: Some(body),
+            body: Some(body.into()),
         }
     }
 }

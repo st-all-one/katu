@@ -3,6 +3,7 @@
 use katu_core::kernel::Message;
 use katu_core::provider::{ProviderError, ProviderRequest, Thinking, ToolDef};
 use katu_policy::{SearchMode, ToolArgs, ToolName, ToolUse};
+use serde::Serialize;
 use serde_json::{Map, Value, json};
 
 use crate::catalog::MaxTokensField;
@@ -24,6 +25,101 @@ pub(crate) struct EncodeOptions {
     pub default_temperature: Option<f32>,
 }
 
+/// Corpo do pedido `chat/completions` (serialização direta, sem árvore `Value` intermédia).
+#[derive(Serialize)]
+struct ChatRequest<'a> {
+    model: &'a str,
+    messages: Vec<MessageJson<'a>>,
+    stream: bool,
+    stream_options: StreamOptions,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tools: Option<Vec<ToolJson<'a>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_completion_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    temperature: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    prompt_cache_key: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    prompt_cache_retention: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reasoning_format: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reasoning_effort: Option<&'static str>,
+}
+
+/// `stream_options` do pedido.
+#[derive(Serialize)]
+struct StreamOptions {
+    include_usage: bool,
+}
+
+/// Uma tool no formato `OpenAI`.
+#[derive(Serialize)]
+struct ToolJson<'a> {
+    #[serde(rename = "type")]
+    kind: &'static str,
+    function: FunctionJson<'a>,
+}
+
+/// A função de uma tool.
+#[derive(Serialize)]
+struct FunctionJson<'a> {
+    name: &'a str,
+    description: &'a str,
+    parameters: &'a Value,
+}
+
+/// Mensagem do histórico (uma forma por variante).
+#[derive(Serialize)]
+#[serde(untagged)]
+enum MessageJson<'a> {
+    Text(TextMessage<'a>),
+    ToolCall(ToolCallMessage<'a>),
+    ToolResult(ToolResultMessage<'a>),
+}
+
+/// Mensagem de texto (`system`/`user`/`assistant`).
+#[derive(Serialize)]
+struct TextMessage<'a> {
+    role: &'static str,
+    content: &'a str,
+}
+
+/// Mensagem de pedido de tool (`assistant` + `tool_calls`).
+#[derive(Serialize)]
+struct ToolCallMessage<'a> {
+    role: &'static str,
+    content: Option<()>,
+    tool_calls: Vec<ToolCallJson<'a>>,
+}
+
+/// Mensagem de resultado de tool.
+#[derive(Serialize)]
+struct ToolResultMessage<'a> {
+    role: &'static str,
+    tool_call_id: &'a str,
+    content: String,
+}
+
+/// Uma tool call do histórico.
+#[derive(Serialize)]
+struct ToolCallJson<'a> {
+    id: &'a str,
+    #[serde(rename = "type")]
+    kind: &'static str,
+    function: ToolCallFunction,
+}
+
+/// Nome + argumentos de uma tool call.
+#[derive(Serialize)]
+struct ToolCallFunction {
+    name: String,
+    arguments: String,
+}
+
 /// Serializa o pedido completo (JSON) para o endpoint.
 ///
 /// # Errors
@@ -32,9 +128,12 @@ pub(crate) fn encode_request(
     request: &ProviderRequest,
     options: &EncodeOptions,
 ) -> Result<String, ProviderError> {
-    let mut messages = Vec::new();
+    let mut messages = Vec::with_capacity(request.messages.len().saturating_add(1));
     if let Some(system) = request.system.as_deref().filter(|s| !s.is_empty()) {
-        messages.push(json!({"role": "system", "content": system}));
+        messages.push(MessageJson::Text(TextMessage {
+            role: "system",
+            content: system,
+        }));
     }
     for message in &request.messages {
         if let Some(encoded) = encode_message(message)? {
@@ -42,73 +141,72 @@ pub(crate) fn encode_request(
         }
     }
 
-    let mut body = Map::new();
-    body.insert("model".to_string(), json!(request.model.model));
-    body.insert("messages".to_string(), Value::Array(messages));
-    body.insert("stream".to_string(), json!(true));
-    body.insert("stream_options".to_string(), json!({"include_usage": true}));
-    if !request.tools.is_empty() {
-        let tools = request.tools.iter().map(encode_tool).collect();
-        body.insert("tools".to_string(), Value::Array(tools));
+    let max_tokens = request.max_tokens.or(options.default_max_tokens);
+    let mut body = ChatRequest {
+        model: &request.model.model,
+        messages,
+        stream: true,
+        stream_options: StreamOptions {
+            include_usage: true,
+        },
+        tools: (!request.tools.is_empty()).then(|| request.tools.iter().map(encode_tool).collect()),
+        max_tokens: None,
+        max_completion_tokens: None,
+        temperature: request
+            .temperature
+            .or(options.default_temperature)
+            .map(f64::from),
+        prompt_cache_key: options.prompt_cache_key.as_deref(),
+        prompt_cache_retention: options.prompt_cache_retention.as_deref(),
+        reasoning_format: options.reasoning_format.as_deref(),
+        reasoning_effort: thinking_effort(request.model.thinking),
+    };
+    match options.max_tokens_field {
+        MaxTokensField::MaxTokens => body.max_tokens = max_tokens,
+        MaxTokensField::MaxCompletionTokens => body.max_completion_tokens = max_tokens,
     }
-    if let Some(max_tokens) = request.max_tokens.or(options.default_max_tokens) {
-        body.insert(
-            options.max_tokens_field.as_str().to_string(),
-            json!(max_tokens),
-        );
-    }
-    if let Some(temperature) = request.temperature.or(options.default_temperature) {
-        body.insert("temperature".to_string(), json!(f64::from(temperature)));
-    }
-    if let Some(key) = options.prompt_cache_key.as_deref() {
-        body.insert("prompt_cache_key".to_string(), json!(key));
-    }
-    if let Some(retention) = options.prompt_cache_retention.as_deref() {
-        body.insert("prompt_cache_retention".to_string(), json!(retention));
-    }
-    if let Some(format) = options.reasoning_format.as_deref() {
-        body.insert("reasoning_format".to_string(), json!(format));
-    }
-    if let Some(effort) = thinking_effort(request.model.thinking) {
-        body.insert("reasoning_effort".to_string(), json!(effort));
-    }
-    serde_json::to_string(&Value::Object(body))
-        .map_err(|error| ProviderError::Decode(error.to_string()))
+    serde_json::to_string(&body).map_err(|error| ProviderError::Decode(error.to_string()))
 }
 
 /// Codifica uma tool no formato `OpenAI`.
-fn encode_tool(tool: &ToolDef) -> Value {
-    json!({
-        "type": "function",
-        "function": {
-            "name": tool.name,
-            "description": tool.description,
-            "parameters": tool.parameters,
-        }
-    })
+fn encode_tool(tool: &ToolDef) -> ToolJson<'_> {
+    ToolJson {
+        kind: "function",
+        function: FunctionJson {
+            name: tool.name.as_str(),
+            description: tool.description.as_str(),
+            parameters: &tool.parameters,
+        },
+    }
 }
 
 /// Codifica uma mensagem do histórico (ou ignora se desconhecida).
-fn encode_message(message: &Message) -> Result<Option<Value>, ProviderError> {
+fn encode_message(message: &Message) -> Result<Option<MessageJson<'_>>, ProviderError> {
     let encoded = match message {
-        Message::User { text } => json!({"role": "user", "content": text}),
-        Message::Assistant { text } => json!({"role": "assistant", "content": text}),
-        Message::ToolCall { call, tool } => json!({
-            "role": "assistant",
-            "content": Value::Null,
-            "tool_calls": [{
-                "id": call.as_str(),
-                "type": "function",
-                "function": {
-                    "name": model_tool_name(tool),
-                    "arguments": tool_arguments(tool).to_string(),
-                }
-            }]
+        Message::User { text } => MessageJson::Text(TextMessage {
+            role: "user",
+            content: text,
         }),
-        Message::ToolResult { call, outcome } => json!({
-            "role": "tool",
-            "tool_call_id": call.as_str(),
-            "content": serde_json::to_string(outcome)
+        Message::Assistant { text } => MessageJson::Text(TextMessage {
+            role: "assistant",
+            content: text,
+        }),
+        Message::ToolCall { call, tool } => MessageJson::ToolCall(ToolCallMessage {
+            role: "assistant",
+            content: Some(()),
+            tool_calls: vec![ToolCallJson {
+                id: call.as_str(),
+                kind: "function",
+                function: ToolCallFunction {
+                    name: model_tool_name(tool),
+                    arguments: tool_arguments(tool).to_string(),
+                },
+            }],
+        }),
+        Message::ToolResult { call, outcome } => MessageJson::ToolResult(ToolResultMessage {
+            role: "tool",
+            tool_call_id: call.as_str(),
+            content: serde_json::to_string(outcome)
                 .map_err(|error| ProviderError::Decode(error.to_string()))?,
         }),
         _ => return Ok(None),

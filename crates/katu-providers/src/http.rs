@@ -7,12 +7,16 @@
 use std::io::Read;
 use std::time::Duration;
 
+use flate2::Compression;
+use flate2::write::GzEncoder;
 use katu_core::provider::Flow;
 use ureq::Agent;
 use ureq::RequestBuilder;
 use ureq::config::Config;
 
-use super::transport::{ChunkSink, HttpMeta, HttpRequest, Method, Transport, TransportError};
+use super::transport::{
+    ChunkSink, Headers, HttpMeta, HttpRequest, Method, Transport, TransportError,
+};
 
 /// Tamanho do buffer de leitura por iteração (reutilizado; sem alocação por chunk).
 const READ_BUFFER: usize = 4096;
@@ -21,6 +25,8 @@ const READ_BUFFER: usize = 4096;
 pub struct UreqTransport {
     agent: Agent,
     recv_millis: u64,
+    /// Comprime o corpo do `POST` (gzip) acima deste tamanho; `None` desliga.
+    compress_above: Option<usize>,
 }
 
 impl UreqTransport {
@@ -31,6 +37,36 @@ impl UreqTransport {
         Self {
             agent: Agent::new_with_config(config),
             recv_millis: u64::try_from(recv_response.as_millis()).unwrap_or(u64::MAX),
+            compress_above: None,
+        }
+    }
+
+    /// Comprime o corpo do pedido (gzip nível rápido) quando excede `threshold` bytes.
+    ///
+    /// Latência primeiro: só vale a pena em corpos grandes (histórico + tools). Abaixo do limiar
+    /// o corpo vai em claro, sem custo de CPU.
+    #[must_use]
+    pub fn with_request_compression(mut self, threshold: usize) -> Self {
+        self.compress_above = Some(threshold);
+        self
+    }
+
+    /// Prepara `(corpo, headers)` aplicando gzip quando compensa.
+    fn prepare(&self, request: &HttpRequest) -> (Vec<u8>, Headers) {
+        let body = request.body.clone().unwrap_or_default();
+        let Some(threshold) = self.compress_above else {
+            return (body, request.headers.clone());
+        };
+        if body.len() < threshold {
+            return (body, request.headers.clone());
+        }
+        match gzip(&body) {
+            Some(compressed) if compressed.len() < body.len() => {
+                let mut headers = request.headers.clone();
+                headers.push(("content-encoding".to_string(), "gzip".to_string()));
+                (compressed, headers)
+            }
+            _ => (body, request.headers.clone()),
         }
     }
 
@@ -56,8 +92,10 @@ impl Transport for UreqTransport {
     ) -> Result<HttpMeta, TransportError> {
         let mut response = match request.method {
             Method::Get => apply(self.agent.get(&request.url), &request.headers).call(),
-            Method::Post => apply(self.agent.post(&request.url), &request.headers)
-                .send(request.body.as_deref().unwrap_or("")),
+            Method::Post => {
+                let (body, headers) = self.prepare(request);
+                apply(self.agent.post(&request.url), &headers).send(body)
+            }
         }
         .map_err(|error| map_error(error, self.recv_millis))?;
 
@@ -101,6 +139,14 @@ fn apply<B>(mut builder: RequestBuilder<B>, headers: &[(String, String)]) -> Req
     builder
 }
 
+/// Comprime com gzip (nível rápido: latência primeiro).
+fn gzip(body: &[u8]) -> Option<Vec<u8>> {
+    use std::io::Write;
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::fast());
+    encoder.write_all(body).ok()?;
+    encoder.finish().ok()
+}
+
 /// Mapeia o erro do ureq para o transporte.
 fn map_error(error: ureq::Error, recv_millis: u64) -> TransportError {
     match error {
@@ -109,5 +155,47 @@ fn map_error(error: ureq::Error, recv_millis: u64) -> TransportError {
         },
         ureq::Error::Io(source) => TransportError::Io(source),
         other => TransportError::Protocol(other.to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Read;
+    use std::time::Duration;
+
+    use flate2::read::GzDecoder;
+
+    use super::{UreqTransport, gzip};
+    use crate::transport::HttpRequest;
+
+    #[test]
+    fn gzip_roundtrips_and_shrinks() -> Result<(), Box<dyn std::error::Error>> {
+        let input = "katu ".repeat(2_000);
+        let compressed = gzip(input.as_bytes()).ok_or("gzip falhou")?;
+        assert!(compressed.len() < input.len());
+        let mut decoder = GzDecoder::new(compressed.as_slice());
+        let mut output = String::new();
+        decoder.read_to_string(&mut output)?;
+        assert_eq!(output, input);
+        Ok(())
+    }
+
+    #[test]
+    fn prepare_compresses_only_above_the_threshold() {
+        let transport = UreqTransport::new(Duration::from_secs(1), Duration::from_secs(1))
+            .with_request_compression(100);
+        let small = HttpRequest::post("https://x.invalid", "pequeno", Vec::new());
+        let (body, headers) = transport.prepare(&small);
+        assert_eq!(body.as_slice(), b"pequeno");
+        assert!(!headers.iter().any(|(key, _)| key == "content-encoding"));
+
+        let big = HttpRequest::post("https://x.invalid", "katu ".repeat(2_000), Vec::new());
+        let (body, headers) = transport.prepare(&big);
+        assert!(body.len() < 10_000);
+        assert!(
+            headers
+                .iter()
+                .any(|(key, value)| key == "content-encoding" && value == "gzip")
+        );
     }
 }

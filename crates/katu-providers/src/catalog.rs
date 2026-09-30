@@ -80,6 +80,8 @@ pub struct ModelEntry {
     pub max_tokens_field: MaxTokensField,
     /// Suporta `prompt_cache_key`/`prompt_cache_retention` (famílias `OpenAI`).
     pub prompt_cache: bool,
+    /// `prompt_cache_retention` a enviar quando o cache está ligado (ex.: `"24h"`).
+    pub prompt_cache_retention: Option<String>,
     /// Emite raciocínio (thinking) e aceita grau de pensamento.
     pub reasoning: bool,
     /// `reasoning_format` específico do gateway (ex.: `"parsed"`).
@@ -96,6 +98,7 @@ impl ModelEntry {
             context_limit: None,
             max_tokens_field: MaxTokensField::MaxTokens,
             prompt_cache: false,
+            prompt_cache_retention: None,
             reasoning: false,
             reasoning_format: None,
         }
@@ -112,6 +115,14 @@ impl ModelEntry {
     #[must_use]
     pub const fn with_prompt_cache(mut self) -> Self {
         self.prompt_cache = true;
+        self
+    }
+
+    /// Fixa a retenção do cache de prefixo (ex.: `"24h"`).
+    #[must_use]
+    pub fn with_prompt_cache_retention(mut self, retention: impl Into<String>) -> Self {
+        self.prompt_cache = true;
+        self.prompt_cache_retention = Some(retention.into());
         self
     }
 

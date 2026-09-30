@@ -76,7 +76,12 @@ Ambos tratam o opencode como **gateway OpenAI-compatible** com o mesmo truque de
 **Adotado no katu:** o mesmo seam (`engine: openai` + `x-opencode-session`), o retry classificado
 com `x-should-retry`/`Retry-After` (segundos, ms ou data `HTTP`) e os limites do opencode como
 permanentes, o `usage` robusto de cache, o **catálogo `model → dialeto`** e a via **declarativa**
-(`ProviderSpec` + JSON; ADR 0012). Os dialetos `responses`/`messages` estão implementados;
+(`ProviderSpec` + JSON; ADR 0012). O **cache de prefixo é por modelo** (`prompt_cache` +
+`prompt_cache_retention`) e foi **medido** em `deepseek-v4.1-flash` (2.º turno: `cached=896/1004`;
+ADR 0013); os cabeçalhos de afinidade extra (`x-client-request-id`/`x-session-affinity`) seguem o
+`pi`; o `chat/completions` serializa direto, sem árvore `Value`. A **compressão do pedido** foi
+**rejeitada** pelos endpoints (opencode `401`, llama `415`) e fica opt-in desligada; HTTP/2 está
+bloqueado pelo `ureq` (HTTP/1.1). Os dialetos `responses`/`messages` estão implementados;
 **por adotar:** `google`/WebSocket, `dynamic_models` e `Control::SetModel` (E12-T10).
 
 ---

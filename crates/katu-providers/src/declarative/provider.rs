@@ -75,6 +75,7 @@ impl<T: Transport> Declarative<T> {
             api_key: self.api_key.as_deref(),
             session: None,
             session_header: self.spec.session_id_header.as_deref(),
+            affinity_headers: &self.spec.affinity_headers,
             entry,
             reasoning_format: None,
             max_tokens: None,

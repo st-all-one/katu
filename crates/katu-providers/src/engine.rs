@@ -23,6 +23,8 @@ pub(crate) struct WireConfig<'a> {
     pub session: Option<&'a str>,
     /// Nome do cabeçalho de sessão.
     pub session_header: Option<&'a str>,
+    /// Cabeçalhos extra que levam o id da sessão (afinidade; ex.: `x-session-affinity`).
+    pub affinity_headers: &'a [String],
     /// Entrada de catálogo (parametriza o wire).
     pub entry: Option<&'a ModelEntry>,
     /// `reasoning_format` de fallback (quando a entrada não o traz).
@@ -104,6 +106,11 @@ pub(crate) fn endpoint(wire: &WireConfig<'_>, dialect: Dialect) -> Endpoint {
     if let (Some(header), Some(session)) = (wire.session_header, wire.session) {
         headers.push((header.to_string(), session.to_string()));
     }
+    if let Some(session) = wire.session {
+        for header in wire.affinity_headers {
+            headers.push((header.clone(), session.to_string()));
+        }
+    }
     Endpoint {
         url: format!("{base}{path}"),
         headers,
@@ -125,9 +132,15 @@ pub(crate) fn options(wire: &WireConfig<'_>) -> EncodeOptions {
         .entry
         .and_then(|entry| entry.reasoning_format.clone())
         .or_else(|| wire.reasoning_format.map(str::to_string));
+    let prompt_cache_retention = if prompt_cache {
+        wire.entry
+            .and_then(|entry| entry.prompt_cache_retention.clone())
+    } else {
+        None
+    };
     EncodeOptions {
         max_tokens_field,
-        prompt_cache_retention: cache_key.is_some().then(|| "24h".to_string()),
+        prompt_cache_retention,
         prompt_cache_key: cache_key,
         reasoning_format,
         default_max_tokens: wire.max_tokens,
@@ -171,12 +184,13 @@ mod tests {
     fn options_follow_the_catalog_entry() {
         let entry = ModelEntry::new("m", Dialect::Responses)
             .with_max_tokens_field(MaxTokensField::MaxCompletionTokens)
-            .with_prompt_cache();
+            .with_prompt_cache_retention("24h");
         let wire = WireConfig {
             base_url: "https://example.invalid/v1",
             api_key: None,
             session: Some("s"),
             session_header: None,
+            affinity_headers: &[],
             entry: Some(&entry),
             reasoning_format: Some("parsed"),
             max_tokens: Some(64),
@@ -201,6 +215,7 @@ mod tests {
             api_key: Some("k"),
             session: Some("s"),
             session_header: Some("x-opencode-session"),
+            affinity_headers: &[],
             entry: None,
             reasoning_format: None,
             max_tokens: None,
@@ -221,5 +236,32 @@ mod tests {
                 .iter()
                 .any(|(key, value)| key == "x-opencode-session" && value == "s")
         );
+    }
+
+    #[test]
+    fn endpoint_adds_affinity_headers() {
+        let affinity = vec!["x-session-affinity".to_string()];
+        let wire = WireConfig {
+            base_url: "https://gateway.invalid/v1",
+            api_key: None,
+            session: Some("s"),
+            session_header: Some("x-opencode-session"),
+            affinity_headers: &affinity,
+            entry: None,
+            reasoning_format: None,
+            max_tokens: None,
+            temperature: None,
+        };
+        let endpoint = super::endpoint(&wire, Dialect::ChatCompletions);
+        assert_eq!(endpoint.url, "https://gateway.invalid/v1/chat/completions");
+        for header in ["x-opencode-session", "x-session-affinity"] {
+            assert!(
+                endpoint
+                    .headers
+                    .iter()
+                    .any(|(key, value)| key == header && value == "s"),
+                "falta o cabeçalho {header}"
+            );
+        }
     }
 }

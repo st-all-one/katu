@@ -41,6 +41,8 @@ pub struct OpenCodeConfig {
     pub temperature: Option<f32>,
     /// Nome do cabeçalho de afinidade.
     pub session_header: Option<String>,
+    /// Cabeçalhos extra de afinidade (levam o id da sessão).
+    pub affinity_headers: Vec<String>,
     /// Catálogo `model → dialeto` da definição declarativa.
     pub catalog: Catalog,
 }
@@ -69,6 +71,7 @@ impl OpenCodeConfig {
             max_tokens: None,
             temperature: None,
             session_header: Some("x-opencode-session".to_string()),
+            affinity_headers: Vec::new(),
             catalog: Catalog::new(),
         }
     }
@@ -83,6 +86,7 @@ impl OpenCodeConfig {
             max_tokens: None,
             temperature: None,
             session_header: spec.session_id_header.clone(),
+            affinity_headers: spec.affinity_headers.clone(),
             catalog: spec.catalog(),
         }
     }
@@ -128,6 +132,7 @@ impl OpenCodeConfig {
             api_key: Some(self.api_key.as_str()),
             session: self.session.as_deref(),
             session_header: self.session_header.as_deref(),
+            affinity_headers: &self.affinity_headers,
             entry,
             reasoning_format: None,
             max_tokens: self.max_tokens,

@@ -63,6 +63,9 @@ pub struct ModelEntrySpec {
     /// Suporta cache de prefixo.
     #[serde(default)]
     pub prompt_cache: Option<bool>,
+    /// `prompt_cache_retention` específico do modelo (ex.: `"24h"`).
+    #[serde(default)]
+    pub prompt_cache_retention: Option<String>,
     /// Emite raciocínio.
     #[serde(default)]
     pub reasoning: Option<bool>,
@@ -91,6 +94,9 @@ pub struct ProviderSpec {
     /// Cabeçalho de afinidade de sessão (ex.: `x-opencode-session`).
     #[serde(default)]
     pub session_id_header: Option<String>,
+    /// Cabeçalhos extra que devem levar o id da sessão (afinidade de cache/routing; ver `pi`).
+    #[serde(default)]
+    pub affinity_headers: Vec<String>,
     /// Campo do teto de tokens por omissão.
     #[serde(default)]
     pub default_max_tokens_field: MaxTokensField,
@@ -100,6 +106,9 @@ pub struct ProviderSpec {
     /// Cache de prefixo por omissão.
     #[serde(default)]
     pub default_prompt_cache: bool,
+    /// `prompt_cache_retention` por omissão (ex.: `"24h"`), quando o cache está ligado.
+    #[serde(default)]
+    pub default_prompt_cache_retention: Option<String>,
     /// Catálogo de modelos.
     #[serde(default)]
     pub models: Vec<ModelEntrySpec>,
@@ -133,6 +142,11 @@ impl ProviderSpec {
                 .with_max_tokens_field(self.default_max_tokens_field);
             entry.context_limit = model.context_limit;
             entry.prompt_cache = model.prompt_cache.unwrap_or(self.default_prompt_cache);
+            entry.prompt_cache_retention = model
+                .prompt_cache_retention
+                .clone()
+                .or_else(|| self.default_prompt_cache_retention.clone());
+            entry.prompt_cache |= entry.prompt_cache_retention.is_some();
             entry.reasoning = model.reasoning.unwrap_or(self.default_reasoning);
             entry.reasoning_format.clone_from(&model.reasoning_format);
             catalog.insert(entry);
