@@ -59,7 +59,7 @@ fn use_write(path: &str) -> Result<ToolUse, PolicyError> {
 fn rules() -> Result<RuleSet, PolicyError> {
     let root = ResolvedPath::from_canonical("/work")?;
     Ok(RuleSet {
-        vocab: 2,
+        vocab: 3,
         rules: vec![Rule {
             id: RuleId::from("no-write"),
             statement: "proibido escrever".to_string(),

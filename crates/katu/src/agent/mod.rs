@@ -15,6 +15,7 @@ mod catalog;
 mod command;
 mod plan;
 mod router;
+mod shell;
 mod turn;
 
 #[cfg(test)]
@@ -23,6 +24,7 @@ mod tests;
 pub(crate) use command::{
     RunArgs, SYSTEM, build_provider, default_base, default_model, open_runtime, run,
 };
+pub(crate) use shell::dispatch as shell_dispatch;
 pub(crate) use turn::{Activity, ActivitySink, Approval, ApprovalPrompt, run_turn, run_turn_with};
 
 use katu_core::error::{Error, ToolOutcome};

@@ -15,12 +15,14 @@ O **motor de política** do katu: avalia factos tipados e devolve um veredicto d
   extraído; sem regex.
 - `audit(rules, now) -> AuditReport` — categorias (`Enforced`/`Advisory`), exemplos negativos,
   duplicados e enunciados vazios (E02-T04).
-- Vocabulário **fechado e versionado** (`POLICY_VOCAB_VERSION`).
+- Vocabulário **fechado e versionado** (`POLICY_VOCAB_VERSION`, v3 desde o ADR 0022).
 
 ## Semântica de negação (OA15)
 
 `DenyWrite`/`DenyRead`/`DenyDelete`/`DenyCommand` são **portas falha-fechado**: disparam salvo se o
 contexto tiver a `Capability` correspondente (`WritePath`/`ReadPath`/`DeletePath`/`Command`).
+`DenyWriteOutside { root }` (E20-T11) é um **muro duro**: nega escrita **fora** de `root` mesmo com
+capacidade — é o que faz o modo `/plan` escrever só sob `.katu/` (ADR 0022).
 `Capability::Workspace { root }` é o grant **implícito** da raiz (E07-T05): destranca o normal
 dentro do workspace, mas **nunca** `DenySensitiveRead` — esse só cede a `ReadPath` explícito
 (aprovação humana). `Capability::Exec { program }` é mais fino: só destranca `DenyCommand { Exec }`
@@ -52,7 +54,7 @@ similaridade; as pré-condições semânticas (dedup ≥ 0.92, âncora, uma afir
 
 - `policy/memory.toml` — as 5 regras `Enforced` do protocolo de memória (E02-T07).
 - `policy/containment.toml` — sensíveis `deny`-by-default + fora do workspace sob aprovação
-  (E07-T05, vocabulário v2).
+  (E07-T05, vocabulário v3).
 - `policy/coverage-ledger.json` — ledger de cobertura (`covered`/`not_applicable`/`deferred`),
   validado por `xtask ledger:validate` contra as regras `Enforced` de `policy/*.toml`.
 

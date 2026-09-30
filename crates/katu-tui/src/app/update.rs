@@ -31,6 +31,14 @@ impl App {
                 self.clear_live();
                 self.status = Status::Message("turno cancelado".to_string());
             }
+            Update::Plan(on) => {
+                self.plan = on;
+                self.status = Status::Message(if on {
+                    "modo plano ligado (escrita só sob .katu/)".to_string()
+                } else {
+                    "modo plano desligado".to_string()
+                });
+            }
             Update::Done => {
                 self.clear_live();
                 self.status = Status::Idle;

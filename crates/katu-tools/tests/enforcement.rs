@@ -25,7 +25,7 @@ type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
 
 fn deny(tool: ToolName) -> RuleSet {
     RuleSet {
-        vocab: 2,
+        vocab: 3,
         rules: vec![Rule {
             id: RuleId::from("gate"),
             statement: "gate".to_string(),
@@ -42,7 +42,7 @@ fn deny(tool: ToolName) -> RuleSet {
 
 fn allow_all() -> RuleSet {
     RuleSet {
-        vocab: 2,
+        vocab: 3,
         rules: Vec::new(),
     }
 }

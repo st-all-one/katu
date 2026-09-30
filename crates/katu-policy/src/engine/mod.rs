@@ -3,9 +3,13 @@
 //! Os helpers são puros; nada de I/O. A evidência é sempre estruturada.
 
 use crate::decision::{ApprovalRequest, ControlId, Decision, Evidence, Reason};
-use crate::facts::{BudgetState, Capability, Facts, Phase, ToolName};
+use crate::facts::{BudgetState, Capability, Facts, ToolName};
 use crate::paths::ResolvedPath;
 use crate::rule::{BudgetCap, Enforcement, Rule, RuleScope, Severity};
+
+mod names;
+
+use names::{phase_name, tool_name};
 
 impl Rule {
     /// Constrói uma evidência a partir de uma regra.
@@ -41,6 +45,9 @@ impl Rule {
             Enforcement::DenyWrite { root } => write_hit(facts, root)
                 .filter(|path| !write_capability_covers(facts, path))
                 .map(|path| self.evidence(path.as_str(), "escrita sob raiz negada sem capacidade")),
+            Enforcement::DenyWriteOutside { root } => write_outside_hit(facts, root).map(|path| {
+                self.evidence(path.as_str(), "escrita fora da raiz permitida (modo plano)")
+            }),
             Enforcement::DenyRead { root } => read_hit(facts, root)
                 .filter(|path| !read_capability_covers(facts, path))
                 .map(|path| self.evidence(path.as_str(), "leitura sob raiz negada sem capacidade")),
@@ -76,6 +83,7 @@ impl Rule {
         match &self.enforcement {
             Enforcement::DenyCommand { .. }
             | Enforcement::DenyWrite { .. }
+            | Enforcement::DenyWriteOutside { .. }
             | Enforcement::DenyRead { .. }
             | Enforcement::DenySensitiveRead { .. }
             | Enforcement::DenyDelete { .. }
@@ -122,40 +130,6 @@ fn is_read_tool(tool: ToolName) -> bool {
     matches!(tool, ToolName::Read | ToolName::Search)
 }
 
-/// Nome estável de uma tool.
-fn tool_name(tool: ToolName) -> &'static str {
-    match tool {
-        ToolName::Read => "read",
-        ToolName::Write => "write",
-        ToolName::Edit => "edit",
-        ToolName::Move => "move",
-        ToolName::Trash => "trash",
-        ToolName::Exec => "exec",
-        ToolName::Search => "search",
-        ToolName::MemoryRecall => "memory_recall",
-        ToolName::MemoryWrite => "memory_write",
-        ToolName::MemoryOutcome => "memory_outcome",
-        ToolName::MemoryClose => "memory_close",
-        ToolName::Plan => "plan",
-        ToolName::Compact => "compact",
-        ToolName::Model => "model",
-        ToolName::Thinking => "thinking",
-    }
-}
-
-/// Nome estável de uma fase.
-fn phase_name(phase: Phase) -> &'static str {
-    match phase {
-        Phase::Task => "task",
-        Phase::KnowledgeConsulted => "knowledge_consulted",
-        Phase::Planned => "planned",
-        Phase::Implemented => "implemented",
-        Phase::Verified => "verified",
-        Phase::Persisted => "persisted",
-        Phase::Closed => "closed",
-    }
-}
-
 /// `true` se o orçamento esgotou o teto.
 fn budget_exceeded(state: BudgetState, cap: BudgetCap) -> bool {
     match cap {
@@ -175,6 +149,18 @@ fn write_hit<'a>(facts: &'a Facts, root: &ResolvedPath) -> Option<&'a ResolvedPa
         .resolved_paths
         .iter()
         .find(|path| path.is_under(root))
+}
+
+/// Primeiro caminho **fora** de `root`, quando a tool escreve (modo plano).
+fn write_outside_hit<'a>(facts: &'a Facts, root: &ResolvedPath) -> Option<&'a ResolvedPath> {
+    if !is_write_tool(facts.tool.name) {
+        return None;
+    }
+    facts
+        .tool
+        .resolved_paths
+        .iter()
+        .find(|path| !path.is_under(root))
 }
 
 /// Primeiro caminho sob `root`, quando a tool lê.

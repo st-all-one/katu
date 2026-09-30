@@ -134,6 +134,10 @@ impl App {
                 None
             }
             "compact" => Some(Command::Compact),
+            "plan" => {
+                self.status = Status::Message("a alternar plano…".to_string());
+                Some(Command::Plan)
+            }
             "verify" => Some(Command::Verify),
             "trash" => {
                 self.trash.open();
@@ -158,8 +162,8 @@ impl App {
 
     /// Toma a mensagem escrita e devolve o pedido de submissão (se não estiver vazia).
     ///
-    /// `@<path>` cita caminhos (E20-T12); `!<cmd>` continua fail-closed. O modo de planeamento
-    /// (E20-T11) é que decidirá a via de shell.
+    /// `@<path>` cita caminhos (E20-T12) e `!<cmd>` executa shell pela política (E20-T12); no modo
+    /// plano a regra `plan-no-shell` recusa `!` com evidência.
     pub(super) fn submit(&mut self) -> Option<Command> {
         let text = self.input.trim().to_string();
         self.input.clear();
@@ -173,9 +177,8 @@ impl App {
         if let Some(rest) = text.strip_prefix('@') {
             return self.cite(rest);
         }
-        if text.starts_with('!') {
-            self.status = Status::Failure("!<cmd> ainda não implementado (E20-T12)".to_string());
-            return None;
+        if let Some(rest) = text.strip_prefix('!') {
+            return self.shell(rest);
         }
         let goal = self.take_goal(text);
         self.transcript.push(Entry {
@@ -217,6 +220,23 @@ impl App {
         let cited = self.citations.join(" ");
         self.citations.clear();
         format!("{cited}\n\n{goal}")
+    }
+
+    /// Prepara um comando shell `!<cmd>` (E20-T12).
+    fn shell(&mut self, rest: &str) -> Option<Command> {
+        let command = rest.trim();
+        if command.is_empty() {
+            self.status = Status::Failure("uso: !<comando>".to_string());
+            return None;
+        }
+        self.transcript.push(Entry {
+            role: Role::User,
+            text: format!("!{command}"),
+        });
+        self.scroll = 0;
+        self.status = Status::Working;
+        self.clear_live();
+        Some(Command::Shell(command.to_string()))
     }
 }
 

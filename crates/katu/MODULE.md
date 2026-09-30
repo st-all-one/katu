@@ -64,7 +64,10 @@ todo o código impuro confinado.
   (multi-turno) e `Runtime::phase` alimenta o indicador de fase (E10-T06). O streaming do modelo e
   as tools em curso vão **ao vivo** para o painel de atividade via `run_turn_with` + `ActivitySink`
   (`LivePainter`/`Painter`), sem entrarem no log. O **steering** (E20-T16) é consultado **entre
-  passos** (`ActivitySink::steer`) e injetado como mensagem de utilizador no passo seguinte. A **transcrição durável** é projetada do log
+  passos** (`ActivitySink::steer`) e injetado como mensagem de utilizador no passo seguinte. O
+  **modo de planeamento** (`/plan`, E20-T11) vive em `src/runtime/plan_mode.rs` (regras
+  `plan-write-only-katu`/`plan-no-shell` + artefacto `.katu/plan/<UTC>.md`), e `!<cmd>` (E20-T12)
+  corre `sh -c` pelo pipeline em `src/agent/shell.rs`. A **transcrição durável** é projetada do log
   (`Runtime::transcript`, `src/runtime/transcript.rs`) e escrita atomicamente em
   `<root>/.katu/transcript.md` após cada turno (`src/tui/transcript.rs`); a TUI serve-a numa vista
   read-only (`T`, E10-T05). As **recusas de política**

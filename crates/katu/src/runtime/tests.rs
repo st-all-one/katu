@@ -201,3 +201,5 @@ fn checkpoint_records_the_declared_next_action() -> Result<(), Box<dyn std::erro
     std::fs::remove_dir_all(&root)?;
     Ok(())
 }
+
+mod plan;

@@ -210,14 +210,33 @@ fn unknown_slash_command_is_reported_not_submitted() {
 }
 
 #[test]
-fn shell_prefix_fails_closed() {
+fn shell_prefix_emits_a_shell_command() {
     let mut app = App::new();
     app.apply_action(Action::EnterInsert);
-    app.apply_action(Action::Insert('!'));
-    app.apply_action(Action::Insert('x'));
-    assert_eq!(app.apply_action(Action::Submit), None, "!");
-    assert!(matches!(app.status(), Status::Failure(_)), "!");
-    assert!(app.transcript().is_empty(), "! não vira mensagem");
+    for character in "!echo oi".chars() {
+        app.apply_action(Action::Insert(character));
+    }
+    assert_eq!(
+        app.apply_action(Action::Submit),
+        Some(Command::Shell("echo oi".to_string()))
+    );
+    assert_eq!(app.status(), &Status::Working);
+    assert_eq!(app.transcript().first().map(|e| e.role), Some(Role::User));
+}
+
+#[test]
+fn slash_plan_toggles_and_the_border_confirms() {
+    let mut app = App::new();
+    app.apply_action(Action::StartCommand);
+    for character in "plan".chars() {
+        app.apply_action(Action::Insert(character));
+    }
+    assert_eq!(app.apply_action(Action::Submit), Some(Command::Plan));
+    assert!(!app.plan_mode(), "só a borda confirma o estado");
+    app.apply_update(Update::Plan(true));
+    assert!(app.plan_mode());
+    app.apply_update(Update::Plan(false));
+    assert!(!app.plan_mode());
 }
 
 #[test]

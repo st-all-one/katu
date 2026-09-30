@@ -154,7 +154,7 @@ mod tests {
             cwd,
         };
         let rules = RuleSet {
-            vocab: 2,
+            vocab: 3,
             rules: vec![Rule {
                 id: "deny-bash".into(),
                 statement: "negar bash".to_string(),

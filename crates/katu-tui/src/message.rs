@@ -28,6 +28,10 @@ pub enum Command {
     Compact,
     /// Corre o gate de verificação e pede override se bloquear (E09-T03).
     Verify,
+    /// Liga/desliga o modo de planeamento (E20-T11).
+    Plan,
+    /// Executa um comando shell pela política/contenção (E20-T12).
+    Shell(String),
     /// Sair.
     Quit,
 }
@@ -61,6 +65,8 @@ pub enum Update {
     Transcript(Vec<String>),
     /// Turno cancelado pelo utilizador (cancelamento cooperativo).
     Cancelled,
+    /// Estado do modo de planeamento confirmado pela borda (E20-T11).
+    Plan(bool),
     /// Turno concluído (limpa a pendência).
     Done,
 }

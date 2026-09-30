@@ -143,6 +143,10 @@ fn input_title(app: &App) -> &'static str {
 /// Barra de estado.
 fn status_line(app: &App) -> Line<'static> {
     match app.status() {
+        Status::Idle if app.plan_mode() => Line::from(Span::styled(
+            "PLANO (escrita só sob .katu/)  ·  q sai  ·  /plan desliga  ·  ? ajuda".to_string(),
+            Style::default().fg(Color::Cyan),
+        )),
         Status::Idle => Line::from(Span::styled(
             "q sai  ·  ↑/↓ rola  ·  i escreve  ·  / comandos  ·  ? ajuda".to_string(),
             Style::default().fg(Color::DarkGray),

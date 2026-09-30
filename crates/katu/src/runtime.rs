@@ -7,26 +7,29 @@
 use std::path::Path;
 
 use katu_core::context::{CompactionMode, ContextBudget};
-use katu_core::error::Error;
 #[cfg(test)]
 use katu_core::kernel::Message;
-use katu_core::kernel::{
-    CallId, ControlError, Event, Session, SessionError, SessionId, discover_root,
-};
-use katu_core::memory::{Memory, MemoryError};
+use katu_core::kernel::{CallId, Event, Session, SessionError, SessionId, discover_root};
+use katu_core::memory::Memory;
 use katu_core::plan::Plan;
 use katu_core::ports::{Clock, Fs};
+use katu_core::skill::Skill;
 use katu_policy::{PolicyError, ResolvedPath, RuleSet};
 
 use crate::memory::KnudgeMemory;
-use crate::scope::{self, ScopeError};
+use crate::scope;
 
 mod checkpoint;
 mod context;
 mod control;
+mod error;
 mod memory;
+mod plan_mode;
+mod skills;
 mod transcript;
 mod verify;
+
+pub(crate) use error::RuntimeError;
 
 /// Regras do protocolo de memória, versionadas no repositório (dado, não código).
 const MEMORY_POLICY: &str = include_str!("../../../policy/memory.toml");
@@ -66,53 +69,6 @@ fn latest_session(fs: &dyn Fs, root: &Path) -> Result<SessionId, RuntimeError> {
         .ok_or_else(|| RuntimeError::Resume("nenhuma sessão para retomar".to_string()))
 }
 
-/// Falha ao montar ou operar o runtime.
-#[derive(Debug, thiserror::Error)]
-pub(crate) enum RuntimeError {
-    /// Falha da porta de memória.
-    #[error("memória: {0}")]
-    Memory(#[from] MemoryError),
-    /// Falha da sessão (log, transição, custo ou política).
-    #[error("sessão: {0}")]
-    Session(#[from] SessionError),
-    /// Vocabulário de política inválido.
-    #[error("política: {0}")]
-    Policy(#[from] PolicyError),
-    /// Artefacto de plano (`scope_contract`/`feature_list`) inválido (E09-T04).
-    #[error("escopo: {0}")]
-    Scope(#[from] ScopeError),
-    /// O gate de verificação (E09-T03) não pôde correr (falta o escopo).
-    #[error("verificação: {0}")]
-    Verification(String),
-    /// Controlo de modelo/pensamento inválido (E12-T10).
-    #[error("controlo: {0}")]
-    Control(#[from] ControlError),
-    /// Não foi possível retomar a sessão (id inválido/desconhecido ou nenhuma sessão).
-    #[error("retomada: {0}")]
-    Resume(String),
-}
-
-impl From<RuntimeError> for Error {
-    fn from(error: RuntimeError) -> Self {
-        match error {
-            RuntimeError::Memory(source) => Self::unavailable(source.to_string()),
-            RuntimeError::Policy(source) => Self::invalid_input(source.to_string()),
-            RuntimeError::Scope(source) => Self::invalid_input(source.to_string()),
-            RuntimeError::Verification(message) | RuntimeError::Resume(message) => {
-                Self::invalid_input(message)
-            }
-            RuntimeError::Control(source) => Self::invalid_input(source.to_string()),
-            RuntimeError::Session(source) => {
-                if matches!(source, SessionError::UnknownSession(_)) {
-                    Self::invalid_input(source.to_string())
-                } else {
-                    Self::internal(source.to_string())
-                }
-            }
-        }
-    }
-}
-
 /// Runtime de uma sessão com memória real (in-process) e regras do protocolo.
 pub(crate) struct Runtime<'a> {
     pub(crate) clock: &'a dyn Clock,
@@ -122,6 +78,12 @@ pub(crate) struct Runtime<'a> {
     pub(crate) cwd: ResolvedPath,
     pub(crate) calls: u64,
     pub(crate) plan: Option<Plan>,
+    /// Modo de planeamento ligado (E20-T11); injeta a regra “escrita só sob `.katu/`”.
+    pub(crate) plan_mode: bool,
+    /// Instruções do projeto (`AGENTS.md`), se existirem (E20-T13).
+    instructions: Option<String>,
+    /// Skills descobertas no arranque (E20-T13).
+    skills: Vec<Skill>,
     goal: String,
     budget: ContextBudget,
     compaction: CompactionMode,
@@ -181,6 +143,8 @@ impl<'a> Runtime<'a> {
         memory.status()?;
         let cwd = ResolvedPath::from_canonical(&root)?;
         let rules = load_rules()?;
+        let instructions = skills::read_instructions(fs, &root);
+        let skills = skills::load_skills(fs, &root);
         // O runtime é um agente a atuar: define o workspace (destranca o normal dentro da raiz e
         // exige aprovação fora) antes de qualquer tool call (§42).
         session.set_workspace(&cwd)?;
@@ -201,6 +165,9 @@ impl<'a> Runtime<'a> {
             cwd,
             calls: 0,
             plan,
+            plan_mode: false,
+            instructions,
+            skills,
             goal,
             budget: DEFAULT_CONTEXT_BUDGET,
             compaction: CompactionMode::Disabled,

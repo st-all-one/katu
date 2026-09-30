@@ -13,9 +13,15 @@ pub(super) fn build_request(
     tools: &[ToolDef],
 ) -> Result<ProviderRequest, AgentError> {
     let context = runtime.context()?;
+    let system = system_for(
+        options,
+        &context,
+        runtime.instructions(),
+        &runtime.skills_catalog(),
+    );
     Ok(ProviderRequest {
         model: options.model.clone(),
-        system: system_for(options, &context),
+        system,
         messages: context.messages,
         tools: tools.to_vec(),
         max_tokens: Some(options.max_tokens),
@@ -23,13 +29,27 @@ pub(super) fn build_request(
     })
 }
 
-/// Funde a instrução de sistema com o **prime** (DF12) e o **digest** da compactação (E09-T07).
-/// O prime é determinístico e versionado (`PRIME_VERSION`); o digest só aparece com compactação.
-fn system_for(options: &TurnOptions, context: &Context) -> Option<String> {
-    let mut system = options.system.clone().unwrap_or_default();
-    for part in [Some(context.prime.as_str()), context.summary.as_deref()]
-        .into_iter()
-        .flatten()
+/// Funde o `AGENTS.md` (fonte de verdade máxima, E20-T13), a instrução de sistema, o **prime**
+/// (DF12), o **digest** (E09-T07) e o catálogo de skills (E20-T13).
+fn system_for(
+    options: &TurnOptions,
+    context: &Context,
+    instructions: Option<&str>,
+    skills: &str,
+) -> Option<String> {
+    let mut system = String::new();
+    if let Some(instructions) = instructions {
+        system.push_str("# AGENTS.md (fonte de verdade do projeto)\n");
+        system.push_str(instructions);
+    }
+    for part in [
+        options.system.as_deref(),
+        Some(context.prime.as_str()),
+        context.summary.as_deref(),
+        (!skills.is_empty()).then_some(skills),
+    ]
+    .into_iter()
+    .flatten()
     {
         if !system.is_empty() {
             system.push_str("\n\n");

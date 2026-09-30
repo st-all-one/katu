@@ -41,6 +41,7 @@
 | [0019](0019-superficie-cli-tui-v2.md) | Superfície v2 do CLI e da TUI | aceite |
 | [0020](0020-configuracao-global-local.md) | Configuração global/local e `--params` | aceite |
 | [0021](0021-layout-katu-e-versionamento.md) | Layout central do `.katu/` e versionamento | aceite |
+| [0022](0022-modo-plano-e-deny-write-outside.md) | Modo de planeamento (`/plan`) e `deny_write_outside` (vocabulário v3) | aceite |
 
 ## Template
 

@@ -1,4 +1,4 @@
-//! Correspondência glob determinística (vocabulário v2, E07-T05).
+//! Correspondência glob determinística (vocabulário v3, E07-T05).
 //!
 //! `*` = qualquer sequência, `?` = um caractere. Sem regex, sem I/O, sem backtracking sobre
 //! entradas não confiáveis. É a **única** semântica de glob do projeto: o contrato de escopo do

@@ -73,7 +73,7 @@ pub enum BudgetCap {
     Execs(u32),
 }
 
-/// Forma de aplicação de uma regra (vocabulário **fechado**, 9 variantes).
+/// Forma de aplicação de uma regra (vocabulário **fechado**, 10 variantes).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -86,6 +86,14 @@ pub enum Enforcement {
     /// Nega escrita sob uma raiz.
     DenyWrite {
         /// Raiz protegida.
+        root: ResolvedPath,
+    },
+    /// Nega escrita **fora** de uma raiz (o modo plano só permite `.katu/`).
+    ///
+    /// Ao contrário de [`Enforcement::DenyWrite`], nenhuma capacidade destranca: é um muro duro do
+    /// modo de planeamento (E20-T11).
+    DenyWriteOutside {
+        /// Raiz permitida (única onde se pode escrever).
         root: ResolvedPath,
     },
     /// Nega a leitura sob uma raiz.
@@ -253,48 +261,4 @@ impl RuleSet {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{
-        Enforcement, PolicyError, Rule, RuleCategory, RuleExamples, RuleId, RuleScope, RuleSet,
-        Severity,
-    };
-    use crate::paths::ResolvedPath;
-
-    pub(crate) fn sample_rules() -> Result<RuleSet, PolicyError> {
-        let root = ResolvedPath::from_canonical("/work/secrets")?;
-        Ok(RuleSet {
-            vocab: 2,
-            rules: vec![Rule {
-                id: RuleId::from("no-write-secrets"),
-                statement: "não escrever em segredos".to_string(),
-                scope: RuleScope::Path { root: root.clone() },
-                enforcement: Enforcement::DenyWrite { root },
-                severity: Severity::Critical,
-                category: RuleCategory::Enforced,
-                expires_at: None,
-                waiver: None,
-                examples: RuleExamples {
-                    negative: vec!["write /work/secrets/token".to_string()],
-                    positive: vec!["write /work/src/main.rs".to_string()],
-                },
-            }],
-        })
-    }
-
-    #[test]
-    fn toml_round_trip_preserves_rules() -> Result<(), PolicyError> {
-        let original = sample_rules()?;
-        let text = original.to_toml()?;
-        let parsed = RuleSet::from_toml(&text)?;
-        assert_eq!(original, parsed);
-        Ok(())
-    }
-
-    #[test]
-    fn unknown_vocab_is_rejected() -> Result<(), PolicyError> {
-        let mut rules = sample_rules()?;
-        rules.vocab = 999;
-        assert!(rules.check_vocab().is_err());
-        Ok(())
-    }
-}
+mod tests;

@@ -91,7 +91,7 @@ mod tests {
     fn denies_write_under_root() -> Result<(), PolicyError> {
         let root = ResolvedPath::from_canonical("/work/secrets")?;
         let rules = RuleSet {
-            vocab: 2,
+            vocab: 3,
             rules: vec![rule(
                 "no-secrets",
                 RuleScope::Path { root: root.clone() },
@@ -107,7 +107,7 @@ mod tests {
     fn allows_write_outside_root() -> Result<(), PolicyError> {
         let root = ResolvedPath::from_canonical("/work/secrets")?;
         let rules = RuleSet {
-            vocab: 2,
+            vocab: 3,
             rules: vec![rule(
                 "no-secrets",
                 RuleScope::Path { root: root.clone() },
@@ -120,9 +120,29 @@ mod tests {
     }
 
     #[test]
+    fn denies_write_outside_the_allowed_root() -> Result<(), PolicyError> {
+        let allowed = ResolvedPath::from_canonical("/work/.katu")?;
+        let anywhere = ResolvedPath::from_canonical("/")?;
+        let rules = RuleSet {
+            vocab: 3,
+            rules: vec![rule(
+                "plan-write-only-katu",
+                RuleScope::Path { root: anywhere },
+                Enforcement::DenyWriteOutside { root: allowed },
+            )],
+        };
+        assert!(matches!(
+            evaluate(&write_facts("/work/src/main.rs")?, &rules)?,
+            Decision::Deny { .. }
+        ));
+        assert!(evaluate(&write_facts("/work/.katu/plan/x.md")?, &rules)?.is_allow());
+        Ok(())
+    }
+
+    #[test]
     fn critical_require_after_denies() -> Result<(), PolicyError> {
         let rules = RuleSet {
-            vocab: 2,
+            vocab: 3,
             rules: vec![rule(
                 "need-verify",
                 RuleScope::Command {
@@ -151,7 +171,7 @@ mod tests {
         );
         require.severity = Severity::Warn;
         let rules = RuleSet {
-            vocab: 2,
+            vocab: 3,
             rules: vec![require],
         };
         let facts = write_facts("/work/x")?;
@@ -165,7 +185,7 @@ mod tests {
     #[test]
     fn budget_exhausted_needs_human() -> Result<(), PolicyError> {
         let rules = RuleSet {
-            vocab: 2,
+            vocab: 3,
             rules: vec![rule(
                 "budget",
                 RuleScope::Budget {
@@ -199,7 +219,7 @@ mod tests {
         );
         deny.severity = Severity::Warn;
         let rules = RuleSet {
-            vocab: 2,
+            vocab: 3,
             rules: vec![deny],
         };
         let facts = write_facts("/work/x")?;
@@ -213,7 +233,7 @@ mod tests {
     #[test]
     fn evaluation_is_deterministic() -> Result<(), PolicyError> {
         let rules = RuleSet {
-            vocab: 2,
+            vocab: 3,
             rules: Vec::new(),
         };
         let facts = facts_for(ToolName::Read, ToolArgs::Plan, "/work/x")?;

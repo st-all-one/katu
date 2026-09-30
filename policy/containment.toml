@@ -1,11 +1,11 @@
 # E07-T05 — contenção **soft** determinística: sensíveis negados por default e acesso fora do
-# workspace sob aprovação. Vocabulário v2 (`deny_read`, `deny_sensitive_read`).
+# workspace sob aprovação. Vocabulário v3 (`deny_read`, `deny_sensitive_read`, `deny_write_outside`).
 #
 # A contenção é **declarada e soft** (§00b): não é fronteira de segurança. A jail de SO real é E17.
 # `Capability::Workspace` (derivada de `State::workspace`) destranca o normal dentro da raiz;
 # `Capability::ReadPath`/`WritePath` são **explícitos** (aprovação humana, E10).
 
-vocab = 2
+vocab = 3
 
 # 1. Sensíveis: negados por default, mesmo **dentro** do workspace. Só um `ReadPath` explícito
 #    destranca (o workspace não conta) — `DenySensitiveRead`.

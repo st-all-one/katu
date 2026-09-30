@@ -136,7 +136,7 @@ efeitos.
 
 > **Nota (E20-T10…T16, onda S3):** `/` + mini-menus + ajuda `?` (**E20-T10**), `Esc` como único
 > cancelamento (**E20-T15**), cópia por seleção de rato via OSC 52 (**E20-T14**) e *steering* FIFO
-> (**E20-T16**) já estão implementados; `/plan` (T11) e `!` (T12) ainda **não**; `@<path>` já cita.
+> (**E20-T16**) já estão implementados, tal como `/plan` (**E20-T11**) e `!`/`@` (**E20-T12**).
 > `?` abre a sobreposição com todos os comandos `/`, os padrões (`!<cmd>`, `@<path>`, `/<comando>`) e
 > as teclas.
 >
@@ -191,7 +191,9 @@ Modos: `Normal` (navegação), `Insert` (edição/mensagem ou comando `/`), `Men
 **suportados pelo modelo**), `/compact`, `/verify`, `/trash`, `/transcript`, `/help`, `/quit`.
 Comando desconhecido → erro na barra de estado (não é enviado ao modelo). `@<path>` **cita** um
 caminho: fica pendente e é prefixado (só o caminho, sem conteúdo) ao próximo turno (E20-T12).
-`!<cmd>` é reconhecido mas recusa até ao modo `/plan` (E20-T11/T12).
+`!<cmd>` executa `sh -c` **pela política** (§42); no modo `/plan` é recusado com evidência
+(`plan-no-shell`). `/plan` liga o modo de planeamento (regra `plan-write-only-katu`: escrita só sob
+`.katu/`) e escreve `.katu/plan/<yymmddhhmmZ>-<slug>.md`; a barra de estado mostra `PLANO`.
 
 **Rato:** arrastar com o botão esquerdo seleciona texto e copia-o automaticamente para o clipboard
 via **OSC 52** (E20-T14); terminais sem suporte ignoram a sequência. A captura de rato é ligada no

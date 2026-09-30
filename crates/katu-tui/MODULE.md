@@ -55,7 +55,9 @@ A **interface de terminal** do katu (uma das duas superfícies, com a CLI — G7
   rodada (`src/run.rs`); os atalhos antigos saíram do keymap. A cópia por seleção de rato usa
   **OSC 52** (`src/copy.rs`, E20-T14). O **steering** e a **citação** vivem na linha de entrada:
   `@<path>` enfileira caminhos (`src/app/menu.rs`, E20-T12) que são prefixados ao próximo turno, e
-  escrever durante o turno enfileira prompts aplicados no passo seguinte (E20-T16).
+  escrever durante o turno enfileira prompts aplicados no passo seguinte (E20-T16). `/plan`
+  (E20-T11) liga o modo de planeamento (barra mostra `PLANO`; `Update::Plan`) e `!<cmd>` (E20-T12)
+  emite `Command::Shell` para a borda executar pela política.
 
 ## Fronteira
 

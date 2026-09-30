@@ -31,7 +31,7 @@
 | `mem-recall-before-write` | enforced | Memória: não gravar nota sem ter consultado o conhecimento (recall) na mesma fase |
 | `mem-single-claim` | enforced | Memória: uma afirmação por nota |
 
-## Eventos de diag (85)
+## Eventos de diag (86)
 
 - `katu.run`
 - `katu.setup`
@@ -111,6 +111,7 @@
 - `provider.error`
 - `provider.models`
 - `provider.tier`
+- `plan.mode`
 - `tui.render`
 - `tui.input`
 - `tui.live`
@@ -119,7 +120,7 @@
 - `tui.approval`
 - `tui.trash_empty`
 
-## ADRs (21)
+## ADRs (22)
 
 - [ADR 0001 — MVK aprovado: o loop possuído (DF1) torna-se compromisso](adr/0001-mvk-gate-aprovado.md)
 - [ADR 0002 — Ferramentas AI-first: envelope + views + TOON (core por medição)](adr/0002-ferramentas-ai-first.md)
@@ -142,3 +143,4 @@
 - [ADR 0019 — Superfície v2 do CLI e da TUI](adr/0019-superficie-cli-tui-v2.md)
 - [ADR 0020 — Configuração global/local e `--params`](adr/0020-configuracao-global-local.md)
 - [ADR 0021 — Layout central do `.katu/` e versionamento](adr/0021-layout-katu-e-versionamento.md)
+- [ADR 0022 — Modo de planeamento (`/plan`) e `deny_write_outside`](adr/0022-modo-plano-e-deny-write-outside.md)

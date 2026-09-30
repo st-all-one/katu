@@ -6,19 +6,24 @@
 //! o uso/custo do turno (E12-T03/T10).
 
 use katu_core::context::CompactionMode;
-use katu_core::diag::{Level, events};
+use katu_core::error::ToolOutcome;
+use katu_core::kernel::Dispatch;
 use katu_core::kernel::next_phase;
 use katu_core::provider::{ModelSpec, Provider};
+use katu_core::report::ToolReport;
 use katu_providers::PriceTable;
-use katu_tui::{ChallengePrompt, Command, Handler, Live, Painter, Update};
+use katu_tui::{Command, Handler, Painter, Update};
 
 use crate::agent::{
-    Activity, ActivitySink, Approval, ApprovalPrompt, Ports, SYSTEM, TurnOptions, TurnReport,
-    TurnRequest, run_turn_with,
+    Ports, SYSTEM, TurnOptions, TurnReport, TurnRequest, run_turn_with, shell_dispatch,
 };
 use crate::ports::{StdEnv, StdFs, StdProcess};
 use crate::runtime::Runtime;
 use crate::tier::TierPolicy;
+
+mod live;
+
+use live::LivePainter;
 
 /// Executor do loop de turnos para a UI (dono do runtime e do provider).
 pub(super) struct AgentHandler<'a> {
@@ -47,6 +52,8 @@ impl Handler for AgentHandler<'_> {
             Command::EmptyTrash => self.empty_trash(painter),
             Command::Compact => self.toggle_compaction(),
             Command::Verify => self.verify(painter),
+            Command::Plan => self.toggle_plan(),
+            Command::Shell(command) => self.shell(&command),
         }
     }
 }
@@ -72,6 +79,39 @@ impl AgentHandler<'_> {
                 ))]
             }
             Ok(_) => vec![Update::Info("nada a compactar".to_string())],
+            Err(error) => vec![Update::Error(error.to_string())],
+        }
+    }
+
+    /// Liga/desliga o modo de planeamento (E20-T11) e, ao ligar, escreve o esqueleto do plano.
+    fn toggle_plan(&mut self) -> Vec<Update> {
+        let on = !self.runtime.plan_mode();
+        match self.runtime.set_plan_mode(on) {
+            Ok(state) => {
+                let mut updates = vec![Update::Plan(state)];
+                if state {
+                    match self.runtime.write_plan_artifact(self.fs) {
+                        Ok(path) => {
+                            updates.push(Update::Info(format!("plano: {}", path.display())));
+                        }
+                        Err(error) => updates.push(Update::Error(format!("plano: {error}"))),
+                    }
+                }
+                updates
+            }
+            Err(error) => vec![Update::Error(error.to_string())],
+        }
+    }
+
+    /// Executa `!<cmd>` pela política/contenção (E20-T12).
+    fn shell(&mut self, command: &str) -> Vec<Update> {
+        let ports = Ports {
+            fs: self.fs,
+            process: &self.process,
+            env: &self.env,
+        };
+        match shell_dispatch(&mut self.runtime, &ports, command) {
+            Ok(dispatch) => shell_updates(&dispatch),
             Err(error) => vec![Update::Error(error.to_string())],
         }
     }
@@ -153,6 +193,30 @@ impl AgentHandler<'_> {
     }
 }
 
+/// Traduz o `Dispatch` de um `!<cmd>` em atualizações (recusa com evidência ou saída).
+fn shell_updates(dispatch: &Dispatch) -> Vec<Update> {
+    match dispatch.outcome() {
+        ToolOutcome::Denied { rule_id, evidence } => vec![Update::Error(format!(
+            "negado por {}: {}",
+            rule_id.as_str(),
+            evidence.argument
+        ))],
+        ToolOutcome::Unavailable { control, .. } => {
+            vec![Update::Error(format!(
+                "! indisponível: {}",
+                control.as_str()
+            ))]
+        }
+        _ => {
+            let body = dispatch
+                .report()
+                .map(ToolReport::to_toon)
+                .unwrap_or_default();
+            vec![Update::Info(body), Update::Done]
+        }
+    }
+}
+
 /// Linha de uso/custo do turno (E12-T03), com a base de evidência. `None` sem contabilização.
 ///
 /// O custo só aparece quando o modelo tem preço em `policy/prices.toml` (nunca inventado, DF5).
@@ -176,80 +240,6 @@ fn usage_line(model: &str, turn: &TurnReport, prices: &PriceTable) -> Option<Str
         return Some(format!("tokens n/d ({})", usage.basis.as_str()));
     }
     Some(format!("tokens {}", parts.join(" ")))
-}
-
-/// Adapta o [`Painter`] da UI ao observador efémero do loop (E10-T05) e ao challenge de aprovação
-/// (E10-T04). O cancelamento (Esc/Ctrl-C) chega pelo mesmo `Painter`.
-struct LivePainter<'p, 'a> {
-    painter: &'p mut Painter<'a>,
-    granted_by: String,
-}
-
-impl ActivitySink for LivePainter<'_, '_> {
-    fn cancelled(&self) -> bool {
-        self.painter.cancelled()
-    }
-
-    fn steer(&mut self) -> Option<String> {
-        self.painter.take_steer()
-    }
-
-    fn approve(&mut self, prompt: &ApprovalPrompt<'_>) -> Option<Approval> {
-        let request = ChallengePrompt {
-            tool: prompt.tool.to_string(),
-            rule: prompt.request.rule_id.as_str().to_string(),
-            scope: prompt.request.scope.clone(),
-        };
-        let signature = self.painter.challenge(request, &self.granted_by)?;
-        katu_core::event!(
-            Level::Warn,
-            events::TUI_APPROVAL,
-            "tool" => prompt.tool,
-            "rule" => prompt.request.rule_id.as_str()
-        );
-        Some(Approval {
-            reason: signature.reason,
-            granted_by: signature.granted_by,
-        })
-    }
-
-    fn activity(&mut self, activity: Activity<'_>) {
-        let live = match activity {
-            Activity::Text(delta) => {
-                katu_core::event!(Level::Trace, events::TUI_LIVE, "kind" => "text");
-                Live::Text(delta.to_string())
-            }
-            Activity::Thinking(delta) => {
-                katu_core::event!(Level::Trace, events::TUI_LIVE, "kind" => "thinking");
-                Live::Thinking(delta.to_string())
-            }
-            Activity::Tool { name, args } => {
-                katu_core::event!(Level::Trace, events::TUI_LIVE, "kind" => "tool");
-                Live::Tool {
-                    name: name.to_string(),
-                    args: args.to_string(),
-                }
-            }
-            Activity::ToolDone { name } => {
-                katu_core::event!(Level::Trace, events::TUI_LIVE, "kind" => "tool_done");
-                Live::ToolDone(name.to_string())
-            }
-            Activity::Refused { rule, evidence, .. } => {
-                katu_core::event!(Level::Warn, events::TUI_LIVE, "kind" => "refused", "rule" => rule);
-                Live::Refused {
-                    rule: rule.to_string(),
-                    evidence: evidence.to_string(),
-                }
-            }
-            Activity::Unavailable { control, .. } => {
-                katu_core::event!(Level::Warn, events::TUI_LIVE, "kind" => "unavailable");
-                Live::Unavailable {
-                    control: control.to_string(),
-                }
-            }
-        };
-        self.painter.live(live);
-    }
 }
 
 #[cfg(test)]

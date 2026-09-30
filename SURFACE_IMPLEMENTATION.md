@@ -228,17 +228,25 @@ S4  Contexto e IA                T13 · T17
   graus que o modelo suporta; `?` mostra a lista completa de comandos/padrões e fecha com `Esc`;
   testes de keymap puros.
 
-### E20-T11 ☐ `/plan` — modo de planeamento
+### E20-T11 ☑ `/plan` — modo de planeamento
+- **Feito:** `Runtime::set_plan_mode` (`crates/katu/src/runtime/plan_mode.rs`) injeta/remove a regra
+  `plan-write-only-katu` (`DenyWriteOutside`, crítica) no `RuleSet` e regista `plan.mode` no log;
+  `write_plan_artifact` escreve `.katu/plan/<yymmddhhmmZ>-<slug>.md` (UTC, Hinnant). ADR 0022
+  (`Enforcement::DenyWriteOutside` + `POLICY_VOCAB_VERSION = 3`). Testes
+  `plan_mode_denies_writes_outside_katu` / `plan_mode_blocks_shell_and_writes_the_artifact`.
 - **Entregáveis:** `/plan` é um **estado do runtime** que injeta uma regra de política
   **Enforced** “escrita só sob `.katu/`” (registada no log); os planos são `.md` densos em
   `.katu/plan/yymmddhhmmZ-*.md`, gerados pelo sistema de tarefas do knudge.
 - **Aceite:** no modo plano, uma tool de escrita fora de `.katu/` é **negada** com evidência
   (teste pelo caminho real); a regra aparece no log; o nome do ficheiro segue o formato UTC.
 
-### E20-T12 ◐ `!` shell e `@` citação
+### E20-T12 ☑ `!` shell e `@` citação
 - **Feito (`@`):** `App::cite`/`take_goal` (`katu-tui/src/app/menu.rs`) enfileira `@<path>` e
   prefixa o próximo objetivo **só com os caminhos** (sem anexar conteúdo); teste
-  `citation_prefixes_the_next_submission`. `!<cmd>` continua fail-closed até ao modo `/plan` (T11).
+  `citation_prefixes_the_next_submission`.
+- **Feito (`!`):** `App::shell` → `Command::Shell` → `agent::shell_dispatch`
+  (`crates/katu/src/agent/shell.rs`) despacha `sh -c <cmd>` pelo pipeline §42 com as regras do
+  runtime; no modo plano a regra `plan-no-shell` (`DenyCommand { Exec }`) recusa com evidência.
 - **Entregáveis:** `!<cmd>` executa shell a partir da raiz de inicialização **pela
   política/contenção** (como a tool `bash`) e é **bloqueado no modo `/plan`**; `@<path>` cita
   ficheiro/diretório e passa **só o caminho exato** ao modelo (sem anexar conteúdo).
@@ -340,10 +348,11 @@ S4  Contexto e IA                T13 · T17
 ### TUI e agente
 12. **`prime` não inclui `AGENTS.md`** (mantém-se byte-idêntico); o `AGENTS.md` entra no
     **contexto do turno** como fonte de verdade máxima.
-13. **`/plan`** — **estado do runtime** que injeta uma regra **Enforced** “escrita só sob `.katu/`”,
-    registada no log.
-14. **`!` shell** — passa pela **política/contenção** (como a tool `bash`) e é **bloqueado no
-    modo `/plan`**.
+13. **`/plan`** — **estado do runtime** que injeta as regras **Enforced** `plan-write-only-katu`
+    (`deny_write_outside`; escrita só sob `.katu/`) e `plan-no-shell` (`deny_command` exec),
+    registadas no log (`plan.mode`); o plano é escrito em `.katu/plan/<UTC>.md` (ADR 0022).
+14. **`!` shell** — passa pela **política/contenção** (tool `exec`, §42) e é **bloqueado no
+    modo `/plan`** pela regra `plan-no-shell` (com evidência).
 15. **Steering** — fila **FIFO** consultada entre chunks/passos; linear do ponto de vista do
     humano. O pintor já sonda o teclado de forma **não bloqueante** durante o stream, pelo que a
     thread leitora dedicada é desnecessária (mantém a UI numa só thread).

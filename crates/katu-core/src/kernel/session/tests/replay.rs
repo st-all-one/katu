@@ -99,7 +99,7 @@ fn run_allowed_tool(session: &mut Session<'_>) -> Result<(), Box<dyn std::error:
         calls: AtomicUsize::new(0),
     };
     let allow = RuleSet {
-        vocab: 2,
+        vocab: 3,
         rules: Vec::new(),
     };
     let outcome = session.tool_call(

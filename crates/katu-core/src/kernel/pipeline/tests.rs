@@ -62,7 +62,7 @@ fn use_write(path: &str) -> Result<ToolUse, PolicyError> {
 fn deny_secrets() -> Result<RuleSet, PolicyError> {
     let root = ResolvedPath::from_canonical("/work/secrets")?;
     Ok(RuleSet {
-        vocab: 2,
+        vocab: 3,
         rules: vec![Rule {
             id: RuleId::from("no-secrets"),
             statement: "não escrever em segredos".to_string(),
@@ -108,7 +108,7 @@ fn deny_does_not_invoke_tool() -> Result<(), PolicyError> {
 fn allow_invokes_tool_once() -> Result<(), PolicyError> {
     let tool = tool();
     let rules = RuleSet {
-        vocab: 2,
+        vocab: 3,
         rules: Vec::new(),
     };
     let result = dispatch(
@@ -148,7 +148,7 @@ fn workspace_capability_unlocks_write_under_the_root() -> Result<(), PolicyError
     let workspace = ResolvedPath::from_canonical("/work")?;
     let root = ResolvedPath::from_canonical("/")?;
     let rules = RuleSet {
-        vocab: 2,
+        vocab: 3,
         rules: vec![Rule {
             id: RuleId::from("only-workspace"),
             statement: "escrever só no workspace".to_string(),
@@ -234,7 +234,7 @@ fn normal_read_inside_the_workspace_is_allowed() -> Result<(), PolicyError> {
 #[test]
 fn dispatch_fills_the_advisory_cost() -> Result<(), Box<dyn std::error::Error>> {
     let rules = RuleSet {
-        vocab: 2,
+        vocab: 3,
         rules: Vec::new(),
     };
     let result = dispatch(

@@ -24,10 +24,16 @@ mod viewer;
 
 /// Estado central da UI.
 #[derive(Debug)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "estado da UI: dois flags independentes (sair e modo plano), sem invariante partilhado"
+)]
 pub struct App {
     input: String,
     /// Caminhos citados com `@<path>` à espera do próximo turno (E20-T12).
     citations: Vec<String>,
+    /// Modo de planeamento ligado (E20-T11).
+    plan: bool,
     /// Buffer de *steering* em curso durante um turno (E20-T16; efémero).
     steering: String,
     transcript: Vec<Entry>,
@@ -74,6 +80,7 @@ impl App {
         Self {
             input: String::new(),
             citations: Vec::new(),
+            plan: false,
             steering: String::new(),
             transcript: Vec::new(),
             mode: Mode::default(),
@@ -141,6 +148,12 @@ impl App {
     #[must_use]
     pub fn steering(&self) -> &str {
         &self.steering
+    }
+
+    /// `true` se o modo de planeamento está ligado (E20-T11).
+    #[must_use]
+    pub const fn plan_mode(&self) -> bool {
+        self.plan
     }
 
     /// Substitui o buffer de *steering* (chamado pelo pintor durante o turno).

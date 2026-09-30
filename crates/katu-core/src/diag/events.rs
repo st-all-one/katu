@@ -145,6 +145,13 @@ catalog! {
         "Seleção de tier pela política (E12-T03)."
     ),
 
+    // -- Planeamento ---------------------------------------------------------
+    (
+        PLAN_MODE,
+        "plan.mode",
+        "Modo de planeamento ligado/desligado (regra de escrita só sob `.katu/`)."
+    ),
+
     // -- TUI -----------------------------------------------------------------
     (TUI_RENDER, "tui.render", "Desenho de um quadro."),
     (TUI_INPUT, "tui.input", "Entrada do utilizador."),

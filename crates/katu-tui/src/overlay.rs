@@ -16,6 +16,10 @@ const COMMANDS: &[(&str, &str)] = &[
     ("/model", "escolhe o modelo (menu)"),
     ("/thinking", "escolhe o grau de pensamento (menu)"),
     ("/compact", "liga/desliga a compactação do histórico"),
+    (
+        "/plan",
+        "liga/desliga o modo de planeamento (escrita só sob .katu/)",
+    ),
     ("/verify", "corre o gate de verificação"),
     ("/trash", "abre a lixeira"),
     ("/transcript", "abre a transcrição durável"),

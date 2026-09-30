@@ -6,7 +6,7 @@
 # adaptador (E03) e chega ao motor como **capacidade** (`Capability::Command`). Sem a capacidade, as
 # regras `deny_command` disparam — falha fechada (DF4). Ver `plan/03` §E02-T07.
 
-vocab = 2
+vocab = 3
 
 # 1. Nada de escrever sem buscar: gravar exige um `memory_recall` concluído na mesma fase.
 [[rules]]

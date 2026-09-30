@@ -24,7 +24,7 @@
 //!     budget: BudgetState::default(),
 //!     completed: BTreeSet::new(),
 //! };
-//! let rules = RuleSet { vocab: 2, rules: Vec::new() };
+//! let rules = RuleSet { vocab: 3, rules: Vec::new() };
 //! assert!(evaluate(&facts, &rules)?.is_allow());
 //! # Ok(())
 //! # }
@@ -67,7 +67,7 @@ pub use rule::{
 /// Versão do vocabulário de regras (`POLICY_VOCAB_VERSION`).
 ///
 /// O motor recusa um `RuleSet` com uma versão desconhecida (fail-closed, E02).
-pub const POLICY_VOCAB_VERSION: u32 = 2;
+pub const POLICY_VOCAB_VERSION: u32 = 3;
 
 #[cfg(test)]
 mod tests {
@@ -77,6 +77,6 @@ mod tests {
     #[test]
     fn vocab_version_is_tracked() {
         let version = black_box(POLICY_VOCAB_VERSION);
-        assert_eq!(version, 2);
+        assert_eq!(version, 3);
     }
 }
