@@ -46,6 +46,22 @@ pub enum Phase {
     Closed,
 }
 
+impl Phase {
+    /// Nome estável (`snake_case`) — vocabulário do modelo, do log e do registo.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Task => "task",
+            Self::KnowledgeConsulted => "knowledge_consulted",
+            Self::Planned => "planned",
+            Self::Implemented => "implemented",
+            Self::Verified => "verified",
+            Self::Persisted => "persisted",
+            Self::Closed => "closed",
+        }
+    }
+}
+
 /// Nome de tool (vocabulário fechado; novas tools = decisão de kernel).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

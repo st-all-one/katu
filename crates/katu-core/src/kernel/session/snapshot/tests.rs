@@ -7,7 +7,7 @@ use crate::kernel::State;
 use crate::ports::MemFs;
 
 #[test]
-fn round_trips_and_defaults_to_absent() {
+fn round_trips_and_defaults_to_absent() -> Result<(), Box<dyn std::error::Error>> {
     let fs = MemFs::new();
     let dir = Path::new("/s");
     assert_eq!(load(&fs, dir), None);
@@ -16,6 +16,7 @@ fn round_trips_and_defaults_to_absent() {
         seq: 7,
         state: State::initial(),
     };
-    save(&fs, dir, &snapshot).expect("gravar");
+    save(&fs, dir, &snapshot)?;
     assert_eq!(load(&fs, dir), Some(snapshot));
+    Ok(())
 }

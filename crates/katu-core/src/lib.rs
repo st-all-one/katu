@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod audit;
 pub mod containment;
 pub mod context;
 pub mod diag;

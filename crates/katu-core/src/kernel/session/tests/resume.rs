@@ -7,16 +7,16 @@ use crate::kernel::Event;
 use crate::ports::{Fs, MemFs};
 use katu_policy::Phase;
 
-fn repo(fs: &MemFs, root: &Path) {
-    fs.write_atomic(&root.join(".git").join("HEAD"), b"ref: refs/heads/main\n")
-        .expect("git");
+fn repo(fs: &MemFs, root: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    fs.write_atomic(&root.join(".git").join("HEAD"), b"ref: refs/heads/main\n")?;
+    Ok(())
 }
 
 #[test]
 fn create_then_resume_restores_state_and_root() -> Result<(), Box<dyn std::error::Error>> {
     let fs = MemFs::new();
     let root = Path::new("/work/proj");
-    repo(&fs, root);
+    repo(&fs, root)?;
     let id = {
         let mut session = Session::create(&fs, root, 1_000, "objetivo")?;
         let id = session.id().cloned().ok_or("sessão sem id")?;
@@ -44,7 +44,7 @@ fn create_then_resume_restores_state_and_root() -> Result<(), Box<dyn std::error
 fn list_is_temporal() -> Result<(), Box<dyn std::error::Error>> {
     let fs = MemFs::new();
     let root = Path::new("/work/proj");
-    repo(&fs, root);
+    repo(&fs, root)?;
     let late = Session::create(&fs, root, 200, "depois")?;
     let early = Session::create(&fs, root, 100, "antes")?;
     let ids: Vec<_> = Session::list(&fs, root)?

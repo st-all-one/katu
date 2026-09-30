@@ -39,7 +39,8 @@ pub use pipeline::{
 };
 pub use project::{Message, Snapshot, derive_messages, snapshot, state_of};
 pub use session::{
-    CallContext, Session, SessionError, SessionId, SessionMeta, audit_dir, discover_root, katu_dir,
+    CallContext, Session, SessionError, SessionId, SessionMeta, StateSnapshot, audit_dir,
+    discover_root, katu_dir,
 };
 pub use state::{CallStatus, Refusal, RefusalReason, State, can_transition, next_phase};
 pub use step::step;

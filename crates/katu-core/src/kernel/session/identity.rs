@@ -12,10 +12,10 @@ use crate::ports::{Fs, FsError};
 use crate::report::fingerprint;
 
 /// Versão do esquema de `meta.json`/`index.jsonl`.
-pub const SESSION_SCHEMA_VERSION: u32 = 1;
+pub(super) const SESSION_SCHEMA_VERSION: u32 = 1;
 
 /// Linha adicionada a `.git/info/exclude` (audit só local, ADR 0009).
-pub const AUDIT_EXCLUDE_LINE: &str = ".katu/audit/";
+pub(super) const AUDIT_EXCLUDE_LINE: &str = ".katu/audit/";
 
 /// Identificador estável de sessão (`s_<16hex>`).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -71,25 +71,25 @@ pub fn katu_dir(root: &Path) -> PathBuf {
 
 /// Diretório de sessões.
 #[must_use]
-pub fn sessions_dir(root: &Path) -> PathBuf {
+pub(super) fn sessions_dir(root: &Path) -> PathBuf {
     katu_dir(root).join("sessions")
 }
 
 /// Diretório de uma sessão.
 #[must_use]
-pub fn session_dir(root: &Path, id: &SessionId) -> PathBuf {
+pub(super) fn session_dir(root: &Path, id: &SessionId) -> PathBuf {
     sessions_dir(root).join(id.as_str())
 }
 
 /// Caminho do `meta.json` de uma sessão.
 #[must_use]
-pub fn meta_path(dir: &Path) -> PathBuf {
+pub(super) fn meta_path(dir: &Path) -> PathBuf {
     dir.join("meta.json")
 }
 
 /// Caminho do índice temporal.
 #[must_use]
-pub fn index_path(root: &Path) -> PathBuf {
+pub(super) fn index_path(root: &Path) -> PathBuf {
     sessions_dir(root).join("index.jsonl")
 }
 
@@ -118,7 +118,7 @@ pub fn discover_root(fs: &dyn Fs, start: &Path) -> PathBuf {
 ///
 /// # Errors
 /// [`FsError`] se a escrita do layout falhar.
-pub fn create(
+pub(super) fn create(
     fs: &dyn Fs,
     root: &Path,
     created_ms: u64,
@@ -145,7 +145,7 @@ pub fn create(
 
 /// Lê o `meta.json` de um diretório de sessão, se existir e for válido.
 #[must_use]
-pub fn load_meta(fs: &dyn Fs, dir: &Path) -> Option<SessionMeta> {
+pub(super) fn load_meta(fs: &dyn Fs, dir: &Path) -> Option<SessionMeta> {
     let bytes = fs.read(&meta_path(dir)).ok()?;
     let meta: SessionMeta = serde_json::from_slice(&bytes).ok()?;
     (meta.schema_version == SESSION_SCHEMA_VERSION).then_some(meta)
@@ -155,7 +155,7 @@ pub fn load_meta(fs: &dyn Fs, dir: &Path) -> Option<SessionMeta> {
 ///
 /// # Errors
 /// [`FsError`] se o ficheiro existir mas for ilegível ou inválido.
-pub fn read_index(fs: &dyn Fs, root: &Path) -> Result<Vec<SessionMeta>, FsError> {
+pub(super) fn read_index(fs: &dyn Fs, root: &Path) -> Result<Vec<SessionMeta>, FsError> {
     let path = index_path(root);
     if !fs.exists(&path) {
         return Ok(Vec::new());
@@ -164,7 +164,7 @@ pub fn read_index(fs: &dyn Fs, root: &Path) -> Result<Vec<SessionMeta>, FsError>
     let text = String::from_utf8(bytes).map_err(|err| FsError::Io(err.to_string()))?;
     let mut metas = Vec::new();
     for line in text.lines().filter(|line| !line.trim().is_empty()) {
-        let meta: SessionMeta = serde_json::from_str(line).map_err(from_parse)?;
+        let meta: SessionMeta = serde_json::from_str(line).map_err(|err| from_parse(&err))?;
         metas.push(meta);
     }
     Ok(metas)
@@ -174,7 +174,7 @@ pub fn read_index(fs: &dyn Fs, root: &Path) -> Result<Vec<SessionMeta>, FsError>
 ///
 /// # Errors
 /// [`FsError`] se o índice for ilegível.
-pub fn list(fs: &dyn Fs, root: &Path) -> Result<Vec<SessionMeta>, FsError> {
+pub(super) fn list(fs: &dyn Fs, root: &Path) -> Result<Vec<SessionMeta>, FsError> {
     let mut metas = read_index(fs, root)?;
     metas.sort_by(|left, right| {
         left.created_ms
@@ -188,7 +188,11 @@ pub fn list(fs: &dyn Fs, root: &Path) -> Result<Vec<SessionMeta>, FsError> {
 ///
 /// # Errors
 /// [`FsError`] se o índice for ilegível.
-pub fn find(fs: &dyn Fs, root: &Path, id: &SessionId) -> Result<Option<SessionMeta>, FsError> {
+pub(super) fn find(
+    fs: &dyn Fs,
+    root: &Path,
+    id: &SessionId,
+) -> Result<Option<SessionMeta>, FsError> {
     Ok(list(fs, root)?.into_iter().find(|meta| &meta.id == id))
 }
 
@@ -196,7 +200,7 @@ pub fn find(fs: &dyn Fs, root: &Path, id: &SessionId) -> Result<Option<SessionMe
 ///
 /// # Errors
 /// [`FsError`] se a escrita falhar.
-pub fn ensure_audit_excluded(fs: &dyn Fs, root: &Path) -> Result<(), FsError> {
+pub(super) fn ensure_audit_excluded(fs: &dyn Fs, root: &Path) -> Result<(), FsError> {
     let git = root.join(".git");
     if !fs.is_dir(&git) {
         return Ok(());
@@ -227,7 +231,7 @@ fn to_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, FsError> {
     serde_json::to_vec(value).map_err(|err| FsError::Io(err.to_string()))
 }
 
-fn from_parse(err: serde_json::Error) -> FsError {
+fn from_parse(err: &serde_json::Error) -> FsError {
     FsError::Io(format!("índice de sessões inválido: {err}"))
 }
 

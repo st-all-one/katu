@@ -40,11 +40,12 @@ termo. Nada disto cria um segundo motor de retrieval: é o **índice lexical do 
    (uma linha por evento): `seq,ts,kind,tool,path,status,rule,bytes,ms,tok,msg`; conteúdo pesado
    (`stdout`/`diff`/`statement`/`preview`) em **blocos literais**. Segmento selado a cada `N`
    eventos **ou** limite de fase, com **hash de conteúdo** (nunca reescrito).
-2. **Índice invertido — binário, delta+varint** (`seg-<NNNN>.idx`):
-   - dicionário ordenado de termos: `term_len, term, df, offset_postings`;
-   - postings: por termo, por documento `doc_delta varint`, `tf varint`, e por campo
-     `field u8`, `pos_count varint`, posições em `delta varint` (posições → **frase**);
-   - `magic KAIX` + versão; determinístico (`BTreeMap`), sem `HashMap` iterado.
+2. **Índice invertido — colunar na v1, delta+varint/Bloom como densificação medida**:
+   - por segmento, uma tabela `t` colunar com `term,field,ln,pos` (uma linha por ocorrência);
+   - os postings são ordenados por `(term, field, ln, pos)` e a leitura reconstrói o mapa;
+   - **fase seguinte (gated por A/B):** delta+varint binário e um *Bloom* por segmento para evitar
+     abrir segmentos sem o termo — só se moverem o ponteiro de bytes/evento;
+   - determinístico (`BTreeMap`), sem `HashMap` iterado.
 3. **Manifesto** (`manifest.json`): `{schema, segments:[{id,from,to,events,rec_hash,idx_hash}],
    terms}`. É a raiz para `is_fresh`/`rebuild`.
 4. **Consulta**: termos e frases; `AND`/`OR`; filtros `kind:`/`tool:`/`phase:`/`path:<glob>`;
@@ -73,8 +74,8 @@ termo. Nada disto cria um segundo motor de retrieval: é o **índice lexical do 
 
 - **Positivas:** consulta em `O(candidatos)`; frase/campos/filtros; densidade colunar; índice
   reconstruível; completude estrutural sob compactação; nada versionado.
-- **Negativas/dívida:** implementar varint/Bloom e o merge de postings; o índice tem de ser
-  validado (`is_fresh`) e reconstruído quando o formato muda.
+- **Negativas/dívida:** a v1 usa postings colunares (não comprimidos); medir delta+varint/Bloom
+  antes de adotar; o índice tem de ser validado (`is_fresh`) e reconstruído quando o formato muda.
 - **Medição (DF5):** bytes/evento (colunar vs JSONL), latência p50/p95 de consulta a 1k/10k/100k
   eventos, custo de `rebuild`, e bytes do índice por evento — via `xtask` (dev-only).
 - **Travas:** testes de segmento/índice/consulta (determinismo, frase, filtros, rebuild),
