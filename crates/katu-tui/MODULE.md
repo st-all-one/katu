@@ -37,8 +37,8 @@ A **interface de terminal** do katu (uma das duas superfícies, com a CLI — G7
   (`Controls`) refletido no cabeçalho; **vista da lixeira** (`l` → lista `.katu/trash` e `r`
   restaura, `src/trash.rs`), **compactação** (`c` → liga/desliga o contexto efetivo, E09-T07) e
   **gate de verificação** (`v`, E09-T03). A borda aplica o modelo ao **próximo** turno e publica a
-  lista via `Update::Models`. **Falta:** a lista de modelos vir do catálogo (`dynamic_models`,
-  E12-T02) e o esvaziamento da lixeira. O turno corre de forma **síncrona** no handler da borda
+  lista via `Update::Models` (do **catálogo** do provider, E12-T02/T10). **Falta:** o esvaziamento da
+  lixeira. O turno corre de forma **síncrona** no handler da borda
   (executor em background é trabalho futuro).
 
 ## Fronteira

@@ -11,8 +11,8 @@ use katu_core::error::Error;
 #[cfg(test)]
 use katu_core::kernel::Message;
 use katu_core::kernel::{
-    CallContext, CallId, Dispatch, Event, MemoryWriteRequest, Session, SessionError, SessionId,
-    discover_root, memory_recall_use,
+    CallContext, CallId, ControlError, Dispatch, Event, MemoryWriteRequest, Session, SessionError,
+    SessionId, discover_root, memory_recall_use,
 };
 use katu_core::memory::{Anchor, Memory, MemoryError, NoteType, PreWriteReq, RecallReq};
 use katu_core::plan::Plan;
@@ -25,6 +25,7 @@ use crate::memory::KnudgeMemory;
 use crate::scope::{self, ScopeError};
 
 mod context;
+mod control;
 mod verify;
 
 /// Regras do protocolo de memória, versionadas no repositório (dado, não código).
@@ -75,6 +76,9 @@ pub(crate) enum RuntimeError {
     /// O gate de verificação (E09-T03) não pôde correr (falta o escopo).
     #[error("verificação: {0}")]
     Verification(String),
+    /// Controlo de modelo/pensamento inválido (E12-T10).
+    #[error("controlo: {0}")]
+    Control(#[from] ControlError),
 }
 
 impl From<RuntimeError> for Error {
@@ -84,6 +88,7 @@ impl From<RuntimeError> for Error {
             RuntimeError::Policy(source) => Self::invalid_input(source.to_string()),
             RuntimeError::Scope(source) => Self::invalid_input(source.to_string()),
             RuntimeError::Verification(message) => Self::invalid_input(message),
+            RuntimeError::Control(source) => Self::invalid_input(source.to_string()),
             RuntimeError::Session(source) => Self::internal(source.to_string()),
         }
     }

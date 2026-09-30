@@ -1,7 +1,7 @@
 //! O provider declarativo: reusa os adaptadores de dialeto do built-in.
 
 use katu_core::provider::{
-    Provider, ProviderError, ProviderOutcome, ProviderRequest, ProviderSink,
+    ModelCapabilities, Provider, ProviderError, ProviderOutcome, ProviderRequest, ProviderSink,
 };
 
 use crate::catalog::{Catalog, ModelEntry};
@@ -87,6 +87,24 @@ impl<T: Transport> Declarative<T> {
 impl<T: Transport> Provider for Declarative<T> {
     fn id(&self) -> &str {
         self.spec.name.as_str()
+    }
+
+    fn models(&self) -> Vec<String> {
+        self.catalog
+            .models()
+            .into_iter()
+            .map(str::to_string)
+            .collect()
+    }
+
+    fn capabilities(&self, model: &str) -> ModelCapabilities {
+        ModelCapabilities {
+            model: model.to_string(),
+            reasoning: self
+                .catalog
+                .lookup(model)
+                .is_some_and(|entry| entry.reasoning),
+        }
     }
 
     fn stream(

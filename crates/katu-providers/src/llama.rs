@@ -7,7 +7,7 @@
 
 use katu_core::diag::{Level, events};
 use katu_core::provider::{
-    Provider, ProviderError, ProviderOutcome, ProviderRequest, ProviderSink,
+    ModelCapabilities, Provider, ProviderError, ProviderOutcome, ProviderRequest, ProviderSink,
 };
 
 use super::catalog::Dialect;
@@ -97,6 +97,14 @@ impl<T: Transport> Llama<T> {
 impl<T: Transport> Provider for Llama<T> {
     fn id(&self) -> &'static str {
         "llama"
+    }
+
+    fn capabilities(&self, model: &str) -> ModelCapabilities {
+        ModelCapabilities {
+            model: model.to_string(),
+            // O llama.cpp aceita o grau de pensamento; o modelo local decide se o emite.
+            reasoning: true,
+        }
     }
 
     fn stream(

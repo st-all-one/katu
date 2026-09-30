@@ -9,6 +9,7 @@
 pub mod budget;
 pub mod bus;
 pub mod checkpoint;
+mod control;
 pub mod cost;
 mod event;
 mod log;
@@ -22,6 +23,7 @@ mod step;
 pub use budget::{Budget, BudgetCap, BudgetGate, BudgetRefusal, Charge};
 pub use bus::{EventBus, HandlerError, HandlerResult, Middleware, Next, Observer};
 pub use checkpoint::{CHECKPOINT_SCHEMA_VERSION, Checkpoint, CheckpointError, checkpoint_path};
+pub use control::{Control, ControlError, ControlState};
 pub use cost::{
     CostCaps, CostCharge, CostGovernor, CostLayer, CostRefusal, KillSwitch, Reenable,
     ReenableError, RollingWindowCap, VelocityCap, cost_charge_for,

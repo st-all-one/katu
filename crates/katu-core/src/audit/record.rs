@@ -4,7 +4,7 @@
 //! excerto limitado (o corpo integral continua no log); a pesquisa indexa `text`/`path`/`tool`/
 //! `status`/`rule`/`kind`.
 
-use crate::kernel::Event;
+use crate::kernel::{Control, Event};
 use crate::toon::{Cell, RowTable};
 
 /// Bytes máximos do excerto pesquisável.
@@ -129,6 +129,15 @@ impl AuditRecord {
                     .map(|check| format!("{}:{}", check.id, check.status.as_str()))
                     .collect::<Vec<_>>()
                     .join("; ");
+            }
+            Event::Control { control } => {
+                record.kind = "control";
+                record.text = match control {
+                    Control::SetModel { model } => format!("model {model}"),
+                    Control::SetThinking { thinking } => {
+                        format!("thinking {}", thinking.as_str())
+                    }
+                };
             }
         }
         record.text = truncate(&record.text, MAX_TEXT_BYTES);

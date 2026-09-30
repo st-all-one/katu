@@ -2,10 +2,12 @@
 
 use std::path::PathBuf;
 
+use katu_core::kernel::Control;
 use katu_core::memory::NoteType;
 use katu_core::ports::{FixedClock, Timestamp};
+use katu_core::provider::{ModelCapabilities, Thinking};
 
-use super::Runtime;
+use super::{Runtime, RuntimeError};
 use crate::ports::StdFs;
 
 /// Raiz temporária única por teste.
@@ -61,6 +63,54 @@ fn compaction_preview_is_enabled_and_deterministic() -> Result<(), Box<dyn std::
         "determinístico"
     );
     assert!(first.context.tokens > 0);
+    drop(runtime);
+    std::fs::remove_dir_all(&root)?;
+    Ok(())
+}
+
+#[test]
+fn set_control_is_validated_and_logged() -> Result<(), Box<dyn std::error::Error>> {
+    let root = root("control")?;
+    let fs = StdFs;
+    let clock = FixedClock::new(Timestamp::from_millis(1_000));
+    let mut runtime = Runtime::open(&fs, &clock, &root, "teste")?;
+
+    let unsupported = ModelCapabilities {
+        model: "m".to_string(),
+        reasoning: false,
+    };
+    let refused = runtime.set_control(
+        &Control::SetThinking {
+            thinking: Thinking::Low,
+        },
+        &unsupported,
+    );
+    assert!(matches!(refused, Err(RuntimeError::Control(_))));
+    assert_eq!(
+        runtime.control().thinking,
+        Thinking::Off,
+        "a recusa não altera o estado nem o log"
+    );
+
+    let supported = ModelCapabilities {
+        model: "m".to_string(),
+        reasoning: true,
+    };
+    runtime.set_control(
+        &Control::SetModel {
+            model: "m".to_string(),
+        },
+        &supported,
+    )?;
+    runtime.set_control(
+        &Control::SetThinking {
+            thinking: Thinking::Medium,
+        },
+        &supported,
+    )?;
+    assert_eq!(runtime.control().model.as_deref(), Some("m"));
+    assert_eq!(runtime.control().thinking, Thinking::Medium);
+
     drop(runtime);
     std::fs::remove_dir_all(&root)?;
     Ok(())

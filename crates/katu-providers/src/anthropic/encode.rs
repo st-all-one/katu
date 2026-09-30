@@ -1,13 +1,23 @@
 //! Codificação do pedido no dialeto `messages` (Anthropic).
 
 use katu_core::kernel::Message;
-use katu_core::provider::{ProviderError, ProviderRequest, ToolDef};
+use katu_core::provider::{ProviderError, ProviderRequest, Thinking, ToolDef};
 use serde_json::{Map, Value, json};
 
 use crate::openai::{EncodeOptions, model_tool_name, tool_arguments};
 
 /// `max_tokens` é obrigatório na Anthropic; usa-se este valor se o pedido não trouxer nenhum.
 const DEFAULT_MAX_TOKENS: u32 = 4096;
+
+/// Orçamento de raciocínio em tokens por grau (`None` = omitir, deixa o default do modelo).
+fn thinking_budget(thinking: Thinking) -> Option<u32> {
+    match thinking {
+        Thinking::Low => Some(1024),
+        Thinking::Medium => Some(8192),
+        Thinking::High => Some(24_576),
+        _ => None,
+    }
+}
 
 /// Serializa o pedido completo (JSON) para `POST /messages`.
 ///
@@ -44,7 +54,13 @@ pub(crate) fn encode_request(
         let tools = request.tools.iter().map(encode_tool).collect();
         body.insert("tools".to_string(), Value::Array(tools));
     }
-    if let Some(temperature) = request.temperature.or(options.default_temperature) {
+    if let Some(budget) = thinking_budget(request.model.thinking) {
+        body.insert(
+            "thinking".to_string(),
+            json!({"type": "enabled", "budget_tokens": budget}),
+        );
+    } else if let Some(temperature) = request.temperature.or(options.default_temperature) {
+        // Com raciocínio ligado a Anthropic exige temperatura omitida (=1).
         body.insert("temperature".to_string(), json!(f64::from(temperature)));
     }
     serde_json::to_string(&Value::Object(body))

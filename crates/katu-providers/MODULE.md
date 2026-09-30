@@ -25,7 +25,9 @@ A camada de **providers**: o caminho built-in first-party é nosso; o resto é c
   **pedido** é opt-in (`with_request_compression`) e fica **desligado**: os endpoints built-in
   rejeitam-no (opencode `401`, llama `415`; ADR 0013). `warm()` pré-aquece a ligação.
 - **Catálogo e despacho.** [`catalog`](src/catalog.rs) mapeia `model → {dialect, context_limit,
-  max_tokens_field, prompt_cache, prompt_cache_retention, reasoning}`; [`engine`](src/engine.rs)
+  max_tokens_field, prompt_cache, prompt_cache_retention, reasoning}`; `Catalog::models()` expõe os
+  ids em ordem determinística e `Provider::{models,capabilities}` (E12-T10) alimentam a lista da TUI
+  e a validação do controlo. [`engine`](src/engine.rs)
   constrói o endpoint por dialeto (auth + afinidade: `x-opencode-session` e `affinity_headers`) e
   despacha.
 - **Streaming.** [`sse`](src/sse.rs) é um parser SSE incremental; [`wire`](src/wire.rs) é o driver
@@ -34,8 +36,9 @@ A camada de **providers**: o caminho built-in first-party é nosso; o resto é c
   [`anthropic`](src/anthropic.rs) (`messages`) e [`google`](src/google.rs)
   (`models/<id>:streamGenerateContent`) normalizam texto, thinking (aceita `reasoning_content`
   /`reasoning`/`reasoning_text` e `thought: true`) e tool calls **completas**; o `chat/completions`
-  serializa direto (sem árvore `Value`); `usage` com base `provider_reported`; preços
-  [`usage`](src/usage.rs) devolvem `unpriced` sem tabela (DF5).
+  serializa direto (sem árvore `Value`); o grau de pensamento é codificado por dialeto
+  (`reasoning.effort`/`reasoning_effort`/`thinking.budget_tokens`/`thinkingConfig`); `usage` com base
+  `provider_reported`; preços [`usage`](src/usage.rs) devolvem `unpriced` sem tabela (DF5).
 - **Cache de prefixo (por modelo).** `prompt_cache`/`prompt_cache_retention` vêm do catálogo; o
   `prompt_cache_key` deriva da sessão. Medido em `deepseek-v4.1-flash` (2.º turno `cached=896/1004`;
   ADR 0013).

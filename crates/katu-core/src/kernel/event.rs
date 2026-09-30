@@ -8,6 +8,8 @@ use crate::plan::Plan;
 use crate::verify::VerificationReport;
 use katu_policy::{Capability, Phase, ResolvedPath, RuleId, ToolUse};
 
+use super::control::Control;
+
 /// Identificador de um pedido de tool (correlaciona `ToolCall` ↔ `ToolResult`).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -112,6 +114,11 @@ pub enum Event {
         /// Relatório determinístico.
         report: VerificationReport,
     },
+    /// Controlo do utilizador em runtime (E12-T10): modelo/pensamento. Evento de controlo.
+    Control {
+        /// Controlo pedido (já validado pela borda contra o catálogo).
+        control: Control,
+    },
     /// Fim de um turno.
     TurnEnd {
         /// Número do turno.
@@ -136,6 +143,7 @@ impl Event {
             Self::WorkspaceSet { .. } => "workspace_set",
             Self::ApprovalGranted { .. } => "approval_granted",
             Self::VerificationRecorded { .. } => "verification_recorded",
+            Self::Control { .. } => "control",
             Self::TurnEnd { .. } => "turn_end",
         }
     }

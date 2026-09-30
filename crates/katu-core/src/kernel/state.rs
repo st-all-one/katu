@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
+use super::control::ControlState;
 use super::event::CallId;
 use crate::error::ToolOutcome;
 use crate::feedback::CommandStatus;
@@ -59,6 +60,9 @@ pub struct State {
     /// Relatório do gate de verificação (E09-T03); exigido para transitar para [`Phase::Verified`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub verification: Option<VerificationReport>,
+    /// Controlo do utilizador (E12-T10): modelo ativo + grau de pensamento.
+    #[serde(default)]
+    pub control: ControlState,
 }
 
 impl State {
@@ -78,6 +82,7 @@ impl State {
             last_command: None,
             workspace: None,
             verification: None,
+            control: ControlState::default(),
         }
     }
 }

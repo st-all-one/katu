@@ -112,12 +112,12 @@ fecha o ponto em aberto **OA3** com um desenho testado. Padrões a herdar:
   `Action`s puras (`CycleModel`/`CycleThinking`) + `Command::{SetModel, SetThinking}`, com o estado
   em `katu-tui/src/controls.rs` (`Controls`) e o modelo/pensamento no cabeçalho. A **vista da
   lixeira** (`l`) lista `.katu/trash` (`trash::list`) e restaura com `r` (`trash::restore`; E06-T09,
-  recuperável). A **compactação** (`c`) mostra a pré-visualização antes/depois
-  (`Runtime::compaction_preview`, E09-T07) e o **gate de verificação** (`v` → `Runtime::verify`;
-  se bloquear, pede override humano por challenge, E09-T03). A borda aplica a escolha de modelo ao
-  **próximo** turno (o agente **nunca** se auto-escala) e publica a lista via `Update::Models`.
-  **Falta:** a lista de modelos vir do catálogo (`dynamic_models`, E12-T02) e o **esvaziamento** da
-  lixeira com challenge-and-response.
+  recuperável). A **compactação** (`c`) liga/desliga o contexto efetivo (`Runtime::set_compaction`,
+  E09-T07) e o **gate de verificação** (`v` → `Runtime::verify`; se bloquear, pede override humano
+  por challenge, E09-T03). A escolha de modelo/pensamento passa por `Runtime::set_control` (validado
+  contra o catálogo com erro que ensina, E12-T10), a lista de modelos vem de `Provider::models()`
+  (E12-T02) e o turno seguinte usa o estado de controlo (o agente **nunca** se auto-escala).
+  **Falta:** o **esvaziamento** da lixeira com challenge-and-response.
 - **Aceite:** cada controlo mapeia para uma `Action` pura (E10-T02) e é testável por modo; o
   agente **não** altera modelo/pensamento sem o utilizador; esvaziar a lixeira exige
   challenge-and-response.

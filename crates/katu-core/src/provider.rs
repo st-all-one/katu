@@ -15,6 +15,10 @@ use crate::error::Error;
 use crate::evidence::EvidenceBasis;
 use crate::kernel::{CallId, Message};
 
+mod collect;
+
+pub use collect::CollectSink;
+
 /// Grau de pensamento (reasoning) pedido ao modelo num turno (E12-T10).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -29,6 +33,19 @@ pub enum Thinking {
     Medium,
     /// Muito.
     High,
+}
+
+impl Thinking {
+    /// Nome estável (`off`/`low`/`medium`/`high`).
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Off => "off",
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+        }
+    }
 }
 
 /// Modelo + grau de pensamento de um turno.
@@ -180,32 +197,6 @@ pub enum Flow {
 pub trait ProviderSink {
     /// Recebe um evento; devolve [`Flow::Break`] para cancelar.
     fn on_event(&mut self, event: ProviderEvent) -> Flow;
-}
-
-/// Implementação trivial que só mantém o último delta (útil em testes e sondagens).
-#[derive(Debug, Default)]
-pub struct CollectSink {
-    /// Texto acumulado.
-    pub text: String,
-    /// Raciocínio acumulado.
-    pub thinking: String,
-    /// Tool calls completas, na ordem de chegada.
-    pub calls: Vec<(CallId, String, Value)>,
-}
-
-impl ProviderSink for CollectSink {
-    fn on_event(&mut self, event: ProviderEvent) -> Flow {
-        match event {
-            ProviderEvent::Text(delta) => self.text.push_str(&delta),
-            ProviderEvent::Thinking(delta) => self.thinking.push_str(&delta),
-            ProviderEvent::ToolCall {
-                call,
-                name,
-                arguments,
-            } => self.calls.push((call, name, arguments)),
-        }
-        Flow::Continue
-    }
 }
 
 /// Porta de acesso a um endpoint de modelo.

@@ -1,6 +1,8 @@
 //! Testes do dialeto Anthropic Messages (encode + decode).
 
-use katu_core::provider::{CollectSink, ModelSpec, ProviderRequest, StopReason, TokenUsage};
+use katu_core::provider::{
+    CollectSink, ModelSpec, ProviderRequest, StopReason, Thinking, TokenUsage,
+};
 use serde_json::json;
 
 use crate::engine::Call;
@@ -47,6 +49,25 @@ fn encode_request_matches_the_messages_api() -> Result<(), Box<dyn std::error::E
     assert_eq!(value.get("system"), Some(&json!("seja breve")));
     assert_eq!(value.get("max_tokens"), Some(&json!(64)));
     assert_eq!(value.get("stream"), Some(&json!(true)));
+    Ok(())
+}
+
+#[test]
+fn thinking_maps_to_budget_tokens_and_drops_temperature() -> Result<(), Box<dyn std::error::Error>>
+{
+    let mut request = request("claude");
+    request.model.thinking = Thinking::Medium;
+    request.temperature = Some(0.2);
+    let body = super::encode::encode_request(&request, &EncodeOptions::default())?;
+    let value: serde_json::Value = serde_json::from_str(&body)?;
+    assert_eq!(
+        value.get("thinking"),
+        Some(&json!({"type": "enabled", "budget_tokens": 8192}))
+    );
+    assert!(
+        value.get("temperature").is_none(),
+        "com raciocínio a temperatura é omitida"
+    );
     Ok(())
 }
 

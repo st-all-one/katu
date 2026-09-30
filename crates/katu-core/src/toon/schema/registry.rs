@@ -47,6 +47,7 @@ pub(super) const AUDIT_KINDS: Domain = &[
     "workspace",
     "approval",
     "verify",
+    "control",
 ];
 
 /// Registo de todas as secções emitidas (modo + colunas por ordem).

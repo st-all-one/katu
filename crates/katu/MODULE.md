@@ -49,7 +49,10 @@ todo o código impuro confinado.
   carrega as regras de **memória + contenção** e define o **workspace** no arranque (`Runtime::open`),
   pelo que a contenção é aplicada no loop. A TUI liga/desliga a compactação (`c`), lista/restaura a
   lixeira (`l`/`r`) e corre o **gate de verificação** (`v`; se bloquear, pede override humano por
-  challenge, E09-T03). O turno é **síncrono** nesta fatia (executor em background é trabalho futuro).
+  challenge, E09-T03). O **modelo/pensamento** (`m`/`t`) passa por `Runtime::set_control` (validado
+  contra o catálogo com erro que ensina, E12-T10) e a lista de modelos vem de `Provider::models()`
+  (E12-T02); o turno seguinte usa o estado de controlo (o agente nunca se auto-escala). O turno é
+  **síncrono** nesta fatia (executor em background é trabalho futuro).
 - Exit codes na borda (a lógica propaga `Result`).
 - Harness de medição do MVK (`examples/measure_mvk.rs`, feature `profile`, E05-T06): corre o
   caminho real e grava `bench/mvk/raw.json` (evidência tipada, DF5).

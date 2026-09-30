@@ -178,6 +178,12 @@ impl Catalog {
         self.entries.len()
     }
 
+    /// Identificadores dos modelos, em ordem determinística (`BTreeMap`) — `dynamic_models` (E12-T02).
+    #[must_use]
+    pub fn models(&self) -> Vec<&str> {
+        self.entries.keys().map(String::as_str).collect()
+    }
+
     /// `true` se vazio.
     #[must_use]
     pub fn is_empty(&self) -> bool {
@@ -214,5 +220,13 @@ mod tests {
         assert!(entry.prompt_cache);
         assert!(entry.reasoning);
         assert_eq!(entry.max_tokens_field.as_str(), "max_completion_tokens");
+    }
+
+    #[test]
+    fn models_lists_ids_in_deterministic_order() {
+        let mut catalog = Catalog::new();
+        catalog.insert(ModelEntry::new("b", Dialect::ChatCompletions));
+        catalog.insert(ModelEntry::new("a", Dialect::Responses));
+        assert_eq!(catalog.models(), vec!["a", "b"]);
     }
 }

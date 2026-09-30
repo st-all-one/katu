@@ -12,7 +12,7 @@
 
 use katu_core::diag::{Level, events};
 use katu_core::provider::{
-    Provider, ProviderError, ProviderOutcome, ProviderRequest, ProviderSink,
+    ModelCapabilities, Provider, ProviderError, ProviderOutcome, ProviderRequest, ProviderSink,
 };
 
 use super::catalog::{Catalog, ModelEntry};
@@ -191,6 +191,26 @@ impl<T: Transport> OpenCode<T> {
 impl<T: Transport> Provider for OpenCode<T> {
     fn id(&self) -> &'static str {
         "opencode"
+    }
+
+    fn models(&self) -> Vec<String> {
+        self.config
+            .catalog
+            .models()
+            .into_iter()
+            .map(str::to_string)
+            .collect()
+    }
+
+    fn capabilities(&self, model: &str) -> ModelCapabilities {
+        ModelCapabilities {
+            model: model.to_string(),
+            reasoning: self
+                .config
+                .catalog
+                .lookup(model)
+                .is_some_and(|entry| entry.reasoning),
+        }
     }
 
     fn stream(

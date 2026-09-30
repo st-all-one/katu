@@ -20,6 +20,7 @@ use crate::ports::{StdEnv, StdFs, StdProcess, SystemClock};
 use crate::report::Report;
 use crate::runtime::Runtime;
 
+mod control;
 mod verify;
 
 /// Corre a UI de terminal ligada ao loop de turnos.
@@ -46,6 +47,7 @@ pub(crate) fn run_tui(args: &RunArgs<'_>) -> Report {
         Ok(provider) => provider,
         Err(message) => return Report::failed("tui", &Error::invalid_input(message)),
     };
+    let models = models_for(provider.as_ref(), &model);
     let mut handler = AgentHandler {
         runtime,
         provider,
@@ -57,22 +59,23 @@ pub(crate) fn run_tui(args: &RunArgs<'_>) -> Report {
         max_steps: args.max_steps,
     };
     let mut app = App::new();
-    app.apply_update(Update::Models(models_for(args.provider)));
+    app.apply_update(Update::Models(models));
     match run(app, &mut handler, &clock) {
         Ok(()) => Report::ok("tui", None),
         Err(error) => Report::failed("tui", &Error::io("<tui>", error)),
     }
 }
 
-/// Modelos oferecidos no seletor da TUI, por provider (E10-T07).
+/// Modelos oferecidos no seletor da TUI (E12-T02/T10): do **catálogo** do provider.
 ///
-/// Lista estática até o `dynamic_models` (E12-T02) expor o catálogo; o **default** vem primeiro
-/// para o índice zero coincidir com o modelo do arranque.
-fn models_for(provider: &str) -> Vec<String> {
-    let mut models = vec![default_model(provider).to_string()];
-    if provider == "opencode-go" {
-        models.push("deepseek-v4.1-flash".to_string());
-    }
+/// O default vem primeiro para o índice zero coincidir com o modelo do arranque.
+fn models_for(provider: &dyn Provider, default: &str) -> Vec<String> {
+    let mut models: Vec<String> = provider
+        .models()
+        .into_iter()
+        .filter(|model| model.as_str() != default)
+        .collect();
+    models.insert(0, default.to_string());
     models
 }
 
@@ -93,14 +96,8 @@ impl Handler for AgentHandler<'_> {
         match command {
             Command::Quit => Vec::new(),
             Command::Submit(goal) => self.submit(&goal, painter),
-            Command::SetModel(model) => {
-                self.model.model = model;
-                vec![Update::Info(format!("modelo: {}", self.model.model))]
-            }
-            Command::SetThinking(thinking) => {
-                self.model.thinking = thinking;
-                vec![Update::Info(format!("pensamento: {thinking:?}"))]
-            }
+            Command::SetModel(model) => self.set_model(model),
+            Command::SetThinking(thinking) => self.set_thinking(thinking),
             Command::Trash => self.trash_list(),
             Command::Restore(token) => self.restore(&token),
             Command::Compact => self.toggle_compaction(),
@@ -166,8 +163,16 @@ impl AgentHandler<'_> {
             process: &self.process,
             env: &self.env,
         };
+        let control = self.runtime.control();
+        let model = ModelSpec {
+            model: control
+                .model
+                .clone()
+                .unwrap_or_else(|| self.model.model.clone()),
+            thinking: control.thinking,
+        };
         let options = TurnOptions {
-            model: self.model.clone(),
+            model,
             system: Some(SYSTEM.to_string()),
             max_tokens: self.max_tokens,
             temperature: 0.0,

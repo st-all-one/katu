@@ -1,5 +1,6 @@
 //! `step(State, Event) -> Result<State, Refusal>` (E04-T01). Transição pura e determinística.
 
+use super::control::Control;
 use super::event::{CallId, Event};
 use super::state::{CallStatus, Refusal, RefusalReason, State, can_transition};
 use crate::diag::{Level, events};
@@ -37,6 +38,7 @@ pub fn step(state: &State, event: &Event) -> Result<State, Refusal> {
             ..
         } => approval_granted(state, capability, reason, granted_by),
         Event::VerificationRecorded { report } => Ok(verification_recorded(state, report)),
+        Event::Control { control } => Ok(control_applied(state, control)),
         Event::TurnEnd { turn } => turn_end(state, *turn),
     }
 }
@@ -141,6 +143,13 @@ fn approval_granted(
 fn verification_recorded(state: &State, report: &VerificationReport) -> State {
     let mut next = state.clone();
     next.verification = Some(report.clone());
+    next
+}
+
+/// Aplica um controlo **já validado** (E12-T10): só o estado muda (a validação é da borda).
+fn control_applied(state: &State, control: &Control) -> State {
+    let mut next = state.clone();
+    next.control = control.apply(&state.control);
     next
 }
 

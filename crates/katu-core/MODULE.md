@@ -29,6 +29,10 @@ função, o log é a fonte da verdade.
   - `kernel::bus` — `EventBus` (observadores + waterfall com a regra "tem de chamar `next`").
   - `kernel::checkpoint` — `Checkpoint` tipado (schema v1, validador zero-dep `validate`,
     `write_atomic`); erros agregados em `Issue { path, message }` (OA19/E09-T02).
+  - `kernel::control` — `Control`/`ControlState` (E12-T10): modelo/pensamento do **utilizador** no
+    log (`Event::Control`, audit `kind=control`) e no estado (sobrevive a *resume*); validação pura
+    com erro que **ensina** (`ControlError::ReasoningUnsupported`), contra `ModelCapabilities`
+    derivadas do catálogo pela borda.
   - `kernel::session` — `Session`/`CallContext` (loop mínimo: valida transição + orçamento antes de
     gravar; `tool_call` e `memory_write` pela ordem §42; `set_workspace`/`record_verification`;
     `approve` (aprovação humana, E07-T05); `context` (contexto efetivo, E09-T01/T07);

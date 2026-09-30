@@ -133,8 +133,10 @@ bloqueado pelo `ureq` (HTTP/1.1). Os dialetos `responses`/`messages`/`google` es
   isolado atrás do trait próprio; `goose-context-management` só como fonte de compaction **off-path**.
 - **Estado:** `ProviderSpec` + `providers/*.json` (opencode zen/go, openai) e `Declarative<T>`,
   reusando os adaptadores de dialeto (ADR 0012). A integração direta com o GDK `goose` foi
-  **rejeitada** (risco R1, `tokio`/`reqwest`/tipos externos). Falta ler o catálogo do endpoint
-  (`dynamic_models`) e cobrir mais dialetos.
+  **rejeitada** (risco R1, `tokio`/`reqwest`/tipos externos). O catálogo é exposto por
+  `Provider::models()`/`Catalog::models()` (ordem determinística) e `Provider::capabilities()`
+  (E12-T10), pelo que a lista de modelos da TUI vem do catálogo. Falta ler o catálogo **do endpoint**
+  (`dynamic_models` ao vivo) e cobrir mais dialetos.
 - **Aceite:** trocar a fonte de commodity muda só o adaptador; nenhum tipo externo na API do katu;
   o caminho built-in (`opencode go/zen`) **não** passa pelo GDK.
 
@@ -213,7 +215,7 @@ bloqueado pelo `ureq` (HTTP/1.1). Os dialetos `responses`/`messages`/`google` es
 - **Aceite:** TTFT in-process ≤ ao caminho HTTP/WebSocket (E12-T07) na mesma máquina; desligar a
   feature remove o crate do grafo; Miri/geiger verdes (E13-T04).
 
-### E12-T10 ◐ Controlo de modelo e grau de pensamento
+### E12-T10 ☑ Controlo de modelo e grau de pensamento
 - **Objetivos:** cumprir o core §1.1 #11 — alterar **modelo** e **grau de pensamento**
   (reasoning/thinking) em runtime, sem reiniciar a sessão.
 - **Entregáveis:** `Control::{SetModel, SetThinking}` no kernel; mapeamento por dialeto
@@ -221,11 +223,16 @@ bloqueado pelo `ureq` (HTTP/1.1). Os dialetos `responses`/`messages`/`google` es
   no Google, equivalente no `llama.cpp`); só os built-in (`opencode go/zen`, `llama.cpp`) expõem a
   capacidade — os demais via GDK quando suportarem; **o utilizador** aciona; o agente **não** se
   auto-escala (custo/qualidade) e, se pedir, vira `NeedsHuman`.
-- **Estado:** o `Catalog` já expõe `model → {dialect, context_limit, reasoning}` e o wire aceita
-  `reasoning_effort`/`reasoning_format` por modelo. A TUI já tem o seletor (`katu-tui::Controls`:
-  `m`/`t` → `Command::{SetModel, SetThinking}`, aplicado ao **próximo** turno pela borda). Falta o
-  `Control::{SetModel, SetThinking}` **no kernel** (evento/estado) e a recusa que ensina para grau
-  inválido, além de a lista de modelos vir do catálogo (`dynamic_models`, E12-T02).
+- **Estado:** o `Catalog` expõe `model → {dialect, context_limit, reasoning}` e `Catalog::models()`
+  (ordem determinística); o wire mapeia o grau de pensamento por dialeto — `reasoning.effort`
+  (Responses), `reasoning_effort` (`chat/completions`), `thinking.budget_tokens` (Anthropic) e
+  `thinkingConfig.thinkingBudget` (Google, E12-T06). O kernel tem `Control::{SetModel, SetThinking}`
+  (`kernel::control`), `ControlState` no `State` (sobrevive a *resume*) e `Event::Control` no log
+  (audit `kind=control`); a validação é pura e o erro **ensina** (`ControlError::ReasoningUnsupported`
+  nomeia o modelo e diz para baixar para `off`), usando `ModelCapabilities` derivadas do catálogo
+  pela borda (`Provider::capabilities`). A borda (TUI `m`/`t`) valida e regista via
+  `Runtime::set_control`; a lista de modelos vem de `Provider::models()` (T02). O agente **não** tem
+  caminho para emitir `Control` — só o utilizador; se o pedisse, seria `NeedsHuman` (E07).
 - **Aceite:** trocar de modelo a meio da sessão preserva log/estado (só muda o provider do próximo
   turno); grau de pensamento inválido para o modelo é recusado com erro que ensina; nenhum caminho
   deixa o agente escolher um modelo mais caro sem aprovação.
