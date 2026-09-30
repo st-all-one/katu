@@ -24,6 +24,8 @@ mod docs;
 mod ledger;
 mod policy;
 mod schemas;
+#[cfg(feature = "tokenizer")]
+mod toon_bench;
 mod walk;
 
 use std::collections::BTreeMap;
@@ -60,6 +62,8 @@ fn main() -> ExitCode {
         Some("gate:bench") => bench::gate_bench(&rest),
         Some("policy:audit") => policy::policy_audit(&rest),
         Some("ledger:validate") => ledger::ledger_validate(&rest),
+        #[cfg(feature = "tokenizer")]
+        Some("bench-toon") => toon_bench::run(),
         Some(other) => Err(format!("tarefa desconhecida: {other}")),
         None => Err(
             "uso: xtask <check-layers|check-crate-coverage|check-diag|check-schemas|check-docs|gate:bench|policy:audit|ledger:validate>"

@@ -111,8 +111,9 @@ mod tests {
         let rendered = output
             .report
             .map_or_else(String::new, |report| report.to_toon());
-        assert!(rendered.contains("kind: move.file\n"), "{rendered}");
-        assert!(rendered.contains("to_id: f_"), "{rendered}");
+        assert!(rendered.contains("move.file\u{1f}"), "{rendered}");
+        assert!(rendered.contains("from\u{1f}"), "{rendered}");
+        assert!(rendered.contains("to_id\u{1f}f_"), "{rendered}");
         Ok(())
     }
 

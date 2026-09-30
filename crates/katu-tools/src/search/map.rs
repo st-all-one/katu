@@ -80,7 +80,7 @@ fn entry_value(fs: &dyn Fs, entry: &Path) -> Value {
     if fs.is_dir(entry) {
         return Value::map(vec![
             ("path".to_string(), Value::str(entry.display().to_string())),
-            ("type".to_string(), Value::str("dir")),
+            ("ty".to_string(), Value::str("dir")),
         ]);
     }
     let text = fs.read(entry).map_or_else(
@@ -96,14 +96,14 @@ fn entry_value(fs: &dyn Fs, entry: &Path) -> Value {
     let shown = entry.to_string_lossy();
     Value::map(vec![
         ("path".to_string(), Value::str(shown.to_string())),
-        ("type".to_string(), Value::str("file")),
+        ("ty".to_string(), Value::str("file")),
         ("lang".to_string(), Value::str(language(&shown))),
         (
             "loc".to_string(),
             Value::int(to_i64(len_u64(text.lines().count()))),
         ),
         (
-            "symbols".to_string(),
+            "syms".to_string(),
             Value::int(to_i64(len_u64(symbols.len()))),
         ),
         ("exports".to_string(), Value::int(to_i64(len_u64(exports)))),

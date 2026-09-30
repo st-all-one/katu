@@ -195,8 +195,8 @@ mod tests {
         let output = tool(&process, &env).execute(&use_()?);
         assert_eq!(output.outcome, ToolOutcome::Ok);
         let rendered = render(&output);
-        assert!(rendered.contains("kind: exec.run\n"), "{rendered}");
-        assert!(rendered.contains("exit: 0\n"), "{rendered}");
+        assert!(rendered.contains("exec.run\u{1f}"));
+        assert!(rendered.contains("exit\u{1f}0\nsignal\u{1f}0\ntimed_out\u{1f}0\n"));
         assert!(rendered.contains("hi\n"), "{rendered}");
         Ok(())
     }
@@ -214,8 +214,9 @@ mod tests {
         let env = FakeEnv::new();
         let output = tool(&process, &env).execute(&use_()?);
         let rendered = render(&output);
-        assert!(rendered.contains("exit: 2\n"), "{rendered}");
-        assert!(rendered.contains("duration_ms: 7\n"), "{rendered}");
+        assert!(
+            rendered.contains("exit\u{1f}2\nsignal\u{1f}0\ntimed_out\u{1f}0\nduration_ms\u{1f}7\n")
+        );
         assert!(rendered.contains("boom"), "{rendered}");
         Ok(())
     }
@@ -233,8 +234,7 @@ mod tests {
         let env = FakeEnv::new();
         let output = tool(&process, &env).execute(&use_()?);
         let rendered = render(&output);
-        assert!(rendered.contains("timed_out: true\n"), "{rendered}");
-        assert!(rendered.contains("signal: 9\n"), "{rendered}");
+        assert!(rendered.contains("exit\u{1f}-1\nsignal\u{1f}9\ntimed_out\u{1f}1\n"));
         Ok(())
     }
 

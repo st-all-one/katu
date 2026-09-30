@@ -4,7 +4,7 @@
 use super::{ReadBudget, View, views};
 
 /// Renderiza a view `full` de `text` com um orçamento, em TOON.
-fn full_toon(text: &str, budget: ReadBudget) -> String {
+fn full_toon(text: &str, max_lines: usize, max_bytes: usize) -> String {
     views::build(views::Build {
         view: View::Full,
         path: "p.txt",
@@ -13,72 +13,59 @@ fn full_toon(text: &str, budget: ReadBudget) -> String {
         range: None,
         symbol: None,
         base: None,
-        budget,
+        budget: ReadBudget {
+            max_lines,
+            max_bytes,
+        },
     })
     .map_or_else(String::new, |report| report.to_toon())
 }
 
 #[test]
-fn truncation_matrix_is_deterministic_and_utf8_safe() {
-    // 1. Minúsculo: uma linha só.
-    let tiny = full_toon(
-        "a\nb\nc\n",
-        ReadBudget {
-            max_lines: 1,
-            max_bytes: 1_000,
-        },
+fn truncation_of_a_tiny_budget_advances_the_cursor() {
+    let tiny = full_toon("a\nb\nc\n", 1, 1_000);
+    assert!(
+        tiny.contains("\u{1f}2\u{1f}3\u{1f}1\u{1f}0\u{1f}0\u{1f}0\n"),
+        "{tiny}"
     );
-    assert!(tiny.contains("truncated: true"), "{tiny}");
-    assert!(tiny.contains("cursor: 2"), "{tiny}");
+}
 
-    // 2. Bytes exatos: a primeira linha cabe certa.
-    let exact = full_toon(
-        "abc\n",
-        ReadBudget {
-            max_lines: 10,
-            max_bytes: 4,
-        },
-    );
-    assert!(exact.contains("truncated: false"), "{exact}");
+#[test]
+fn truncation_of_exact_bytes_keeps_the_line() {
+    let exact = full_toon("abc\n", 10, 4);
+    assert!(exact.contains("\u{1f}0\u{1f}0\u{1f}0\u{1f}0\n"), "{exact}");
     assert!(exact.contains("abc"), "{exact}");
+}
 
-    // 3. Chunk único enorme: corta no limite do carácter, sem substituir por U+FFFD.
+#[test]
+fn truncation_of_a_huge_single_chunk_is_utf8_safe() {
     let multibyte = "日".repeat(100);
-    let huge = full_toon(
-        &multibyte,
-        ReadBudget {
-            max_lines: 10,
-            max_bytes: 10,
-        },
-    );
-    assert!(huge.contains("truncated: true"), "{huge}");
+    let huge = full_toon(&multibyte, 10, 10);
+    assert!(huge.contains("\u{1f}1\u{1f}0\u{1f}0\u{1f}0\n"), "{huge}");
     assert!(
         !huge.contains('\u{FFFD}'),
         "cortou a meio de um carácter: {huge}"
     );
     assert_eq!(multibyte.chars().next().map(char::len_utf8), Some(3));
+}
 
-    // 4. Multibyte entre linhas: nunca parte um carácter a meio.
-    let lines = "áéíóú\nüñ\n";
-    let clipped = full_toon(
-        lines,
-        ReadBudget {
-            max_lines: 10,
-            max_bytes: 11,
-        },
-    );
+#[test]
+fn truncation_never_splits_a_multibyte_line() {
+    let clipped = full_toon("áéíóú\nüñ\n", 10, 11);
     assert!(clipped.contains("áéíóú"), "{clipped}");
     assert!(!clipped.contains("üñ"), "{clipped}");
-    assert!(clipped.contains("truncated: true"), "{clipped}");
-
-    // 5. Orçamento zero: trunca sem cursor (não há paginação que avance).
-    let zero = full_toon(
-        "a\n",
-        ReadBudget {
-            max_lines: 10,
-            max_bytes: 0,
-        },
+    assert!(
+        clipped.contains("\u{1f}1\u{1f}0\u{1f}0\u{1f}0\n"),
+        "{clipped}"
     );
-    assert!(zero.contains("truncated: true"), "{zero}");
-    assert!(!zero.contains("cursor:"), "{zero}");
+}
+
+#[test]
+fn truncation_with_zero_budget_has_no_cursor() {
+    let zero = full_toon("a\n", 10, 0);
+    assert!(
+        zero.contains("\u{1f}\u{1f}1\u{1f}1\u{1f}0\u{1f}0\u{1f}0\n"),
+        "{zero}"
+    );
+    assert!(zero.contains("path\u{1f}p.txt\n"), "{zero}");
 }

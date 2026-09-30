@@ -12,6 +12,8 @@ use katu_core::report::{Page, ToolReport};
 use katu_core::toon::Value;
 use katu_policy::{ControlId, ToolName, ToolUse};
 
+use crate::lang::{len_u64, to_i64};
+
 /// Executor do recall de memória.
 pub struct RecallTool<'a> {
     /// Porta de memória (a busca vive aqui).
@@ -40,7 +42,11 @@ impl Tool for RecallTool<'_> {
 
 /// Envelope AI-first do recall (DF12): só o delta (nota + afirmação + score) chega ao modelo.
 fn recall_report(query: &str, hits: &[RecallHit]) -> ToolReport {
-    let items = hits.iter().map(hit_value).collect();
+    let items = hits
+        .iter()
+        .enumerate()
+        .map(|(index, hit)| hit_value(hit, index))
+        .collect();
     let data = Value::map(vec![
         ("query".to_string(), Value::str(query.to_string())),
         ("hits".to_string(), Value::list(items)),
@@ -52,9 +58,13 @@ fn recall_report(query: &str, hits: &[RecallHit]) -> ToolReport {
         ))
 }
 
-/// Uma nota recordada como `Value` TOON.
-fn hit_value(hit: &RecallHit) -> Value {
-    Value::map(vec![
+/// Uma nota recordada como `Value` TOON (com `rank` e evidência `ev`).
+fn hit_value(hit: &RecallHit, rank: usize) -> Value {
+    let mut entries = vec![
+        (
+            "rank".to_string(),
+            Value::int(to_i64(len_u64(rank.saturating_add(1)))),
+        ),
         (
             "note".to_string(),
             Value::str(hit.note.as_str().to_string()),
@@ -62,10 +72,14 @@ fn hit_value(hit: &RecallHit) -> Value {
         ("statement".to_string(), Value::str(hit.statement.clone())),
         (
             "score".to_string(),
-            Value::int(i64::from(hit.score.as_basis_points())),
+            Value::int(i64::from(hit.score.as_basis_points().saturating_div(10))),
         ),
         ("basis".to_string(), Value::str(hit.basis.as_str())),
-    ])
+    ];
+    if let Some(anchor) = &hit.anchor {
+        entries.push(("ev".to_string(), Value::str(anchor.as_str().to_string())));
+    }
+    Value::map(entries)
 }
 
 #[cfg(test)]

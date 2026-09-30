@@ -14,6 +14,11 @@ toml.workspace = true
 katu-core.workspace = true
 katu-policy.workspace = true
 katu-tools.workspace = true
+tiktoken-rs = { version = "0.12", optional = true }
+
+[features]
+# Micro-bench de densidade (dev-only): `cargo run -p xtask --features tokenizer -- bench-toon`.
+tokenizer = ["dep:tiktoken-rs"]
 
 [lints]
 workspace = true

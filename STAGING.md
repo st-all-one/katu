@@ -7,7 +7,7 @@
 ## 0. Snapshot
 
 - **6 crates + `xtask`**: `katu-policy`, `katu-core`, `katu-tools`, `katu` (bin), `katu-providers`*, `katu-tui`*.
-- **367 testes** · catálogo de instrumentação **62 ids** · **11 tools** · **8 regras** (5 memória + 3 contenção) · **4 ADRs**.
+- **384 testes** · catálogo de instrumentação **68 ids** · **11 tools** · **8 regras** (5 memória + 3 contenção) · **7 ADRs**.
 - `make check` verde (fmt + clippy `-D warnings` + testes + `check-layers` + `check-diag` + `check-schemas` + `check-docs` + `policy:audit` + `gate:bench` + file-length ≤300) · `make instrument` verde.
 - **O MVK passou** ([ADR 0001](docs/adr/0001-mvk-gate-aprovado.md)); o kernel (E04) e a política (E02) estão completos.
 
@@ -22,6 +22,7 @@
 - Contexto: `assemble` + prime (+`--long`), compactação determinística opt-in, gate de verificação, scope contracts.
 - Contenção soft: sensíveis negados, fora do workspace → aprovação, busca como leitura, `Capability::Net`; **symlink resolvido via porta `Fs` antes do veredicto** (`katu-tools::resolve`).
 - Instrumentação transversal zero-custo (DF9): **redação por allowlist** no sink (E01-T07), **fingerprint determinístico** (`fingerprint!`, E19-T04) e **filtro por subsistema** (E19-T06).
+- **Saída ao modelo colunar v3** (ADR 0006/0007): **sem headers** no *stream* (o prime v3 é o registo de esquema, re-emitido no início e após compactação), blocos literais (`\x1d`) para código, escalares explícitos em `k`, domínios no registo e **aliases de sessão** `#N`/`@N` (lazy, limiar 3). Projeções model-facing canónicas de `ToolOutcome`/`Error`/`VerificationReport`; digest de compactação em tabela `m` (sem `Debug`); catálogo de tools no prime (`prime_with_catalog`, anti-drift). JSON de máquina inalterado.
 
 ---
 
@@ -41,6 +42,7 @@
 | **E03-T07** | ☐ | Memória como invariante (produção sempre com memória; fail-closed no arranque). |
 | **E06-T02** | ☑ | Linter de schema (`katu-tools::schema`) + `xtask check-schemas` em `make check`. |
 | **E06-T03** | ☑ | Matriz multibyte (§45.22); `edit.hunks`/`added`/`removed` reais; chunk único truncado em limite UTF-8. `read.diff` sem `base` é integração CLI (§3.2). |
+| **E06-T12** | ☑ | Formato ao modelo **colunar v3** (ADR 0006): sem headers (registo no prime), blocos literais, `k` explícito, aliases de sessão; qualidade (`rank`/`basis`/`ev`/`sym`). A/B: **-21%** vs JSON; aliases neutros no corpus sintético (§3.4). |
 | **E06-T07** | ◐ | Rotação do registo de comando (→ E01-T07). |
 | **E07-T02** | ☑ | Symlink resolvido via porta `Fs` (`Fs::canonicalize` + `katu-tools::resolve`) antes do veredicto; `StdFs`/`MemFs` com teste de escape. |
 | **E07-T03** | ☑ | Gate do épico: autorização ausente fora do workspace recusada; symlink para fora negado na política. |
@@ -60,7 +62,6 @@
 | **E19-T04** | ☑ | Fingerprint determinístico (`diag::fingerprint!`) com golden. |
 | **E19-T06** | ☑ | Filtro de nível por subsistema (`KATU_INSTRUMENT_FILTER`/`set_filter`). |
 | **E19-T05** | ◐ | Gate no CI (fecho). |
-| **E19-T06** | ☐ | Filtro de nível por subsistema (OA18). |
 | **E08 · E11 · E17** | ⏸️ | Futuro (MCP, plugins WASM, jail de SO). |
 
 ---
@@ -87,6 +88,7 @@ Nenhuma fórmula implementada: contexto submodular+MMR (T02), compactação por 
 ### 3.4 Dívida técnica concreta
 
 - Emissor TOON concatena `String` (sem `fmt::Write`) — irrelevante sem perfil.
+- **Densidade colunar v3 (ADR 0006/0007):** o micro-bench dev-only (`xtask --features tokenizer -- bench-toon`, `cl100k_base`) mede **-18%** vs JSON no corpus alinhado ao registo. A/B das costuras: **digest -36%** (tabela `m` sem `Debug`/id), **catálogo de tools +91 tokens** (clareza/anti-drift — o dono preferiu um prime claro) e **emissor ~1,16–1,21x** (escrita direta, perfil dev). Aliases neutros no corpus sintético (dependem da reutilização por sessão). Detalhe e método em [`docs/toon-melhorias.md`](docs/toon-melhorias.md).
 - Process-group kill / cgroup **deferido** para E17 ([ADR 0004](docs/adr/0004-sem-ffi-kill-grupo-e17.md)).
 - **Nenhum número de tokens/latência publicado** (regra: nada sem artefacto — E15/E18).
 
@@ -98,7 +100,7 @@ Nenhuma fórmula implementada: contexto submodular+MMR (T02), compactação por 
 2. **E12-T01/T05** — port `Provider` + provider fake (desbloqueia testes de loop reais).
 3. **E03-T02** — adaptador in-process do knudge (memória real; decisão de dep pendente).
 4. **E15-T01 + E18-T10** — harness de medição antes de qualquer otimização.
-5. Fechos core/policy/tools: **E06-T02/T03**, **E07-T02/T03**, **E01-T07**, **E19-T04/T06** — ✅; faltam **E06-T07** (rotação gated), **E03-T06/T07** (bloqueados em E03-T02) e a integração de `read.diff`/CLI.
+5. Fechos core/policy/tools: **E06-T02/T03/T12**, **E07-T02/T03**, **E01-T07**, **E19-T04/T06** — ✅; faltam **E06-T07** (rotação gated), **E03-T06/T07** (bloqueados em E03-T02), a iteração de densidade colunar (§3.4) e a integração de `read.diff`/CLI.
 
 ## 5. Regras que não se quebram
 

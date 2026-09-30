@@ -122,19 +122,23 @@ fn cluster_value(name: &str, items: &[&Hit]) -> Value {
     let symbol = content_id("s", name.as_bytes());
     let hits: Vec<Value> = items.iter().map(|hit| hit_value(hit)).collect();
     Value::map(vec![
-        ("symbol".to_string(), Value::str(symbol)),
+        ("sym".to_string(), Value::str(symbol)),
         ("name".to_string(), Value::str(name)),
         ("hits".to_string(), Value::list(hits)),
     ])
 }
 
 fn hit_value(hit: &Hit) -> Value {
-    Value::map(vec![
+    let mut entries = vec![
         ("path".to_string(), Value::str(hit.path.clone())),
-        ("line".to_string(), Value::int(i64::from(hit.line))),
-        ("type".to_string(), Value::str(hit.kind)),
+        ("ln".to_string(), Value::int(i64::from(hit.line))),
+        ("ty".to_string(), Value::str(hit.kind)),
         ("preview".to_string(), Value::str(hit.preview.clone())),
-    ])
+    ];
+    if let Some(symbol) = &hit.symbol {
+        entries.push(("sym".to_string(), Value::str(symbol.clone())));
+    }
+    Value::map(entries)
 }
 
 fn classify(line: &str, origin: Origin) -> &'static str {

@@ -156,8 +156,11 @@ mod tests {
         assert_eq!(output.outcome, ToolOutcome::Ok);
         let report = output.report.ok_or("sem relatório")?;
         let toon = report.to_toon();
-        assert!(toon.contains("kind: edit.patch\n"), "{toon}");
-        assert!(toon.contains("hunks: 1\n"), "{toon}");
+        assert!(toon.contains("edit.patch\u{1f}"), "{toon}");
+        assert!(
+            toon.contains("path\u{1f}/work/src/lib.rs\nhunks\u{1f}1\n"),
+            "{toon}"
+        );
         assert_eq!(
             fs.read(std::path::Path::new(PATH))?,
             b"fn a() { let x = 2; }\n"
@@ -216,9 +219,10 @@ mod tests {
         let report = output.report.ok_or("sem relatório")?;
         let rendered = report.to_toon();
         // O delta é real: `hunks` não é um literal; sem alteração, são zero.
-        assert!(rendered.contains("hunks: 0\n"), "{rendered}");
-        assert!(rendered.contains("added: 0\n"), "{rendered}");
-        assert!(rendered.contains("removed: 0\n"), "{rendered}");
+        assert!(
+            rendered.contains("hunks\u{1f}0\nadded\u{1f}0\nremoved\u{1f}0\n"),
+            "{rendered}"
+        );
         Ok(())
     }
 }

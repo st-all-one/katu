@@ -7,7 +7,8 @@
 
 use serde::Serialize;
 
-use crate::toon::{self, Value};
+use crate::diag::{Level, events};
+use crate::toon::{self, Aliases, Cell, RowTable, Section, Value};
 
 /// Paginação de um resultado (cursor opaco; `total` sempre presente).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -31,16 +32,6 @@ impl Page {
             truncated: false,
         }
     }
-
-    fn to_value(self) -> Value {
-        let mut entries = Vec::new();
-        if let Some(cursor) = self.cursor {
-            entries.push(("cursor".to_string(), Value::int(to_i64(cursor))));
-        }
-        entries.push(("total".to_string(), Value::int(to_i64(self.total))));
-        entries.push(("truncated".to_string(), Value::bool(self.truncated)));
-        Value::flow(entries)
-    }
 }
 
 /// Custo estimado de uma resposta (**advisory**; não é métrica publicada, DF5).
@@ -52,19 +43,6 @@ pub struct Cost {
     pub ms: u64,
     /// Estimativa de tokens (base `inferred`; o modelo usa como heurística).
     pub tokens_est: u64,
-}
-
-impl Cost {
-    fn to_value(self) -> Value {
-        Value::flow(vec![
-            ("bytes".to_string(), Value::int(to_i64(self.bytes))),
-            ("ms".to_string(), Value::int(to_i64(self.ms))),
-            (
-                "tokens_est".to_string(),
-                Value::int(to_i64(self.tokens_est)),
-            ),
-        ])
-    }
 }
 
 /// Envelope tipado da saída de uma tool.
@@ -141,30 +119,75 @@ impl ToolReport {
         self
     }
 
-    /// Renderiza em **TOON** (formato ao modelo).
+    /// Renderiza em **TOON colunar v3** (formato ao modelo, ADR 0005), sem aliases.
     #[must_use]
     pub fn to_toon(&self) -> String {
-        let mut entries = vec![("kind".to_string(), Value::str(self.kind))];
-        if let Some(id) = &self.id {
-            entries.push(("id".to_string(), Value::str(id.clone())));
+        let _span = crate::span!(Level::Debug, events::TOON_EMIT, "kind" => self.kind);
+        let mut sections = vec![self.envelope(self.id.as_deref().unwrap_or_default())];
+        sections.extend(toon::project(&self.data));
+        self.push_next(&mut sections);
+        toon::emit(&sections)
+    }
+
+    /// Renderiza com **aliases de sessão** (`#N`/`@N`) e a secção `sym` dos novos.
+    #[must_use]
+    pub fn to_toon_with(&self, aliases: &mut Aliases) -> String {
+        let _span = crate::span!(Level::Debug, events::TOON_EMIT, "kind" => self.kind);
+        let (data, mut fresh) = aliases.substitute(&self.data);
+        let id = self.id.as_deref().map_or_else(String::new, |raw| {
+            let (alias, pair) = aliases.intern_id(raw);
+            if let Some(pair) = pair {
+                fresh.insert(0, pair);
+            }
+            alias
+        });
+        let mut sections = Vec::new();
+        if !fresh.is_empty() {
+            let mut table = RowTable::new("sym");
+            for (alias, value) in &fresh {
+                table.push(vec![Cell::text(alias.clone()), Cell::text(value.clone())]);
+            }
+            sections.push(Section::Rows(table));
         }
-        if let Some(hash) = &self.hash {
-            entries.push(("hash".to_string(), Value::str(hash.clone())));
+        sections.push(self.envelope(&id));
+        sections.extend(toon::project(&data));
+        self.push_next(&mut sections);
+        toon::emit(&sections)
+    }
+
+    fn push_next(&self, sections: &mut Vec<Section>) {
+        if self.next.is_empty() {
+            return;
         }
-        entries.push(("data".to_string(), self.data.clone()));
-        if let Some(page) = self.page {
-            entries.push(("page".to_string(), page.to_value()));
+        let mut table = RowTable::new("next");
+        for action in &self.next {
+            table.push(vec![Cell::text(action.clone())]);
         }
-        if !self.next.is_empty() {
-            entries.push((
-                "next".to_string(),
-                Value::list(self.next.iter().map(|s| Value::str(s.clone())).collect()),
-            ));
-        }
-        if let Some(cost) = self.cost {
-            entries.push(("cost".to_string(), cost.to_value()));
-        }
-        toon::emit(&Value::map(entries))
+        sections.push(Section::Rows(table));
+    }
+
+    /// Envelope universal `r` (colunas fixas; ausente = célula vazia).
+    fn envelope(&self, id: &str) -> Section {
+        let (cursor, total, truncated) = self.page.map_or((None, 0, false), |page| {
+            (page.cursor.map(to_i64), to_i64(page.total), page.truncated)
+        });
+        let (bytes, ms, tokens) = self.cost.map_or((0, 0, 0), |cost| {
+            (to_i64(cost.bytes), to_i64(cost.ms), to_i64(cost.tokens_est))
+        });
+        let row = vec![
+            Cell::text(self.kind),
+            Cell::text(id),
+            Cell::optional(self.hash.clone()),
+            cursor.map_or_else(|| Cell::text(""), Cell::int),
+            Cell::int(total),
+            Cell::bool(truncated),
+            Cell::int(bytes),
+            Cell::int(ms),
+            Cell::int(tokens),
+        ];
+        let mut table = RowTable::new("r");
+        table.push(row);
+        Section::Rows(table)
     }
 
     /// Renderiza em **JSON** (alternativa de máquina).

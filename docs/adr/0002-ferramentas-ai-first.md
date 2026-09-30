@@ -1,6 +1,6 @@
 # ADR 0002 — Ferramentas AI-first: envelope + views + TOON (core por medição)
 
-- **Estado:** aceite
+- **Estado:** aceite (o *formato ao modelo* é substituído por [ADR 0005](0005-formato-colunar-d39.md))
 - **Data:** 2026-09-29
 - **Decisões fundacionais:** DF12 (ferramentas AI-first), DF5 (evidência), DF6 (porta `Memory`),
   G3/G6 (superfície mínima, otimizado para tokens)

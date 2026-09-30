@@ -47,9 +47,9 @@ fn trashes_and_records_index() -> Result<(), Box<dyn std::error::Error>> {
     assert!(!fs.exists(Path::new(PATH)));
     assert_eq!(fs.read(Path::new(STORED))?, b"body".to_vec());
     let rendered = render(&output);
-    assert!(rendered.contains("kind: trash.move\n"), "{rendered}");
-    assert!(rendered.contains("undo_token:"), "{rendered}");
-    assert!(rendered.contains("refs:"), "{rendered}");
+    assert!(rendered.contains("trash.move\u{1f}"), "{rendered}");
+    assert!(rendered.contains("original\u{1f}"), "{rendered}");
+    assert!(rendered.contains("\u{1e}refs\n"), "{rendered}");
     let index = fs.read(Path::new("/work/.katu/trash/index.tsv"))?;
     let text = String::from_utf8_lossy(&index);
     assert!(text.contains(STORED), "{text}");

@@ -14,6 +14,8 @@ pub use specs::SCHEMAS;
 
 use std::collections::BTreeSet;
 
+use katu_core::diag::{Level, events};
+use katu_core::toon::{Cell, RowTable, Section, emit};
 use katu_core::validate::{Issue, Issues};
 
 /// Conjunto fechado de verbos aceites como primeira palavra de um nome de tool (ordem
@@ -221,6 +223,44 @@ fn check_params(schema: &ToolSchema<'_>, issues: &mut Vec<Issue>) {
             ));
         }
     }
+}
+
+/// Catálogo compacto das tools (tabela `tool`) para o prime (ADR 0006).
+///
+/// A assinatura usa os **domínios fechados** inline (`view{a,b,c}`) e marca os opcionais com `?` —
+/// o modelo vê o contrato sem repetir as descrições longas. Fonte única: [`SCHEMAS`].
+#[must_use]
+pub fn catalog() -> String {
+    let _span = katu_core::span!(
+        Level::Debug,
+        events::SCHEMA_CATALOG,
+        "tools" => SCHEMAS.len(),
+    );
+    let mut table = RowTable::new("tool");
+    for schema in SCHEMAS {
+        table.push(vec![Cell::text(schema.name), Cell::text(signature(schema))]);
+    }
+    emit(&[Section::Rows(table)])
+}
+
+/// Assinatura compacta dos parâmetros de uma tool.
+fn signature(schema: &ToolSchema<'_>) -> String {
+    let mut sig = String::new();
+    for param in schema.params {
+        if !sig.is_empty() {
+            sig.push(' ');
+        }
+        sig.push_str(param.name);
+        if let ParamKind::Enum(values) = param.kind {
+            sig.push('{');
+            sig.push_str(&values.join(","));
+            sig.push('}');
+        }
+        if !param.required {
+            sig.push('?');
+        }
+    }
+    sig
 }
 
 /// `true` se o texto contém um marcador de *poisoning* (comparação em minúsculas).

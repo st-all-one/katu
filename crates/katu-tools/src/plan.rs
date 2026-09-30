@@ -53,10 +53,7 @@ fn build(plan: &Plan) -> ToolReport {
             Value::map(vec![
                 ("id".to_string(), Value::str(feature.id.clone())),
                 ("status".to_string(), Value::str(feature.status.as_str())),
-                (
-                    "description".to_string(),
-                    Value::str(feature.description.clone()),
-                ),
+                ("desc".to_string(), Value::str(feature.description.clone())),
             ])
         })
         .collect();
@@ -163,8 +160,9 @@ mod tests {
         let output = PlanTool { plan: plan(1) }.execute(&use_()?);
         assert_eq!(output.outcome, ToolOutcome::Ok);
         let rendered = render(&output);
-        assert!(rendered.contains("kind: plan.validate\n"), "{rendered}");
-        assert!(rendered.contains("in_progress: 1\n"), "{rendered}");
+        assert!(rendered.contains("plan.validate\u{1f}"), "{rendered}");
+        assert!(rendered.contains("in_progress\u{1f}1\n"), "{rendered}");
+        assert!(rendered.contains("\u{1e}features\n"), "{rendered}");
         Ok(())
     }
 

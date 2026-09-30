@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::diag::{Level, events};
 use crate::error::ToolOutcome;
 use crate::kernel::{Event, Message, derive_messages};
+use crate::toon::schema::{self, Mode};
 use katu_policy::ToolUse;
 
 mod compact;
@@ -20,7 +21,7 @@ pub use compact::{
 };
 
 /// Versão do prime (DF12). Mudar o texto do prime exige incrementar isto.
-pub const PRIME_VERSION: u32 = 1;
+pub const PRIME_VERSION: u32 = 3;
 
 /// Orçamento de contexto: **mínimo para o cru, teto para o resumido**.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -92,28 +93,83 @@ pub enum PrimeMode {
     Long,
 }
 
-/// Prime compacto (DF12): ensina o envelope das tools e a gramática TOON. Estável por versão.
+/// Gramática do formato, partilhada pelo prime compacto e pelo prime com catálogo.
+const PRIME_GRAMMAR: &str = "saida: TOON colunar v3 (D39) SEM headers; o esquema vive aqui:\n\
+     - tabela: `\\x1eNOME` e depois linhas com celulas separadas por `\\x1f`, na ordem indicada;\n\
+     - literal: `\\x1dNOME` e depois linhas cruas ate a proxima secao;\n\
+     - vazio = celula ausente; `{a,b}` = dominio fechado; booleano 0/1; sem floats.\n";
+
+/// Prime compacto (DF12): ensina a gramática do TOON colunar v3 **e o registo de esquema**.
 #[must_use]
 pub fn prime() -> String {
     format!(
         "katu prime v{PRIME_VERSION}\n\
          tools: read/write/edit/move/trash/bash/grep/find/ls/plan/memory\n\
-         saida: TOON (chave: valor; listas com '-'; blocos com '|'); JSON com format=json\n\
-         cada resultado traz kind/id/hash; so o delta chega ao modelo\n"
+         {PRIME_GRAMMAR}{}\n\
+         JSON com format=json; so o delta chega ao modelo.\n",
+        registry_text()
     )
 }
 
-/// Prime completo (spec TOON) — `--long` (E09-T01). Determinístico e versionado.
+/// Prime compacto com o **catálogo de tools** injetado (fonte: `katu_tools::schema::catalog`).
+///
+/// Substitui a linha `tools:` pela tabela `tool` do registo — o esquema e as tools partilham a
+/// mesma projeção colunar, sem a lista escrita à mão.
+#[must_use]
+pub fn prime_with_catalog(catalog: &str) -> String {
+    format!(
+        "katu prime v{PRIME_VERSION}\n\
+         tools (tabela `tool`; `?` opcional, `{{a,b}}` dominio fechado):\n\
+         {catalog}\
+         {PRIME_GRAMMAR}{}\n\
+         JSON com format=json; so o delta chega ao modelo.\n",
+        registry_text()
+    )
+}
+
+/// Prime completo (spec TOON colunar v3) — `--long` (E09-T01). Determinístico e versionado.
 #[must_use]
 pub fn prime_long() -> String {
     format!(
         "katu prime v{PRIME_VERSION} (long)\n\
          tools: read/write/edit/move/trash/bash/grep/find/ls/plan/memory\n\
-         saida: TOON — `chave: valor` por linha; listas com `- item`; blocos de texto com `|`;\n\
-         strings entre aspas quando contêm `:`/`#`; inteiros e booleanos sem aspas.\n\
-         JSON equivalente com `format=json`/`--json`.\n\
-         cada resultado traz kind/id/hash/page; so o delta chega ao modelo; o original fica no log.\n"
+         saida: TOON colunar v3 (D39, ADR 0005). Sem headers no stream; o esquema segue.\n\
+         - tabela: linha `\\x1eNOME`; linhas seguintes com celulas `\\x1f` na ordem das colunas;\n\
+         - literal: linha `\\x1dNOME`; linhas cruas ate a proxima secao;\n\
+         - envelope `r` = kind,id,hash,cur,tot,trunc,bytes,ms,tok; escadares da tool em `k` (k,v);\n\
+         - ids/paths podem vir como `#N`/`@N` (aliases de sessao), mapeados na secao `sym`;\n\
+         - vazio = celula ausente; dominio `{{a,b}}` fechado; booleano 0/1; sem floats.\n\
+         {}\n\
+         JSON equivalente com `format=json`/`--json`; so o delta chega ao modelo.\n",
+        registry_text()
     )
+}
+
+/// Uma linha por secção do registo: `nome R col...` ou `nome L`.
+fn registry_text() -> String {
+    let mut out = String::from("esquema:\n");
+    for spec in schema::registry() {
+        out.push_str(spec.name);
+        match spec.mode {
+            Mode::Literal => {
+                out.push_str(" L\n");
+            }
+            Mode::Rows => {
+                out.push_str(" R");
+                for col in spec.cols {
+                    out.push(' ');
+                    out.push_str(col.name);
+                    if !col.domain.is_empty() {
+                        out.push('{');
+                        out.push_str(&col.domain.join(","));
+                        out.push('}');
+                    }
+                }
+                out.push('\n');
+            }
+        }
+    }
+    out
 }
 
 /// Prime no modo pedido.

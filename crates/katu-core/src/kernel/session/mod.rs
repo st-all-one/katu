@@ -24,15 +24,21 @@ use katu_policy::{ResolvedPath, ToolUse};
 
 mod context;
 mod error;
+mod identity;
+mod resume;
+mod snapshot;
 
 pub use context::CallContext;
 use context::log_outcome;
 pub use error::SessionError;
+pub use identity::{SessionId, SessionMeta, audit_dir, discover_root, katu_dir};
 
 /// Sessão append-only: o log é a fonte da verdade e o estado é a sua projeção.
 pub struct Session<'a> {
     fs: &'a dyn Fs,
     dir: PathBuf,
+    root: PathBuf,
+    meta: Option<SessionMeta>,
     log: Log<'a>,
     state: State,
     cost: CostGovernor,
@@ -72,13 +78,30 @@ impl<'a> Session<'a> {
         caps: CostCaps,
     ) -> Result<Self, SessionError> {
         let records = read_records(fs, &session_path(dir))?;
-        let events: Vec<Event> = records.into_iter().map(|record| record.event).collect();
-        let state = state_of(&events)?;
-        let cost = CostGovernor::from_events(caps, &events);
+        let meta = identity::load_meta(fs, dir);
+        let root = meta
+            .as_ref()
+            .map_or_else(|| dir.to_path_buf(), |meta| PathBuf::from(&meta.root));
+        let last_seq = records.last().map_or(0, |record| record.seq);
+        let (mut state, start_seq) = snapshot::load(fs, dir)
+            .filter(|snapshot| snapshot.seq <= last_seq)
+            .map_or_else(
+                || (State::initial(), 0),
+                |snapshot| (snapshot.state, snapshot.seq),
+            );
+        for record in &records {
+            if record.seq > start_seq {
+                state = step(&state, &record.event)?;
+            }
+        }
+        let all: Vec<Event> = records.into_iter().map(|record| record.event).collect();
+        let cost = CostGovernor::from_events(caps, &all);
         let log = Log::open(fs, dir)?;
         Ok(Self {
             fs,
             dir: dir.to_path_buf(),
+            root,
+            meta,
             log,
             state,
             cost,
@@ -135,6 +158,9 @@ impl<'a> Session<'a> {
             self.cost.commit(charge);
         }
         self.state = next;
+        if matches!(event, Event::PhaseTransition { .. }) && self.write_snapshot().is_err() {
+            crate::event!(Level::Warn, events::SESSION_SNAPSHOT, "ok" => false);
+        }
         Ok(())
     }
 

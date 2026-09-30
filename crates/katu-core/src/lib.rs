@@ -14,6 +14,7 @@ pub mod evidence;
 pub mod feedback;
 pub mod kernel;
 pub mod memory;
+pub mod model;
 pub mod plan;
 pub mod ports;
 pub mod report;

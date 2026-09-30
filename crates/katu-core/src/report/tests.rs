@@ -1,5 +1,5 @@
-//! Testes do envelope `ToolReport` (DF12/E06-T12): TOON/JSON coerentes, vazios omitidos,
-//! bloco literal e ids content-addressed.
+//! Testes do envelope `ToolReport` (DF12/E06-T12, ADR 0005 v3): TOON colunar/JSON coerentes,
+//! vazios omitidos, bloco literal e ids content-addressed.
 
 use super::{Cost, Page, ToolReport, content_hash, content_id, fingerprint};
 use crate::toon::Value;
@@ -26,16 +26,19 @@ fn sample() -> ToolReport {
 #[test]
 fn toon_carries_kind_id_and_data() {
     let toon = sample().to_toon();
-    assert!(toon.starts_with("kind: read.summary\n"), "{toon}");
-    assert!(toon.contains("id: f_0badc0de\n"), "{toon}");
-    assert!(toon.contains("hash: 0123456789abcdef\n"), "{toon}");
-    assert!(toon.contains("loc: 42\n"), "{toon}");
+    assert!(toon.starts_with("\u{1e}r\n"), "{toon}");
     assert!(
-        toon.contains("page: {total: 1, truncated: false}\n"),
+        toon.contains(
+            "read.summary\u{1f}f_0badc0de\u{1f}0123456789abcdef\u{1f}\u{1f}1\u{1f}0\u{1f}120\u{1f}1\u{1f}30\n"
+        ),
         "{toon}"
     );
     assert!(
-        toon.contains("cost: {bytes: 120, ms: 1, tokens_est: 30}\n"),
+        toon.contains("\u{1e}k\npath\u{1f}src/lib.rs\nloc\u{1f}42\n"),
+        "{toon}"
+    );
+    assert!(
+        toon.contains("\u{1e}next\nread f_0badc0de#s_x1\n"),
         "{toon}"
     );
 }
@@ -62,12 +65,11 @@ fn json_carries_the_same_fields() -> Result<(), serde_json::Error> {
 }
 
 #[test]
-fn omits_empty_fields_in_both_formats() -> Result<(), serde_json::Error> {
+fn omits_absent_blocks_in_both_formats() -> Result<(), serde_json::Error> {
     let report = ToolReport::new("read.full", Value::str("x"));
     let toon = report.to_toon();
-    for key in ["id:", "hash:", "page:", "next:", "cost:"] {
-        assert!(!toon.contains(key), "{key} não devia aparecer em {toon}");
-    }
+    assert!(!toon.contains("\u{1e}next"), "{toon}");
+    assert!(!toon.contains('\u{1d}'), "{toon}");
     let json: serde_json::Value = serde_json::from_str(&report.to_json()?)?;
     assert!(json.get("id").is_none());
     assert!(json.get("page").is_none());
@@ -84,9 +86,12 @@ fn block_renders_literal_lines() {
             Value::block("fn main() {\n    ok();\n}"),
         )]),
     );
-    assert_eq!(
-        report.to_toon(),
-        "kind: read.full\ndata:\n  text: |\n    fn main() {\n        ok();\n    }\n"
+    assert!(
+        report
+            .to_toon()
+            .contains("\u{1d}text\nfn main() {\n    ok();\n}\n"),
+        "{}",
+        report.to_toon()
     );
 }
 
@@ -107,7 +112,7 @@ fn fingerprint_is_deterministic() {
 }
 
 #[test]
-fn page_cursor_is_omitted_when_none() {
+fn page_cursor_is_empty_when_none() {
     let page = Page {
         cursor: None,
         total: 5,
@@ -117,6 +122,6 @@ fn page_cursor_is_omitted_when_none() {
     assert!(
         report
             .to_toon()
-            .contains("page: {total: 5, truncated: true}\n")
+            .contains("grep.hits\u{1f}\u{1f}\u{1f}\u{1f}5\u{1f}1\u{1f}0\u{1f}0\u{1f}0\n")
     );
 }

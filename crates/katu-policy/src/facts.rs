@@ -83,6 +83,30 @@ pub enum ToolName {
     Thinking,
 }
 
+impl ToolName {
+    /// Nome estável (`snake_case`) — vocabulário do modelo, do log e do registo.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Read => "read",
+            Self::Write => "write",
+            Self::Edit => "edit",
+            Self::Move => "move",
+            Self::Trash => "trash",
+            Self::Exec => "exec",
+            Self::Search => "search",
+            Self::MemoryRecall => "memory_recall",
+            Self::MemoryWrite => "memory_write",
+            Self::MemoryOutcome => "memory_outcome",
+            Self::MemoryClose => "memory_close",
+            Self::Plan => "plan",
+            Self::Compact => "compact",
+            Self::Model => "model",
+            Self::Thinking => "thinking",
+        }
+    }
+}
+
 /// Modo da busca (E06-T05).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

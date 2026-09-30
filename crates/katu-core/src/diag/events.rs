@@ -87,6 +87,23 @@ catalog! {
     (VERIFY_REPORT, "verify.report", "Relatório do gate de verificação determinístico (E09)."),
     (SCOPE_MERGE, "scope.merge", "Merge de contratos de escopo por menor privilégio (E09-T04)."),
 
+    // -- Sessões (ADR 0008) --------------------------------------------------
+    (SESSION_OPEN, "session.open", "Criação de uma sessão vinculada ao projeto."),
+    (SESSION_RESUME, "session.resume", "Retomada de uma sessão pelo id."),
+    (SESSION_SNAPSHOT, "session.snapshot", "Gravação do snapshot de estado numa fronteira de fase."),
+
+    // -- Auditoria (ADR 0009) ------------------------------------------------
+    (AUDIT_SEAL, "audit.seal", "Selagem de um segmento de auditoria."),
+    (AUDIT_INDEX, "audit.index", "Construção/atualização do índice de auditoria."),
+    (AUDIT_QUERY, "audit.query", "Consulta à auditoria."),
+
+    // -- Formato ao modelo (TOON colunar v3, ADR 0006) -----------------------
+    (TOON_PROJECT, "toon.project", "Projeção de um payload `Value` em secções colunares."),
+    (TOON_EMIT, "toon.emit", "Renderização do *stream* colunar ao modelo."),
+    (MODEL_PROJECT, "model.project", "Projeção model-facing (outcome/erro/verificação)."),
+    (CONTEXT_DIGEST, "context.digest", "Construção do digest de compactação (tabela `m`)."),
+    (SCHEMA_CATALOG, "schema.catalog", "Geração do catálogo compacto de tools."),
+
     // -- Custo (E09-T06) -----------------------------------------------------
     (COST_CHECK, "cost.check", "Verificação das camadas do cost governor."),
     (COST_REFUSE, "cost.refuse", "Recusa do cost governor (camada + causa)."),

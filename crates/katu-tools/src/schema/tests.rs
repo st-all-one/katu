@@ -1,6 +1,8 @@
 //! Testes do linter de schema (E06-T02).
 
-use super::{MAX_DESCRIPTION_CHARS, ParamKind, ParamSpec, SCHEMAS, ToolSchema, lint, lint_all};
+use super::{
+    MAX_DESCRIPTION_CHARS, ParamKind, ParamSpec, SCHEMAS, ToolSchema, catalog, lint, lint_all,
+};
 
 fn param<'a>(name: &'a str, kind: ParamKind<'a>) -> ParamSpec<'a> {
     ParamSpec {
@@ -44,6 +46,24 @@ fn real_schema_names_match_the_registry() {
             "memory"
         ]
     );
+}
+
+#[test]
+fn catalog_covers_every_tool_with_closed_domains() {
+    let catalog = catalog();
+    assert!(catalog.starts_with("\u{1e}tool\n"), "{catalog}");
+    for schema in SCHEMAS {
+        assert!(
+            catalog.contains(schema.name),
+            "tool `{}` fora do catálogo",
+            schema.name
+        );
+    }
+    assert!(
+        catalog.contains("view{full,range,outline,summary,symbol,diff}"),
+        "{catalog}"
+    );
+    assert!(catalog.contains("dry_run?"), "{catalog}");
 }
 
 #[test]

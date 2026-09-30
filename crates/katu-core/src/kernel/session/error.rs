@@ -33,6 +33,9 @@ pub enum SessionError {
     /// Falha de sistema de ficheiros.
     #[error("fs: {0}")]
     Fs(#[from] FsError),
+    /// Sessão pedida não existe no índice.
+    #[error("sessão desconhecida: {0}")]
+    UnknownSession(String),
     /// Invariante `Model-visible ⟺ logged` violada (§42).
     #[error("invariante: {0}")]
     Invariant(String),

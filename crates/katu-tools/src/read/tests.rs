@@ -62,22 +62,22 @@ fn diff_report(base: &str) -> String {
 #[test]
 fn summary_carries_symbols_imports_and_next() {
     let toon = report(View::Summary, None, None);
-    assert!(toon.starts_with("kind: read.summary\n"), "{toon}");
-    assert!(toon.contains("lang: rust\n"), "{toon}");
-    assert!(toon.contains("imports: [use std::fmt]\n"), "{toon}");
-    assert!(toon.contains("name: Point\n"), "{toon}");
-    assert!(toon.contains("name: new\n"), "{toon}");
-    assert!(toon.contains("next:"), "{toon}");
+    assert!(toon.starts_with("\u{1e}r\n"), "{toon}");
+    assert!(
+        toon.contains("path\u{1f}src/point.rs\nlang\u{1f}rust\n"),
+        "{toon}"
+    );
+    assert!(toon.contains("\u{1e}imports\nuse std::fmt\n"), "{toon}");
+    assert!(toon.contains("Point"), "{toon}");
+    assert!(toon.contains("new"), "{toon}");
+    assert!(toon.contains("\u{1e}next\n"), "{toon}");
 }
 
 #[test]
 fn full_returns_a_literal_block_with_ids() {
     let toon = report(View::Full, None, None);
-    assert!(toon.contains("kind: read.full\n"), "{toon}");
-    assert!(toon.contains("id: f_"), "{toon}");
-    assert!(toon.contains("hash: "), "{toon}");
-    assert!(toon.contains("text: |\n"), "{toon}");
-    assert!(toon.contains("  use std::fmt;\n"), "{toon}");
+    assert!(toon.contains("read.full\u{1f}f_"), "{toon}");
+    assert!(toon.contains("\u{1d}text\nuse std::fmt;\n"), "{toon}");
 }
 
 #[test]
@@ -107,17 +107,21 @@ fn full_round_trips_the_bytes() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn outline_lists_symbols_with_ranges() {
     let toon = report(View::Outline, None, None);
-    assert!(toon.contains("kind: read.outline\n"), "{toon}");
-    assert!(toon.contains("kind: struct\n"), "{toon}");
-    assert!(toon.contains("kind: fn\n"), "{toon}");
-    assert!(toon.contains("range: [3, 5]\n"), "{toon}");
+    assert!(toon.contains("read.outline\u{1f}"), "{toon}");
+    assert!(toon.contains("\u{1e}symbols\n"), "{toon}");
+    assert!(
+        toon.contains("\u{1f}struct\u{1f}Point\u{1f}3\u{1f}5\n"),
+        "{toon}"
+    );
+    assert!(toon.contains("\u{1f}fn\u{1f}new\u{1f}"), "{toon}");
 }
 
 #[test]
 fn symbol_returns_only_the_body() {
     let toon = report(View::Symbol, None, Some("new"));
-    assert!(toon.contains("kind: read.symbol\n"), "{toon}");
-    assert!(toon.contains("symbol: new\n"), "{toon}");
+    assert!(toon.contains("read.symbol\u{1f}"), "{toon}");
+    assert!(toon.contains("symbol\u{1f}new\n"), "{toon}");
+    assert!(toon.contains("start\u{1f}"), "{toon}");
     assert!(toon.contains("Self { x }\n"), "{toon}");
     assert!(
         !toon.contains("use std::fmt"),
@@ -128,14 +132,14 @@ fn symbol_returns_only_the_body() {
 #[test]
 fn unknown_symbol_is_explicit() {
     let toon = report(View::Symbol, None, Some("nope"));
-    assert!(toon.contains("found: false\n"), "{toon}");
-    assert!(toon.contains("symbols:"), "{toon}");
+    assert!(toon.contains("found\u{1f}0\n"), "{toon}");
+    assert!(toon.contains("\u{1e}symbols\n"), "{toon}");
 }
 
 #[test]
 fn range_returns_the_requested_slice() {
     let toon = report(View::Range, Some(LineRange { start: 3, end: 5 }), None);
-    assert!(toon.contains("range: [3, 5]\n"), "{toon}");
+    assert!(toon.contains("start\u{1f}3\nend\u{1f}5\n"), "{toon}");
     assert!(toon.contains("pub struct Point {\n"), "{toon}");
     assert!(!toon.contains("use std::fmt"), "{toon}");
 }
@@ -157,18 +161,19 @@ fn small_budget_truncates_deterministically() {
         budget,
     });
     let toon = report.map_or_else(String::new, |report| report.to_toon());
-    assert!(toon.contains("truncated: true"), "{toon}");
-    assert!(toon.contains("cursor: 3"), "{toon}");
+    assert!(
+        toon.contains("\u{1f}3\u{1f}10\u{1f}1\u{1f}0\u{1f}0\u{1f}0\n"),
+        "{toon}"
+    );
 }
 
 #[test]
 fn diff_without_base_is_unavailable_and_with_base_shows_the_delta() {
     assert!(report(View::Diff, None, None).is_empty());
     let toon = diff_report("use std::fmt;\npub struct Point {\n    x: i32,\n}\n");
-    assert!(toon.starts_with("kind: read.diff\n"), "{toon}");
-    assert!(toon.contains("added:"), "{toon}");
-    assert!(toon.contains("removed:"), "{toon}");
-    assert!(toon.contains("hunks:"), "{toon}");
+    assert!(toon.contains("read.diff\u{1f}"), "{toon}");
+    assert!(toon.contains("added\u{1f}"), "{toon}");
+    assert!(toon.contains("\u{1e}hunks\n"), "{toon}");
     assert_eq!(View::parse("summary"), Some(View::Summary));
     assert_eq!(View::parse("bogus"), None);
 }
@@ -190,7 +195,7 @@ fn tool_reads_and_reports() -> Result<(), Box<dyn std::error::Error>> {
     };
     let output = tool.execute(&use_()?);
     let report = output.report.as_ref().ok_or("sem relatório")?;
-    assert!(report.to_toon().contains("kind: read.summary"));
+    assert!(report.to_toon().contains("read.summary\u{1f}"));
     Ok(())
 }
 
@@ -230,6 +235,6 @@ fn tool_diff_uses_the_base() -> Result<(), Box<dyn std::error::Error>> {
     let output = tool.execute(&use_()?);
     let report = output.report.as_ref().ok_or("sem relatório")?;
     assert_eq!(report.kind, "read.diff");
-    assert!(report.to_toon().contains("hunks:"), "{report:?}");
+    assert!(report.to_toon().contains("\u{1e}hunks\n"), "{report:?}");
     Ok(())
 }

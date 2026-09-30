@@ -48,10 +48,10 @@ fn grep_finds_and_clusters() -> Result<(), Box<dyn std::error::Error>> {
     let output = tool(&fs, DEFAULT_LIMIT).execute(&use_(SearchMode::Grep, "run")?);
     assert_eq!(output.outcome, ToolOutcome::Ok);
     let rendered = render(&output);
-    assert!(rendered.contains("kind: search.grep\n"), "{rendered}");
+    assert!(rendered.contains("search.grep\u{1f}"), "{rendered}");
     assert!(rendered.contains("/work/src/a.rs"), "{rendered}");
-    assert!(rendered.contains("clusters:"), "{rendered}");
-    assert!(rendered.contains("negative:"), "{rendered}");
+    assert!(rendered.contains("\u{1e}clusters\n"), "{rendered}");
+    assert!(rendered.contains("negative\u{1f}"), "{rendered}");
     Ok(())
 }
 
@@ -71,7 +71,10 @@ fn grep_applies_the_limit() -> Result<(), Box<dyn std::error::Error>> {
     seed(&fs)?;
     let output = tool(&fs, 1).execute(&use_(SearchMode::Grep, "run")?);
     let rendered = render(&output);
-    assert!(rendered.contains("hits: 1\n"), "{rendered}");
+    assert!(
+        rendered.contains("scanned\u{1f}1\nsearched\u{1f}3\nhits\u{1f}1\n"),
+        "{rendered}"
+    );
     Ok(())
 }
 
@@ -81,7 +84,7 @@ fn find_ranks_by_name() -> Result<(), Box<dyn std::error::Error>> {
     seed(&fs)?;
     let output = tool(&fs, DEFAULT_LIMIT).execute(&use_(SearchMode::Find, "a.rs")?);
     let rendered = render(&output);
-    assert!(rendered.contains("kind: search.find\n"), "{rendered}");
+    assert!(rendered.contains("search.find\u{1f}"), "{rendered}");
     assert!(rendered.contains("/work/src/a.rs"), "{rendered}");
     Ok(())
 }
@@ -92,9 +95,13 @@ fn ls_maps_semantics() -> Result<(), Box<dyn std::error::Error>> {
     seed(&fs)?;
     let output = tool(&fs, DEFAULT_LIMIT).execute(&use_at("/work/src", SearchMode::Ls, "")?);
     let rendered = render(&output);
-    assert!(rendered.contains("kind: search.ls\n"), "{rendered}");
-    assert!(rendered.contains("lang: rust\n"), "{rendered}");
-    assert!(rendered.contains("tests: true\n"), "{rendered}");
+    assert!(rendered.contains("search.ls\u{1f}"), "{rendered}");
+    assert!(rendered.contains("rust"), "{rendered}");
+    assert!(rendered.contains("\u{1e}entries\n"), "{rendered}");
+    assert!(
+        rendered.contains("\u{1f}file\u{1f}rust\u{1f}"),
+        "{rendered}"
+    );
     Ok(())
 }
 

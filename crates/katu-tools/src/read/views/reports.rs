@@ -43,13 +43,8 @@ pub(super) fn range_report(lines: &[&str], meta: &Meta<'_>, span: LineRange) -> 
     let body = slice(lines, start, end).join("\n");
     let data = Value::map(vec![
         ("path".to_string(), Value::str(meta.path)),
-        (
-            "range".to_string(),
-            Value::list(vec![
-                Value::int(i64::from(start)),
-                Value::int(i64::from(end)),
-            ]),
-        ),
+        ("start".to_string(), Value::int(i64::from(start))),
+        ("end".to_string(), Value::int(i64::from(end))),
         ("text".to_string(), Value::block(body)),
     ]);
     ToolReport::new("read.range", data)
@@ -99,7 +94,7 @@ pub(super) fn summary(lines: &[&str], meta: &Meta<'_>) -> ToolReport {
                     .iter()
                     .map(|(line, kind)| {
                         Value::map(vec![
-                            ("line".to_string(), Value::int(i64::from(*line))),
+                            ("ln".to_string(), Value::int(i64::from(*line))),
                             ("kind".to_string(), Value::str(*kind)),
                         ])
                     })
@@ -126,13 +121,8 @@ pub(super) fn symbol(lines: &[&str], meta: &Meta<'_>, wanted: &str) -> ToolRepor
             ("path".to_string(), Value::str(meta.path)),
             ("symbol".to_string(), Value::str(found.name.clone())),
             ("kind".to_string(), Value::str(found.kind.as_str())),
-            (
-                "range".to_string(),
-                Value::list(vec![
-                    Value::int(i64::from(found.start)),
-                    Value::int(i64::from(found.end)),
-                ]),
-            ),
+            ("start".to_string(), Value::int(i64::from(found.start))),
+            ("end".to_string(), Value::int(i64::from(found.end))),
             ("text".to_string(), Value::block(body)),
         ]);
         return ToolReport::new("read.symbol", data)
@@ -167,13 +157,8 @@ fn symbol_value(path: &str, symbol: &Symbol) -> Value {
         ),
         ("kind".to_string(), Value::str(symbol.kind.as_str())),
         ("name".to_string(), Value::str(symbol.name.clone())),
-        (
-            "range".to_string(),
-            Value::list(vec![
-                Value::int(i64::from(symbol.start)),
-                Value::int(i64::from(symbol.end)),
-            ]),
-        ),
+        ("start".to_string(), Value::int(i64::from(symbol.start))),
+        ("end".to_string(), Value::int(i64::from(symbol.end))),
     ])
 }
 

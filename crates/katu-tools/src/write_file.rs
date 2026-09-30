@@ -99,8 +99,8 @@ mod tests {
         let rendered = output
             .report
             .map_or_else(String::new, |report| report.to_toon());
-        assert!(rendered.contains("kind: write.file\n"), "{rendered}");
-        assert!(rendered.contains("bytes: 3\n"), "{rendered}");
+        assert!(rendered.contains("write.file\u{1f}"), "{rendered}");
+        assert!(rendered.contains("bytes\u{1f}3\n"), "{rendered}");
         assert_eq!(fs.read(std::path::Path::new(PATH))?, b"abc".to_vec());
         Ok(())
     }

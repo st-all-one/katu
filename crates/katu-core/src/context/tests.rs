@@ -1,6 +1,7 @@
 use super::{
     COMPACTION_SCHEMA_VERSION, CompactionMode, ContextBudget, PRIME_VERSION, PrimeMode, assemble,
-    assemble_with_prime, compact, message_id, prime, prime_for, prime_long, recover,
+    assemble_with_prime, compact, message_id, prime, prime_for, prime_long, prime_with_catalog,
+    recover,
 };
 use crate::evidence::EvidenceBasis;
 use crate::kernel::{Event, derive_messages};
@@ -174,6 +175,15 @@ fn no_prefix_means_no_replacements() -> Result<(), Box<dyn std::error::Error>> {
     assert!(compaction.replacements.is_empty());
     assert_eq!(compaction.context.messages, derive_messages(&events));
     Ok(())
+}
+
+#[test]
+fn prime_with_catalog_injects_the_tool_table() {
+    let catalog = "\u{1e}tool\nread\u{1f}path view?\n";
+    let rendered = prime_with_catalog(catalog);
+    assert!(rendered.contains("tabela `tool`"), "{rendered}");
+    assert!(rendered.contains(catalog), "{rendered}");
+    assert!(!rendered.contains("tools: read/write"), "{rendered}");
 }
 
 #[test]
