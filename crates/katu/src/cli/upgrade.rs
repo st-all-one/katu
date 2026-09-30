@@ -4,6 +4,7 @@
 //! artefacto. A sincronização futura será contra GitHub Releases.
 
 use clap::Args;
+use katu_core::diag::{Level, events};
 use katu_core::error::Error;
 
 use crate::report::Report;
@@ -18,6 +19,7 @@ pub(crate) struct UpgradeArgs {
 
 /// Executa `katu upgrade` (recusa enquanto o canal não existir).
 pub(crate) fn execute(_args: &UpgradeArgs) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_UPGRADE, "upgrade::execute");
     Report::failed(
         "upgrade",
         &Error::unavailable("canal de atualização não configurado"),

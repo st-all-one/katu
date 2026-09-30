@@ -27,6 +27,8 @@ pub(super) fn read<'a>(
     cwd: &ResolvedPath,
     args: &Value,
 ) -> Result<Routed<'a>, RouteError> {
+    let _span = katu_core::trace_fn!("agent::router::tools::read");
+
     let path = resolve(ports.fs, cwd, &required_str(args, "path")?)?;
     let view = match optional_str(args, "view") {
         Some(name) => View::parse(&name).ok_or(RouteError::InvalidArg("view"))?,
@@ -62,6 +64,8 @@ pub(super) fn write<'a>(
     cwd: &ResolvedPath,
     args: &Value,
 ) -> Result<Routed<'a>, RouteError> {
+    let _span = katu_core::trace_fn!("agent::router::tools::write");
+
     let path = resolve(ports.fs, cwd, &required_str(args, "path")?)?;
     let content = required_str(args, "content")?;
     let bytes = u64::try_from(content.len()).unwrap_or(u64::MAX);
@@ -91,6 +95,8 @@ pub(super) fn edit<'a>(
     cwd: &ResolvedPath,
     args: &Value,
 ) -> Result<Routed<'a>, RouteError> {
+    let _span = katu_core::trace_fn!("agent::router::tools::edit");
+
     let path = resolve(ports.fs, cwd, &required_str(args, "path")?)?;
     let use_ = use_of(
         ToolName::Edit,
@@ -117,6 +123,8 @@ pub(super) fn move_<'a>(
     cwd: &ResolvedPath,
     args: &Value,
 ) -> Result<Routed<'a>, RouteError> {
+    let _span = katu_core::trace_fn!("agent::router::tools::move_");
+
     let from = resolve(ports.fs, cwd, &required_str(args, "from")?)?;
     let to = resolve(ports.fs, cwd, &required_str(args, "to")?)?;
     let use_ = use_of(
@@ -141,6 +149,8 @@ pub(super) fn trash<'a>(
     cwd: &ResolvedPath,
     args: &Value,
 ) -> Result<Routed<'a>, RouteError> {
+    let _span = katu_core::trace_fn!("agent::router::tools::trash");
+
     let path = resolve(ports.fs, cwd, &required_str(args, "path")?)?;
     let use_ = use_of(
         ToolName::Trash,
@@ -166,6 +176,8 @@ pub(super) fn bash<'a>(
     cwd: &ResolvedPath,
     args: &Value,
 ) -> Result<Routed<'a>, RouteError> {
+    let _span = katu_core::trace_fn!("agent::router::tools::bash");
+
     let command = required_argv(args, "argv")?;
     let workdir = match optional_str(args, "cwd") {
         Some(raw) => resolve(ports.fs, cwd, &raw)?,
@@ -200,6 +212,8 @@ pub(super) fn search<'a>(
     args: &Value,
     mode: SearchMode,
 ) -> Result<Routed<'a>, RouteError> {
+    let _span = katu_core::trace_fn!("agent::router::tools::search");
+
     let root = match optional_str(args, "root").or_else(|| optional_str(args, "path")) {
         Some(raw) => resolve(ports.fs, cwd, &raw)?,
         None => cwd.clone(),
@@ -223,6 +237,8 @@ pub(super) fn search<'a>(
 /// Tool `plan`: valida o plano do artefacto carregado no arranque (E09-T04). Sem artefacto fica
 /// **não executável** (controlo `scope-contract` em falta), fail-closed recuperável.
 pub(super) fn plan<'a>(cwd: &ResolvedPath, loaded: Option<&Plan>) -> Routed<'a> {
+    let _span = katu_core::trace_fn!("agent::router::tools::plan");
+
     let use_ = use_of(ToolName::Plan, ToolArgs::Plan, Vec::new(), None, cwd);
     match loaded {
         Some(plan) => Routed::Plan {
@@ -247,10 +263,14 @@ struct Unavailable {
 
 impl Tool for Unavailable {
     fn name(&self) -> ToolName {
+        let _span = katu_core::trace_fn!("agent::router::tools::name");
+
         self.tool_name
     }
 
     fn execute(&self, _use_: &ToolUse) -> ToolOutput {
+        let _span = katu_core::trace_fn!("agent::router::tools::execute");
+
         ToolOutput::outcome(ToolOutcome::Unavailable {
             control: ControlId::new(self.control),
             rule_id: None,

@@ -14,6 +14,7 @@ mod tests;
 
 use std::path::{Path, PathBuf};
 
+use katu_core::diag::{Level, events};
 use katu_core::kernel::Tool;
 use katu_core::memory::{Anchor, NoteType, PreWriteReq, RecallReq};
 use katu_core::plan::Plan;
@@ -93,6 +94,7 @@ pub(super) fn route<'a>(
     args: &Value,
     loaded: Option<&Plan>,
 ) -> Result<Routed<'a>, RouteError> {
+    let _span = katu_core::fn_span!(Level::Debug, events::AGENT_ROUTE, "router::route");
     match name {
         "read" => read(ports, cwd, args),
         "write" => write(ports, cwd, args),
@@ -111,6 +113,8 @@ pub(super) fn route<'a>(
 
 /// Tool `memory` (`record`/`search`); a execução é do gate de memória (E05).
 pub(super) fn memory(args: &Value) -> Result<Routed<'static>, RouteError> {
+    let _span = katu_core::trace_fn!("agent::router::memory");
+
     match required_str(args, "command")?.as_str() {
         "search" => Ok(Routed::MemoryRecall {
             req: RecallReq {
@@ -138,6 +142,8 @@ pub(super) fn use_of(
     argv: Option<ResolvedArgv>,
     cwd: &ResolvedPath,
 ) -> ToolUse {
+    let _span = katu_core::trace_fn!("agent::router::use_of");
+
     ToolUse {
         name,
         args: tool_args,
@@ -153,6 +159,8 @@ pub(super) fn resolve(
     cwd: &ResolvedPath,
     raw: &str,
 ) -> Result<ResolvedPath, RouteError> {
+    let _span = katu_core::trace_fn!("agent::router::resolve");
+
     let path = Path::new(raw);
     let full = if path.is_absolute() {
         path.to_path_buf()
@@ -164,6 +172,8 @@ pub(super) fn resolve(
 
 /// Interpreta `inicio:fim` (1-based, inclusivo).
 pub(super) fn parse_range(raw: &str) -> Result<LineRange, RouteError> {
+    let _span = katu_core::trace_fn!("agent::router::parse_range");
+
     let (first, second) = raw.split_once(':').ok_or(RouteError::InvalidArg("range"))?;
     let parse = |text: &str| text.trim().parse::<u32>().ok();
     match (parse(first), parse(second)) {
@@ -174,6 +184,8 @@ pub(super) fn parse_range(raw: &str) -> Result<LineRange, RouteError> {
 
 /// String obrigatória.
 pub(super) fn required_str(args: &Value, key: &'static str) -> Result<String, RouteError> {
+    let _span = katu_core::trace_fn!("agent::router::required_str");
+
     args.get(key)
         .and_then(Value::as_str)
         .map(str::to_string)
@@ -182,16 +194,22 @@ pub(super) fn required_str(args: &Value, key: &'static str) -> Result<String, Ro
 
 /// String opcional.
 pub(super) fn optional_str(args: &Value, key: &str) -> Option<String> {
+    let _span = katu_core::trace_fn!("agent::router::optional_str");
+
     args.get(key).and_then(Value::as_str).map(str::to_string)
 }
 
 /// Booleano opcional (`false` por omissão).
 pub(super) fn optional_bool(args: &Value, key: &str) -> bool {
+    let _span = katu_core::trace_fn!("agent::router::optional_bool");
+
     args.get(key).and_then(Value::as_bool).unwrap_or(false)
 }
 
 /// Inteiro opcional.
 pub(super) fn optional_usize(args: &Value, key: &str) -> Option<usize> {
+    let _span = katu_core::trace_fn!("agent::router::optional_usize");
+
     args.get(key)
         .and_then(Value::as_u64)
         .and_then(|value| usize::try_from(value).ok())
@@ -199,6 +217,8 @@ pub(super) fn optional_usize(args: &Value, key: &str) -> Option<usize> {
 
 /// `argv` obrigatório (lista de strings não vazia).
 pub(super) fn required_argv(args: &Value, key: &'static str) -> Result<ResolvedArgv, RouteError> {
+    let _span = katu_core::trace_fn!("agent::router::required_argv");
+
     let list = args
         .get(key)
         .and_then(Value::as_array)

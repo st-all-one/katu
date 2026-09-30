@@ -9,6 +9,8 @@ impl Runtime<'_> {
     /// Estado do controlo (E12-T10): modelo ativo + grau de pensamento.
     #[must_use]
     pub(crate) fn control(&self) -> ControlState {
+        let _span = katu_core::trace_fn!("runtime::control::control");
+
         self.session.state().control.clone()
     }
 
@@ -24,6 +26,8 @@ impl Runtime<'_> {
         control: &Control,
         caps: &ModelCapabilities,
     ) -> Result<(), RuntimeError> {
+        let _span = katu_core::trace_fn!("runtime::control::set_control");
+
         control.validate(&self.session.state().control, caps)?;
         self.session.apply(&Event::Control {
             control: control.clone(),

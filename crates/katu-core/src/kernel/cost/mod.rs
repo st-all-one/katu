@@ -46,6 +46,8 @@ impl CostGovernor {
     /// Cria o governor com os tetos dados e uso nulo.
     #[must_use]
     pub fn new(caps: CostCaps, usage: Budget) -> Self {
+        let _span = crate::trace_fn!("kernel::cost::new");
+
         Self::with_usage(caps, usage, BTreeMap::new())
     }
 
@@ -56,6 +58,8 @@ impl CostGovernor {
         usage: Budget,
         per_tool_used: BTreeMap<ToolName, u32>,
     ) -> Self {
+        let _span = crate::trace_fn!("kernel::cost::with_usage");
+
         Self {
             global: BudgetGate::resume(caps.global, usage),
             caps,
@@ -68,6 +72,8 @@ impl CostGovernor {
     /// Reconstrói o governor a partir do log (uso global e por ferramenta).
     #[must_use]
     pub fn from_events(caps: CostCaps, events: &[Event]) -> Self {
+        let _span = crate::trace_fn!("kernel::cost::from_events");
+
         let mut per_tool: BTreeMap<ToolName, u32> = BTreeMap::new();
         for event in events {
             if let Event::ToolCall { tool, .. } = event {
@@ -81,24 +87,32 @@ impl CostGovernor {
     /// Tetos correntes.
     #[must_use]
     pub fn caps(&self) -> &CostCaps {
+        let _span = crate::trace_fn!("kernel::cost::caps");
+
         &self.caps
     }
 
     /// Portão global/tarefa (único dono do teto de contexto).
     #[must_use]
     pub fn global(&self) -> BudgetGate {
+        let _span = crate::trace_fn!("kernel::cost::global");
+
         self.global
     }
 
     /// Kill switch, se engatado.
     #[must_use]
     pub fn kill_switch(&self) -> Option<&KillSwitch> {
+        let _span = crate::trace_fn!("kernel::cost::kill_switch");
+
         self.kill.as_ref()
     }
 
     /// Uso por ferramenta.
     #[must_use]
     pub fn per_tool_used(&self) -> &BTreeMap<ToolName, u32> {
+        let _span = crate::trace_fn!("kernel::cost::per_tool_used");
+
         &self.per_tool_used
     }
 
@@ -114,7 +128,7 @@ impl CostGovernor {
         )
     )]
     pub fn check(&self, charge: &CostCharge) -> Result<(), CostRefusal> {
-        let _span = crate::span!(Level::Trace, events::COST_CHECK, "tool" => charge.tool.is_some());
+        let _span = crate::fn_span!(Level::Trace, events::COST_CHECK, "kernel::cost::check", "tool" => charge.tool.is_some());
         let result = self.check_layers(charge);
         if let Err(refusal) = &result {
             crate::event!(
@@ -128,6 +142,8 @@ impl CostGovernor {
 
     /// Aplica um débito (o chamador deve ter verificado com [`CostGovernor::check`]).
     pub fn commit(&mut self, charge: &CostCharge) {
+        let _span = crate::trace_fn!("kernel::cost::commit");
+
         if let Some(tool) = charge.tool {
             let entry = self.per_tool_used.entry(tool).or_insert(0_u32);
             *entry = entry.saturating_add(1);
@@ -141,6 +157,8 @@ impl CostGovernor {
 
     /// Engata o kill switch (corta tudo até re-enable separado).
     pub fn trip(&mut self, reason: impl Into<String>, now_millis: u64) {
+        let _span = crate::trace_fn!("kernel::cost::trip");
+
         let reason = reason.into();
         crate::event!(Level::Warn, events::COST_KILL, "reason" => reason.as_str());
         self.kill = Some(KillSwitch {
@@ -158,6 +176,8 @@ impl CostGovernor {
         )
     )]
     pub fn reenable(&mut self, grant: &Reenable) {
+        let _span = crate::trace_fn!("kernel::cost::reenable");
+
         crate::event!(
             Level::Info,
             events::COST_REENABLE,
@@ -168,6 +188,8 @@ impl CostGovernor {
 
     /// Avalia as camadas pela ordem de precedência.
     fn check_layers(&self, charge: &CostCharge) -> Result<(), CostRefusal> {
+        let _span = crate::trace_fn!("kernel::cost::check_layers");
+
         self.check_kill()?;
         if let Some(tool) = charge.tool {
             self.check_per_tool(tool)?;
@@ -184,6 +206,8 @@ impl CostGovernor {
 
     /// Kill switch.
     fn check_kill(&self) -> Result<(), CostRefusal> {
+        let _span = crate::trace_fn!("kernel::cost::check_kill");
+
         match &self.kill {
             Some(kill) => Err(CostRefusal::KillSwitch {
                 reason: kill.reason.clone(),
@@ -194,6 +218,8 @@ impl CostGovernor {
 
     /// Teto por ferramenta.
     fn check_per_tool(&self, tool: ToolName) -> Result<(), CostRefusal> {
+        let _span = crate::trace_fn!("kernel::cost::check_per_tool");
+
         let Some(cap) = self.caps.per_tool.get(&tool).copied() else {
             return Ok(());
         };
@@ -211,6 +237,8 @@ impl CostGovernor {
 
     /// Janela rolante.
     fn check_rolling(&self, now: u64) -> Result<(), CostRefusal> {
+        let _span = crate::trace_fn!("kernel::cost::check_rolling");
+
         let Some(rolling) = self.caps.rolling else {
             return Ok(());
         };
@@ -228,6 +256,8 @@ impl CostGovernor {
 
     /// Velocidade financeira.
     fn check_velocity(&self, now: u64, micros: u64) -> Result<(), CostRefusal> {
+        let _span = crate::trace_fn!("kernel::cost::check_velocity");
+
         let Some(velocity) = self.caps.velocity else {
             return Ok(());
         };
@@ -246,6 +276,8 @@ impl CostGovernor {
 /// Débito implícito de um evento (turnos e chamadas; as temporais vêm do clock).
 #[must_use]
 pub fn cost_charge_for(event: &Event) -> Option<CostCharge> {
+    let _span = crate::trace_fn!("kernel::cost::cost_charge_for");
+
     match event {
         Event::TurnStart { .. } => Some(CostCharge::turn()),
         Event::ToolCall { tool, .. } => Some(CostCharge::tool_call(tool.name)),

@@ -15,6 +15,8 @@ pub(crate) const AGENTS_FILE: &str = "AGENTS.md";
 
 /// Lê o `AGENTS.md` da raiz (ausência ou bytes inválidos → `None`).
 pub(crate) fn read_instructions(fs: &dyn Fs, root: &Path) -> Option<String> {
+    let _span = katu_core::trace_fn!("runtime::skills::read_instructions");
+
     let bytes = fs.read(&root.join(AGENTS_FILE)).ok()?;
     let text = String::from_utf8(bytes).ok()?;
     let trimmed = text.trim();
@@ -23,6 +25,8 @@ pub(crate) fn read_instructions(fs: &dyn Fs, root: &Path) -> Option<String> {
 
 /// Descobre as skills do projeto (fail-open).
 pub(crate) fn load_skills(fs: &dyn Fs, root: &Path) -> Vec<Skill> {
+    let _span = katu_core::trace_fn!("runtime::skills::load_skills");
+
     discover(fs, root)
 }
 
@@ -30,18 +34,24 @@ impl Runtime<'_> {
     /// Instruções do projeto (`AGENTS.md`), se existirem (E20-T13).
     #[must_use]
     pub(crate) fn instructions(&self) -> Option<&str> {
+        let _span = katu_core::trace_fn!("runtime::skills::instructions");
+
         self.instructions.as_deref()
     }
 
     /// Skill pelo nome (E20-T13).
     #[must_use]
     pub(crate) fn skill(&self, name: &str) -> Option<&Skill> {
+        let _span = katu_core::trace_fn!("runtime::skills::skill");
+
         self.skills.iter().find(|skill| skill.name == name)
     }
 
     /// Catálogo de skills para o prompt de sistema (vazio se não houver).
     #[must_use]
     pub(crate) fn skills_catalog(&self) -> String {
+        let _span = katu_core::trace_fn!("runtime::skills::skills_catalog");
+
         catalog(&self.skills)
     }
 }

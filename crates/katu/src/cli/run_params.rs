@@ -4,6 +4,7 @@
 //! Sem inferência: `--params` e flags explícitas **não** coexistem (exit 2); um item de lote sem
 //! `body` recusa; um lote inválido recusa **antes** de executar seja o que for.
 
+use katu_core::diag::{Level, events};
 use katu_core::error::Error;
 use katu_core::provider::Thinking;
 use serde::Deserialize;
@@ -80,6 +81,8 @@ struct Flags {
 impl Flags {
     /// Flags explícitas de `katu run`.
     fn from_run(args: &RunCli) -> Self {
+        let _span = katu_core::trace_fn!("cli::run_params::from_run");
+
         Self {
             provider: args.provider.clone(),
             model: args.model.clone(),
@@ -94,6 +97,8 @@ impl Flags {
 
     /// Flags explícitas de `katu tui`.
     fn from_tui(args: &TuiCli) -> Self {
+        let _span = katu_core::trace_fn!("cli::run_params::from_tui");
+
         Self {
             provider: args.provider.clone(),
             model: args.model.clone(),
@@ -108,6 +113,8 @@ impl Flags {
 
     /// Se alguma flag explícita foi usada.
     fn any(&self) -> bool {
+        let _span = katu_core::trace_fn!("cli::run_params::any");
+
         self.provider.is_some()
             || self.model.is_some()
             || self.base.is_some()
@@ -125,6 +132,8 @@ impl Flags {
         parsed: RunParams,
         defaults: &Defaults,
     ) -> Result<RunConfig, Error> {
+        let _span = katu_core::trace_fn!("cli::run_params::assemble");
+
         let RunParams {
             body: _,
             provider,
@@ -170,6 +179,7 @@ impl Flags {
 
 /// Executa `katu run` (uma rodada ou um lote).
 pub(crate) fn execute(args: &RunCli) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_RUN, "run_params::execute");
     if let Some(path) = &args.batch {
         return batch(args, path);
     }
@@ -181,6 +191,7 @@ pub(crate) fn execute(args: &RunCli) -> Report {
 
 /// Resolve a config do `katu tui` (mesmas regras de `run`, sem body nem lote).
 pub(crate) fn resolve_tui(args: &TuiCli) -> Result<RunConfig, Error> {
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_TUI, "run_params::resolve_tui");
     let flags = Flags::from_tui(args);
     let parsed = parse_params(args.params.as_deref(), flags.any())?;
     flags.assemble("tui".to_owned(), parsed, &defaults::current())
@@ -188,6 +199,7 @@ pub(crate) fn resolve_tui(args: &TuiCli) -> Result<RunConfig, Error> {
 
 /// Resolve uma rodada a partir das flags e/ou de `--params` (XOR).
 fn resolve(args: &RunCli) -> Result<RunConfig, Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::CLI_RUN, "run_params::resolve");
     let flags = Flags::from_run(args);
     let parsed = parse_params(args.params.as_deref(), flags.any())?;
     if args.body.is_some() && parsed.body.is_some() {
@@ -211,6 +223,7 @@ fn resolve(args: &RunCli) -> Result<RunConfig, Error> {
     reason = "`explicit` é o lado do XOR com `--params`"
 )]
 fn parse_params(raw: Option<&str>, explicit: bool) -> Result<RunParams, Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::CLI_INPUT, "run_params::parse_params");
     if raw.is_some() && explicit {
         return Err(Error::invalid_input(
             "--params é exclusivo com flags explícitas (não se infere)",
@@ -224,6 +237,7 @@ fn parse_params(raw: Option<&str>, explicit: bool) -> Result<RunParams, Error> {
 
 /// Processa um lote JSONL: valida tudo **antes** de executar.
 fn batch(args: &RunCli, path: &str) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_RUN, "run_params::batch");
     if args.params.is_some() || Flags::from_run(args).any() || args.body.is_some() {
         return Report::failed(
             "run",
@@ -263,6 +277,8 @@ fn batch(args: &RunCli, path: &str) -> Report {
 
 /// Constrói a config de um item de lote (o `body` é obrigatório).
 fn config_from_params(parsed: RunParams, defaults: &Defaults) -> Result<RunConfig, Error> {
+    let _span = katu_core::trace_fn!("cli::run_params::config_from_params");
+
     let Some(goal) = parsed.body.clone() else {
         return Err(Error::invalid_input("item de lote sem `body`"));
     };

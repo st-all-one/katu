@@ -5,6 +5,8 @@
 //! comentários) — é o suficiente para o modelo decidir onde ir; o tree-sitter fica gated por
 //! medição (DF12). Ordem canónica: a ordem do ficheiro.
 
+use katu_core::diag::{Level, events};
+
 /// Tipo de símbolo reconhecido.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SymbolKind {
@@ -76,6 +78,7 @@ impl Symbol {
 /// Extrai os símbolos de um texto (ordem do ficheiro).
 #[must_use]
 pub fn outline(text: &str) -> Vec<Symbol> {
+    let _span = katu_core::fn_span!(Level::Trace, events::TOOL_READ, "outline::outline");
     let lines: Vec<&str> = text.lines().collect();
     let mut symbols = Vec::new();
     let mut index = 0_usize;
@@ -96,11 +99,15 @@ pub fn outline(text: &str) -> Vec<Symbol> {
 }
 
 fn to_line(index: usize) -> u32 {
+    let _span = katu_core::trace_fn!("outline::to_line");
+
     u32::try_from(index).unwrap_or(u32::MAX).saturating_add(1)
 }
 
 /// Classifica uma linha como declaração, devolvendo o tipo e o nome.
 fn classify(line: &str) -> Option<(SymbolKind, String)> {
+    let _span = katu_core::trace_fn!("outline::classify");
+
     let normalized = normalize(line);
     let (kind, rest) = keyword(&normalized)?;
     let name = if kind == SymbolKind::Impl {
@@ -117,6 +124,8 @@ fn classify(line: &str) -> Option<(SymbolKind, String)> {
 
 /// Remove `pub`/`pub(...)` e modificadores (`async`/`unsafe`/`default`); `const fn` vira `fn`.
 fn normalize(line: &str) -> String {
+    let _span = katu_core::trace_fn!("outline::normalize");
+
     let mut rest = strip_visibility(line.trim_start());
     loop {
         let stripped = rest
@@ -135,6 +144,8 @@ fn normalize(line: &str) -> String {
 }
 
 fn strip_visibility(line: &str) -> &str {
+    let _span = katu_core::trace_fn!("outline::strip_visibility");
+
     if let Some(rest) = line.strip_prefix("pub(")
         && let Some(close) = rest.find(')')
     {
@@ -170,6 +181,8 @@ fn keyword(trimmed: &str) -> Option<(SymbolKind, &str)> {
 }
 
 fn take_ident(rest: &str) -> Option<String> {
+    let _span = katu_core::trace_fn!("outline::take_ident");
+
     let name: String = rest
         .chars()
         .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
@@ -179,6 +192,8 @@ fn take_ident(rest: &str) -> Option<String> {
 
 /// Fim do bloco: conta chaves a partir da linha; sem `{` na primeira linha, é a própria linha.
 fn block_end(lines: &[&str], start: usize) -> usize {
+    let _span = katu_core::trace_fn!("outline::block_end");
+
     let first = lines.get(start).copied().unwrap_or("");
     if !first.contains('{') {
         return start;

@@ -6,6 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::record::AuditRecord;
+use crate::diag::{Level, events};
 use crate::plan::matches_glob;
 
 /// Uma ocorrência de termo.
@@ -29,6 +30,7 @@ impl Index {
     /// Constrói o índice a partir das linhas.
     #[must_use]
     pub fn build(records: &[AuditRecord]) -> Self {
+        let _span = crate::fn_span!(Level::Trace, events::AUDIT_INDEX, "audit::index::build");
         let mut postings: BTreeMap<String, Vec<Posting>> = BTreeMap::new();
         for (ln, record) in records.iter().enumerate() {
             let ln = u32::try_from(ln).unwrap_or(u32::MAX);
@@ -49,6 +51,7 @@ impl Index {
     /// Linhas que satisfazem um grupo (todos os termos/frases; filtros exactos).
     #[must_use]
     pub fn matches(&self, records: &[AuditRecord], group: &Group) -> BTreeSet<u32> {
+        let _span = crate::fn_span!(Level::Trace, events::AUDIT_QUERY, "audit::index::matches");
         let mut candidates: Option<BTreeSet<u32>> = None;
         for term in &group.terms {
             let docs = self.docs(term);
@@ -71,16 +74,22 @@ impl Index {
     /// Ocorrências de um termo, indexadas por `(field, ln, pos)`.
     #[must_use]
     pub fn postings(&self) -> &BTreeMap<String, Vec<Posting>> {
+        let _span = crate::trace_fn!("audit::index::postings");
+
         &self.postings
     }
 
     /// Constrói a partir de postings já ordenados (persistência).
     #[must_use]
     pub fn from_postings(postings: BTreeMap<String, Vec<Posting>>) -> Self {
+        let _span = crate::trace_fn!("audit::index::from_postings");
+
         Self { postings }
     }
 
     fn docs(&self, term: &str) -> BTreeSet<u32> {
+        let _span = crate::trace_fn!("audit::index::docs");
+
         self.postings
             .get(term)
             .map(|list| list.iter().map(|posting| posting.ln).collect())
@@ -88,6 +97,8 @@ impl Index {
     }
 
     fn phrase_docs(&self, words: &[String]) -> BTreeSet<u32> {
+        let _span = crate::trace_fn!("audit::index::phrase_docs");
+
         let Some(first) = words.first() else {
             return BTreeSet::new();
         };
@@ -138,6 +149,8 @@ impl Query {
     /// Analisa a consulta: `termo`, `"frase"`, `kind:x`, `tool:x`, `status:x`, `path:<glob>`, `OR`.
     #[must_use]
     pub fn parse(text: &str) -> Self {
+        let _span = crate::trace_fn!("audit::index::parse");
+
         let mut groups: Vec<Group> = vec![Group::default()];
         for clause in clauses(text) {
             if matches!(clause, Clause::Or) {
@@ -164,6 +177,8 @@ impl Query {
 }
 
 fn push_filter(group: &mut Group, key: &str, value: &str) {
+    let _span = crate::trace_fn!("audit::index::push_filter");
+
     match key {
         "kind" => group.kinds.push(value.to_string()),
         "tool" => group.tools.push(value.to_string()),
@@ -181,6 +196,8 @@ enum Clause {
 }
 
 fn clauses(text: &str) -> Vec<Clause> {
+    let _span = crate::trace_fn!("audit::index::clauses");
+
     let mut out = Vec::new();
     let mut current = String::new();
     let mut quoted = false;
@@ -206,6 +223,8 @@ fn clauses(text: &str) -> Vec<Clause> {
 }
 
 fn flush(out: &mut Vec<Clause>, current: &mut String) {
+    let _span = crate::trace_fn!("audit::index::flush");
+
     if current.is_empty() {
         return;
     }
@@ -220,6 +239,8 @@ fn flush(out: &mut Vec<Clause>, current: &mut String) {
 /// Quebra um texto em termos (minúsculas, `[a-z0-9_]`/alfanumérico).
 #[must_use]
 pub(super) fn tokenize(text: &str) -> Vec<String> {
+    let _span = crate::trace_fn!("audit::index::tokenize");
+
     let mut tokens = Vec::new();
     let mut current = String::new();
     for ch in text.chars() {
@@ -236,6 +257,8 @@ pub(super) fn tokenize(text: &str) -> Vec<String> {
 }
 
 fn intersect(current: Option<BTreeSet<u32>>, next: BTreeSet<u32>) -> BTreeSet<u32> {
+    let _span = crate::trace_fn!("audit::index::intersect");
+
     match current {
         Some(set) => set.intersection(&next).copied().collect(),
         None => next,
@@ -243,12 +266,16 @@ fn intersect(current: Option<BTreeSet<u32>>, next: BTreeSet<u32>) -> BTreeSet<u3
 }
 
 fn all_docs(records: &[AuditRecord]) -> BTreeSet<u32> {
+    let _span = crate::trace_fn!("audit::index::all_docs");
+
     (0..records.len())
         .map(|index| u32::try_from(index).unwrap_or(u32::MAX))
         .collect()
 }
 
 fn record_matches(record: &AuditRecord, group: &Group) -> bool {
+    let _span = crate::trace_fn!("audit::index::record_matches");
+
     group.kinds.iter().all(|kind| kind == record.kind)
         && group
             .tools

@@ -11,7 +11,7 @@ use crate::layout::centered;
 
 /// Desenha o challenge centrado na área.
 pub(crate) fn render(frame: &mut Frame<'_>, challenge: &Challenge) {
-    let _span = katu_core::span!(Level::Trace, events::TUI_RENDER);
+    let _span = katu_core::fn_span!(Level::Trace, events::TUI_RENDER, "approval::view::render");
     let area = centered(frame.area(), 64, 12);
     frame.render_widget(Clear, area);
     let mut lines = vec![

@@ -7,6 +7,7 @@
 use std::path::Path;
 
 use katu_core::context::{CompactionMode, ContextBudget};
+use katu_core::diag::{Level, events};
 #[cfg(test)]
 use katu_core::kernel::Message;
 use katu_core::kernel::{CallId, Event, Session, SessionError, SessionId, discover_root};
@@ -54,6 +55,7 @@ pub(crate) struct VerifyRequest {
 
 /// Carrega as regras do protocolo de memória **e** as de contenção (DF3: dado versionado).
 fn load_rules() -> Result<RuleSet, PolicyError> {
+    let _span = katu_core::fn_span!(Level::Debug, events::POLICY_LOAD, "runtime::load_rules");
     let mut rules = RuleSet::from_toml(MEMORY_POLICY)?;
     rules
         .rules
@@ -63,6 +65,8 @@ fn load_rules() -> Result<RuleSet, PolicyError> {
 
 /// Id da sessão mais recente do projeto (ordem temporal `(created_ms, id)`).
 fn latest_session(fs: &dyn Fs, root: &Path) -> Result<SessionId, RuntimeError> {
+    let _span = katu_core::trace_fn!("runtime::latest_session");
+
     Session::list(fs, root)?
         .pop()
         .map(|meta| meta.id)
@@ -100,6 +104,8 @@ impl<'a> Runtime<'a> {
         start: &Path,
         goal: &str,
     ) -> Result<Self, RuntimeError> {
+        let _span = katu_core::trace_fn!("runtime::open");
+
         let root = discover_root(fs, start);
         let session = Session::create(fs, &root, clock.now().as_millis(), goal)?;
         Self::assemble(fs, clock, goal, session)
@@ -120,6 +126,8 @@ impl<'a> Runtime<'a> {
         goal: &str,
         id: Option<&str>,
     ) -> Result<Self, RuntimeError> {
+        let _span = katu_core::trace_fn!("runtime::resume");
+
         let root = discover_root(fs, start);
         let id = match id {
             Some(id) => SessionId::parse(id)
@@ -137,6 +145,8 @@ impl<'a> Runtime<'a> {
         goal: &str,
         mut session: Session<'a>,
     ) -> Result<Self, RuntimeError> {
+        let _span = katu_core::trace_fn!("runtime::assemble");
+
         let root = session.root().to_path_buf();
         let plan = scope::load(fs, &root)?;
         let memory = KnudgeMemory::open(&root)?;
@@ -179,24 +189,32 @@ impl<'a> Runtime<'a> {
     /// # Errors
     /// [`SessionError`] se já houver um turno aberto ou a transição for recusada.
     pub(crate) fn begin_turn(&mut self) -> Result<(), SessionError> {
+        let _span = katu_core::trace_fn!("runtime::begin_turn");
+
         let next = self.session.state().turn.saturating_add(1);
         self.session.apply(&Event::TurnStart { turn: next })
     }
 
     /// Raiz do projeto vinculada (delegada ao log/sessão).
     pub(crate) fn root(&self) -> &Path {
+        let _span = katu_core::trace_fn!("runtime::root");
+
         self.session.root()
     }
 
     /// Fase corrente do kernel (E10-T06).
     #[must_use]
     pub(crate) fn phase(&self) -> katu_policy::Phase {
+        let _span = katu_core::trace_fn!("runtime::phase");
+
         self.session.state().phase
     }
 
     /// Plano carregado no arranque (E09-T04); `None` mantém a tool `plan` indisponível.
     #[must_use]
     pub(crate) fn plan(&self) -> Option<&Plan> {
+        let _span = katu_core::trace_fn!("runtime::plan");
+
         self.plan.as_ref()
     }
 
@@ -211,12 +229,16 @@ impl<'a> Runtime<'a> {
 
     /// Turno corrente (o turno é aberto por [`Runtime::open`]).
     pub(crate) fn turn(&self) -> u32 {
+        let _span = katu_core::trace_fn!("runtime::turn");
+
         self.session.state().turn
     }
 
     /// Identificador estável da sessão (afinidade do provider).
     #[must_use]
     pub(crate) fn session_id(&self) -> Option<&str> {
+        let _span = katu_core::trace_fn!("runtime::session_id");
+
         self.session.id().map(SessionId::as_str)
     }
 
@@ -225,6 +247,8 @@ impl<'a> Runtime<'a> {
     /// # Errors
     /// [`SessionError`] se o evento não puder ser logado.
     pub(crate) fn record_user(&mut self, text: &str) -> Result<(), SessionError> {
+        let _span = katu_core::trace_fn!("runtime::record_user");
+
         self.session.apply(&Event::UserMessage {
             text: text.to_string(),
         })
@@ -235,6 +259,8 @@ impl<'a> Runtime<'a> {
     /// # Errors
     /// [`SessionError`] se o evento não puder ser logado.
     pub(crate) fn record_assistant(&mut self, text: &str) -> Result<(), SessionError> {
+        let _span = katu_core::trace_fn!("runtime::record_assistant");
+
         self.session.apply(&Event::AssistantMessage {
             text: text.to_string(),
         })
@@ -245,6 +271,8 @@ impl<'a> Runtime<'a> {
     /// # Errors
     /// [`SessionError`] se o turno não corresponder ao aberto.
     pub(crate) fn record_turn_end(&mut self, turn: u32) -> Result<(), SessionError> {
+        let _span = katu_core::trace_fn!("runtime::record_turn_end");
+
         self.session.apply(&Event::TurnEnd { turn })
     }
 
@@ -256,6 +284,8 @@ impl<'a> Runtime<'a> {
 
     /// Identificador de chamada único e determinístico dentro da sessão.
     fn call(&mut self, kind: &str) -> CallId {
+        let _span = katu_core::trace_fn!("runtime::call");
+
         let id = self.calls;
         self.calls = self.calls.saturating_add(1);
         CallId::new(format!("{kind}-{id}"))

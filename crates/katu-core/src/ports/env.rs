@@ -27,12 +27,16 @@ impl FakeEnv {
     /// Cria um ambiente vazio.
     #[must_use]
     pub fn new() -> Self {
+        let _span = crate::trace_fn!("ports::env::new");
+
         Self::default()
     }
 
     /// Define uma variável de ambiente.
     #[must_use]
     pub fn with_var(mut self, key: &str, value: &str) -> Self {
+        let _span = crate::trace_fn!("ports::env::with_var");
+
         self.vars.insert(key.to_string(), value.to_string());
         self
     }
@@ -40,6 +44,8 @@ impl FakeEnv {
     /// Define os argumentos do processo.
     #[must_use]
     pub fn with_args(mut self, args: Vec<String>) -> Self {
+        let _span = crate::trace_fn!("ports::env::with_args");
+
         self.args = args;
         self
     }
@@ -47,14 +53,20 @@ impl FakeEnv {
 
 impl Env for FakeEnv {
     fn var(&self, key: &str) -> Option<String> {
+        let _span = crate::trace_fn!("ports::env::var");
+
         self.vars.get(key).cloned()
     }
 
     fn args(&self) -> Vec<String> {
+        let _span = crate::trace_fn!("ports::env::args");
+
         self.args.clone()
     }
 
     fn vars(&self) -> Vec<(String, String)> {
+        let _span = crate::trace_fn!("ports::env::vars");
+
         self.vars
             .iter()
             .map(|(key, value)| (key.clone(), value.clone()))

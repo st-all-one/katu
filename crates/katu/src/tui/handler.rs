@@ -6,6 +6,7 @@
 //! o uso/custo do turno (E12-T03/T10).
 
 use katu_core::context::CompactionMode;
+use katu_core::diag::{Level, events};
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::Dispatch;
 use katu_core::kernel::next_phase;
@@ -42,6 +43,7 @@ pub(super) struct AgentHandler<'a> {
 
 impl Handler for AgentHandler<'_> {
     fn handle(&mut self, command: Command, painter: &mut Painter<'_>) -> Vec<Update> {
+        let _span = katu_core::fn_span!(Level::Trace, events::TUI_ACTION, "handler::handle");
         match command {
             Command::Quit => Vec::new(),
             Command::Submit(goal) => self.submit(&goal, painter),
@@ -66,6 +68,8 @@ impl AgentHandler<'_> {
     /// Liga só quando há algo a compactar; nunca compacta em silêncio (nada muda se não houver
     /// prefixo fora do orçamento). Desligar volta ao `assemble` puro.
     fn toggle_compaction(&mut self) -> Vec<Update> {
+        let _span = katu_core::trace_fn!("tui::handler::toggle_compaction");
+
         if self.runtime.compaction() == CompactionMode::Enabled {
             self.runtime.set_compaction(CompactionMode::Disabled);
             return vec![Update::Info("compactação desligada".to_string())];
@@ -87,6 +91,8 @@ impl AgentHandler<'_> {
 
     /// Liga/desliga o modo de planeamento (E20-T11) e, ao ligar, escreve o esqueleto do plano.
     fn toggle_plan(&mut self) -> Vec<Update> {
+        let _span = katu_core::trace_fn!("tui::handler::toggle_plan");
+
         let on = !self.runtime.plan_mode();
         match self.runtime.set_plan_mode(on) {
             Ok(state) => {
@@ -107,6 +113,8 @@ impl AgentHandler<'_> {
 
     /// Executa `!<cmd>` pela política/contenção (E20-T12).
     fn shell(&mut self, command: &str) -> Vec<Update> {
+        let _span = katu_core::trace_fn!("tui::handler::shell");
+
         let ports = Ports {
             fs: self.fs,
             process: &self.process,
@@ -120,6 +128,7 @@ impl AgentHandler<'_> {
 
     /// Força o carregamento de uma skill pelo nome (E20-T13): o `SKILL.md` vira objetivo do turno.
     fn skill(&mut self, name: &str, painter: &mut Painter<'_>) -> Vec<Update> {
+        let _span = katu_core::fn_span!(Level::Trace, events::SKILL_READ, "handler::skill");
         let Some(skill) = self.runtime.skill(name) else {
             return vec![Update::Error(format!("skill desconhecida: {name}"))];
         };
@@ -132,6 +141,8 @@ impl AgentHandler<'_> {
 
     /// Submete um turno e traduz o resultado em atualizações da UI.
     fn submit(&mut self, goal: &str, painter: &mut Painter<'_>) -> Vec<Update> {
+        let _span = katu_core::trace_fn!("tui::handler::submit");
+
         let granted_by = self.granted_by();
         let ports = Ports {
             fs: self.fs,
@@ -177,6 +188,8 @@ impl AgentHandler<'_> {
 
     /// Traduz o fim do turno em atualizações (uso, cancelamento, fase, checkpoint, transcript).
     fn turn_updates(&self, model: &str, turn: TurnReport) -> Vec<Update> {
+        let _span = katu_core::trace_fn!("tui::handler::turn_updates");
+
         let usage = usage_line(model, &turn, &self.prices);
         let cancelled = turn.cancelled;
         let calls = turn.calls;
@@ -209,6 +222,8 @@ impl AgentHandler<'_> {
 
 /// Traduz o `Dispatch` de um `!<cmd>` em atualizações (recusa com evidência ou saída).
 fn shell_updates(dispatch: &Dispatch) -> Vec<Update> {
+    let _span = katu_core::trace_fn!("tui::handler::shell_updates");
+
     match dispatch.outcome() {
         ToolOutcome::Denied { rule_id, evidence } => vec![Update::Error(format!(
             "negado por {}: {}",
@@ -235,6 +250,8 @@ fn shell_updates(dispatch: &Dispatch) -> Vec<Update> {
 ///
 /// O custo só aparece quando o modelo tem preço em `policy/prices.toml` (nunca inventado, DF5).
 fn usage_line(model: &str, turn: &TurnReport, prices: &PriceTable) -> Option<String> {
+    let _span = katu_core::trace_fn!("tui::handler::usage_line");
+
     let usage = turn.usage.as_ref()?;
     let mut parts: Vec<String> = Vec::new();
     for (label, tokens) in [

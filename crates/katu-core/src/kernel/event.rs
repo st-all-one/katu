@@ -18,12 +18,16 @@ pub struct CallId(String);
 impl CallId {
     /// Constrói um identificador de chamada.
     pub fn new(id: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("kernel::event::new");
+
         Self(id.into())
     }
 
     /// Identificador textual.
     #[must_use]
     pub fn as_str(&self) -> &str {
+        let _span = crate::trace_fn!("kernel::event::as_str");
+
         &self.0
     }
 }

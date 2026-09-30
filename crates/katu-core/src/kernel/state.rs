@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::control::ControlState;
 use super::event::CallId;
+use crate::diag::{Level, events};
 use crate::error::ToolOutcome;
 use crate::feedback::CommandStatus;
 use crate::plan::Plan;
@@ -69,6 +70,8 @@ impl State {
     /// Estado inicial: caminho único em [`Phase::Task`], sem turno aberto.
     #[must_use]
     pub fn initial() -> Self {
+        let _span = crate::trace_fn!("kernel::state::initial");
+
         Self {
             phase: Phase::Task,
             turn: 0,
@@ -159,6 +162,11 @@ pub const fn next_phase(phase: Phase) -> Option<Phase> {
 /// o avanço é estritamente de um passo.
 #[must_use]
 pub fn can_transition(from: Phase, to: Phase) -> bool {
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::KERNEL_TRANSITION,
+        "kernel::state::can_transition"
+    );
     if from == to {
         return false;
     }

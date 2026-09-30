@@ -3,6 +3,8 @@
 //! Nunca são escritos no log de sessão nem enviados ao modelo: servem só para o utilizador ver o
 //! progresso (deltas, tools) e as recusas de política enquanto o turno corre.
 
+use katu_core::diag::{Level, events};
+
 /// Evento efémero do painel de atividade.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Live {
@@ -39,6 +41,7 @@ pub enum Live {
 ///
 /// O painel de atividade é efémero: interessa o que está a chegar agora, não o histórico todo.
 pub(crate) fn trim_tail(buffer: &mut String, max: usize) {
+    let _span = katu_core::fn_span!(Level::Trace, events::TUI_LIVE, "live::trim_tail");
     if buffer.len() <= max {
         return;
     }

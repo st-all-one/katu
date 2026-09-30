@@ -6,6 +6,7 @@
 
 use std::path::PathBuf;
 
+use katu_core::diag::{Level, events};
 use katu_core::memory::MemoryError;
 use knudge_core::adapters::HttpEmbedder;
 use knudge_core::embeddings::{DrainInput, LightweightEmbedder, drain};
@@ -43,6 +44,8 @@ pub(crate) struct DrainSummary {
 impl DrainSummary {
     /// Dreno desligado (sem provedor de embeddings).
     fn disabled() -> Self {
+        let _span = katu_core::trace_fn!("memory::drain::disabled");
+
         Self {
             enabled: false,
             batches: 0,
@@ -61,6 +64,7 @@ impl DrainSummary {
     reason = "`force` é o modo `--force` do dreno"
 )]
 pub(super) fn run(kd: &Knudge, force: bool) -> Result<DrainSummary, MemoryError> {
+    let _span = katu_core::fn_span!(Level::Debug, events::EMBED_REQUEST, "drain::run");
     // E20-T17: a config de embeddings do katu (segunda IA) sobrepõe-se à do knudge; URL ausente → off.
     let mut config = kd.config().clone();
     let embeddings = defaults::from_root(kd.project_root()).embeddings;
@@ -113,6 +117,8 @@ fn apply_embeddings(
     config: &mut Config,
     embeddings: &EmbeddingDefaults,
 ) -> Result<(), KnudgeError> {
+    let _span = katu_core::trace_fn!("memory::drain::apply_embeddings");
+
     let Some(url) = embeddings.url.as_deref().filter(|url| !url.is_empty()) else {
         config.set_str("embeddings.enabled", "false")?;
         return Ok(());
@@ -132,6 +138,8 @@ fn apply_embeddings(
 
 /// `<url>/embeddings`, sem barra dupla.
 fn endpoint_from(url: &str) -> String {
+    let _span = katu_core::trace_fn!("memory::drain::endpoint_from");
+
     format!("{}/embeddings", url.trim_end_matches('/'))
 }
 
@@ -144,6 +152,8 @@ fn build_embedder(
     config: &Config,
     env: &dyn Env,
 ) -> Result<Option<Box<dyn Embedder>>, KnudgeError> {
+    let _span = katu_core::trace_fn!("memory::drain::build_embedder");
+
     if !config.get_bool("embeddings.enabled").unwrap_or(true) {
         return Ok(None);
     }
@@ -165,6 +175,8 @@ fn build_embedder(
 
 /// Apaga `.idx/` (derivado) e devolve os nomes dos itens apagados.
 fn remove_derived(kd: &Knudge) -> Result<Vec<String>, MemoryError> {
+    let _span = katu_core::trace_fn!("memory::drain::remove_derived");
+
     let dir: PathBuf = kd.knowledge_dir().join(".idx");
     let fs = kd.fs_dyn();
     if !fs.exists(&dir) {

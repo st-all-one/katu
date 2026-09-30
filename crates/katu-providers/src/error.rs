@@ -5,6 +5,7 @@
 //! (log/modelo), extrai-se a mensagem e removem-se credenciais e *query* de qualquer `URL` — o
 //! texto do erro vai para o log e para o modelo.
 
+use katu_core::diag::{Level, events};
 use serde_json::Value;
 
 /// Limite do resumo guardado (evita despejar corpos grandes no log).
@@ -13,6 +14,7 @@ const MAX_CHARS: usize = 512;
 /// Extrai a mensagem útil de um corpo de erro (JSON ou texto) e sanitiza-a.
 #[must_use]
 pub(crate) fn normalize(body: &str) -> String {
+    let _span = katu_core::fn_span!(Level::Trace, events::PROVIDER_ERROR, "error::normalize");
     let trimmed = body.trim();
     if trimmed.is_empty() {
         return String::new();
@@ -24,6 +26,7 @@ pub(crate) fn normalize(body: &str) -> String {
 /// Retira credenciais (`user:pass@`) e *query*/*fragment* de qualquer `URL` `http(s)`.
 #[must_use]
 pub(crate) fn sanitize(text: &str) -> String {
+    let _span = katu_core::fn_span!(Level::Trace, events::PROVIDER_ERROR, "error::sanitize");
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
     while let Some(index) = scheme_at(rest) {
@@ -48,6 +51,8 @@ pub(crate) fn sanitize(text: &str) -> String {
 
 /// Extrai `error.message`, `error` (string), `message` ou `detail` de um JSON.
 fn extract(body: &str) -> Option<String> {
+    let _span = katu_core::trace_fn!("error::extract");
+
     let value: Value = serde_json::from_str(body).ok()?;
     let message = value
         .get("error")
@@ -64,6 +69,8 @@ fn extract(body: &str) -> Option<String> {
 
 /// Trunca por caracteres (não por bytes), com elipse.
 fn truncate(text: &str) -> String {
+    let _span = katu_core::trace_fn!("error::truncate");
+
     if text.chars().count() <= MAX_CHARS {
         return text.to_string();
     }
@@ -74,6 +81,8 @@ fn truncate(text: &str) -> String {
 
 /// Índice do primeiro esquema `http(s)://`.
 fn scheme_at(text: &str) -> Option<usize> {
+    let _span = katu_core::trace_fn!("error::scheme_at");
+
     match (text.find("http://"), text.find("https://")) {
         (Some(http), Some(https)) => Some(http.min(https)),
         (Some(http), None) => Some(http),
@@ -84,6 +93,8 @@ fn scheme_at(text: &str) -> Option<usize> {
 
 /// Remove `userinfo` e *query*/*fragment* de uma `URL`, preservando esquema/host/caminho.
 fn scrub(url: &str) -> String {
+    let _span = katu_core::trace_fn!("error::scrub");
+
     let Some((scheme, rest)) = url.split_once("://") else {
         return url.to_string();
     };

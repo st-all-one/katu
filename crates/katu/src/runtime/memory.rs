@@ -3,6 +3,7 @@
 //! Vive num módulo filho para manter `runtime.rs` sob o teto de linhas. Tudo passa pelo caminho
 //! único `logar → política → efeito` da `Session`; a memória é a de primeira classe (in-process).
 
+use katu_core::diag::{Level, events};
 use katu_core::kernel::{CallContext, Dispatch, MemoryWriteRequest, memory_recall_use};
 use katu_core::memory::{Anchor, NoteType, PreWriteReq, RecallReq};
 use katu_tools::recall::RecallTool;
@@ -16,6 +17,7 @@ impl Runtime<'_> {
     /// # Errors
     /// [`RuntimeError`] se a transição, o custo ou a política falharem.
     pub(crate) fn recall(&mut self, query: &str, limit: usize) -> Result<Dispatch, RuntimeError> {
+        let _span = katu_core::fn_span!(Level::Debug, events::MEMORY_RECALL, "memory::recall");
         let call = self.call("recall");
         let tool = RecallTool {
             memory: &self.memory,
@@ -51,6 +53,7 @@ impl Runtime<'_> {
         reason = "caminho de escrita reservado (agente/kd); exercido pelos testes do runtime"
     )]
     pub(crate) fn remember(&mut self, req: &PreWriteReq) -> Result<Dispatch, RuntimeError> {
+        let _span = katu_core::fn_span!(Level::Debug, events::MEMORY_WRITE, "memory::remember");
         self.recall(&req.statement, 5)?;
         let call = self.call("write");
         let tool = WriteNoteTool {
@@ -75,6 +78,8 @@ impl Runtime<'_> {
         reason = "construtor do caminho de escrita reservado; exercido pelos testes do runtime"
     )]
     pub(crate) fn note(statement: &str, note_type: NoteType, anchor: Option<&str>) -> PreWriteReq {
+        let _span = katu_core::trace_fn!("runtime::memory::note");
+
         PreWriteReq {
             statement: statement.to_string(),
             note_type,

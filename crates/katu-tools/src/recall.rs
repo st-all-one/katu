@@ -24,11 +24,13 @@ pub struct RecallTool<'a> {
 
 impl Tool for RecallTool<'_> {
     fn name(&self) -> ToolName {
+        let _span = katu_core::trace_fn!("recall::name");
+
         ToolName::MemoryRecall
     }
 
     fn execute(&self, _use_: &ToolUse) -> ToolOutput {
-        let _span = katu_core::span!(Level::Trace, events::MEMORY_RECALL);
+        let _span = katu_core::fn_span!(Level::Trace, events::MEMORY_RECALL, "recall::execute");
         match self.memory.search(&self.req) {
             Ok(hits) => ToolOutput::report(recall_report(&self.req.query, &hits)),
             Err(err) if err.retryable() => ToolOutput::outcome(ToolOutcome::Timeout),
@@ -42,6 +44,7 @@ impl Tool for RecallTool<'_> {
 
 /// Envelope AI-first do recall (DF12): só o delta (nota + afirmação + score) chega ao modelo.
 fn recall_report(query: &str, hits: &[RecallHit]) -> ToolReport {
+    let _span = katu_core::fn_span!(Level::Trace, events::MEMORY_RECALL, "recall::report");
     let items = hits
         .iter()
         .enumerate()
@@ -60,6 +63,7 @@ fn recall_report(query: &str, hits: &[RecallHit]) -> ToolReport {
 
 /// Uma nota recordada como `Value` TOON (com `rank` e evidência `ev`).
 fn hit_value(hit: &RecallHit, rank: usize) -> Value {
+    let _span = katu_core::fn_span!(Level::Trace, events::MEMORY_RECALL, "recall::hit_value");
     let mut entries = vec![
         (
             "rank".to_string(),

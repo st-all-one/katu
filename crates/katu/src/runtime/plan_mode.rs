@@ -41,6 +41,8 @@ impl Runtime<'_> {
         reason = "toggle explícito (`on`), mais legível que um enum de dois valores"
     )]
     pub(crate) fn set_plan_mode(&mut self, on: bool) -> Result<bool, PolicyError> {
+        let _span =
+            katu_core::fn_span!(Level::Debug, events::PLAN_MODE, "plan_mode::set_plan_mode");
         if on == self.plan_mode {
             return Ok(self.plan_mode);
         }
@@ -71,6 +73,11 @@ impl Runtime<'_> {
     /// # Errors
     /// [`FsError`] se o diretório ou a escrita atómica falharem.
     pub(crate) fn write_plan_artifact(&self, fs: &dyn Fs) -> Result<PathBuf, FsError> {
+        let _span = katu_core::fn_span!(
+            Level::Trace,
+            events::PLAN_MODE,
+            "plan_mode::write_plan_artifact"
+        );
         let dir = self.root().join(PLAN_DIR);
         fs.create_dir_all(&dir)?;
         let stamp = utc_stamp(self.clock.now().as_millis());
@@ -82,11 +89,15 @@ impl Runtime<'_> {
 
 /// `true` se o id pertence às regras injetadas pelo modo plano.
 fn is_plan_rule(id: &str) -> bool {
+    let _span = katu_core::trace_fn!("runtime::plan_mode::is_plan_rule");
+
     id == PLAN_RULE_ID || id == PLAN_SHELL_RULE_ID
 }
 
 /// Regra crítica que nega shell no modo plano (nenhuma capacidade destranca).
 fn shell_rule() -> Rule {
+    let _span = katu_core::trace_fn!("runtime::plan_mode::shell_rule");
+
     Rule {
         id: RuleId::from(PLAN_SHELL_RULE_ID),
         statement: "Modo de planeamento: sem shell (`!`)".to_string(),
@@ -109,6 +120,8 @@ fn shell_rule() -> Rule {
 
 /// Regra crítica que nega escrita fora de `allowed` (nenhuma capacidade destranca).
 fn plan_rule(allowed: ResolvedPath, anywhere: ResolvedPath) -> Rule {
+    let _span = katu_core::trace_fn!("runtime::plan_mode::plan_rule");
+
     Rule {
         id: RuleId::from(PLAN_RULE_ID),
         statement: "Modo de planeamento: escrita só sob `.katu/`".to_string(),
@@ -127,6 +140,8 @@ fn plan_rule(allowed: ResolvedPath, anywhere: ResolvedPath) -> Rule {
 
 /// Esqueleto denso do plano (o modelo preenche-o em `.katu/`).
 fn plan_markdown(goal: &str) -> String {
+    let _span = katu_core::trace_fn!("runtime::plan_mode::plan_markdown");
+
     format!(
         "# Plano — {goal}\n\n\
          > Gerado pelo modo de planeamento (`/plan`). Escrita só sob `.katu/`.\n\n\
@@ -140,6 +155,8 @@ fn plan_markdown(goal: &str) -> String {
 /// Marca UTC compacta `yymmddhhmmZ` a partir de milissegundos desde a época.
 #[must_use]
 pub(crate) fn utc_stamp(millis: u64) -> String {
+    let _span = katu_core::trace_fn!("runtime::plan_mode::utc_stamp");
+
     let seconds = millis / 1_000;
     let days = i64::try_from(seconds / 86_400).unwrap_or(0);
     let rem = seconds % 86_400;
@@ -156,6 +173,8 @@ pub(crate) fn utc_stamp(millis: u64) -> String {
     reason = "conversão civil de Hinnant sobre dias não-negativos (sem risco de overflow)"
 )]
 fn civil_from_days(days: i64) -> (i64, u32, u32) {
+    let _span = katu_core::trace_fn!("runtime::plan_mode::civil_from_days");
+
     let z = days + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
     let doe = z - era * 146_097;
@@ -176,6 +195,8 @@ fn civil_from_days(days: i64) -> (i64, u32, u32) {
 /// Slug determinístico do objetivo para o nome do ficheiro.
 #[must_use]
 pub(crate) fn slugify(goal: &str) -> String {
+    let _span = katu_core::trace_fn!("runtime::plan_mode::slugify");
+
     let mut slug = String::new();
     for character in goal.chars() {
         if character.is_ascii_alphanumeric() {

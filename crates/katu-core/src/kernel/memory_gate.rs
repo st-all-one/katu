@@ -44,6 +44,8 @@ pub enum MemoryWriteError {
 /// Constrói o `ToolUse` resolvido de uma escrita de memória.
 #[must_use]
 pub fn memory_write_use(cwd: &ResolvedPath) -> ToolUse {
+    let _span = crate::trace_fn!("kernel::memory_gate::memory_write_use");
+
     ToolUse {
         name: ToolName::MemoryWrite,
         args: ToolArgs::Other,
@@ -56,6 +58,8 @@ pub fn memory_write_use(cwd: &ResolvedPath) -> ToolUse {
 /// Constrói o `ToolUse` resolvido de um recall de memória (E06-T10).
 #[must_use]
 pub fn memory_recall_use(cwd: &ResolvedPath) -> ToolUse {
+    let _span = crate::trace_fn!("kernel::memory_gate::memory_recall_use");
+
     ToolUse {
         name: ToolName::MemoryRecall,
         args: ToolArgs::Other,
@@ -73,7 +77,11 @@ pub fn enforce_memory_write(
     state: &State,
     request: MemoryWriteRequest<'_>,
 ) -> Result<Dispatch, MemoryWriteError> {
-    let _span = crate::span!(Level::Trace, events::MEMORY_WRITE);
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::MEMORY_WRITE,
+        "kernel::memory_gate::enforce_memory_write"
+    );
     let pre_write = request.memory.pre_write(request.req)?;
     let capabilities = capabilities_for(&pre_write);
     let use_ = memory_write_use(request.cwd);
@@ -90,6 +98,8 @@ pub fn enforce_memory_write(
 
 /// Capacidade concedida pela pré-validação: só grava quem não é rejeitado.
 fn capabilities_for(outcome: &PreWriteOutcome) -> Vec<Capability> {
+    let _span = crate::trace_fn!("kernel::memory_gate::capabilities_for");
+
     match outcome {
         PreWriteOutcome::Reject { .. } => Vec::new(),
         PreWriteOutcome::Create | PreWriteOutcome::Merge { .. } => vec![Capability::Command {

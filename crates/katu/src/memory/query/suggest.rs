@@ -13,6 +13,8 @@ use super::convert::anchors_of;
 
 /// Modo `--suggest` (sugestões semânticas de aresta/contradição).
 pub(super) fn suggest(inner: &mut Inner, req: &QueryReq) -> Result<QueryResult, MemoryError> {
+    let _span = katu_core::trace_fn!("memory::query::suggest::suggest");
+
     let mut warnings = Vec::new();
     let meta = EmbeddingMeta::from_config(inner.kd.config()).map_err(to_memory_error)?;
     let loaded = EmbeddingIndex::load(

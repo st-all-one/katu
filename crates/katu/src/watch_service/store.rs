@@ -6,6 +6,7 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::Path;
 
+use katu_core::diag::{Level, events};
 use katu_core::error::Error;
 
 use super::Paths;
@@ -35,6 +36,7 @@ pub(super) const TIMER_UNIT: &str = "[Unit]\nDescription=katu — timer de auto-
 
 /// Materializa o script do worker com permissão de execução.
 pub(super) fn write_script(path: &Path) -> Result<(), Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::WATCH_TICK, "store::write_script");
     write_file(path, SCRIPT_BODY)?;
     #[cfg(unix)]
     {
@@ -50,6 +52,8 @@ pub(super) fn write_script(path: &Path) -> Result<(), Error> {
 
 /// Escreve `body` em `path`, criando o diretório pai.
 pub(super) fn write_file(path: &Path, body: &str) -> Result<(), Error> {
+    let _span = katu_core::trace_fn!("watch_service::store::write_file");
+
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|err| Error::io(parent.display().to_string(), err))?;
     }
@@ -58,6 +62,8 @@ pub(super) fn write_file(path: &Path, body: &str) -> Result<(), Error> {
 
 /// Remove um ficheiro, ignorando a ausência.
 pub(super) fn remove_file(path: &Path) -> Result<(), Error> {
+    let _span = katu_core::trace_fn!("watch_service::store::remove_file");
+
     match fs::remove_file(path) {
         Ok(()) => Ok(()),
         Err(err) if err.kind() == ErrorKind::NotFound => Ok(()),
@@ -67,6 +73,7 @@ pub(super) fn remove_file(path: &Path) -> Result<(), Error> {
 
 /// Lê a lista de projetos subscritos (ordem preservada, sem linhas vazias).
 pub(super) fn read_watched(paths: &Paths) -> Result<Vec<String>, Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::WATCH_TICK, "store::read_watched");
     let path = paths.watched();
     match fs::read_to_string(&path) {
         Ok(text) => Ok(text
@@ -82,6 +89,7 @@ pub(super) fn read_watched(paths: &Paths) -> Result<Vec<String>, Error> {
 
 /// Grava a lista de projetos subscritos (uma por linha).
 pub(super) fn write_watched(paths: &Paths, watched: &[String]) -> Result<(), Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::WATCH_TICK, "store::write_watched");
     let mut body = watched.join("\n");
     if !body.is_empty() {
         body.push('\n');
@@ -91,6 +99,8 @@ pub(super) fn write_watched(paths: &Paths, watched: &[String]) -> Result<(), Err
 
 /// Unidade systemd do worker, com o caminho real do script.
 pub(super) fn service_unit(script: &Path) -> String {
+    let _span = katu_core::trace_fn!("watch_service::store::service_unit");
+
     format!(
         "[Unit]\nDescription=katu — auto-drain de embeddings (worker ocioso)\n\n\
          [Service]\nType=oneshot\nExecStart={}\n",

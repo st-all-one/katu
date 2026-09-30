@@ -6,6 +6,7 @@
 //! chave de API é lida pela borda e injetada ([`Declarative::with_api_key`]); nada aqui toca o
 //! ambiente.
 
+use katu_core::diag::{Level, events};
 use serde::Deserialize;
 
 use crate::catalog::{Catalog, Dialect, MaxTokensField, ModelEntry};
@@ -133,12 +134,19 @@ impl ProviderSpec {
     /// # Errors
     /// [`SpecError::Parse`] se o JSON não seguir o formato.
     pub fn from_json(json: &str) -> Result<Self, SpecError> {
+        let _span = katu_core::trace_fn!("declarative::from_json");
+
         serde_json::from_str(json).map_err(|error| SpecError::Parse(error.to_string()))
     }
 
     /// Catálogo derivado da definição.
     #[must_use]
     pub fn catalog(&self) -> Catalog {
+        let _span = katu_core::fn_span!(
+            Level::Debug,
+            events::PROVIDER_MODELS,
+            "declarative::ProviderSpec::catalog"
+        );
         let mut catalog = Catalog::new();
         for model in &self.models {
             let dialect = model.dialect.unwrap_or_else(|| self.engine.dialect());
@@ -162,24 +170,32 @@ impl ProviderSpec {
     /// Definição curada do `opencode zen` (embutida).
     #[must_use]
     pub fn opencode_zen() -> Self {
+        let _span = katu_core::trace_fn!("declarative::opencode_zen");
+
         embedded(include_str!("../providers/opencode_zen.json"))
     }
 
     /// Definição curada do `opencode go` (embutida; exige afinidade de sessão).
     #[must_use]
     pub fn opencode_go() -> Self {
+        let _span = katu_core::trace_fn!("declarative::opencode_go");
+
         embedded(include_str!("../providers/opencode_go.json"))
     }
 
     /// Definição da `OpenAI` (Responses API), exemplo do caminho declarativo.
     #[must_use]
     pub fn openai() -> Self {
+        let _span = katu_core::trace_fn!("declarative::openai");
+
         embedded(include_str!("../providers/openai.json"))
     }
 }
 
 /// Carrega uma definição embutida; um ficheiro malformado é apanhado pelo teste do módulo.
 fn embedded(json: &str) -> ProviderSpec {
+    let _span = katu_core::trace_fn!("declarative::embedded");
+
     ProviderSpec::from_json(json).unwrap_or_default()
 }
 

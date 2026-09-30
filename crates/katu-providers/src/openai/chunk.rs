@@ -1,5 +1,6 @@
 //! Estruturas wire do `chat.completion.chunk` (serde).
 
+use katu_core::diag::{Level, events};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -30,6 +31,8 @@ pub(crate) struct Delta {
 impl Delta {
     /// Texto de raciocínio, aceitando as três variantes conhecidas de campo.
     pub(crate) fn reasoning(&self) -> Option<&str> {
+        let _span = katu_core::trace_fn!("openai::chunk::reasoning");
+
         [
             self.reasoning_content.as_deref(),
             self.reasoning.as_deref(),
@@ -80,6 +83,7 @@ pub(crate) struct CompletionDetails {
 
 /// Extrai texto de um campo `content` (string ou lista de partes de texto).
 pub(crate) fn text_of(content: &Value) -> Option<String> {
+    let _span = katu_core::fn_span!(Level::Trace, events::PROVIDER_CHUNK, "openai::text_of");
     match content {
         Value::String(text) => Some(text.clone()),
         Value::Array(parts) => {

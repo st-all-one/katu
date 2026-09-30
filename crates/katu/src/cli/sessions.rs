@@ -3,6 +3,7 @@
 //! Vive num módulo filho para manter `cli.rs` sob o teto de linhas. Só **lê** o índice temporal
 //! (`<root>/.katu/sessions/index.jsonl`); nunca cria sessões nem toca no log.
 
+use katu_core::diag::{Level, events};
 use katu_core::error::Error;
 use katu_core::kernel::{Session, discover_root};
 use serde_json::{Value, json};
@@ -12,6 +13,7 @@ use crate::report::Report;
 
 /// Lista as sessões do projeto (id, instante, objetivo) em ordem temporal.
 pub(super) fn list() -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_SESSIONS, "sessions::list");
     let fs = StdFs;
     let start = std::env::current_dir().unwrap_or_default();
     let root = discover_root(&fs, &start);

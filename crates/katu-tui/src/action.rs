@@ -6,6 +6,7 @@
 //! Na TUI v2 os comandos vivem na linha de mensagem (`/model`, `/thinking`, …) e a ajuda é uma
 //! sobreposição (`?`); os antigos atalhos de um toque foram **removidos**.
 
+use katu_core::diag::{Level, events};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// Modo de entrada da UI.
@@ -88,6 +89,7 @@ pub enum Action {
 /// Traduz uma tecla na ação correspondente ao modo (função pura, §E10-T02).
 #[must_use]
 pub fn map_key(key: KeyEvent, mode: Mode) -> Option<Action> {
+    let _span = katu_core::fn_span!(Level::Debug, events::TUI_INPUT, "action::map_key");
     let control = key.modifiers.contains(KeyModifiers::CONTROL);
     if control && matches!(key.code, KeyCode::Char('c')) {
         return Some(Action::Quit);

@@ -13,6 +13,8 @@ use katu_core::memory::{Anchor, Memory, NoteRef, QueryHit, QueryOutcome, QueryRe
 
 /// Estado do backend de memória (adaptador in-process do knudge, E03-T07).
 pub(crate) fn memory_status() -> Value {
+    let _span = katu_core::trace_fn!("memory::commands::memory_status");
+
     let root = std::env::current_dir().unwrap_or_default();
     match KnudgeMemory::open(&root) {
         Ok(memory) => match memory.status() {
@@ -35,6 +37,8 @@ pub(crate) fn memory_status() -> Value {
     reason = "`force` é o modo `--force` do dreno"
 )]
 pub(crate) fn memory_drain(force: bool) -> Report {
+    let _span = katu_core::trace_fn!("memory::commands::memory_drain");
+
     let root = std::env::current_dir().unwrap_or_default();
     match KnudgeMemory::open(&root) {
         Ok(memory) => match memory.drain(force) {
@@ -60,6 +64,8 @@ pub(crate) fn memory_drain(force: bool) -> Report {
 ///
 /// Read-only (não escreve memória); sem o adaptador, recusa (fail-closed).
 pub(crate) fn memory_query(command: &'static str, req: &QueryReq) -> Report {
+    let _span = katu_core::trace_fn!("memory::commands::memory_query");
+
     let root = std::env::current_dir().unwrap_or_default();
     match KnudgeMemory::open(&root) {
         Ok(memory) => match memory.query(req) {
@@ -72,6 +78,8 @@ pub(crate) fn memory_query(command: &'static str, req: &QueryReq) -> Report {
 
 /// Envelope de uma consulta rica (forma + avisos).
 fn query_value(result: &QueryResult) -> Value {
+    let _span = katu_core::trace_fn!("memory::commands::query_value");
+
     let outcome = match &result.outcome {
         QueryOutcome::Hits(hits) => json!({
             "kind": "hits",
@@ -105,6 +113,8 @@ fn query_value(result: &QueryResult) -> Value {
 
 /// Um hit como JSON.
 fn hit_value(hit: &QueryHit) -> Value {
+    let _span = katu_core::trace_fn!("memory::commands::hit_value");
+
     json!({
         "note": hit.note.as_str(),
         "statement": hit.statement,
@@ -117,6 +127,8 @@ fn hit_value(hit: &QueryHit) -> Value {
 
 /// Converte a falha do runtime na taxonomia estável de erro do katu.
 fn runtime_failure(command: &'static str, error: RuntimeError) -> Report {
+    let _span = katu_core::trace_fn!("memory::commands::runtime_failure");
+
     let core: Error = error.into();
     Report::failed(command, &core)
 }

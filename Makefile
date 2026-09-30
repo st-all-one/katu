@@ -26,7 +26,7 @@ test:
 build:
 	$(CARGO) build --workspace
 
-## Nenhum arquivo de produção passa de 300 linhas.
+## Nenhum arquivo de produção passa de 400 linhas.
 file-length:
 	./scripts/check_file_length.sh
 

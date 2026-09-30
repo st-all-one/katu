@@ -4,6 +4,7 @@
 //! [`crate::report`]. Sem subcomando, `katu` abre a TUI; `--init` faz o bootstrap e sai.
 
 use clap::{Parser, Subcommand};
+use katu_core::diag::{Level, events};
 use serde_json::json;
 
 use crate::bootstrap::{self, GitMode};
@@ -136,6 +137,8 @@ impl Command {
 
 /// Executa o comando pedido e devolve o relatório.
 pub(crate) fn execute(cli: &Cli) -> Report {
+    let _span = katu_core::trace_fn!("cli::execute");
+
     if cli.init {
         return init_project(cli);
     }
@@ -159,6 +162,8 @@ pub(crate) fn execute(cli: &Cli) -> Report {
 /// Garante o `.katu/` antes de abrir sessão; devolve um relatório de erro, se falhar.
 #[cfg(feature = "memory-in-process")]
 fn ensure_project(command: &'static str) -> Option<Report> {
+    let _span = katu_core::trace_fn!("cli::ensure_project");
+
     bootstrap::ensure_current(GitMode::Default, false)
         .err()
         .map(|error| Report::failed(command, &error))
@@ -166,6 +171,7 @@ fn ensure_project(command: &'static str) -> Option<Report> {
 
 /// `katu --init`: bootstrap do projeto e saída (E20-T19).
 fn init_project(cli: &Cli) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::BOOTSTRAP_INIT, "cli::init_project");
     let mode = if cli.git_excluded {
         GitMode::Excluded
     } else if cli.git_tracked {
@@ -193,6 +199,7 @@ fn default_tui() -> Report {
 
     use katu_core::error::Error;
 
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_TUI, "cli::default_tui");
     if !std::io::stdout().is_terminal() {
         return Report::failed(
             "tui",

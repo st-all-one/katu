@@ -50,15 +50,18 @@ pub struct Context {
 /// Monta o contexto a partir do log, respeitando o orçamento (prime compacto).
 #[must_use]
 pub fn assemble(events: &[Event], budget: ContextBudget) -> Context {
+    let _span = crate::trace_fn!("context::assemble");
+
     assemble_with_prime(events, budget, PrimeMode::Compact)
 }
 
 /// Monta o contexto no modo de prime pedido (`--long` usa a spec completa — E09-T01).
 #[must_use]
 pub fn assemble_with_prime(events: &[Event], budget: ContextBudget, mode: PrimeMode) -> Context {
-    let _span = crate::span!(
+    let _span = crate::fn_span!(
         Level::Debug,
         events::CONTEXT_BUILD,
+        "context::assemble_with_prime",
         "raw_min" => budget.raw_min,
         "summary_max" => budget.summary_max,
     );
@@ -79,6 +82,8 @@ pub fn assemble_with_prime(events: &[Event], budget: ContextBudget, mode: PrimeM
 /// Gatilho do kernel (E09-T07): há prefixo fora do orçamento a compactar?
 #[must_use]
 pub fn needs_compaction(events: &[Event], budget: ContextBudget) -> bool {
+    let _span = crate::trace_fn!("context::needs_compaction");
+
     let all = derive_messages(events);
     fit_raw(&all, budget.raw_min).len() < all.len()
 }
@@ -102,6 +107,8 @@ const PRIME_GRAMMAR: &str = "saida: TOON colunar v3 (D39) SEM headers; o esquema
 /// Prime compacto (DF12): ensina a gramática do TOON colunar v3 **e o registo de esquema**.
 #[must_use]
 pub fn prime() -> String {
+    let _span = crate::trace_fn!("context::prime");
+
     format!(
         "katu prime v{PRIME_VERSION}\n\
          tools: read/write/edit/move/trash/bash/grep/find/ls/plan/memory\n\
@@ -117,6 +124,8 @@ pub fn prime() -> String {
 /// mesma projeção colunar, sem a lista escrita à mão.
 #[must_use]
 pub fn prime_with_catalog(catalog: &str) -> String {
+    let _span = crate::trace_fn!("context::prime_with_catalog");
+
     format!(
         "katu prime v{PRIME_VERSION}\n\
          tools (tabela `tool`; `?` opcional, `{{a,b}}` dominio fechado):\n\
@@ -130,6 +139,8 @@ pub fn prime_with_catalog(catalog: &str) -> String {
 /// Prime completo (spec TOON colunar v3) — `--long` (E09-T01). Determinístico e versionado.
 #[must_use]
 pub fn prime_long() -> String {
+    let _span = crate::trace_fn!("context::prime_long");
+
     format!(
         "katu prime v{PRIME_VERSION} (long)\n\
          tools: read/write/edit/move/trash/bash/grep/find/ls/plan/memory\n\
@@ -147,6 +158,8 @@ pub fn prime_long() -> String {
 
 /// Uma linha por secção do registo: `nome R col...` ou `nome L`.
 fn registry_text() -> String {
+    let _span = crate::trace_fn!("context::registry_text");
+
     let mut out = String::from("esquema:\n");
     for spec in schema::registry() {
         out.push_str(spec.name);
@@ -175,6 +188,8 @@ fn registry_text() -> String {
 /// Prime no modo pedido.
 #[must_use]
 pub fn prime_for(mode: PrimeMode) -> String {
+    let _span = crate::trace_fn!("context::prime_for");
+
     match mode {
         PrimeMode::Compact => prime(),
         PrimeMode::Long => prime_long(),
@@ -183,6 +198,7 @@ pub fn prime_for(mode: PrimeMode) -> String {
 
 /// Mantém o **sufixo mais recente** cujo peso cabe em `raw_min`.
 fn fit_raw(messages: &[Message], raw_min: usize) -> Vec<Message> {
+    let _span = crate::fn_span!(Level::Trace, events::CONTEXT_TRIM, "context::fit_raw");
     let mut used = 0usize;
     let mut start = messages.len();
     for (index, message) in messages.iter().enumerate().rev() {
@@ -198,6 +214,8 @@ fn fit_raw(messages: &[Message], raw_min: usize) -> Vec<Message> {
 
 /// Estimativa determinística de tokens de uma mensagem (sem tokenizer).
 fn message_weight(message: &Message) -> usize {
+    let _span = crate::trace_fn!("context::message_weight");
+
     let bytes = match message {
         Message::User { text } | Message::Assistant { text } => text.len(),
         Message::ToolCall { tool, .. } => tool_weight(tool),
@@ -208,6 +226,8 @@ fn message_weight(message: &Message) -> usize {
 
 /// Peso estimado de um `ToolUse` (caminhos + `argv` + `cwd`).
 fn tool_weight(tool: &ToolUse) -> usize {
+    let _span = crate::trace_fn!("context::tool_weight");
+
     let paths: usize = tool
         .resolved_paths
         .iter()
@@ -224,6 +244,8 @@ fn tool_weight(tool: &ToolUse) -> usize {
 
 /// Peso estimado de um resultado de tool (evidência/controlo).
 fn outcome_weight(outcome: &ToolOutcome) -> usize {
+    let _span = crate::trace_fn!("context::outcome_weight");
+
     match outcome {
         ToolOutcome::Denied { evidence, .. } => {
             evidence.argument.len().saturating_add(evidence.fact.len())
@@ -235,6 +257,8 @@ fn outcome_weight(outcome: &ToolOutcome) -> usize {
 
 /// Estimativa `bytes/4` (arredondada para cima).
 fn tokens_from_bytes(bytes: usize) -> usize {
+    let _span = crate::trace_fn!("context::tokens_from_bytes");
+
     bytes.div_ceil(4)
 }
 

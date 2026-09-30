@@ -108,6 +108,8 @@ impl ArtifactRef {
     /// Cria uma referência a partir de um caminho.
     #[must_use]
     pub fn new(path: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("evidence::new");
+
         Self {
             path: path.into(),
             note: None,
@@ -117,6 +119,8 @@ impl ArtifactRef {
     /// Acrescenta uma nota descritiva.
     #[must_use]
     pub fn with_note(mut self, note: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("evidence::with_note");
+
         self.note = Some(note.into());
         self
     }
@@ -181,6 +185,8 @@ impl Metric {
         basis: EvidenceBasis,
         artifact: Option<ArtifactRef>,
     ) -> Result<Self, EvidenceError> {
+        let _span = crate::trace_fn!("evidence::new");
+
         let name = name.into();
         if basis.requires_artifact() && artifact.is_none() {
             return Err(EvidenceError::MissingArtifact {
@@ -203,6 +209,8 @@ impl Metric {
     /// `true` se o número pode fundamentar decisão (base publicável **e** artefacto presente).
     #[must_use]
     pub fn is_publishable(&self) -> bool {
+        let _span = crate::trace_fn!("evidence::is_publishable");
+
         self.basis.is_publishable() && self.artifact.is_some()
     }
 
@@ -216,6 +224,8 @@ impl Metric {
         metrics: &[Self],
         unit: Unit,
     ) -> Result<Self, EvidenceError> {
+        let _span = crate::trace_fn!("evidence::sum");
+
         let first = metrics.first().ok_or(EvidenceError::Empty)?;
         for metric in metrics {
             if metric.basis != first.basis {
@@ -238,6 +248,8 @@ impl Metric {
 )]
 #[must_use]
 pub fn to_f64(value: u64) -> f64 {
+    let _span = crate::trace_fn!("evidence::to_f64");
+
     value as f64
 }
 

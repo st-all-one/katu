@@ -113,6 +113,8 @@ pub(crate) enum AgentError {
 
 impl From<AgentError> for Error {
     fn from(error: AgentError) -> Self {
+        let _span = katu_core::trace_fn!("agent::from");
+
         match error {
             AgentError::Provider(source) => source.into(),
             AgentError::Route(router::RouteError::UnknownTool(name)) => {
@@ -148,6 +150,8 @@ fn execute_call(
     name: &str,
     args: &Value,
 ) -> Result<CallOutcome, AgentError> {
+    let _span = katu_core::trace_fn!("agent::execute_call");
+
     if name == "memory" {
         return execute_memory(runtime, call, args);
     }
@@ -206,6 +210,8 @@ fn execute_memory(
     call: CallId,
     args: &Value,
 ) -> Result<CallOutcome, AgentError> {
+    let _span = katu_core::trace_fn!("agent::execute_memory");
+
     let Runtime {
         session,
         memory,

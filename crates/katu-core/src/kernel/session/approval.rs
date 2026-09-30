@@ -21,6 +21,11 @@ impl Session<'_> {
         reason: &str,
         granted_by: &str,
     ) -> Result<(), SessionError> {
+        let _span = crate::fn_span!(
+            Level::Debug,
+            events::POLICY_APPROVAL,
+            "kernel::session::approve"
+        );
         crate::event!(Level::Info, events::POLICY_APPROVAL);
         self.apply(&Event::ApprovalGranted {
             rule_id,

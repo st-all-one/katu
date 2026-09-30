@@ -169,6 +169,8 @@ impl Error {
 
     /// Erro de I/O com caminho.
     pub fn io(path: impl Into<String>, source: std::io::Error) -> Self {
+        let _span = crate::trace_fn!("error::io");
+
         Self::Io {
             path: path.into(),
             source,
@@ -177,6 +179,8 @@ impl Error {
 
     /// Entrada inválida.
     pub fn invalid_input(message: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("error::invalid_input");
+
         Self::InvalidInput {
             message: message.into(),
         }
@@ -184,6 +188,8 @@ impl Error {
 
     /// Serviço indisponível (fail-closed, E03-T07).
     pub fn unavailable(service: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("error::unavailable");
+
         Self::Unavailable {
             service: service.into(),
         }
@@ -191,6 +197,8 @@ impl Error {
 
     /// Erro interno.
     pub fn internal(message: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("error::internal");
+
         Self::Internal {
             message: message.into(),
         }
@@ -238,6 +246,8 @@ impl ToolOutcome {
     /// controlo opaco.
     #[must_use]
     pub fn rule_id(&self) -> Option<&RuleId> {
+        let _span = crate::trace_fn!("error::rule_id");
+
         match self {
             Self::Denied { rule_id, .. } => Some(rule_id),
             Self::Unavailable { rule_id, .. } => rule_id.as_ref(),
@@ -264,6 +274,8 @@ pub struct OutcomeError {
 ///
 /// Um *panic* a segurar o lock não deve propagar; recuperamos o guard e deixamos rasto em `diag`.
 pub fn lock_recover<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    let _span = crate::trace_fn!("error::lock_recover");
+
     match mutex.lock() {
         Ok(guard) => guard,
         Err(poison) => {

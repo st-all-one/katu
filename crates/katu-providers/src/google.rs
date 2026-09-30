@@ -4,6 +4,7 @@
 //! `functionCall` (completo, sem acumulação). A contabilização vem em `usageMetadata`. O endpoint
 //! e a autenticação (`x-goog-api-key`) são construídos pelo despacho comum ([`crate::engine`]).
 
+use katu_core::diag::{Level, events};
 use katu_core::provider::{ProviderError, ProviderOutcome, ProviderSink};
 
 use super::engine::Call;
@@ -26,6 +27,7 @@ pub(crate) fn stream<T: Transport>(
     call: &Call<'_>,
     sink: &mut dyn ProviderSink,
 ) -> Result<ProviderOutcome, ProviderError> {
+    let _span = katu_core::fn_span!(Level::Debug, events::PROVIDER_REQUEST, "google::stream");
     let body = encode_request(call.request, call.options)?;
     let http = HttpRequest::post(
         call.endpoint.url.clone(),

@@ -65,6 +65,8 @@ impl Control {
         current: &ControlState,
         caps: &ModelCapabilities,
     ) -> Result<(), ControlError> {
+        let _span = crate::trace_fn!("kernel::control::validate");
+
         let thinking = match self {
             Self::SetThinking { thinking } => *thinking,
             Self::SetModel { .. } => current.thinking,
@@ -80,6 +82,8 @@ impl Control {
     /// Estado resultante de aplicar o controlo (determinístico; sem validação).
     #[must_use]
     pub fn apply(&self, current: &ControlState) -> ControlState {
+        let _span = crate::trace_fn!("kernel::control::apply");
+
         let mut next = current.clone();
         match self {
             Self::SetModel { model } => next.model = Some(model.clone()),
@@ -91,6 +95,8 @@ impl Control {
     /// Resumo legível e estável (para a UI; evita `match` não-exaustivo fora da crate).
     #[must_use]
     pub fn summary(&self) -> String {
+        let _span = crate::trace_fn!("kernel::control::summary");
+
         match self {
             Self::SetModel { model } => format!("modelo: {model}"),
             Self::SetThinking { thinking } => format!("pensamento: {}", thinking.as_str()),

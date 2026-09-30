@@ -9,6 +9,8 @@
 
 use std::time::Duration;
 
+use katu_core::diag::{Level, events};
+
 /// Teto absoluto de um atraso pedido pelo servidor (1 h): um `1e30` malformado degrada para
 /// "sem dica", nunca congela o agente.
 const MAX_DELAY: Duration = Duration::from_secs(3600);
@@ -26,6 +28,8 @@ pub struct RetryPolicy {
 
 impl Default for RetryPolicy {
     fn default() -> Self {
+        let _span = katu_core::trace_fn!("retry::default");
+
         Self {
             max_retries: 2,
             base_delay: Duration::from_millis(400),
@@ -62,6 +66,7 @@ const PERMANENT: &[&str] = &[
 /// Decide se uma resposta não-2xx merece retry.
 #[must_use]
 pub(crate) fn is_retryable(status: u16, headers: &[(String, String)], body: &str) -> bool {
+    let _span = katu_core::fn_span!(Level::Trace, events::PROVIDER_RETRY, "retry::is_retryable");
     if let Some(value) = header(headers, "x-should-retry") {
         match value.trim() {
             "true" => return true,
@@ -81,6 +86,7 @@ pub(crate) fn is_retryable(status: u16, headers: &[(String, String)], body: &str
 /// cabeçalho `Date` da mesma resposta). Datas sem `Date` são ignoradas (o provider é puro).
 #[must_use]
 pub(crate) fn retry_after(headers: &[(String, String)]) -> Option<Duration> {
+    let _span = katu_core::fn_span!(Level::Trace, events::PROVIDER_RETRY, "retry::retry_after");
     if let Some(millis) = header(headers, "retry-after-ms").and_then(parse_secs) {
         return secs_to_duration(millis / 1000.0);
     }
@@ -97,6 +103,8 @@ pub(crate) fn retry_after(headers: &[(String, String)]) -> Option<Duration> {
 /// Extrai um atraso do **corpo** (`error.metadata.retry_after_seconds`, forma `OpenRouter`).
 #[must_use]
 pub(crate) fn body_retry_after(body: &str) -> Option<Duration> {
+    let _span = katu_core::trace_fn!("retry::body_retry_after");
+
     let value: serde_json::Value = serde_json::from_str(body).ok()?;
     let seconds = value
         .get("error")?
@@ -109,6 +117,7 @@ pub(crate) fn body_retry_after(body: &str) -> Option<Duration> {
 /// Atraso do `attempt` (o pedido do servidor vence a exponencial), limitado ao teto.
 #[must_use]
 pub(crate) fn delay(policy: &RetryPolicy, attempt: u32, requested: Option<Duration>) -> Duration {
+    let _span = katu_core::fn_span!(Level::Trace, events::PROVIDER_RETRY, "retry::delay");
     if let Some(server) = requested {
         return server.min(policy.max_delay);
     }
@@ -121,6 +130,8 @@ pub(crate) fn delay(policy: &RetryPolicy, attempt: u32, requested: Option<Durati
 
 /// Converte segundos (finitos, não-negativos e limitados) num [`Duration`].
 fn secs_to_duration(seconds: f64) -> Option<Duration> {
+    let _span = katu_core::trace_fn!("retry::secs_to_duration");
+
     if !seconds.is_finite() || seconds < 0.0 {
         return None;
     }
@@ -131,6 +142,8 @@ fn secs_to_duration(seconds: f64) -> Option<Duration> {
 
 /// Interpreta uma data `IMF-fixdate` (`Sun, 06 Nov 1994 08:49:37 GMT`) em segundos `epoch`.
 fn parse_http_date(value: &str) -> Option<i64> {
+    let _span = katu_core::trace_fn!("retry::parse_http_date");
+
     let rest = value.split_once(", ").map_or(value, |(_, rest)| rest);
     let mut parts = rest.split_whitespace();
     let day = parts.next()?.parse::<i64>().ok()?;
@@ -163,6 +176,8 @@ fn month_index(name: &str) -> Option<i64> {
 /// Dias desde `1970-01-01` (algoritmo de Howard Hinnant; `wrapping_*` porque as entradas são
 /// datas válidas e nunca chegam perto dos limites de `i64`).
 fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
+    let _span = katu_core::trace_fn!("retry::days_from_civil");
+
     let year = if month <= 2 {
         year.wrapping_sub(1)
     } else {
@@ -194,6 +209,8 @@ fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
 
 /// Lê um cabeçalho (case-insensitive).
 fn header<'a>(headers: &'a [(String, String)], name: &str) -> Option<&'a str> {
+    let _span = katu_core::trace_fn!("retry::header");
+
     headers
         .iter()
         .find(|(key, _)| key.eq_ignore_ascii_case(name))
@@ -202,6 +219,8 @@ fn header<'a>(headers: &'a [(String, String)], name: &str) -> Option<&'a str> {
 
 /// Interpreta um valor decimal não-negativo.
 fn parse_secs(value: &str) -> Option<f64> {
+    let _span = katu_core::trace_fn!("retry::parse_secs");
+
     let parsed = value.trim().parse::<f64>().ok()?;
     (parsed.is_finite() && parsed >= 0.0).then_some(parsed)
 }

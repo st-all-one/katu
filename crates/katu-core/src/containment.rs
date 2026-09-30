@@ -117,6 +117,8 @@ impl ContainmentStatus {
 /// exige autorização para o resto. Sem workspace definido, não há concessão — falha fechado.
 #[must_use]
 pub fn workspace_capabilities(root: &ResolvedPath) -> Vec<Capability> {
+    let _span = crate::trace_fn!("containment::workspace_capabilities");
+
     vec![Capability::Workspace { root: root.clone() }]
 }
 
@@ -130,6 +132,8 @@ pub fn workspace_capabilities(root: &ResolvedPath) -> Vec<Capability> {
     )
 )]
 pub fn announce(status: ContainmentStatus) {
+    let _span = crate::trace_fn!("containment::announce");
+
     crate::event!(
         Level::Info,
         events::CONTAIN_MODE,
@@ -154,9 +158,15 @@ pub struct NoJail;
 
 impl Jail for NoJail {
     fn acquire(&self, mode: SandboxEnforcement) -> Result<(), ContainmentError> {
+        let _span = crate::fn_span!(
+            Level::Trace,
+            events::CONTAIN_CHECK,
+            "containment::jail_acquire"
+        );
         match mode {
             SandboxEnforcement::Soft => Ok(()),
             SandboxEnforcement::Full | SandboxEnforcement::Partial => {
+                crate::event!(Level::Debug, events::CONTAIN_DENY, "mode" => mode.as_str());
                 Err(ContainmentError::Unavailable { mode })
             }
         }
@@ -175,6 +185,8 @@ pub enum ContainmentError {
 
 impl std::fmt::Display for ContainmentError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let _span = crate::trace_fn!("containment::fmt");
+
         match self {
             Self::Unavailable { mode } => {
                 write!(formatter, "jail indisponível: {} (E17)", mode.as_str())

@@ -3,6 +3,7 @@
 //! Render **puro**: a ajuda (`?`) lista os comandos `/`, os padrões e as teclas; o mini-menu
 //! mostra as escolhas de `/model`/`/thinking` com a seleção destacada.
 
+use katu_core::diag::{Level, events};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -52,6 +53,7 @@ const MENU_SIZE: (u16, u16) = (48, 14);
 
 /// Desenha a sobreposição de ajuda (`?`).
 pub(crate) fn help(frame: &mut Frame<'_>) {
+    let _span = katu_core::fn_span!(Level::Trace, events::TUI_RENDER, "overlay::help");
     let area = centered(frame.area(), HELP_SIZE);
     frame.render_widget(Clear, area);
     let mut lines = vec![section("comandos")];
@@ -74,6 +76,7 @@ pub(crate) fn help(frame: &mut Frame<'_>) {
 
 /// Desenha o mini-menu corrente (E20-T10).
 pub(crate) fn menu(frame: &mut Frame<'_>, app: &App) {
+    let _span = katu_core::fn_span!(Level::Trace, events::TUI_RENDER, "overlay::menu");
     let Some(menu) = app.menu() else {
         return;
     };
@@ -107,6 +110,8 @@ pub(crate) fn menu(frame: &mut Frame<'_>, app: &App) {
 
 /// Linha de secção da ajuda.
 fn section(title: &str) -> Line<'static> {
+    let _span = katu_core::trace_fn!("overlay::section");
+
     Line::from(Span::styled(
         title.to_string(),
         Style::default()
@@ -117,6 +122,8 @@ fn section(title: &str) -> Line<'static> {
 
 /// Linha `nome — ajuda`.
 fn entry(name: &str, help: &str) -> Line<'static> {
+    let _span = katu_core::trace_fn!("overlay::entry");
+
     Line::from(vec![
         Span::styled(format!("  {name:<12}"), Style::default().fg(Color::Cyan)),
         Span::raw(help.to_string()),
@@ -125,6 +132,8 @@ fn entry(name: &str, help: &str) -> Line<'static> {
 
 /// Área centrada com tamanho fixo (clampada ao ecrã).
 fn centered(area: Rect, (width, height): (u16, u16)) -> Rect {
+    let _span = katu_core::trace_fn!("overlay::centered");
+
     let width = width.min(area.width);
     let height = height.min(area.height);
     let x = area.x.saturating_add(area.width.saturating_sub(width) / 2);

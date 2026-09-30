@@ -7,6 +7,7 @@
 //! O trait existe para que os adaptadores (`opencode`, `llama`) sejam testáveis sem rede: os
 //! testes injetam um [`MockTransport`] que serve bytes canónicos.
 
+use katu_core::diag::{Level, events};
 use katu_core::provider::{Flow, ProviderError};
 
 use crate::error::sanitize;
@@ -44,6 +45,8 @@ impl HttpRequest {
         body: impl Into<Vec<u8>>,
         headers: Vec<(String, String)>,
     ) -> Self {
+        let _span = katu_core::trace_fn!("transport::post");
+
         Self {
             method: Method::Post,
             url: url.into(),
@@ -84,6 +87,8 @@ pub enum TransportError {
 
 impl From<TransportError> for ProviderError {
     fn from(error: TransportError) -> Self {
+        let _span = katu_core::trace_fn!("transport::from");
+
         match error {
             TransportError::Timeout { millis } => Self::Timeout { millis },
             TransportError::Io(source) => Self::Transport(sanitize(&source.to_string())),
@@ -118,6 +123,11 @@ pub trait Transport: Send + Sync {
     /// # Errors
     /// [`TransportError`] em falha de I/O, protocolo ou timeout.
     fn get(&self, request: &HttpRequest) -> Result<(u16, String), TransportError> {
+        let _span = katu_core::fn_span!(
+            Level::Trace,
+            events::PROVIDER_REQUEST,
+            "transport::Transport::get"
+        );
         let mut body = String::new();
         let meta = self.send(request, &mut |chunk| {
             if body.len() >= GET_BODY_CAP {
@@ -134,6 +144,8 @@ pub trait Transport: Send + Sync {
     /// # Errors
     /// [`TransportError`] em falha de I/O, protocolo ou timeout.
     fn get_text(&self, url: &str) -> Result<(u16, String), TransportError> {
+        let _span = katu_core::trace_fn!("transport::get_text");
+
         let request = HttpRequest {
             method: Method::Get,
             url: url.to_string(),
@@ -148,6 +160,11 @@ pub trait Transport: Send + Sync {
     /// É uma **otimização**, não um contrato: erros são ignorados e o objetivo é deixar a
     /// ligação quente no *pool* antes do primeiro turno. O provider **não** toca o relógio.
     fn warm(&self, request: &HttpRequest) {
+        let _span = katu_core::fn_span!(
+            Level::Trace,
+            events::PROVIDER_REQUEST,
+            "transport::Transport::warm"
+        );
         let mut total = 0_usize;
         let _sent = self.send(request, &mut |chunk| {
             total = total.saturating_add(chunk.len());
@@ -174,6 +191,8 @@ impl MockTransport {
     /// Resposta `200` com o corpo dado (entregue em fragmentos de `chunk` bytes).
     #[must_use]
     pub fn ok(body: impl Into<Vec<u8>>, chunk: usize) -> Self {
+        let _span = katu_core::trace_fn!("transport::ok");
+
         Self {
             status: 200,
             headers: vec![("content-type".to_string(), "text/event-stream".to_string())],
@@ -185,6 +204,8 @@ impl MockTransport {
     /// Resposta com um estado explícito (para testar o caminho de erro HTTP).
     #[must_use]
     pub fn status(status: u16, body: impl Into<Vec<u8>>) -> Self {
+        let _span = katu_core::trace_fn!("transport::status");
+
         Self {
             status,
             headers: Vec::new(),
@@ -200,6 +221,8 @@ impl Transport for MockTransport {
         _request: &HttpRequest,
         sink: &mut ChunkSink<'_>,
     ) -> Result<HttpMeta, TransportError> {
+        let _span = katu_core::trace_fn!("transport::send");
+
         let mut bytes = 0_u64;
         for fragment in self.body.chunks(self.chunk) {
             bytes = bytes.saturating_add(u64::try_from(fragment.len()).unwrap_or(u64::MAX));

@@ -15,6 +15,8 @@ use super::super::translate::{from_note_type, from_status, note_type, points};
 
 /// Filtro estrutural (statuses vazios = visíveis por omissão, como o `kd`).
 pub(super) fn filter(req: &QueryReq) -> Result<Filter, MemoryError> {
+    let _span = katu_core::trace_fn!("memory::query::convert::filter");
+
     let classifications = req
         .filter
         .classes
@@ -41,6 +43,8 @@ pub(super) fn filter(req: &QueryReq) -> Result<Filter, MemoryError> {
 
 /// Âncoras como `String` (canal de âncoras + filtro).
 pub(super) fn anchors(req: &QueryReq) -> Vec<String> {
+    let _span = katu_core::trace_fn!("memory::query::convert::anchors");
+
     req.filter
         .anchors
         .iter()
@@ -50,6 +54,8 @@ pub(super) fn anchors(req: &QueryReq) -> Vec<String> {
 
 /// Universo da consulta.
 pub(super) fn universe(req: &QueryReq) -> Universe {
+    let _span = katu_core::trace_fn!("memory::query::convert::universe");
+
     match req.universe {
         QueryUniverse::All => Universe::All,
         _ => Universe::Knowledge,
@@ -58,6 +64,8 @@ pub(super) fn universe(req: &QueryReq) -> Universe {
 
 /// Converte o estado do katu no do knudge.
 fn knudge_status(status: KatuStatus) -> KdStatus {
+    let _span = katu_core::trace_fn!("memory::query::convert::knudge_status");
+
     match status {
         KatuStatus::InProgress => KdStatus::InProgress,
         KatuStatus::Blocked => KdStatus::Blocked,
@@ -71,6 +79,8 @@ fn knudge_status(status: KatuStatus) -> KdStatus {
 
 /// Metadados por id (para enriquecer os hits).
 pub(super) fn meta_map(index: &Index) -> BTreeMap<&str, &Meta> {
+    let _span = katu_core::trace_fn!("memory::query::convert::meta_map");
+
     index
         .docs
         .iter()
@@ -80,6 +90,8 @@ pub(super) fn meta_map(index: &Index) -> BTreeMap<&str, &Meta> {
 
 /// Âncoras declaradas por id (para o `--suggest`).
 pub(super) fn anchors_of(index: &Index) -> BTreeMap<String, Vec<String>> {
+    let _span = katu_core::trace_fn!("memory::query::convert::anchors_of");
+
     index
         .docs
         .iter()
@@ -92,6 +104,8 @@ pub(super) fn convert_hits(
     hits: &[KdHit],
     metas: &BTreeMap<&str, &Meta>,
 ) -> Result<Vec<QueryHit>, MemoryError> {
+    let _span = katu_core::trace_fn!("memory::query::convert::convert_hits");
+
     hits.iter()
         .map(|hit| {
             let meta = metas.get(hit.id.as_str()).copied();
@@ -118,6 +132,8 @@ pub(super) fn convert_hits(
     reason = "`full` é o modo `--full-content`"
 )]
 pub(super) fn note_hit(note: &Note, full: bool) -> Result<QueryHit, MemoryError> {
+    let _span = katu_core::trace_fn!("memory::query::convert::note_hit");
+
     let frontmatter = &note.frontmatter;
     let score = Score::from_basis_points(Score::MAX_BASIS_POINTS)
         .ok_or_else(|| MemoryError::internal("score máximo inválido"))?;

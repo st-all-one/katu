@@ -48,6 +48,11 @@ impl Checkpoint {
         goal: impl Into<String>,
         next_action: impl Into<String>,
     ) -> Self {
+        let _span = crate::fn_span!(
+            Level::Trace,
+            events::CONTEXT_CHECKPOINT,
+            "kernel::checkpoint::from_state"
+        );
         let pending: Vec<String> = state
             .calls
             .iter()
@@ -94,6 +99,8 @@ pub enum CheckpointError {
 /// Caminho canónico do checkpoint de uma sessão.
 #[must_use]
 pub fn checkpoint_path(dir: &Path) -> PathBuf {
+    let _span = crate::trace_fn!("kernel::checkpoint::checkpoint_path");
+
     dir.join("checkpoint.json")
 }
 
@@ -103,6 +110,8 @@ pub fn checkpoint_path(dir: &Path) -> PathBuf {
 /// [`CheckpointError`] se não for um objeto, faltar `schema_version`, a versão não casar, houver
 /// campos desconhecidos ou algum campo tiver o tipo errado.
 pub fn validate(value: &Value) -> Result<Checkpoint, CheckpointError> {
+    let _span = crate::trace_fn!("kernel::checkpoint::validate");
+
     let Some(object) = value.as_object() else {
         return Err(CheckpointError::Invalid(Issues::new(vec![Issue::new(
             "$",
@@ -132,6 +141,8 @@ const KNOWN_FIELDS: &[&str] = &[
 
 /// Recusa uma versão de esquema presente mas não suportada (falha-fechado dedicada).
 fn check_schema_version(object: &Map<String, Value>) -> Result<(), CheckpointError> {
+    let _span = crate::trace_fn!("kernel::checkpoint::check_schema_version");
+
     match object.get("schema_version").and_then(Value::as_u64) {
         Some(found) if found != u64::from(CHECKPOINT_SCHEMA_VERSION) => {
             Err(CheckpointError::SchemaVersion {
@@ -145,6 +156,8 @@ fn check_schema_version(object: &Map<String, Value>) -> Result<(), CheckpointErr
 
 /// Agrega **todos** os problemas de esquema, com o caminho exato de cada um.
 fn collect_issues(object: &Map<String, Value>) -> Vec<Issue> {
+    let _span = crate::trace_fn!("kernel::checkpoint::collect_issues");
+
     let mut issues = Vec::new();
     if object
         .get("schema_version")
@@ -178,6 +191,8 @@ fn collect_issues(object: &Map<String, Value>) -> Vec<Issue> {
 
 /// `true` se o valor é uma lista de textos.
 fn is_string_array(value: Option<&Value>) -> bool {
+    let _span = crate::trace_fn!("kernel::checkpoint::is_string_array");
+
     value
         .and_then(Value::as_array)
         .is_some_and(|items| items.iter().all(Value::is_string))
@@ -188,7 +203,11 @@ fn is_string_array(value: Option<&Value>) -> bool {
 /// # Errors
 /// [`CheckpointError`] se a serialização ou o I/O falharem.
 pub fn save(fs: &dyn Fs, dir: &Path, checkpoint: &Checkpoint) -> Result<(), CheckpointError> {
-    let _span = crate::span!(Level::Trace, events::CONTEXT_CHECKPOINT);
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::CONTEXT_CHECKPOINT,
+        "kernel::checkpoint::save"
+    );
     let mut bytes = serde_json::to_vec_pretty(checkpoint)
         .map_err(|err| CheckpointError::Parse(err.to_string()))?;
     bytes.push(b'\n');
@@ -201,6 +220,11 @@ pub fn save(fs: &dyn Fs, dir: &Path, checkpoint: &Checkpoint) -> Result<(), Chec
 /// # Errors
 /// [`CheckpointError`] se o ficheiro existir mas não validar.
 pub fn load(fs: &dyn Fs, dir: &Path) -> Result<Option<Checkpoint>, CheckpointError> {
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::CONTEXT_CHECKPOINT,
+        "kernel::checkpoint::load"
+    );
     let path = checkpoint_path(dir);
     if !fs.exists(&path) {
         return Ok(None);

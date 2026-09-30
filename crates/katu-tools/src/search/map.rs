@@ -2,6 +2,7 @@
 
 use std::path::Path;
 
+use katu_core::diag::{Level, events};
 use katu_core::ports::Fs;
 use katu_core::report::{ToolReport, content_id};
 use katu_core::toon::Value;
@@ -15,6 +16,7 @@ use super::walk;
 const MAX_FILES: usize = 4096;
 
 pub(super) fn find(fs: &dyn Fs, root: &Path, query: &str, limit: usize) -> ToolReport {
+    let _span = katu_core::fn_span!(Level::Debug, events::TOOL_SEARCH, "search::map::find");
     let files = walk::walk(fs, root, MAX_FILES);
     let needle = query.to_lowercase();
     let mut ranked: Vec<(u8, String)> = files
@@ -50,6 +52,8 @@ pub(super) fn find(fs: &dyn Fs, root: &Path, query: &str, limit: usize) -> ToolR
 }
 
 fn rank(name: &str, path: &str, needle: &str) -> u8 {
+    let _span = katu_core::trace_fn!("search::map::rank");
+
     if needle.is_empty() {
         0
     } else if name == needle {
@@ -62,6 +66,7 @@ fn rank(name: &str, path: &str, needle: &str) -> u8 {
 }
 
 pub(super) fn ls(fs: &dyn Fs, root: &Path, limit: usize) -> ToolReport {
+    let _span = katu_core::fn_span!(Level::Debug, events::TOOL_SEARCH, "search::map::ls");
     let entries = fs.list_dir(root).unwrap_or_default();
     let items: Vec<Value> = entries
         .iter()
@@ -77,6 +82,11 @@ pub(super) fn ls(fs: &dyn Fs, root: &Path, limit: usize) -> ToolReport {
 }
 
 fn entry_value(fs: &dyn Fs, entry: &Path) -> Value {
+    let _span = katu_core::fn_span!(
+        Level::Trace,
+        events::TOOL_SEARCH,
+        "search::map::entry_value"
+    );
     if fs.is_dir(entry) {
         return Value::map(vec![
             ("path".to_string(), Value::str(entry.display().to_string())),

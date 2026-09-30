@@ -117,6 +117,8 @@ pub struct QueryReq {
 
 impl Default for QueryReq {
     fn default() -> Self {
+        let _span = crate::trace_fn!("memory::query::default");
+
         Self {
             mode: QueryMode::Recall,
             query: String::new(),
@@ -144,6 +146,8 @@ impl QueryReq {
     /// Consulta de recall simples (compatível com o caminho do agente).
     #[must_use]
     pub fn recall(query: impl Into<String>, limit: usize) -> Self {
+        let _span = crate::trace_fn!("memory::query::recall");
+
         Self {
             query: query.into(),
             limit,

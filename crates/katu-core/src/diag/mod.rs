@@ -28,6 +28,9 @@ pub mod fingerprint;
 /// Redação de segredos no caminho de diagnóstico (E01-T07).
 pub mod redact;
 
+/// Macro `fn_span!` (E19-T03): span com rótulo estável de função.
+mod function_span;
+
 /// Sink agregador de contagens e durações por evento (E19-T02).
 #[cfg(feature = "instrument")]
 pub mod aggregate;
@@ -120,6 +123,12 @@ pub struct Record<'a> {
     pub level: Level,
     /// Identificador estável do evento (do catálogo [`events`]).
     pub event: &'static str,
+    /// Nome estável da função instrumentada, quando o span é aberto por [`fn_span!`](crate::fn_span).
+    ///
+    /// Serve o mapeamento de tempo atómico **por função** (o [`Sink`] pode agrupar por
+    /// `(event, function)`); `None` nos eventos pontuais e nos spans sem esse rótulo. É um literal
+    /// `&'static str` (do par `módulo::função`), pelo que nunca carrega dado variável.
+    pub function: Option<&'static str>,
     /// Tipo do registo.
     pub kind: Kind,
     /// Duração em nanossegundos (apenas em [`Kind::SpanEnd`]).
@@ -153,7 +162,24 @@ impl Span {
     #[must_use]
     pub fn start(level: Level, event: &'static str, fields: &[(&'static str, Value<'_>)]) -> Self {
         Self {
-            inner: active::begin(level, event, fields),
+            inner: active::begin(level, event, None, fields),
+        }
+    }
+
+    /// Abre um span com nível, identificador, **nome da função** e campos.
+    ///
+    /// O `function` (um literal `"módulo::função"`) viaja no [`Record`] até ao fim do span, para
+    /// que o [`Sink`] atribua o tempo atómico à função certa (E19-T03).
+    #[cfg(feature = "instrument")]
+    #[must_use]
+    pub fn start_function(
+        level: Level,
+        event: &'static str,
+        function: &'static str,
+        fields: &[(&'static str, Value<'_>)],
+    ) -> Self {
+        Self {
+            inner: active::begin(level, event, Some(function), fields),
         }
     }
 

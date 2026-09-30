@@ -55,11 +55,14 @@ use clap::Parser;
 use katu_core::diag::{Level, events};
 
 fn main() -> ExitCode {
+    let _span = katu_core::trace_fn!("main");
+
     let cli = cli::Cli::parse();
     #[cfg(feature = "profile")]
     setup_diag(&cli);
-    let _span = katu_core::span!(Level::Info, events::KATU_RUN);
+    let _span = katu_core::fn_span!(Level::Info, events::KATU_RUN, "main::main");
     let report = cli::execute(&cli);
+    let _shutdown = katu_core::fn_span!(Level::Info, events::KATU_SHUTDOWN, "main::shutdown");
     ExitCode::from(report::emit(&report, cli.json()))
 }
 
@@ -74,7 +77,7 @@ fn setup_diag(cli: &cli::Cli) {
     use katu_core::diag::{Sink, install, set_filter, set_level};
     use katu_core::ports::Env;
 
-    let _span = katu_core::span!(Level::Info, events::KATU_SETUP);
+    let _span = katu_core::fn_span!(Level::Info, events::KATU_SETUP, "main::setup_diag");
     let env = ports::StdEnv;
     let requested = cli.log_level != cli::LogLevel::Quiet
         || env

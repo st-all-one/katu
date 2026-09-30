@@ -6,6 +6,7 @@
 //! - `check-layers` — firewall LLM-free (fonte: `layers.toml`);
 //! - `check-crate-coverage` — cada crate tem `MODULE.md`;
 //! - `check-diag` — logs só estruturados (nenhuma macro de texto livre fora do sink);
+//! - `diag:coverage` — cobertura de instrumentação por função (E19-T03, ≥ 90 %);
 //! - `check-schemas` — schema das tools válido (E06-T02);
 //! - `check-docs` — todos os links de `*.md` resolvem;
 //! - `check-surface` — teto de superfície versionado (E14-T05);
@@ -100,6 +101,7 @@ fn dispatch(task: Option<&str>, rest: &[String]) -> Result<(), String> {
         Some("check-layers") => check_layers(),
         Some("check-crate-coverage") => check_crate_coverage(),
         Some("check-diag") => check_diag(),
+        Some("diag:coverage") => diag::check_diag_coverage(),
         Some("check-schemas") => schemas::check_schemas(),
         Some("check-docs") => check_docs(),
         Some("check-surface") => surface::check_surface(rest),
@@ -143,7 +145,7 @@ fn dispatch(task: Option<&str>, rest: &[String]) -> Result<(), String> {
         Some("bench-toon") => toon_bench::run(),
         Some(other) => Err(format!("tarefa desconhecida: {other}")),
         None => Err(
-            "uso: xtask <check|check-layers|check-crate-coverage|check-diag|check-schemas|check-docs|check-surface|check-policy|check-unsafe|check-catalog|check-rule-coverage|check-slices|check-memory-swap|gate:bench|gate:provider|gate:render|test:unit|test:integration|test:e2e|test:all|policy:audit|ledger:validate|bench-audit|bench-resume|bench-provider|bench-render|provider-smoke>"
+            "uso: xtask <check|check-layers|check-crate-coverage|check-diag|diag:coverage|check-schemas|check-docs|check-surface|check-policy|check-unsafe|check-catalog|check-rule-coverage|check-slices|check-memory-swap|gate:bench|gate:provider|gate:render|test:unit|test:integration|test:e2e|test:all|policy:audit|ledger:validate|bench-audit|bench-resume|bench-provider|bench-render|provider-smoke>"
                 .to_string(),
         ),
     }

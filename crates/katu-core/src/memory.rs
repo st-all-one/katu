@@ -61,6 +61,8 @@ pub trait Memory: Send + Sync {
     /// # Errors
     /// [`MemoryError`] se o backend falhar, o pedido for inválido ou não suportado.
     fn query(&self, _req: &QueryReq) -> Result<QueryResult, MemoryError> {
+        let _span = crate::trace_fn!("memory::query");
+
         Err(MemoryError::new(
             MemoryErrorKind::Unavailable,
             "consulta rica não suportada por este backend",

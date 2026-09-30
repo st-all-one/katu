@@ -20,6 +20,8 @@ impl CostGovernor {
         per_tool_used: BTreeMap<ToolName, u32>,
         history: impl IntoIterator<Item = (u64, u64)>,
     ) -> Self {
+        let _span = crate::trace_fn!("kernel::cost::history::with_history");
+
         let mut governor = Self::with_usage(caps, usage, per_tool_used);
         governor.history = history.into_iter().collect();
         governor
@@ -27,11 +29,15 @@ impl CostGovernor {
 
     /// Histórico temporal `(now_millis, micros)` ainda retido.
     pub fn history(&self) -> impl Iterator<Item = (u64, u64)> + '_ {
+        let _span = crate::trace_fn!("kernel::cost::history::history");
+
         self.history.iter().copied()
     }
 
     /// Chamadas registadas estritamente dentro da janela.
     pub(super) fn calls_in_window(&self, now: u64, window_ms: u64) -> u32 {
+        let _span = crate::trace_fn!("kernel::cost::history::calls_in_window");
+
         let count = self
             .history
             .iter()
@@ -42,6 +48,8 @@ impl CostGovernor {
 
     /// Custo registado estritamente dentro da janela.
     pub(super) fn micros_in_window(&self, now: u64, window_ms: u64) -> u64 {
+        let _span = crate::trace_fn!("kernel::cost::history::micros_in_window");
+
         self.history
             .iter()
             .filter(|entry| now.saturating_sub(entry.0) < window_ms)
@@ -50,6 +58,8 @@ impl CostGovernor {
 
     /// Descarta histórico fora da maior janela configurada.
     pub(super) fn prune(&mut self, now: u64) {
+        let _span = crate::trace_fn!("kernel::cost::history::prune");
+
         let retention = self.retention_ms();
         if retention == 0 {
             return;
@@ -65,6 +75,8 @@ impl CostGovernor {
 
     /// Maior janela configurada (0 = sem camadas temporais).
     fn retention_ms(&self) -> u64 {
+        let _span = crate::trace_fn!("kernel::cost::history::retention_ms");
+
         let rolling = self.caps.rolling.map_or(0, |rolling| rolling.window_ms);
         let velocity = if self.caps.velocity.is_some() {
             super::VELOCITY_WINDOW_MS

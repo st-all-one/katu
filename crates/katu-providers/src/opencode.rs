@@ -54,18 +54,24 @@ impl OpenCodeConfig {
     /// Zen (pay-as-you-go).
     #[must_use]
     pub fn zen(api_key: impl Into<String>) -> Self {
+        let _span = katu_core::trace_fn!("opencode::zen");
+
         Self::from_spec(&ProviderSpec::opencode_zen(), api_key)
     }
 
     /// Go (subscrição).
     #[must_use]
     pub fn go(api_key: impl Into<String>) -> Self {
+        let _span = katu_core::trace_fn!("opencode::go");
+
         Self::from_spec(&ProviderSpec::opencode_go(), api_key)
     }
 
     /// Gateway arbitrário (útil em testes/self-hosted).
     #[must_use]
     pub fn at(base_url: impl Into<String>, api_key: impl Into<String>) -> Self {
+        let _span = katu_core::trace_fn!("opencode::at");
+
         Self {
             base_url: base_url.into(),
             api_key: api_key.into(),
@@ -81,6 +87,8 @@ impl OpenCodeConfig {
 
     /// Constrói a partir de uma definição declarativa (a chave é injetada).
     fn from_spec(spec: &ProviderSpec, api_key: impl Into<String>) -> Self {
+        let _span = katu_core::trace_fn!("opencode::from_spec");
+
         Self {
             base_url: spec.base_url.clone(),
             api_key: api_key.into(),
@@ -97,6 +105,8 @@ impl OpenCodeConfig {
     /// Fixa a sessão de afinidade.
     #[must_use]
     pub fn with_session(mut self, session: impl Into<String>) -> Self {
+        let _span = katu_core::trace_fn!("opencode::with_session");
+
         self.session = Some(session.into());
         self
     }
@@ -104,6 +114,8 @@ impl OpenCodeConfig {
     /// Substitui a base do gateway.
     #[must_use]
     pub fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
+        let _span = katu_core::trace_fn!("opencode::with_base_url");
+
         self.base_url = base_url.into();
         self
     }
@@ -111,6 +123,8 @@ impl OpenCodeConfig {
     /// Fixa o dialeto por omissão.
     #[must_use]
     pub fn with_dialect(mut self, dialect: Dialect) -> Self {
+        let _span = katu_core::trace_fn!("opencode::with_dialect");
+
         self.dialect = dialect;
         self
     }
@@ -118,6 +132,8 @@ impl OpenCodeConfig {
     /// Substitui o catálogo.
     #[must_use]
     pub fn with_catalog(mut self, catalog: Catalog) -> Self {
+        let _span = katu_core::trace_fn!("opencode::with_catalog");
+
         self.catalog = catalog;
         self
     }
@@ -125,11 +141,15 @@ impl OpenCodeConfig {
     /// Endpoint + cabeçalhos do dialeto por omissão.
     #[must_use]
     pub fn endpoint(&self) -> Endpoint {
+        let _span = katu_core::trace_fn!("opencode::endpoint");
+
         engine::endpoint(&self.wire(None), Dialect::ChatCompletions)
     }
 
     /// Vista de wire (para o despacho).
     fn wire<'a>(&'a self, entry: Option<&'a ModelEntry>) -> WireConfig<'a> {
+        let _span = katu_core::trace_fn!("opencode::wire");
+
         WireConfig {
             base_url: &self.base_url,
             api_key: Some(self.api_key.as_str()),
@@ -155,6 +175,8 @@ impl<T: Transport> OpenCode<T> {
     /// Constrói com transporte e configuração (retry por omissão).
     #[must_use]
     pub fn new(transport: T, config: OpenCodeConfig) -> Self {
+        let _span = katu_core::trace_fn!("opencode::new");
+
         Self {
             transport,
             config,
@@ -165,6 +187,8 @@ impl<T: Transport> OpenCode<T> {
     /// Substitui a política de retry.
     #[must_use]
     pub fn with_retry(mut self, retry: RetryPolicy) -> Self {
+        let _span = katu_core::trace_fn!("opencode::with_retry");
+
         self.retry = retry;
         self
     }
@@ -172,6 +196,8 @@ impl<T: Transport> OpenCode<T> {
     /// Fixa a sessão de afinidade (atalho).
     #[must_use]
     pub fn with_session(mut self, session: impl Into<String>) -> Self {
+        let _span = katu_core::trace_fn!("opencode::with_session");
+
         self.config = self.config.with_session(session);
         self
     }
@@ -179,6 +205,8 @@ impl<T: Transport> OpenCode<T> {
     /// Configuração em uso.
     #[must_use]
     pub fn config(&self) -> &OpenCodeConfig {
+        let _span = katu_core::trace_fn!("opencode::config");
+
         &self.config
     }
 
@@ -186,6 +214,8 @@ impl<T: Transport> OpenCode<T> {
     ///
     /// É uma otimização de latência: a ligação quente no *pool* evita o *handshake* no 1.º turno.
     pub fn warm(&self) {
+        let _span = katu_core::trace_fn!("opencode::warm");
+
         self.transport
             .warm(&engine::models_request(&self.config.wire(None)));
     }
@@ -193,10 +223,14 @@ impl<T: Transport> OpenCode<T> {
 
 impl<T: Transport> Provider for OpenCode<T> {
     fn id(&self) -> &'static str {
+        let _span = katu_core::trace_fn!("opencode::id");
+
         "opencode"
     }
 
     fn models(&self) -> Vec<String> {
+        let _span = katu_core::trace_fn!("opencode::models");
+
         self.config
             .catalog
             .models()
@@ -206,6 +240,11 @@ impl<T: Transport> Provider for OpenCode<T> {
     }
 
     fn dynamic_models(&self) -> Result<Vec<String>, ProviderError> {
+        let _span = katu_core::fn_span!(
+            Level::Debug,
+            events::PROVIDER_MODELS,
+            "opencode::OpenCode::dynamic_models"
+        );
         let request = engine::models_request(&self.config.wire(None));
         let (status, body) = self.transport.get(&request).map_err(ProviderError::from)?;
         if !(200..300).contains(&status) {
@@ -219,6 +258,8 @@ impl<T: Transport> Provider for OpenCode<T> {
     }
 
     fn capabilities(&self, model: &str) -> ModelCapabilities {
+        let _span = katu_core::trace_fn!("opencode::capabilities");
+
         ModelCapabilities {
             model: model.to_string(),
             reasoning: self
@@ -230,6 +271,8 @@ impl<T: Transport> Provider for OpenCode<T> {
     }
 
     fn model_for_tier(&self, tier: Tier) -> Option<String> {
+        let _span = katu_core::trace_fn!("opencode::model_for_tier");
+
         self.config.catalog.select_tier(tier).map(str::to_string)
     }
 
@@ -238,9 +281,10 @@ impl<T: Transport> Provider for OpenCode<T> {
         request: &ProviderRequest,
         sink: &mut dyn ProviderSink,
     ) -> Result<ProviderOutcome, ProviderError> {
-        let _span = katu_core::span!(
+        let _span = katu_core::fn_span!(
             Level::Trace,
             events::PROVIDER_REQUEST,
+            "opencode::OpenCode::stream",
             "provider" => "opencode",
             "model" => request.model.model.as_str(),
             "dialect" => self.config.dialect.as_str(),

@@ -4,6 +4,7 @@
 //! **capacidades** do modelo (`Update::ThinkingOptions`), pelo que o menu só oferece o que o
 //! modelo suporta. O menu é estado puro: navegar e confirmar não faz I/O.
 
+use katu_core::diag::{Level, events};
 use katu_core::provider::Thinking;
 
 /// Tipo de mini-menu aberto.
@@ -39,6 +40,8 @@ impl MenuChoice {
     /// Texto mostrado no menu.
     #[must_use]
     pub fn label(&self) -> String {
+        let _span = katu_core::trace_fn!("menu::label");
+
         match self {
             Self::Model(model) => model.clone(),
             Self::Thinking(thinking) => thinking.as_str().to_string(),
@@ -58,6 +61,8 @@ impl Menu {
     /// Menu de modelos (vazio → `None`); posiciona no modelo atual, se conhecido.
     #[must_use]
     pub fn models(models: &[String], current: Option<&str>) -> Option<Self> {
+        let _span = katu_core::trace_fn!("menu::models");
+
         if models.is_empty() {
             return None;
         }
@@ -74,6 +79,8 @@ impl Menu {
     /// Menu de graus de pensamento (só os suportados); posiciona no atual.
     #[must_use]
     pub fn thinking(options: &[Thinking], current: Thinking) -> Self {
+        let _span = katu_core::trace_fn!("menu::thinking");
+
         let index = options
             .iter()
             .position(|option| *option == current)
@@ -100,16 +107,20 @@ impl Menu {
     /// Escolhas (para o render).
     #[must_use]
     pub fn items(&self) -> &[MenuChoice] {
+        let _span = katu_core::trace_fn!("menu::items");
+
         &self.items
     }
 
     /// Move a seleção para cima (satura no topo).
     pub fn up(&mut self) {
+        let _span = katu_core::fn_span!(Level::Debug, events::TUI_SLASH, "menu::up");
         self.index = self.index.saturating_sub(1);
     }
 
     /// Move a seleção para baixo (satura no fundo).
     pub fn down(&mut self) {
+        let _span = katu_core::fn_span!(Level::Debug, events::TUI_SLASH, "menu::down");
         if self.index.saturating_add(1) < self.items.len() {
             self.index = self.index.saturating_add(1);
         }
@@ -118,6 +129,8 @@ impl Menu {
     /// Escolha selecionada.
     #[must_use]
     pub fn selected(&self) -> Option<&MenuChoice> {
+        let _span = katu_core::trace_fn!("menu::selected");
+
         self.items.get(self.index)
     }
 }

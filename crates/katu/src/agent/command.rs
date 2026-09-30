@@ -4,6 +4,7 @@
 //! envelope de máquina. Sem o adaptador de memória, o runtime **recusa** (fail-closed, E03-T07).
 
 use katu_core::context::CompactionMode;
+use katu_core::diag::{Level, events};
 use katu_core::error::Error;
 use katu_core::provider::{ModelSpec, Provider, Thinking};
 use serde_json::{Value, json};
@@ -52,6 +53,8 @@ pub(crate) fn open_runtime<'a>(
     goal: &str,
     resume: Option<&str>,
 ) -> Result<Runtime<'a>, RuntimeError> {
+    let _span = katu_core::trace_fn!("agent::command::open_runtime");
+
     match resume {
         Some("last") => Runtime::resume(fs, clock, start, goal, None),
         Some(id) => Runtime::resume(fs, clock, start, goal, Some(id)),
@@ -61,6 +64,7 @@ pub(crate) fn open_runtime<'a>(
 
 /// Executa um turno do agente e devolve o relatório do comando.
 pub(crate) fn run(args: &RunArgs<'_>) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_RUN, "command::run");
     let fs = StdFs;
     let clock = SystemClock;
     let env = StdEnv;
@@ -119,6 +123,8 @@ pub(crate) fn run(args: &RunArgs<'_>) -> Report {
 
 /// Opções do turno (modelo + pensamento resolvidos, E20-T17).
 fn turn_options(model: String, args: &RunArgs<'_>) -> TurnOptions {
+    let _span = katu_core::trace_fn!("agent::command::turn_options");
+
     TurnOptions {
         model: ModelSpec {
             model,
@@ -133,6 +139,8 @@ fn turn_options(model: String, args: &RunArgs<'_>) -> TurnOptions {
 
 /// Converte a falha do runtime na taxonomia estável de erro do katu.
 fn runtime_failure(error: RuntimeError) -> Report {
+    let _span = katu_core::trace_fn!("agent::command::runtime_failure");
+
     let core: Error = error.into();
     Report::failed("run", &core)
 }
@@ -187,6 +195,8 @@ pub(crate) fn build_provider(
 
 /// Envelope do resultado de um turno (id da sessão + exit da rodada).
 fn turn_value(model: &str, turn: &super::TurnReport, session: Option<&str>) -> Value {
+    let _span = katu_core::trace_fn!("agent::command::turn_value");
+
     let usage = turn.usage.as_ref().map(|usage| {
         json!({
             "input": usage.input,
@@ -209,6 +219,8 @@ fn turn_value(model: &str, turn: &super::TurnReport, session: Option<&str>) -> V
 
 /// Base URL por omissão de cada provider.
 pub(crate) fn default_base(provider: &str) -> &'static str {
+    let _span = katu_core::trace_fn!("agent::command::default_base");
+
     match provider {
         "opencode-go" => "https://opencode.ai/zen/go/v1",
         "opencode-zen" => "https://opencode.ai/zen/v1",
@@ -218,6 +230,8 @@ pub(crate) fn default_base(provider: &str) -> &'static str {
 
 /// Modelo por omissão de cada provider.
 pub(crate) fn default_model(provider: &str) -> &'static str {
+    let _span = katu_core::trace_fn!("agent::command::default_model");
+
     match provider {
         "opencode-go" | "opencode-zen" => "longcat-2.5-preview-free",
         _ => "qwen",

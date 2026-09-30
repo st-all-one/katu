@@ -33,6 +33,8 @@ impl Process for StdProcess {
         reason = "adaptador: relógio do SO para o timeout de execução"
     )]
     fn run(&self, request: &ExecRequest) -> Result<ExecResult, ProcessError> {
+        let _span = katu_core::trace_fn!("ports::process::run");
+
         let started = Instant::now();
         let mut child = spawn_child(request)?;
         let (out_rx, err_rx) = start_readers(&mut child);
@@ -51,6 +53,8 @@ impl Process for StdProcess {
 
 /// Arranca o filho com `stdio` fechado/piped e, em unix, no seu próprio process group.
 fn spawn_child(request: &ExecRequest) -> Result<Child, ProcessError> {
+    let _span = katu_core::trace_fn!("ports::process::spawn_child");
+
     let Some((program, args)) = request.argv.split_first() else {
         return Err(ProcessError::Io("argv vazio".to_string()));
     };
@@ -69,6 +73,8 @@ fn spawn_child(request: &ExecRequest) -> Result<Child, ProcessError> {
 
 /// Leitores **destacados**: entregam o texto por canal, para o `run` nunca bloquear num neto.
 fn start_readers(child: &mut Child) -> (Receiver<String>, Receiver<String>) {
+    let _span = katu_core::trace_fn!("ports::process::start_readers");
+
     let mut out = child.stdout.take();
     let mut err = child.stderr.take();
     let (out_tx, out_rx) = mpsc::channel();
@@ -91,6 +97,8 @@ fn wait_with_timeout(
     child: &mut Child,
     timeout_ms: u64,
 ) -> Result<(ExitStatus, bool), ProcessError> {
+    let _span = katu_core::trace_fn!("ports::process::wait_with_timeout");
+
     let Some(deadline) = Instant::now().checked_add(Duration::from_millis(timeout_ms)) else {
         return Err(ProcessError::Io("timeout inválido".to_string()));
     };
@@ -119,6 +127,8 @@ fn wait_with_timeout(
     reason = "kill(2) com pid negativo (grupo) não tem wrapper em std; único `unsafe` do projeto (ADR 0016/E07-T04)"
 )]
 fn kill_group(child: &Child) {
+    let _span = katu_core::trace_fn!("ports::process::kill_group");
+
     let Ok(pid) = i32::try_from(child.id()) else {
         return;
     };
@@ -134,7 +144,9 @@ fn kill_group(child: &Child) {
 
 /// Não-unix: sem process group; o filho direto é morto por `Child::kill`.
 #[cfg(not(unix))]
-fn kill_group(_child: &Child) {}
+fn kill_group(_child: &Child) {
+    let _span = katu_core::trace_fn!("ports::process::kill_group");
+}
 
 /// Sinal que matou o processo (unix).
 #[cfg(unix)]
@@ -146,11 +158,15 @@ fn signal_of(status: ExitStatus) -> Option<i32> {
 /// Sinal que matou o processo (não-unix: sempre `None`).
 #[cfg(not(unix))]
 fn signal_of(_status: ExitStatus) -> Option<i32> {
+    let _span = katu_core::trace_fn!("ports::process::signal_of");
+
     None
 }
 
 /// Lê um fluxo até ao fim, devolvendo texto *lossy*.
 fn read_stream(stream: &mut Option<impl Read>) -> String {
+    let _span = katu_core::trace_fn!("ports::process::read_stream");
+
     let mut bytes = Vec::new();
     if let Some(reader) = stream.as_mut() {
         drop(reader.read_to_end(&mut bytes));
@@ -160,6 +176,8 @@ fn read_stream(stream: &mut Option<impl Read>) -> String {
 
 /// Mapeia um erro de `spawn` (programa ausente/permissão) para a porta.
 fn map_spawn_error(err: &std::io::Error) -> ProcessError {
+    let _span = katu_core::trace_fn!("ports::process::map_spawn_error");
+
     match err.kind() {
         std::io::ErrorKind::NotFound => ProcessError::NotFound,
         std::io::ErrorKind::PermissionDenied => ProcessError::Denied,
@@ -169,11 +187,15 @@ fn map_spawn_error(err: &std::io::Error) -> ProcessError {
 
 /// Mapeia um erro de I/O do processo para a porta.
 fn map_io_error(err: &std::io::Error) -> ProcessError {
+    let _span = katu_core::trace_fn!("ports::process::map_io_error");
+
     ProcessError::Io(err.to_string())
 }
 
 /// Duração em milissegundos, saturante.
 fn elapsed_millis(duration: Duration) -> u64 {
+    let _span = katu_core::trace_fn!("ports::process::elapsed_millis");
+
     u64::try_from(duration.as_millis()).unwrap_or(u64::MAX)
 }
 
@@ -184,6 +206,8 @@ mod tests {
     use std::path::PathBuf;
 
     fn request(argv: &[&str], timeout_ms: u64) -> ExecRequest {
+        let _span = katu_core::trace_fn!("ports::process::request");
+
         ExecRequest {
             argv: argv.iter().map(|arg| (*arg).to_string()).collect(),
             cwd: PathBuf::from("/tmp"),

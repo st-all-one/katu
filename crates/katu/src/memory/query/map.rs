@@ -12,6 +12,8 @@ use super::convert::filter;
 
 /// Modo `memo knowledge` (mapa estrutural).
 pub(super) fn map(inner: &mut Inner, req: &QueryReq) -> Result<QueryResult, MemoryError> {
+    let _span = katu_core::trace_fn!("memory::query::map::map");
+
     inner.ensure_index()?;
     inner.ensure_graph()?;
     let (Some(index), Some(graph)) = (inner.index.as_ref(), inner.graph.as_ref()) else {
@@ -42,6 +44,8 @@ pub(super) fn map(inner: &mut Inner, req: &QueryReq) -> Result<QueryResult, Memo
     reason = "`members` é a flag `--members`"
 )]
 fn katu_cluster(cluster: &KdCluster, members: bool) -> Cluster {
+    let _span = katu_core::trace_fn!("memory::query::map::katu_cluster");
+
     Cluster {
         axis: cluster.axis.axis().to_string(),
         key: cluster.axis.key().to_string(),
@@ -59,6 +63,8 @@ fn katu_cluster(cluster: &KdCluster, members: bool) -> Cluster {
 
 /// Restringe os membros dos clusters aos que pertencem a `scope`.
 fn restrict_to_scope(clusters: Vec<KdCluster>, graph: &Graph, scope: &str) -> Vec<KdCluster> {
+    let _span = katu_core::trace_fn!("memory::query::map::restrict_to_scope");
+
     clusters
         .into_iter()
         .filter_map(|cluster| {

@@ -59,6 +59,7 @@ pub(crate) fn run_all() -> Result<(), String> {
     check_layers()?;
     check_crate_coverage()?;
     check_diag()?;
+    crate::diag::check_diag_coverage()?;
     check_schemas()?;
     check_docs()?;
     check_surface(&[])?;

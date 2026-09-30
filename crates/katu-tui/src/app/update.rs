@@ -3,6 +3,8 @@
 //! Vive num módulo filho para manter `app.rs` sob o teto de linhas. As atualizações são o único
 //! caminho pelo qual o executor devolve resultados à UI; o render continua **puro**.
 
+use katu_core::diag::{Level, events};
+
 use crate::entry::{Entry, Role, Status};
 use crate::message::Update;
 
@@ -11,6 +13,7 @@ use super::App;
 impl App {
     /// Injeta o resultado do executor.
     pub fn apply_update(&mut self, update: Update) {
+        let _span = katu_core::fn_span!(Level::Debug, events::TUI_ACTION, "app::apply_update");
         match update {
             Update::Assistant(text) => self.push(Role::Assistant, text),
             Update::Tool(text) => self.push(Role::Tool, text),
@@ -48,6 +51,8 @@ impl App {
 
     /// Acrescenta uma entrada (ignora texto vazio) e volta ao fundo.
     pub(super) fn push(&mut self, role: Role, text: String) {
+        let _span = katu_core::trace_fn!("app::update::push");
+
         if !text.is_empty() {
             self.transcript.push(Entry { role, text });
             self.scroll = 0;

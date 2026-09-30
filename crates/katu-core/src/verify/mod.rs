@@ -71,6 +71,8 @@ impl Check {
     /// Constrói uma verificação.
     #[must_use]
     pub fn new(id: impl Into<String>, status: CheckStatus, detail: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("verify::new");
+
         Self {
             id: id.into(),
             status,
@@ -156,6 +158,8 @@ impl Override {
         overridden_by: impl Into<String>,
         at_millis: u64,
     ) -> Result<Self, VerifyError> {
+        let _span = crate::trace_fn!("verify::new");
+
         let reason = reason.into();
         let overridden_by = overridden_by.into();
         if reason.trim().is_empty() {
@@ -176,7 +180,7 @@ impl Override {
 /// Executa o gate (puro, sem I/O, sem LLM).
 #[must_use]
 pub fn verify(input: &VerificationInput<'_>) -> VerificationReport {
-    let _span = crate::span!(Level::Debug, events::VERIFY_REPORT, "strict" => input.strict);
+    let _span = crate::fn_span!(Level::Debug, events::VERIFY_REPORT, "verify::verify", "strict" => input.strict);
     let mut checks = scope_checks(input);
     checks.extend(feedback_checks(input));
     let coverage_bps = coverage_bps(input);
@@ -204,12 +208,16 @@ pub fn verify(input: &VerificationInput<'_>) -> VerificationReport {
 /// Caminho do relatório de verificação.
 #[must_use]
 pub fn report_path(dir: &Path) -> PathBuf {
+    let _span = crate::trace_fn!("verify::report_path");
+
     dir.join("verification_report.json")
 }
 
 /// Caminho do registo append-only de overrides.
 #[must_use]
 pub fn overrides_path(dir: &Path) -> PathBuf {
+    let _span = crate::trace_fn!("verify::overrides_path");
+
     dir.join("overrides.jsonl")
 }
 
@@ -218,6 +226,8 @@ pub fn overrides_path(dir: &Path) -> PathBuf {
 /// # Errors
 /// [`VerifyError`] se a serialização ou o I/O falharem.
 pub fn save(fs: &dyn Fs, dir: &Path, report: &VerificationReport) -> Result<(), VerifyError> {
+    let _span = crate::trace_fn!("verify::save");
+
     let mut bytes =
         serde_json::to_vec_pretty(report).map_err(|err| VerifyError::Serialize(err.to_string()))?;
     bytes.push(b'\n');
@@ -230,6 +240,8 @@ pub fn save(fs: &dyn Fs, dir: &Path, report: &VerificationReport) -> Result<(), 
 /// # Errors
 /// [`VerifyError`] se a serialização ou o I/O falharem.
 pub fn append_override(fs: &dyn Fs, dir: &Path, override_: &Override) -> Result<(), VerifyError> {
+    let _span = crate::trace_fn!("verify::append_override");
+
     let mut line =
         serde_json::to_vec(override_).map_err(|err| VerifyError::Serialize(err.to_string()))?;
     line.push(b'\n');

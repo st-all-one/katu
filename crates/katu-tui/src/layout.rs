@@ -6,6 +6,8 @@ use ratatui::layout::Rect;
 
 /// Área centrada de tamanho `width`×`height` (limitada à moldura).
 pub(crate) fn centered(area: Rect, width: u16, height: u16) -> Rect {
+    let _span = katu_core::trace_fn!("layout::centered");
+
     let width = width.min(area.width);
     let height = height.min(area.height);
     Rect {

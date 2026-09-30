@@ -22,6 +22,8 @@ impl Issue {
     /// Constrói um problema com caminho e mensagem.
     #[must_use]
     pub fn new(path: impl Into<String>, message: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("validate::new");
+
         Self {
             path: path.into(),
             message: message.into(),
@@ -31,6 +33,8 @@ impl Issue {
 
 impl fmt::Display for Issue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let _span = crate::trace_fn!("validate::fmt");
+
         write!(f, "{}: {}", self.path, self.message)
     }
 }
@@ -44,30 +48,40 @@ impl Issues {
     /// Agrega os problemas (o chamador garante que não está vazio).
     #[must_use]
     pub fn new(issues: Vec<Issue>) -> Self {
+        let _span = crate::trace_fn!("validate::new");
+
         Self(issues)
     }
 
     /// Problemas, na ordem em que foram encontrados.
     #[must_use]
     pub fn as_slice(&self) -> &[Issue] {
+        let _span = crate::trace_fn!("validate::as_slice");
+
         &self.0
     }
 
     /// Número de problemas.
     #[must_use]
     pub fn len(&self) -> usize {
+        let _span = crate::trace_fn!("validate::len");
+
         self.0.len()
     }
 
     /// `true` se não há problemas.
     #[must_use]
     pub fn is_empty(&self) -> bool {
+        let _span = crate::trace_fn!("validate::is_empty");
+
         self.0.is_empty()
     }
 }
 
 impl fmt::Display for Issues {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let _span = crate::trace_fn!("validate::fmt");
+
         let mut first = true;
         for issue in &self.0 {
             if !first {

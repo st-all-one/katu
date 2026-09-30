@@ -6,6 +6,7 @@
 
 use std::collections::BTreeMap;
 
+use katu_core::diag::{Level, events};
 use katu_core::kernel::Message;
 use katu_core::provider::{ProviderError, ProviderRequest, Thinking, ToolDef};
 use serde_json::{Map, Value, json};
@@ -14,6 +15,8 @@ use crate::openai::{EncodeOptions, model_tool_name, tool_arguments};
 
 /// Orçamento de pensamento em tokens por grau (`None` = omitir, deixa o default do modelo).
 fn thinking_budget(thinking: Thinking) -> Option<u32> {
+    let _span = katu_core::trace_fn!("google::encode::thinking_budget");
+
     match thinking {
         Thinking::Low => Some(1024),
         Thinking::Medium => Some(8192),
@@ -30,6 +33,11 @@ pub(crate) fn encode_request(
     request: &ProviderRequest,
     options: &EncodeOptions,
 ) -> Result<String, ProviderError> {
+    let _span = katu_core::fn_span!(
+        Level::Debug,
+        events::PROVIDER_REQUEST,
+        "google::encode_request"
+    );
     let mut names: BTreeMap<String, String> = BTreeMap::new();
     let mut contents = Vec::new();
     for message in &request.messages {
@@ -63,6 +71,11 @@ pub(crate) fn encode_request(
 
 /// `generationConfig` (teto de tokens, temperatura e pensamento).
 fn generation_config(request: &ProviderRequest, options: &EncodeOptions) -> Map<String, Value> {
+    let _span = katu_core::fn_span!(
+        Level::Trace,
+        events::PROVIDER_REQUEST,
+        "google::generation_config"
+    );
     let mut generation = Map::new();
     if let Some(max) = request.max_tokens.or(options.default_max_tokens) {
         generation.insert("maxOutputTokens".to_string(), json!(max));
@@ -81,6 +94,8 @@ fn generation_config(request: &ProviderRequest, options: &EncodeOptions) -> Map<
 
 /// Codifica uma tool em `functionDeclaration`.
 fn encode_tool(tool: &ToolDef) -> Value {
+    let _span = katu_core::trace_fn!("google::encode::encode_tool");
+
     json!({
         "name": tool.name,
         "description": tool.description,
@@ -93,6 +108,11 @@ fn encode_message(
     message: &Message,
     names: &mut BTreeMap<String, String>,
 ) -> Result<Option<Value>, ProviderError> {
+    let _span = katu_core::fn_span!(
+        Level::Trace,
+        events::PROVIDER_REQUEST,
+        "google::encode_message"
+    );
     let encoded = match message {
         Message::User { text } => json!({"role": "user", "parts": [{"text": text}]}),
         Message::Assistant { text } => json!({"role": "model", "parts": [{"text": text}]}),

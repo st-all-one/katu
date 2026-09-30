@@ -41,6 +41,8 @@ impl Cost {
         model: &str,
         artifact: Option<ArtifactRef>,
     ) -> Result<Metric, EvidenceError> {
+        let _span = katu_core::trace_fn!("usage::metric");
+
         let value = self.micros.map_or(0.0, to_f64);
         Metric::new(
             format!("provider.cost_micros.{model}"),
@@ -63,6 +65,8 @@ pub fn usage_metrics(
     usage: &TokenUsage,
     artifact: Option<&ArtifactRef>,
 ) -> Result<Vec<Metric>, EvidenceError> {
+    let _span = katu_core::trace_fn!("usage::usage_metrics");
+
     let mut metrics = Vec::new();
     for (field, tokens) in [
         ("input", usage.input),
@@ -93,17 +97,23 @@ impl PriceTable {
     /// Tabela vazia.
     #[must_use]
     pub fn new() -> Self {
+        let _span = katu_core::trace_fn!("usage::new");
+
         Self::default()
     }
 
     /// Regista/atualiza o preço de um modelo.
     pub fn set(&mut self, model: impl Into<String>, price: Price) {
+        let _span = katu_core::trace_fn!("usage::set");
+
         self.prices.insert(model.into(), price);
     }
 
     /// Calcula o custo; `unpriced` se o modelo não tiver preço.
     #[must_use]
     pub fn cost(&self, model: &str, usage: &TokenUsage) -> Cost {
+        let _span = katu_core::trace_fn!("usage::cost");
+
         self.prices.get(model).map_or(
             Cost {
                 micros: None,
@@ -119,6 +129,8 @@ impl PriceTable {
 
 /// Custo em micro-USD: entrada não-cacheada + cache + saída, por 1M tokens.
 fn compute(price: &Price, usage: &TokenUsage) -> u64 {
+    let _span = katu_core::trace_fn!("usage::compute");
+
     let input = usage.input.unwrap_or(0);
     let cached = usage.cached_input.unwrap_or(0).min(input);
     let fresh = input.saturating_sub(cached);

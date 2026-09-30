@@ -24,6 +24,8 @@ impl FsError {
     /// Converte um erro de I/O do `std` num erro de porta.
     #[must_use]
     pub fn from_io(err: &std::io::Error) -> Self {
+        let _span = crate::trace_fn!("ports::fs::from_io");
+
         if err.kind() == std::io::ErrorKind::NotFound {
             Self::NotFound
         } else {
@@ -34,6 +36,8 @@ impl FsError {
 
 impl std::fmt::Display for FsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let _span = crate::trace_fn!("ports::fs::fmt");
+
         match self {
             Self::NotFound => f.write_str("caminho não encontrado"),
             Self::Stale => f.write_str("conteúdo mudou desde a leitura"),

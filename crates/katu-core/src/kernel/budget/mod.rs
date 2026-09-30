@@ -59,6 +59,8 @@ impl Budget {
     /// Tokens e tempo de parede não são reprodutíveis a partir do log e ficam a zero.
     #[must_use]
     pub fn from_events(events: &[Event]) -> Self {
+        let _span = crate::trace_fn!("kernel::budget::from_events");
+
         let mut usage = Self::ZERO;
         for event in events {
             if let Some(charge) = charge_for(event) {
@@ -202,6 +204,8 @@ impl BudgetRefusal {
     /// Uso projetado que disparou a recusa.
     #[must_use]
     pub fn used(self) -> u64 {
+        let _span = crate::trace_fn!("kernel::budget::used");
+
         match self {
             Self::Turns { used, .. } | Self::ToolCalls { used, .. } => u64::from(used),
             Self::Tokens { used, .. } | Self::WallClock { used, .. } => used,
@@ -211,6 +215,8 @@ impl BudgetRefusal {
     /// Teto violado.
     #[must_use]
     pub fn cap(self) -> u64 {
+        let _span = crate::trace_fn!("kernel::budget::cap");
+
         match self {
             Self::Turns { cap, .. } | Self::ToolCalls { cap, .. } => u64::from(cap),
             Self::Tokens { cap, .. } | Self::WallClock { cap, .. } => cap,
@@ -264,6 +270,8 @@ impl BudgetGate {
     /// # Errors
     /// [`BudgetRefusal`] se o uso projetado exceder um teto.
     pub fn check(&self, charge: Charge) -> Result<(), BudgetRefusal> {
+        let _span = crate::trace_fn!("kernel::budget::check");
+
         let projected = self.usage.after(charge);
         if let Some(refusal) = self.cap.breach(projected) {
             crate::event!(
@@ -280,6 +288,8 @@ impl BudgetGate {
 
     /// Aplica um débito. O chamador deve ter verificado com [`BudgetGate::check`].
     pub fn commit(&mut self, charge: Charge) {
+        let _span = crate::trace_fn!("kernel::budget::commit");
+
         self.usage = self.usage.after(charge);
     }
 }

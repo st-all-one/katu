@@ -87,6 +87,8 @@ impl ToolReport {
     /// Define o id.
     #[must_use]
     pub fn with_id(mut self, id: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("report::with_id");
+
         self.id = Some(id.into());
         self
     }
@@ -94,6 +96,8 @@ impl ToolReport {
     /// Define o hash.
     #[must_use]
     pub fn with_hash(mut self, hash: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("report::with_hash");
+
         self.hash = Some(hash.into());
         self
     }
@@ -101,6 +105,8 @@ impl ToolReport {
     /// Define a página.
     #[must_use]
     pub fn with_page(mut self, page: Page) -> Self {
+        let _span = crate::trace_fn!("report::with_page");
+
         self.page = Some(page);
         self
     }
@@ -108,6 +114,8 @@ impl ToolReport {
     /// Define as próximas ações.
     #[must_use]
     pub fn with_next(mut self, next: Vec<String>) -> Self {
+        let _span = crate::trace_fn!("report::with_next");
+
         self.next = next;
         self
     }
@@ -115,6 +123,8 @@ impl ToolReport {
     /// Define o custo.
     #[must_use]
     pub fn with_cost(mut self, cost: Cost) -> Self {
+        let _span = crate::trace_fn!("report::with_cost");
+
         self.cost = Some(cost);
         self
     }
@@ -122,7 +132,7 @@ impl ToolReport {
     /// Renderiza em **TOON colunar v3** (formato ao modelo, ADR 0005), sem aliases.
     #[must_use]
     pub fn to_toon(&self) -> String {
-        let _span = crate::span!(Level::Debug, events::TOON_EMIT, "kind" => self.kind);
+        let _span = crate::fn_span!(Level::Debug, events::TOON_EMIT, "report::to_toon", "kind" => self.kind);
         let mut sections = vec![self.envelope(self.id.as_deref().unwrap_or_default())];
         sections.extend(toon::project(&self.data));
         self.push_next(&mut sections);
@@ -132,7 +142,12 @@ impl ToolReport {
     /// Renderiza com **aliases de sessão** (`#N`/`@N`) e a secção `sym` dos novos.
     #[must_use]
     pub fn to_toon_with(&self, aliases: &mut Aliases) -> String {
-        let _span = crate::span!(Level::Debug, events::TOON_EMIT, "kind" => self.kind);
+        let _span = crate::fn_span!(
+            Level::Debug,
+            events::TOON_EMIT,
+            "report::to_toon_with",
+            "kind" => self.kind
+        );
         let (data, mut fresh) = aliases.substitute(&self.data);
         let id = self.id.as_deref().map_or_else(String::new, |raw| {
             let (alias, pair) = aliases.intern_id(raw);
@@ -156,6 +171,8 @@ impl ToolReport {
     }
 
     fn push_next(&self, sections: &mut Vec<Section>) {
+        let _span = crate::trace_fn!("report::push_next");
+
         if self.next.is_empty() {
             return;
         }
@@ -168,6 +185,8 @@ impl ToolReport {
 
     /// Envelope universal `r` (colunas fixas; ausente = célula vazia).
     fn envelope(&self, id: &str) -> Section {
+        let _span = crate::trace_fn!("report::envelope");
+
         let (cursor, total, truncated) = self.page.map_or((None, 0, false), |page| {
             (page.cursor.map(to_i64), to_i64(page.total), page.truncated)
         });
@@ -195,18 +214,24 @@ impl ToolReport {
     /// # Errors
     /// [`serde_json::Error`] se a serialização falhar (não deve ocorrer para um `ToolReport`).
     pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        let _span = crate::trace_fn!("report::to_json");
+
         serde_json::to_string(self)
     }
 }
 
 /// Converte `u64` em `i64` para o TOON (satura no máximo).
 fn to_i64(value: u64) -> i64 {
+    let _span = crate::trace_fn!("report::to_i64");
+
     i64::try_from(value).unwrap_or(i64::MAX)
 }
 
 /// Hash FNV-1a de 64 bits (determinístico, sem dependências).
 #[must_use]
 pub fn fingerprint(bytes: &[u8]) -> u64 {
+    let _span = crate::trace_fn!("report::fingerprint");
+
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
     for byte in bytes {
         hash ^= u64::from(*byte);
@@ -218,12 +243,16 @@ pub fn fingerprint(bytes: &[u8]) -> u64 {
 /// Id content-addressed com prefixo (`f_`/`s_`/…), 16 hex estáveis (64 bits — sem colisões a escala).
 #[must_use]
 pub fn content_id(prefix: &str, seed: &[u8]) -> String {
+    let _span = crate::trace_fn!("report::content_id");
+
     format!("{prefix}_{:016x}", fingerprint(seed))
 }
 
 /// Hash de conteúdo em 16 hex.
 #[must_use]
 pub fn content_hash(bytes: &[u8]) -> String {
+    let _span = crate::trace_fn!("report::content_hash");
+
     format!("{:016x}", fingerprint(bytes))
 }
 

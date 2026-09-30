@@ -37,6 +37,8 @@ pub struct ExecTool<'a> {
 
 impl Tool for ExecTool<'_> {
     fn name(&self) -> ToolName {
+        let _span = katu_core::trace_fn!("exec::name");
+
         ToolName::Exec
     }
 
@@ -69,6 +71,8 @@ impl Tool for ExecTool<'_> {
 /// Remove variáveis sensíveis do ambiente herdado (E07-T04).
 #[must_use]
 pub fn scrub_env(vars: &[(String, String)]) -> Vec<(String, String)> {
+    let _span = katu_core::trace_fn!("exec::scrub_env");
+
     vars.iter()
         .filter(|(key, _)| {
             let upper = key.to_ascii_uppercase();
@@ -80,6 +84,8 @@ pub fn scrub_env(vars: &[(String, String)]) -> Vec<(String, String)> {
 
 /// Constrói o registo do comando (redigido + truncado pela cauda).
 fn build(request: &ExecRequest, result: &ExecResult, parent: Option<&str>) -> CommandRecord {
+    let _span = katu_core::trace_fn!("exec::build");
+
     let seed = format!("exec:{}", request.argv.join(" "));
     CommandRecord {
         id: content_id("x", seed.as_bytes()),
@@ -97,6 +103,8 @@ fn build(request: &ExecRequest, result: &ExecResult, parent: Option<&str>) -> Co
 
 /// Renderiza o registo no envelope AI-first (DF12).
 fn report(record: &CommandRecord) -> ToolReport {
+    let _span = katu_core::trace_fn!("exec::report");
+
     let argv: Vec<Value> = record
         .argv
         .iter()
@@ -133,6 +141,8 @@ fn report(record: &CommandRecord) -> ToolReport {
 }
 
 fn unavailable(control: &'static str) -> ToolOutput {
+    let _span = katu_core::trace_fn!("exec::unavailable");
+
     ToolOutput::outcome(ToolOutcome::Unavailable {
         control: ControlId::new(control),
         rule_id: None,

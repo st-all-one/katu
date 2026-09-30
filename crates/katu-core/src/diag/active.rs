@@ -100,6 +100,7 @@ pub fn record(level: Level, event: &'static str, fields: &[(&'static str, Value<
     emit(&Record {
         level,
         event,
+        function: None,
         kind: Kind::Event,
         duration_nanos: None,
         fields,
@@ -110,6 +111,7 @@ pub fn record(level: Level, event: &'static str, fields: &[(&'static str, Value<
 pub(super) struct Active {
     level: Level,
     event: &'static str,
+    function: Option<&'static str>,
     start: Instant,
 }
 
@@ -120,6 +122,7 @@ pub(super) struct Active {
 pub(super) fn begin(
     level: Level,
     event: &'static str,
+    function: Option<&'static str>,
     fields: &[(&'static str, Value<'_>)],
 ) -> Option<Active> {
     if !enabled() || level > current_level() || !filter_allows(event) {
@@ -128,6 +131,7 @@ pub(super) fn begin(
     emit(&Record {
         level,
         event,
+        function,
         kind: Kind::SpanStart,
         duration_nanos: None,
         fields,
@@ -135,6 +139,7 @@ pub(super) fn begin(
     Some(Active {
         level,
         event,
+        function,
         start: Instant::now(),
     })
 }
@@ -146,6 +151,7 @@ impl Active {
         emit(&Record {
             level: self.level,
             event: self.event,
+            function: self.function,
             kind: Kind::SpanEnd,
             duration_nanos: Some(nanos),
             fields: &[],

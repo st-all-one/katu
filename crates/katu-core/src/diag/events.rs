@@ -28,6 +28,11 @@ catalog! {
     (KATU_RUN, "katu.run", "Execução de topo do binário."),
     (KATU_SETUP, "katu.setup", "Configuração de arranque (diagnóstico, portas)."),
     (KATU_SHUTDOWN, "katu.shutdown", "Encerramento controlado."),
+    (
+        KATU_FN,
+        "katu.fn",
+        "Span genérico de função (E19-T03): tempo atómico por função via `trace_fn!`."
+    ),
 
     // -- Sistema de ficheiros (borda) ----------------------------------------
     (FS_READ, "fs.read", "Leitura de um ficheiro."),
@@ -164,6 +169,39 @@ catalog! {
         "tui.trash_empty",
         "Lixeira esvaziada permanentemente após challenge humano."
     ),
+    (TUI_ACTION, "tui.action", "Ação do keymap aplicada no estado central."),
+    (TUI_SLASH, "tui.slash", "Comando `/` da linha de mensagem (mini-menu)."),
+    (MOUSE_COPY, "mouse.copy", "Cópia por seleção de rato (OSC 52)."),
+
+    // -- Superfície CLI (E20) ------------------------------------------------
+    (CLI_PRIME, "cli.prime", "Verbo `prime` (contexto estático por grupo)."),
+    (CLI_RUN, "cli.run", "Verbo `run` (turno único)."),
+    (CLI_TUI, "cli.tui", "Verbo `tui` (interface de terminal)."),
+    (CLI_MEMO, "cli.memo", "Verbo `memo` (consulta à memória)."),
+    (CLI_CONFIG, "cli.config", "Verbo `config` (get/set/unset/list)."),
+    (CLI_UPGRADE, "cli.upgrade", "Verbo `upgrade`."),
+    (CLI_SESSIONS, "cli.sessions", "Verbo `sessions` (lista o índice)."),
+    (CLI_INPUT, "cli.input", "Leitura de body/stdin e `--params`/`--batch`."),
+
+    // -- Arranque / configuração / workers -----------------------------------
+    (BOOTSTRAP_INIT, "bootstrap.init", "Bootstrap do `.katu/` no arranque."),
+    (BOOTSTRAP_FIX, "bootstrap.fix", "Reparação do layout (`memo doctor --fix`)."),
+    (CONFIG_LOAD, "config.load", "Carregamento/merge da configuração efetiva."),
+    (CONFIG_SET, "config.set", "Alteração de uma chave de configuração."),
+    (WATCH_TICK, "watch.tick", "Iteração do worker `--watch-service`."),
+    (WATCH_DRAIN, "watch.drain", "Dreno periódico de embeddings no worker."),
+    (SKILL_DISCOVER, "skill.discover", "Descoberta do catálogo de skills no arranque."),
+    (SKILL_READ, "skill.read", "Leitura de uma `SKILL.md` para o contexto."),
+    (EMBED_REQUEST, "embed.request", "Pedido à segunda IA (embeddings)."),
+    (AGENT_ROUTE, "agent.route", "Roteamento fail-closed de uma tool call do modelo."),
+    (MEMORY_OPEN, "memory.open", "Abertura do adaptador de memória."),
+    (BUS_PUBLISH, "bus.publish", "Publicação de um evento no bus do kernel."),
+    (BUS_DELIVER, "bus.deliver", "Entrega de um evento aos observadores (waterfall)."),
+
+    // -- Política (instrumentada pelo chamador, por firewall) ----------------
+    (POLICY_LOAD, "policy.load", "Carregamento/parse das regras de política."),
+    (POLICY_AUDIT, "policy.audit", "Auditoria das regras (E02-T04)."),
+    (POLICY_CAPABILITY, "policy.capability", "Cálculo da capacidade mínima (aprovação)."),
 }
 
 #[cfg(test)]

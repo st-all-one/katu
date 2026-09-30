@@ -5,11 +5,13 @@
 
 use std::io::Read;
 
+use katu_core::diag::{Level, events};
 use katu_core::error::Error;
 use serde::de::DeserializeOwned;
 
 /// Lê o conteúdo de `--params`/`--batch` (`-` = `stdin`).
 pub(crate) fn source(raw: &str) -> Result<String, Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::CLI_INPUT, "params::source");
     if raw == "-" {
         return read_stdin();
     }
@@ -18,6 +20,7 @@ pub(crate) fn source(raw: &str) -> Result<String, Error> {
 
 /// Lê um lote (`-` = `stdin`) e devolve as linhas não vazias.
 pub(crate) fn batch_lines(path: &str) -> Result<Vec<String>, Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::CLI_INPUT, "params::batch_lines");
     let text = if path == "-" {
         read_stdin()?
     } else {
@@ -33,11 +36,14 @@ pub(crate) fn batch_lines(path: &str) -> Result<Vec<String>, Error> {
 
 /// Desserializa um objeto JSON, recusando campos desconhecidos (fail-closed).
 pub(crate) fn parse<T: DeserializeOwned>(text: &str) -> Result<T, Error> {
+    let _span = katu_core::trace_fn!("cli::params::parse");
+
     serde_json::from_str(text).map_err(|err| Error::invalid_input(format!("JSON inválido: {err}")))
 }
 
 /// Lê todo o `stdin`.
 fn read_stdin() -> Result<String, Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::CLI_INPUT, "params::read_stdin");
     let mut buffer = String::new();
     std::io::stdin()
         .read_to_string(&mut buffer)

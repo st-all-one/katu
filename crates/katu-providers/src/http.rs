@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use flate2::Compression;
 use flate2::write::GzEncoder;
+use katu_core::diag::{Level, events};
 use katu_core::provider::Flow;
 use ureq::Agent;
 use ureq::RequestBuilder;
@@ -33,6 +34,8 @@ impl UreqTransport {
     /// Constrói com os timeouts de ligação e de resposta (segundos do corpo ficam a cargo do sink).
     #[must_use]
     pub fn new(connect: Duration, recv_response: Duration) -> Self {
+        let _span = katu_core::trace_fn!("http::new");
+
         let config = Self::config(connect, recv_response);
         Self {
             agent: Agent::new_with_config(config),
@@ -47,12 +50,15 @@ impl UreqTransport {
     /// o corpo vai em claro, sem custo de CPU.
     #[must_use]
     pub fn with_request_compression(mut self, threshold: usize) -> Self {
+        let _span = katu_core::trace_fn!("http::with_request_compression");
+
         self.compress_above = Some(threshold);
         self
     }
 
     /// Prepara `(corpo, headers)` aplicando gzip quando compensa.
     fn prepare(&self, request: &HttpRequest) -> (Vec<u8>, Headers) {
+        let _span = katu_core::fn_span!(Level::Trace, events::PROVIDER_REQUEST, "http::prepare");
         let body = request.body.clone().unwrap_or_default();
         let Some(threshold) = self.compress_above else {
             return (body, request.headers.clone());
@@ -72,6 +78,8 @@ impl UreqTransport {
 
     /// Configuração afinada para um endpoint de modelo.
     fn config(connect: Duration, recv_response: Duration) -> Config {
+        let _span = katu_core::trace_fn!("http::config");
+
         Agent::config_builder()
             .no_delay(true)
             .http_status_as_error(false)
@@ -90,6 +98,7 @@ impl Transport for UreqTransport {
         request: &HttpRequest,
         sink: &mut ChunkSink<'_>,
     ) -> Result<HttpMeta, TransportError> {
+        let _span = katu_core::fn_span!(Level::Trace, events::PROVIDER_REQUEST, "http::send");
         let mut response = match request.method {
             Method::Get => apply(self.agent.get(&request.url), &request.headers).call(),
             Method::Post => {
@@ -133,6 +142,8 @@ impl Transport for UreqTransport {
 
 /// Aplica os cabeçalhos a um pedido ureq (genérico no tipo-estado).
 fn apply<B>(mut builder: RequestBuilder<B>, headers: &[(String, String)]) -> RequestBuilder<B> {
+    let _span = katu_core::trace_fn!("http::apply");
+
     for (key, value) in headers {
         builder = builder.header(key.as_str(), value.as_str());
     }
@@ -149,6 +160,8 @@ fn gzip(body: &[u8]) -> Option<Vec<u8>> {
 
 /// Mapeia o erro do ureq para o transporte.
 fn map_error(error: ureq::Error, recv_millis: u64) -> TransportError {
+    let _span = katu_core::trace_fn!("http::map_error");
+
     match error {
         ureq::Error::Timeout(_) => TransportError::Timeout {
             millis: recv_millis,

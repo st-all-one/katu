@@ -42,6 +42,8 @@ impl FixedClock {
 
 impl Clock for FixedClock {
     fn now(&self) -> Timestamp {
+        let _span = crate::trace_fn!("ports::clock::now");
+
         self.now
     }
 }

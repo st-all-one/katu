@@ -49,6 +49,8 @@ pub struct LogError {
 impl LogError {
     /// Constrói um erro do log.
     fn new(kind: LogErrorKind, message: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("kernel::log::new");
+
         Self {
             kind,
             message: message.into(),
@@ -59,6 +61,8 @@ impl LogError {
 /// Caminho canônico da geração atual do log.
 #[must_use]
 pub fn session_path(dir: &Path) -> PathBuf {
+    let _span = crate::trace_fn!("kernel::log::session_path");
+
     dir.join(format!("session.v{LOG_SCHEMA_VERSION}.jsonl"))
 }
 
@@ -76,6 +80,7 @@ impl<'a> Log<'a> {
     /// # Errors
     /// [`LogError`] se o log existente estiver corrompido.
     pub fn open(fs: &'a dyn Fs, dir: &Path) -> Result<Self, LogError> {
+        let _span = crate::fn_span!(Level::Trace, events::LOG_REPLAY, "kernel::log::open");
         let path = session_path(dir);
         let (records, len) = read_records_with_len(fs, &path)?;
         let seq = records.last().map_or(0, |record| record.seq);
@@ -89,6 +94,8 @@ impl<'a> Log<'a> {
 
     /// Retoma o log a partir dos valores já conhecidos (sem reler o ficheiro — ADR 0008).
     pub(crate) fn resume(fs: &'a dyn Fs, dir: &Path, seq: u64, offset: u64) -> Self {
+        let _span = crate::trace_fn!("kernel::log::resume");
+
         Self {
             fs,
             path: session_path(dir),
@@ -100,18 +107,24 @@ impl<'a> Log<'a> {
     /// Caminho do ficheiro de log.
     #[must_use]
     pub fn path(&self) -> &Path {
+        let _span = crate::trace_fn!("kernel::log::path");
+
         &self.path
     }
 
     /// Último `seq` gravado (`0` se vazio).
     #[must_use]
     pub fn seq(&self) -> u64 {
+        let _span = crate::trace_fn!("kernel::log::seq");
+
         self.seq
     }
 
     /// Offset (bytes) do início da próxima linha.
     #[must_use]
     pub fn offset(&self) -> u64 {
+        let _span = crate::trace_fn!("kernel::log::offset");
+
         self.offset
     }
 
@@ -120,8 +133,11 @@ impl<'a> Log<'a> {
     /// # Errors
     /// [`LogError`] se a serialização ou o I/O falharem.
     pub fn append(&mut self, event: &Event) -> Result<u64, LogError> {
+        let _span = crate::trace_fn!("kernel::log::append");
+
         let seq = self.seq.saturating_add(1);
-        let _span = crate::span!(Level::Trace, events::LOG_APPEND, "seq" => seq);
+        let _span =
+            crate::fn_span!(Level::Trace, events::LOG_APPEND, "kernel::log::append", "seq" => seq);
         let record = LogRecord {
             seq,
             event: event.clone(),
@@ -143,6 +159,8 @@ impl<'a> Log<'a> {
 /// # Errors
 /// [`LogError`] se o ficheiro não for UTF-8, tiver uma linha ilegível ou um salto de `seq`.
 pub fn read_records(fs: &dyn Fs, path: &Path) -> Result<Vec<LogRecord>, LogError> {
+    let _span = crate::trace_fn!("kernel::log::read_records");
+
     read_records_with_len(fs, path).map(|(records, _)| records)
 }
 
@@ -151,7 +169,11 @@ pub(super) fn read_records_with_len(
     fs: &dyn Fs,
     path: &Path,
 ) -> Result<(Vec<LogRecord>, usize), LogError> {
-    let _span = crate::span!(Level::Trace, events::LOG_REPLAY);
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::LOG_REPLAY,
+        "kernel::log::read_records_with_len"
+    );
     if !fs.exists(path) {
         return Ok((Vec::new(), 0));
     }
@@ -170,7 +192,11 @@ pub(super) fn read_records_from(
     offset: u64,
     first_seq: u64,
 ) -> Result<(Vec<LogRecord>, usize), LogError> {
-    let _span = crate::span!(Level::Trace, events::LOG_REPLAY);
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::LOG_REPLAY,
+        "kernel::log::read_records_from"
+    );
     let tail = fs.read_from(path, offset).map_err(from_io)?;
     let len = usize::try_from(offset)
         .unwrap_or(usize::MAX)
@@ -180,6 +206,11 @@ pub(super) fn read_records_from(
 
 /// Valida e desserializa as linhas de um log, exigindo `seq` contíguo desde `first_seq`.
 fn parse_records(bytes: &[u8], first_seq: u64) -> Result<Vec<LogRecord>, LogError> {
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::LOG_REPLAY,
+        "kernel::log::parse_records"
+    );
     let text = std::str::from_utf8(bytes)
         .map_err(|err| LogError::new(LogErrorKind::Corrupt, format!("log não é UTF-8: {err}")))?;
     let mut records = Vec::new();
@@ -205,6 +236,8 @@ fn parse_records(bytes: &[u8], first_seq: u64) -> Result<Vec<LogRecord>, LogErro
 
 /// Converte um erro da porta `Fs` num erro do log.
 fn from_io(err: FsError) -> LogError {
+    let _span = crate::trace_fn!("kernel::log::from_io");
+
     match err {
         FsError::NotFound => LogError::new(LogErrorKind::Io, "caminho não encontrado"),
         FsError::Stale => LogError::new(LogErrorKind::Io, "conteúdo mudou desde a leitura"),

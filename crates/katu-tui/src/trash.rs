@@ -2,6 +2,7 @@
 //!
 //! A lixeira é **recuperável**: restaurar nunca apaga nada e não passa pela política (E06-T09).
 
+use katu_core::diag::{Level, events};
 use ratatui::Frame;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -31,6 +32,8 @@ impl Trash {
     /// Estado inicial (fechada, vazia).
     #[must_use]
     pub(crate) fn new() -> Self {
+        let _span = katu_core::trace_fn!("trash::new");
+
         Self::default()
     }
 
@@ -43,6 +46,8 @@ impl Trash {
     /// Entradas listadas (mais recentes primeiro).
     #[must_use]
     pub(crate) fn items(&self) -> &[TrashEntry] {
+        let _span = katu_core::trace_fn!("trash::items");
+
         &self.items
     }
 
@@ -54,27 +59,37 @@ impl Trash {
 
     /// Abre a sobreposição.
     pub(crate) fn open(&mut self) {
+        let _span = katu_core::trace_fn!("trash::open");
+
         self.open = true;
     }
 
     /// Fecha a sobreposição.
     pub(crate) fn close(&mut self) {
+        let _span = katu_core::trace_fn!("trash::close");
+
         self.open = false;
     }
 
     /// Substitui a lista (o primeiro fica selecionado).
     pub(crate) fn set_items(&mut self, items: Vec<TrashEntry>) {
+        let _span = katu_core::trace_fn!("trash::set_items");
+
         self.items = items;
         self.index = 0;
     }
 
     /// Move a seleção para cima (satura no topo).
     pub(crate) fn up(&mut self) {
+        let _span = katu_core::trace_fn!("trash::up");
+
         self.index = self.index.saturating_sub(1);
     }
 
     /// Move a seleção para baixo (satura no fim).
     pub(crate) fn down(&mut self) {
+        let _span = katu_core::trace_fn!("trash::down");
+
         let next = self.index.saturating_add(1);
         if next < self.items.len() {
             self.index = next;
@@ -84,12 +99,15 @@ impl Trash {
     /// Token da entrada selecionada, se houver.
     #[must_use]
     pub(crate) fn selected(&self) -> Option<&TrashEntry> {
+        let _span = katu_core::trace_fn!("trash::selected");
+
         self.items.get(self.index)
     }
 }
 
 /// Desenha a sobreposição da lixeira.
 pub(crate) fn render(frame: &mut Frame<'_>, app: &App) {
+    let _span = katu_core::fn_span!(Level::Trace, events::TUI_RENDER, "trash::render");
     let area = centered(frame.area(), 72, 16);
     frame.render_widget(Clear, area);
     let items = app.trash_items();

@@ -5,6 +5,7 @@
 
 use std::path::{Path, PathBuf};
 
+use katu_core::diag::{Level, events};
 use katu_core::ports::{Fs, FsError};
 
 /// Um registo da lixeira.
@@ -21,12 +22,15 @@ pub(super) struct TrashRecord {
 /// Caminho do índice.
 #[must_use]
 pub(super) fn index_path(root: &Path) -> PathBuf {
+    let _span = katu_core::trace_fn!("trash::index::index_path");
+
     root.join(".katu").join("trash").join("index.tsv")
 }
 
 /// Lê o índice (vazio se ainda não existir).
 #[must_use]
 pub(super) fn read(fs: &dyn Fs, root: &Path) -> Vec<TrashRecord> {
+    let _span = katu_core::fn_span!(Level::Trace, events::TOOL_TRASH, "trash::index::read");
     let Ok(bytes) = fs.read(&index_path(root)) else {
         return Vec::new();
     };
@@ -38,6 +42,7 @@ pub(super) fn read(fs: &dyn Fs, root: &Path) -> Vec<TrashRecord> {
 
 /// Anexa um registo ao índice.
 pub(super) fn append(fs: &dyn Fs, root: &Path, record: &TrashRecord) -> Result<(), FsError> {
+    let _span = katu_core::fn_span!(Level::Trace, events::TOOL_TRASH, "trash::index::append");
     let stored = encode(&record.stored);
     let original = encode(&record.original);
     let at = record.at_millis;
@@ -46,6 +51,8 @@ pub(super) fn append(fs: &dyn Fs, root: &Path, record: &TrashRecord) -> Result<(
 }
 
 fn parse(line: &str) -> Option<TrashRecord> {
+    let _span = katu_core::trace_fn!("trash::index::parse");
+
     let mut parts = line.split('\t');
     let at_millis = parts.next()?.parse::<u64>().ok()?;
     let stored = decode(parts.next()?);
@@ -58,6 +65,8 @@ fn parse(line: &str) -> Option<TrashRecord> {
 }
 
 fn encode(field: &str) -> String {
+    let _span = katu_core::trace_fn!("trash::index::encode");
+
     field
         .replace('\\', "\\\\")
         .replace('\t', "\\t")
@@ -65,6 +74,8 @@ fn encode(field: &str) -> String {
 }
 
 fn decode(field: &str) -> String {
+    let _span = katu_core::trace_fn!("trash::index::decode");
+
     let mut out = String::new();
     let mut chars = field.chars();
     while let Some(ch) = chars.next() {

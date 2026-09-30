@@ -39,6 +39,8 @@ pub struct StateSnapshot {
 /// Caminho do snapshot numa sessão.
 #[must_use]
 pub(super) fn snapshot_path(dir: &Path) -> PathBuf {
+    let _span = crate::trace_fn!("kernel::session::snapshot::snapshot_path");
+
     dir.join("snapshot.v1.json")
 }
 
@@ -47,6 +49,8 @@ pub(super) fn snapshot_path(dir: &Path) -> PathBuf {
 /// # Errors
 /// [`FsError`] se a serialização ou a escrita falharem.
 pub(super) fn save(fs: &dyn Fs, dir: &Path, snapshot: &StateSnapshot) -> Result<(), FsError> {
+    let _span = crate::trace_fn!("kernel::session::snapshot::save");
+
     let bytes = serde_json::to_vec(snapshot).map_err(|err| FsError::Io(err.to_string()))?;
     fs.write_atomic(&snapshot_path(dir), &bytes)
 }
@@ -54,6 +58,8 @@ pub(super) fn save(fs: &dyn Fs, dir: &Path, snapshot: &StateSnapshot) -> Result<
 /// Lê o snapshot, se existir e tiver a versão suportada.
 #[must_use]
 pub(super) fn load(fs: &dyn Fs, dir: &Path) -> Option<StateSnapshot> {
+    let _span = crate::trace_fn!("kernel::session::snapshot::load");
+
     let bytes = fs.read(&snapshot_path(dir)).ok()?;
     let snapshot: StateSnapshot = serde_json::from_slice(&bytes).ok()?;
     (snapshot.schema_version == SNAPSHOT_SCHEMA_VERSION).then_some(snapshot)

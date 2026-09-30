@@ -3,6 +3,7 @@
 mod helpers;
 mod reports;
 
+use katu_core::diag::{Level, events};
 use katu_core::report::{ToolReport, content_hash, content_id};
 
 use super::{LineRange, ReadBudget};
@@ -28,6 +29,8 @@ impl View {
     /// Interpreta o nome da view.
     #[must_use]
     pub fn parse(text: &str) -> Option<Self> {
+        let _span = katu_core::trace_fn!("read::views::parse");
+
         match text {
             "full" => Some(Self::Full),
             "range" => Some(Self::Range),
@@ -89,6 +92,7 @@ pub(super) struct Meta<'a> {
 /// Constrói o relatório da view (ou `None` se indisponível).
 #[must_use]
 pub(super) fn build(input: Build<'_>) -> Option<ToolReport> {
+    let _span = katu_core::fn_span!(Level::Trace, events::TOOL_READ, "read::views::build");
     let lines: Vec<&str> = input.text.lines().collect();
     let meta = Meta {
         path: input.path,

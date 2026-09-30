@@ -56,6 +56,8 @@ impl Feature {
         description: impl Into<String>,
         status: FeatureStatus,
     ) -> Self {
+        let _span = crate::trace_fn!("plan::new");
+
         Self {
             id: id.into(),
             description: description.into(),
@@ -92,6 +94,8 @@ impl ScopeContract {
         acceptance_criteria: Vec<String>,
         rollback_plan: impl Into<String>,
     ) -> Self {
+        let _span = crate::trace_fn!("plan::new");
+
         Self {
             allowed_files,
             forbidden_files,
@@ -105,6 +109,8 @@ impl ScopeContract {
     /// Define o orçamento de tempo em minutos (merge por **mínimo**, E09-T04).
     #[must_use]
     pub fn with_time_budget(mut self, minutes: u64) -> Self {
+        let _span = crate::trace_fn!("plan::with_time_budget");
+
         self.time_budget_minutes = Some(minutes);
         self
     }
@@ -112,6 +118,8 @@ impl ScopeContract {
     /// `true` se o caminho é permitido pelo contrato (proibido vence; `allowed` vazio = tudo).
     #[must_use]
     pub fn allows(&self, path: &str) -> bool {
+        let _span = crate::trace_fn!("plan::allows");
+
         if self
             .forbidden_files
             .iter()
@@ -140,6 +148,8 @@ impl Plan {
     /// Constrói um plano.
     #[must_use]
     pub fn new(scope_contract: ScopeContract, feature_list: Vec<Feature>) -> Self {
+        let _span = crate::trace_fn!("plan::new");
+
         Self {
             scope_contract,
             feature_list,
@@ -151,6 +161,8 @@ impl Plan {
     /// # Errors
     /// Devolve [`PlanError`] na primeira violação encontrada (fail-closed).
     pub fn validate(&self) -> Result<(), PlanError> {
+        let _span = crate::trace_fn!("plan::validate");
+
         if self.feature_list.is_empty() {
             return Err(PlanError::EmptyFeatureList);
         }
@@ -205,6 +217,8 @@ pub enum PlanError {
 
 /// `true` se o padrão é um glob relativo (sem raiz absoluta nem `..`).
 fn is_relative_glob(pattern: &str) -> bool {
+    let _span = crate::trace_fn!("plan::is_relative_glob");
+
     !pattern.starts_with('/')
         && !pattern.starts_with('\\')
         && !pattern.split(['/', '\\']).any(|segment| segment == "..")
@@ -212,6 +226,8 @@ fn is_relative_glob(pattern: &str) -> bool {
 
 impl std::fmt::Display for PlanError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let _span = crate::trace_fn!("plan::fmt");
+
         match self {
             Self::EmptyFeatureList => f.write_str("plano sem features"),
             Self::MissingForbiddenFiles => f.write_str("plano sem forbidden_files"),

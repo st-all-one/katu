@@ -93,6 +93,8 @@ pub(crate) fn run_tui(args: &RunArgs<'_>) -> Report {
 
 /// Aplica o pensamento por omissão da config como controlo **logado** (E20-T17).
 fn apply_thinking(app: &mut App, handler: &mut AgentHandler<'_>, thinking: Option<Thinking>) {
+    let _span = katu_core::trace_fn!("tui::apply_thinking");
+
     if let Some(thinking) = thinking {
         for update in handler.set_thinking(thinking) {
             app.apply_update(update);
@@ -102,6 +104,8 @@ fn apply_thinking(app: &mut App, handler: &mut AgentHandler<'_>, thinking: Optio
 
 /// Injeta o checkpoint de fase (próxima ação) no arranque (E10-T06), se houver.
 fn apply_initial(app: &mut App, runtime: &Runtime<'_>) {
+    let _span = katu_core::trace_fn!("tui::apply_initial");
+
     match runtime.checkpoint() {
         Ok(Some(checkpoint)) => app.apply_update(Update::NextAction(checkpoint.next_action)),
         Ok(None) => {}
@@ -114,6 +118,8 @@ fn apply_initial(app: &mut App, runtime: &Runtime<'_>) {
 /// Tenta a descoberta ao vivo (`dynamic_models`); se falhar ou vier vazia, usa o catálogo estático.
 /// O default vem primeiro para o índice zero coincidir com o modelo do arranque.
 fn models_for(provider: &dyn Provider, default: &str) -> Vec<String> {
+    let _span = katu_core::trace_fn!("tui::models_for");
+
     let discovered = provider.dynamic_models().unwrap_or_default();
     katu_core::event!(
         Level::Debug,

@@ -39,6 +39,8 @@ struct Inner {
 
 impl Inner {
     fn ensure_index(&mut self) -> Result<(), MemoryError> {
+        let _span = katu_core::trace_fn!("memory::ensure_index");
+
         if self.index.is_none() {
             self.index = Some(self.kd.index().map_err(to_memory_error)?);
         }
@@ -46,6 +48,8 @@ impl Inner {
     }
 
     fn ensure_graph(&mut self) -> Result<(), MemoryError> {
+        let _span = katu_core::trace_fn!("memory::ensure_graph");
+
         if self.graph.is_none() {
             self.graph = Some(self.kd.graph().map_err(to_memory_error)?);
         }
@@ -64,6 +68,7 @@ impl KnudgeMemory {
     /// # Errors
     /// [`MemoryError`] se a resolução do projeto/config ou o acesso ao disco falharem.
     pub(crate) fn open(root: &Path) -> Result<Self, MemoryError> {
+        let _span = katu_core::fn_span!(Level::Debug, events::MEMORY_OPEN, "memory::open");
         let kd = Knudge::builder()
             .root(root)
             .knowledge_dir(KNOWLEDGE_LAYOUT)
@@ -83,6 +88,8 @@ impl KnudgeMemory {
 
     /// Diretório de conhecimento (para diagnóstico).
     pub(crate) fn knowledge_dir(&self) -> PathBuf {
+        let _span = katu_core::trace_fn!("memory::knowledge_dir");
+
         lock(&self.inner).kd.knowledge_dir()
     }
 
@@ -92,7 +99,7 @@ impl KnudgeMemory {
         reason = "`force` é o modo `--force` do dreno"
     )]
     pub(crate) fn drain(&self, force: bool) -> Result<DrainSummary, MemoryError> {
-        let _span = katu_core::span!(Level::Trace, events::MEMORY_WRITE, "op" => "drain");
+        let _span = katu_core::fn_span!(Level::Trace, events::MEMORY_WRITE, "memory::drain", "op" => "drain");
         let inner = lock(&self.inner);
         drain::run(&inner.kd, force)
     }
@@ -100,7 +107,7 @@ impl KnudgeMemory {
 
 impl Memory for KnudgeMemory {
     fn pre_write(&self, req: &PreWriteReq) -> Result<PreWriteOutcome, MemoryError> {
-        let _span = katu_core::span!(Level::Trace, events::MEMORY_WRITE, "op" => "pre_write");
+        let _span = katu_core::fn_span!(Level::Trace, events::MEMORY_WRITE, "memory::pre_write", "op" => "pre_write");
         let mut inner = lock(&self.inner);
         let draft = make_draft(req);
         let thresholds = inner.kd.thresholds().map_err(to_memory_error)?;
@@ -116,7 +123,7 @@ impl Memory for KnudgeMemory {
     }
 
     fn pre_edit(&self, req: &PreEditReq) -> Result<PreEditOutcome, MemoryError> {
-        let _span = katu_core::span!(Level::Trace, events::MEMORY_WRITE, "op" => "pre_edit");
+        let _span = katu_core::fn_span!(Level::Trace, events::MEMORY_WRITE, "memory::pre_edit", "op" => "pre_edit");
         let inner = lock(&self.inner);
         let note = match inner.kd.store().read(req.note.as_str()) {
             Ok(note) => note,
@@ -138,7 +145,7 @@ impl Memory for KnudgeMemory {
     }
 
     fn record(&self, req: &PreWriteReq) -> Result<NoteRef, MemoryError> {
-        let _span = katu_core::span!(Level::Trace, events::MEMORY_WRITE, "op" => "record");
+        let _span = katu_core::fn_span!(Level::Trace, events::MEMORY_WRITE, "memory::record", "op" => "record");
         let mut inner = lock(&self.inner);
         let draft = make_draft(req);
         let id = {
@@ -154,7 +161,7 @@ impl Memory for KnudgeMemory {
     }
 
     fn search(&self, req: &RecallReq) -> Result<Vec<RecallHit>, MemoryError> {
-        let _span = katu_core::span!(Level::Trace, events::MEMORY_RECALL, "limit" => req.limit);
+        let _span = katu_core::fn_span!(Level::Trace, events::MEMORY_RECALL, "memory::search", "limit" => req.limit);
         let mut inner = lock(&self.inner);
         inner.ensure_index()?;
         inner.ensure_graph()?;
@@ -171,12 +178,15 @@ impl Memory for KnudgeMemory {
     }
 
     fn query(&self, req: &QueryReq) -> Result<QueryResult, MemoryError> {
+        let _span = katu_core::trace_fn!("memory::query");
+
         let mut inner = lock(&self.inner);
         query::run(&mut inner, req)
     }
 
     fn session_end(&self, req: &SessionEndReq) -> Result<SessionEndOutcome, MemoryError> {
-        let _span = katu_core::span!(Level::Trace, events::MEMORY_HANDOFF);
+        let _span =
+            katu_core::fn_span!(Level::Trace, events::MEMORY_HANDOFF, "memory::session_end");
         let mut warnings = Vec::new();
         if req.task.is_some() {
             warnings.push(
@@ -190,7 +200,7 @@ impl Memory for KnudgeMemory {
     }
 
     fn status(&self) -> Result<MemoryStatus, MemoryError> {
-        let _span = katu_core::span!(Level::Trace, events::MEMORY_STATUS);
+        let _span = katu_core::fn_span!(Level::Trace, events::MEMORY_STATUS, "memory::status");
         let inner = lock(&self.inner);
         let dir = inner.kd.knowledge_dir();
         let mut warnings = Vec::new();
@@ -210,6 +220,8 @@ impl Memory for KnudgeMemory {
 
 /// Constrói o rascunho do knudge a partir do pedido do katu.
 fn make_draft(req: &PreWriteReq) -> Draft {
+    let _span = katu_core::trace_fn!("memory::make_draft");
+
     translate::draft(
         &req.statement,
         req.note_type,
@@ -224,6 +236,8 @@ fn make_draft(req: &PreWriteReq) -> Draft {
     reason = "`map_err(to_memory_error)` passa o erro por valor e consome-o na mensagem"
 )]
 fn to_memory_error(error: KnudgeError) -> MemoryError {
+    let _span = katu_core::trace_fn!("memory::to_memory_error");
+
     let kind = match error.kind() {
         ErrorKind::Timeout => MemoryErrorKind::Timeout,
         ErrorKind::InvalidInput | ErrorKind::Schema | ErrorKind::Config | ErrorKind::NotFound => {
@@ -237,6 +251,8 @@ fn to_memory_error(error: KnudgeError) -> MemoryError {
 
 /// Bloqueia um `Mutex`, recuperando o valor mesmo que o lock esteja envenenado.
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    let _span = katu_core::trace_fn!("memory::lock");
+
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 

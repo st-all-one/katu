@@ -31,11 +31,13 @@ pub struct EditFileTool<'a> {
 
 impl Tool for EditFileTool<'_> {
     fn name(&self) -> ToolName {
+        let _span = katu_core::trace_fn!("edit::name");
+
         ToolName::Edit
     }
 
     fn execute(&self, use_: &ToolUse) -> ToolOutput {
-        let _span = katu_core::span!(Level::Trace, events::TOOL_EDIT);
+        let _span = katu_core::fn_span!(Level::Trace, events::TOOL_EDIT, "edit::execute");
         let ToolArgs::Edit { path } = &use_.args else {
             return unavailable("edit");
         };
@@ -85,6 +87,7 @@ struct Patch<'a> {
 }
 
 fn report(kind: &'static str, patch: &Patch<'_>) -> ToolReport {
+    let _span = katu_core::fn_span!(Level::Trace, events::TOOL_EDIT, "edit::report");
     let Patch {
         path,
         id,
@@ -108,6 +111,8 @@ fn report(kind: &'static str, patch: &Patch<'_>) -> ToolReport {
 }
 
 fn unavailable(control: &'static str) -> ToolOutput {
+    let _span = katu_core::trace_fn!("edit::unavailable");
+
     ToolOutput::outcome(ToolOutcome::Unavailable {
         control: ControlId::new(control),
         rule_id: None,

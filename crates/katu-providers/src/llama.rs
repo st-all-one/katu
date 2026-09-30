@@ -36,6 +36,8 @@ impl LlamaConfig {
     /// Servidor local numa porta.
     #[must_use]
     pub fn local(port: u16) -> Self {
+        let _span = katu_core::trace_fn!("llama::local");
+
         Self {
             base_url: format!("http://127.0.0.1:{port}/v1"),
             health_url: format!("http://127.0.0.1:{port}/health"),
@@ -48,6 +50,8 @@ impl LlamaConfig {
     /// Fixa o `reasoning_format` pedido ao servidor.
     #[must_use]
     pub fn with_reasoning_format(mut self, format: impl Into<String>) -> Self {
+        let _span = katu_core::trace_fn!("llama::with_reasoning_format");
+
         self.reasoning_format = Some(format.into());
         self
     }
@@ -64,6 +68,8 @@ impl<T: Transport> Llama<T> {
     /// Constrói com transporte e configuração (retry por omissão).
     #[must_use]
     pub fn new(transport: T, config: LlamaConfig) -> Self {
+        let _span = katu_core::trace_fn!("llama::new");
+
         Self {
             transport,
             config,
@@ -74,6 +80,8 @@ impl<T: Transport> Llama<T> {
     /// Substitui a política de retry.
     #[must_use]
     pub fn with_retry(mut self, retry: RetryPolicy) -> Self {
+        let _span = katu_core::trace_fn!("llama::with_retry");
+
         self.retry = retry;
         self
     }
@@ -83,6 +91,11 @@ impl<T: Transport> Llama<T> {
     /// # Errors
     /// [`ProviderError`] se o servidor não responder.
     pub fn health(&self) -> Result<u16, ProviderError> {
+        let _span = katu_core::fn_span!(
+            Level::Trace,
+            events::PROVIDER_REQUEST,
+            "llama::Llama::health"
+        );
         let (status, _body) = self
             .transport
             .get_text(&self.config.health_url)
@@ -92,16 +105,25 @@ impl<T: Transport> Llama<T> {
 
     /// Pré-aquece a ligação via `GET /health`; ignora erros (otimização de latência).
     pub fn warm(&self) {
+        let _span = katu_core::trace_fn!("llama::warm");
+
         let _status = self.health();
     }
 }
 
 impl<T: Transport> Provider for Llama<T> {
     fn id(&self) -> &'static str {
+        let _span = katu_core::trace_fn!("llama::id");
+
         "llama"
     }
 
     fn dynamic_models(&self) -> Result<Vec<String>, ProviderError> {
+        let _span = katu_core::fn_span!(
+            Level::Debug,
+            events::PROVIDER_MODELS,
+            "llama::Llama::dynamic_models"
+        );
         let url = format!("{}/models", self.config.base_url.trim_end_matches('/'));
         let (status, body) = self.transport.get_text(&url).map_err(ProviderError::from)?;
         if !(200..300).contains(&status) {
@@ -114,6 +136,8 @@ impl<T: Transport> Provider for Llama<T> {
     }
 
     fn capabilities(&self, model: &str) -> ModelCapabilities {
+        let _span = katu_core::trace_fn!("llama::capabilities");
+
         ModelCapabilities {
             model: model.to_string(),
             // O llama.cpp aceita o grau de pensamento; o modelo local decide se o emite.
@@ -126,9 +150,10 @@ impl<T: Transport> Provider for Llama<T> {
         request: &ProviderRequest,
         sink: &mut dyn ProviderSink,
     ) -> Result<ProviderOutcome, ProviderError> {
-        let _span = katu_core::span!(
+        let _span = katu_core::fn_span!(
             Level::Trace,
             events::PROVIDER_REQUEST,
+            "llama::Llama::stream",
             "provider" => "llama",
             "model" => request.model.model.as_str(),
         );

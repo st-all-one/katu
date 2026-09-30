@@ -7,6 +7,7 @@
 
 use std::io::{self, Write};
 
+use katu_core::diag::{Level, events};
 use ratatui::buffer::Buffer;
 
 /// Ponto de ecrã (coluna, linha).
@@ -22,12 +23,16 @@ pub(crate) struct Selection {
 impl Selection {
     /// Inicia a seleção no ponto.
     pub(crate) fn start(&mut self, point: Point) {
+        let _span = katu_core::trace_fn!("copy::start");
+
         self.start = Some(point);
         self.end = Some(point);
     }
 
     /// Estende a seleção até ao ponto (só depois de iniciada).
     pub(crate) fn drag(&mut self, point: Point) {
+        let _span = katu_core::trace_fn!("copy::drag");
+
         if self.start.is_some() {
             self.end = Some(point);
         }
@@ -35,6 +40,8 @@ impl Selection {
 
     /// Consome a seleção (início, fim), se houver.
     pub(crate) fn take(&mut self) -> Option<(Point, Point)> {
+        let _span = katu_core::trace_fn!("copy::take");
+
         let start = self.start.take()?;
         let end = self.end.take()?;
         Some((start, end))
@@ -43,6 +50,8 @@ impl Selection {
 
 /// Extrai o texto entre dois pontos do buffer renderizado (ordem normalizada).
 pub(crate) fn extract(buffer: &Buffer, start: Point, end: Point) -> String {
+    let _span = katu_core::trace_fn!("copy::extract");
+
     let (top, bottom) = if start.1 <= end.1 {
         (start, end)
     } else {
@@ -65,6 +74,8 @@ pub(crate) fn extract(buffer: &Buffer, start: Point, end: Point) -> String {
 
 /// Intervalo de colunas da linha `row` dentro da seleção.
 fn bounds(row: u16, top: Point, bottom: Point, last_col: u16) -> (u16, u16) {
+    let _span = katu_core::trace_fn!("copy::bounds");
+
     if top.1 == bottom.1 {
         if top.0 <= bottom.0 {
             (top.0, bottom.0)
@@ -82,6 +93,7 @@ fn bounds(row: u16, top: Point, bottom: Point, last_col: u16) -> (u16, u16) {
 
 /// Escreve `text` no clipboard via OSC 52, no `writer` dado.
 pub(crate) fn osc52_to(writer: &mut impl Write, text: &str) -> io::Result<()> {
+    let _span = katu_core::fn_span!(Level::Debug, events::MOUSE_COPY, "copy::osc52_to");
     if text.is_empty() {
         return Ok(());
     }
@@ -91,6 +103,8 @@ pub(crate) fn osc52_to(writer: &mut impl Write, text: &str) -> io::Result<()> {
 
 /// Escreve `text` no clipboard via OSC 52 no `stdout` do terminal.
 pub(crate) fn osc52(text: &str) -> io::Result<()> {
+    let _span = katu_core::trace_fn!("copy::osc52");
+
     osc52_to(&mut io::stdout(), text)
 }
 

@@ -18,6 +18,8 @@ pub struct CallContext<'a> {
 
 /// Emite o evento estruturado de resultado (`tool.ok`/`tool.error`).
 pub(super) fn log_outcome(outcome: &ToolOutcome) {
+    let _span = crate::trace_fn!("kernel::session::context::log_outcome");
+
     if outcome.is_success() {
         crate::event!(Level::Debug, events::TOOL_OK);
     } else {

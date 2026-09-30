@@ -33,6 +33,8 @@ pub struct FakeMemory {
 
 impl Default for FakeMemory {
     fn default() -> Self {
+        let _span = crate::trace_fn!("memory::fake::default");
+
         Self {
             pre_write: PreWriteOutcome::Create,
             pre_edit: PreEditOutcome::Update,
@@ -52,6 +54,8 @@ impl FakeMemory {
     /// Fake que rejeita todas as escritas como duplicata forte.
     #[must_use]
     pub fn rejecting(duplicate: NoteRef, score: Score) -> Self {
+        let _span = crate::trace_fn!("memory::fake::rejecting");
+
         Self {
             pre_write: PreWriteOutcome::Reject {
                 duplicate,
@@ -65,6 +69,8 @@ impl FakeMemory {
     /// Fake que falha sempre com a natureza dada.
     #[must_use]
     pub fn failing(kind: MemoryErrorKind) -> Self {
+        let _span = crate::trace_fn!("memory::fake::failing");
+
         Self {
             fail: Some(kind),
             ..Self::default()
@@ -74,6 +80,8 @@ impl FakeMemory {
     /// Fake que devolve resultados fixos no `search`.
     #[must_use]
     pub fn with_hits(hits: Vec<RecallHit>) -> Self {
+        let _span = crate::trace_fn!("memory::fake::with_hits");
+
         Self {
             recall: hits,
             ..Self::default()
@@ -82,6 +90,8 @@ impl FakeMemory {
 
     /// Falha injetada, se houver.
     fn failure(&self) -> Option<MemoryError> {
+        let _span = crate::trace_fn!("memory::fake::failure");
+
         self.fail
             .map(|kind| MemoryError::new(kind, "falha injetada no FakeMemory"))
     }
@@ -89,12 +99,16 @@ impl FakeMemory {
     /// Número de commits (`record`) efetivos.
     #[must_use]
     pub fn recorded(&self) -> usize {
+        let _span = crate::trace_fn!("memory::fake::recorded");
+
         self.recorded.load(Ordering::SeqCst)
     }
 }
 
 impl Memory for FakeMemory {
     fn pre_write(&self, _req: &PreWriteReq) -> Result<PreWriteOutcome, MemoryError> {
+        let _span = crate::trace_fn!("memory::fake::pre_write");
+
         match self.failure() {
             Some(err) => Err(err),
             None => Ok(self.pre_write.clone()),
@@ -102,6 +116,8 @@ impl Memory for FakeMemory {
     }
 
     fn pre_edit(&self, _req: &PreEditReq) -> Result<PreEditOutcome, MemoryError> {
+        let _span = crate::trace_fn!("memory::fake::pre_edit");
+
         match self.failure() {
             Some(err) => Err(err),
             None => Ok(self.pre_edit.clone()),
@@ -109,6 +125,8 @@ impl Memory for FakeMemory {
     }
 
     fn record(&self, _req: &PreWriteReq) -> Result<NoteRef, MemoryError> {
+        let _span = crate::trace_fn!("memory::fake::record");
+
         if let Some(err) = self.failure() {
             return Err(err);
         }
@@ -117,6 +135,8 @@ impl Memory for FakeMemory {
     }
 
     fn search(&self, req: &RecallReq) -> Result<Vec<RecallHit>, MemoryError> {
+        let _span = crate::trace_fn!("memory::fake::search");
+
         if let Some(err) = self.failure() {
             return Err(err);
         }
@@ -124,6 +144,8 @@ impl Memory for FakeMemory {
     }
 
     fn query(&self, req: &QueryReq) -> Result<QueryResult, MemoryError> {
+        let _span = crate::trace_fn!("memory::fake::query");
+
         if let Some(err) = self.failure() {
             return Err(err);
         }
@@ -156,6 +178,8 @@ impl Memory for FakeMemory {
     }
 
     fn session_end(&self, _req: &SessionEndReq) -> Result<SessionEndOutcome, MemoryError> {
+        let _span = crate::trace_fn!("memory::fake::session_end");
+
         match self.failure() {
             Some(err) => Err(err),
             None => Ok(self.session_end.clone()),
@@ -163,6 +187,8 @@ impl Memory for FakeMemory {
     }
 
     fn status(&self) -> Result<MemoryStatus, MemoryError> {
+        let _span = crate::trace_fn!("memory::fake::status");
+
         match self.failure() {
             Some(err) => Err(err),
             None => Ok(self.status.clone()),

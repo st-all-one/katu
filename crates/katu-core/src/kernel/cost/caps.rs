@@ -111,6 +111,8 @@ impl Reenable {
         reason: impl Into<String>,
         authorized_by: impl Into<String>,
     ) -> Result<Self, ReenableError> {
+        let _span = crate::trace_fn!("kernel::cost::caps::new");
+
         let reason = reason.into();
         let authorized_by = authorized_by.into();
         if reason.trim().is_empty() {
@@ -128,12 +130,16 @@ impl Reenable {
     /// Motivo.
     #[must_use]
     pub fn reason(&self) -> &str {
+        let _span = crate::trace_fn!("kernel::cost::caps::reason");
+
         &self.reason
     }
 
     /// Autor.
     #[must_use]
     pub fn authorized_by(&self) -> &str {
+        let _span = crate::trace_fn!("kernel::cost::caps::authorized_by");
+
         &self.authorized_by
     }
 }

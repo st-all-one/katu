@@ -55,6 +55,8 @@ pub struct Painter<'a> {
 impl Painter<'_> {
     /// Regista um evento efémero e redesenha.
     pub fn live(&mut self, live: Live) {
+        let _span = katu_core::trace_fn!("run::live");
+
         self.poll_input();
         self.app.apply_update(Update::Live(live));
         self.redraw();
@@ -63,12 +65,16 @@ impl Painter<'_> {
     /// `true` se o utilizador pediu para **cancelar** o turno (Esc durante o stream).
     #[must_use]
     pub fn cancelled(&self) -> bool {
+        let _span = katu_core::trace_fn!("run::cancelled");
+
         self.cancel
     }
 
     /// Retira o próximo prompt de *steering* enfileirado, se houver (E20-T16).
     #[must_use]
     pub fn take_steer(&mut self) -> Option<String> {
+        let _span = katu_core::trace_fn!("run::take_steer");
+
         if self.steer.is_empty() {
             return None;
         }
@@ -81,6 +87,8 @@ impl Painter<'_> {
     /// (E20-T16), que `Enter` enfileira e a borda aplica no passo seguinte. `Ctrl-C`/`q` saem da UI
     /// no loop principal (não aqui).
     fn poll_input(&mut self) {
+        let _span = katu_core::trace_fn!("run::poll_input");
+
         loop {
             match event::poll(Duration::ZERO) {
                 Ok(true) => {}
@@ -103,6 +111,8 @@ impl Painter<'_> {
 
     /// Trata uma tecla durante o turno (cancelamento ou *steering*).
     fn on_key(&mut self, key: KeyEvent) {
+        let _span = katu_core::trace_fn!("run::on_key");
+
         if is_cancel_key(key) {
             if !self.cancel {
                 self.cancel = true;
@@ -135,6 +145,8 @@ impl Painter<'_> {
 
     /// Toma o erro de desenho acumulado, se houver (a borda decide abortar).
     pub fn take_error(&mut self) -> Option<io::Error> {
+        let _span = katu_core::trace_fn!("run::take_error");
+
         self.error.take()
     }
 
@@ -146,6 +158,8 @@ impl Painter<'_> {
         prompt: ChallengePrompt,
         granted_by: &str,
     ) -> Option<ChallengeSignature> {
+        let _span = katu_core::trace_fn!("run::challenge");
+
         let mut challenge = Challenge::new(prompt);
         loop {
             if self.error.is_some() {
@@ -181,6 +195,8 @@ impl Painter<'_> {
 
     /// Redesenha se o orçamento de render o permitir (E10-T03) e não houver erro pendente.
     fn redraw(&mut self) {
+        let _span = katu_core::trace_fn!("run::redraw");
+
         if self.error.is_some() || !self.throttle.due() {
             return;
         }
@@ -193,6 +209,8 @@ impl Painter<'_> {
 
 /// `true` se a tecla pede o cancelamento do turno: **só `Esc`** (E20-T15).
 fn is_cancel_key(key: KeyEvent) -> bool {
+    let _span = katu_core::trace_fn!("run::is_cancel_key");
+
     matches!(key.code, KeyCode::Esc)
 }
 
@@ -203,6 +221,8 @@ struct TerminalGuard {
 
 impl TerminalGuard {
     fn enter() -> io::Result<Self> {
+        let _span = katu_core::trace_fn!("run::enter");
+
         let terminal = try_init()?;
         execute!(io::stdout(), EnableMouseCapture)?;
         Ok(Self { terminal })
@@ -211,6 +231,8 @@ impl TerminalGuard {
 
 impl Drop for TerminalGuard {
     fn drop(&mut self) {
+        let _span = katu_core::trace_fn!("run::drop");
+
         drop(execute!(io::stdout(), DisableMouseCapture));
         restore();
     }
@@ -224,6 +246,8 @@ impl Drop for TerminalGuard {
 /// # Errors
 /// [`io::Error`] em falha de terminal (setup, desenho ou leitura de eventos).
 pub fn run<H: Handler>(mut app: App, handler: &mut H, clock: &dyn Clock) -> io::Result<()> {
+    let _span = katu_core::trace_fn!("run::run");
+
     let mut guard = TerminalGuard::enter()?;
     let throttle = Throttle::new(clock, FRAME_INTERVAL_MS);
     let mut selection = Selection::default();
@@ -275,6 +299,8 @@ fn handle_mouse(
     selection: &mut Selection,
     terminal: &mut DefaultTerminal,
 ) -> io::Result<()> {
+    let _span = katu_core::trace_fn!("run::handle_mouse");
+
     match mouse.kind {
         MouseEventKind::Down(MouseButton::Left) => selection.start((mouse.column, mouse.row)),
         MouseEventKind::Drag(MouseButton::Left) => selection.drag((mouse.column, mouse.row)),

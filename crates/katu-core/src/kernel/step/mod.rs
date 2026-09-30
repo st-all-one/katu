@@ -17,7 +17,7 @@ use katu_policy::{Capability, Phase, ResolvedPath, ToolName, ToolUse};
 /// # Errors
 /// [`Refusal`] se o evento violar a forma do caminho único ou o protocolo de turnos/chamadas.
 pub fn step(state: &State, event: &Event) -> Result<State, Refusal> {
-    let _span = crate::span!(Level::Trace, events::KERNEL_STEP, "event" => event.kind());
+    let _span = crate::fn_span!(Level::Trace, events::KERNEL_STEP, "kernel::step::step", "event" => event.kind());
     match event {
         Event::TurnStart { turn } => turn_start(state, *turn),
         Event::UserMessage { .. } | Event::AssistantMessage { .. } => {
@@ -45,6 +45,11 @@ pub fn step(state: &State, event: &Event) -> Result<State, Refusal> {
 
 /// Abre um turno.
 fn turn_start(state: &State, turn: u32) -> Result<State, Refusal> {
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::KERNEL_TRANSITION,
+        "kernel::step::turn_start"
+    );
     if state.turn_open {
         return Err(refuse(state, RefusalReason::TurnAlreadyOpen));
     }
@@ -56,6 +61,8 @@ fn turn_start(state: &State, turn: u32) -> Result<State, Refusal> {
 
 /// Regista um pedido de tool.
 fn tool_call(state: &State, call: &CallId, tool: &ToolUse) -> Result<State, Refusal> {
+    let _span = crate::trace_fn!("kernel::step::tool_call");
+
     require_open(state)?;
     if state.calls.contains_key(call) {
         return Err(refuse(
@@ -71,6 +78,8 @@ fn tool_call(state: &State, call: &CallId, tool: &ToolUse) -> Result<State, Refu
 
 /// Fecha um pedido de tool com o efeito observado.
 fn tool_result(state: &State, call: &CallId, outcome: &ToolOutcome) -> Result<State, Refusal> {
+    let _span = crate::trace_fn!("kernel::step::tool_result");
+
     let Some(CallStatus::Pending { tool }) = state.calls.get(call) else {
         return Err(refuse(
             state,
@@ -93,6 +102,7 @@ fn tool_result(state: &State, call: &CallId, outcome: &ToolOutcome) -> Result<St
 
 /// Regista um `waiver` explícito para uma transição de fase.
 fn waiver(state: &State, transition: Phase) -> State {
+    let _span = crate::fn_span!(Level::Trace, events::POLICY_WAIVER, "kernel::step::waiver", "phase" => format!("{transition:?}").as_str());
     let mut next = state.clone();
     next.waivers.insert(transition);
     next
@@ -100,6 +110,8 @@ fn waiver(state: &State, transition: Phase) -> State {
 
 /// Regista/atualiza o plano do estado (E06-T06).
 fn plan_recorded(state: &State, plan: &Plan) -> State {
+    let _span = crate::trace_fn!("kernel::step::plan_recorded");
+
     let mut next = state.clone();
     next.plan = Some(plan.clone());
     next
@@ -107,6 +119,8 @@ fn plan_recorded(state: &State, plan: &Plan) -> State {
 
 /// Regista o feedback do último comando (E06-T07).
 fn command_recorded(state: &State, record: &CommandRecord) -> State {
+    let _span = crate::trace_fn!("kernel::step::command_recorded");
+
     let mut next = state.clone();
     next.last_command = Some(record.status());
     next
@@ -114,6 +128,8 @@ fn command_recorded(state: &State, record: &CommandRecord) -> State {
 
 /// Define a raiz do workspace (E07-T05); a partir daqui a política sabe o que é "fora".
 fn workspace_set(state: &State, root: &ResolvedPath) -> State {
+    let _span = crate::trace_fn!("kernel::step::workspace_set");
+
     let mut next = state.clone();
     next.workspace = Some(root.clone());
     next
@@ -129,6 +145,11 @@ fn approval_granted(
     reason: &str,
     granted_by: &str,
 ) -> Result<State, Refusal> {
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::POLICY_APPROVAL,
+        "kernel::step::approval_granted"
+    );
     if reason.trim().is_empty() || granted_by.trim().is_empty() {
         return Err(refuse(state, RefusalReason::UnsignedApproval));
     }
@@ -141,6 +162,8 @@ fn approval_granted(
 
 /// Regista o relatório do gate de verificação (E09-T03).
 fn verification_recorded(state: &State, report: &VerificationReport) -> State {
+    let _span = crate::trace_fn!("kernel::step::verification_recorded");
+
     let mut next = state.clone();
     next.verification = Some(report.clone());
     next
@@ -148,6 +171,8 @@ fn verification_recorded(state: &State, report: &VerificationReport) -> State {
 
 /// Aplica um controlo **já validado** (E12-T10): só o estado muda (a validação é da borda).
 fn control_applied(state: &State, control: &Control) -> State {
+    let _span = crate::trace_fn!("kernel::step::control_applied");
+
     let mut next = state.clone();
     next.control = control.apply(&state.control);
     next
@@ -155,6 +180,11 @@ fn control_applied(state: &State, control: &Control) -> State {
 
 /// Muda de fase, validando a forma do caminho único e a pré-condição da fase destino.
 fn phase_transition(state: &State, to: Phase, outcome: Option<&str>) -> Result<State, Refusal> {
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::KERNEL_TRANSITION,
+        "kernel::step::phase_transition"
+    );
     if !can_transition(state.phase, to) {
         return Err(refuse(
             state,
@@ -174,6 +204,8 @@ fn phase_transition(state: &State, to: Phase, outcome: Option<&str>) -> Result<S
 
 /// Pré-condição da fase destino (E05-T02/T04); um `waiver` dispensa-a (§47).
 fn satisfies_precondition(state: &State, to: Phase, outcome: Option<&str>) -> bool {
+    let _span = crate::trace_fn!("kernel::step::satisfies_precondition");
+
     if state.waivers.contains(&to) {
         return true;
     }
@@ -200,11 +232,18 @@ fn satisfies_precondition(state: &State, to: Phase, outcome: Option<&str>) -> bo
 
 /// `true` se o último comando é **ambíguo** (`exit_code: null`) — bloqueia avançar (§31).
 fn command_ambiguous(state: &State) -> bool {
+    let _span = crate::trace_fn!("kernel::step::command_ambiguous");
+
     state.last_command.is_some_and(CommandStatus::is_ambiguous)
 }
 
 /// Fecha um turno, validando o número.
 fn turn_end(state: &State, turn: u32) -> Result<State, Refusal> {
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::KERNEL_TRANSITION,
+        "kernel::step::turn_end"
+    );
     if !state.turn_open {
         return Err(refuse(state, RefusalReason::NoOpenTurn));
     }
@@ -224,6 +263,8 @@ fn turn_end(state: &State, turn: u32) -> Result<State, Refusal> {
 
 /// Exige um turno aberto.
 fn require_open(state: &State) -> Result<(), Refusal> {
+    let _span = crate::trace_fn!("kernel::step::require_open");
+
     if state.turn_open {
         Ok(())
     } else {
@@ -233,6 +274,8 @@ fn require_open(state: &State) -> Result<(), Refusal> {
 
 /// Constrói uma recusa ancorada na fase corrente.
 fn refuse(state: &State, reason: RefusalReason) -> Refusal {
+    let _span = crate::trace_fn!("kernel::step::refuse");
+
     crate::event!(Level::Warn, events::KERNEL_REFUSAL);
     Refusal {
         reason,

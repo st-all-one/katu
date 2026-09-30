@@ -5,6 +5,7 @@
 
 use std::path::{Path, PathBuf};
 
+use katu_core::diag::{Level, events};
 use katu_core::error::Error;
 
 use crate::config;
@@ -22,6 +23,7 @@ const ATTRIBUTES: &str = ".katu/audit/** -diff\n.katu/log/** -diff\n";
 
 /// Gere os ficheiros de git (só quando o projeto está num repositório).
 pub(super) fn ensure(root: &Path, mode: GitMode) -> Result<bool, Error> {
+    let _span = katu_core::fn_span!(Level::Debug, events::BOOTSTRAP_INIT, "git::ensure");
     let Some(git) = find_git(root) else {
         return Ok(false);
     };
@@ -40,6 +42,7 @@ pub(super) fn ensure(root: &Path, mode: GitMode) -> Result<bool, Error> {
 
 /// Se o `.katu/` (fora de audit/trash/log) deve ser versionado.
 fn versioned(root: &Path) -> bool {
+    let _span = katu_core::fn_span!(Level::Trace, events::CONFIG_LOAD, "git::versioned");
     let mut table = match config::global_path() {
         Ok(path) => config::load(&path).unwrap_or_default(),
         Err(_) => toml::Table::new(),
@@ -55,6 +58,8 @@ fn versioned(root: &Path) -> bool {
 
 /// Sobe a partir de `root` à procura do diretório `.git`.
 fn find_git(root: &Path) -> Option<PathBuf> {
+    let _span = katu_core::trace_fn!("bootstrap::git::find_git");
+
     let mut current = root.to_path_buf();
     loop {
         let git = current.join(".git");
@@ -70,6 +75,7 @@ fn find_git(root: &Path) -> Option<PathBuf> {
 
 /// Substitui (ou remove) o bloco gerido de um ficheiro; devolve `true` se mudou.
 fn upsert_block(path: &Path, body: &str) -> Result<bool, Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::BOOTSTRAP_INIT, "git::upsert_block");
     let existing = match std::fs::read_to_string(path) {
         Ok(text) => text,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => String::new(),
@@ -102,6 +108,8 @@ fn upsert_block(path: &Path, body: &str) -> Result<bool, Error> {
 
 /// Remove o bloco gerido (marcadores incluídos) do texto.
 fn strip_block(text: &str) -> String {
+    let _span = katu_core::trace_fn!("bootstrap::git::strip_block");
+
     let mut out = String::new();
     let mut inside = false;
     for line in text.lines() {

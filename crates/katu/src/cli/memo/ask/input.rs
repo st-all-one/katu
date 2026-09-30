@@ -76,6 +76,8 @@ pub(super) struct Input {
 impl Input {
     /// Entrada a partir das flags explícitas.
     pub(super) fn from_flags(args: &AskArgs) -> Self {
+        let _span = katu_core::trace_fn!("cli::memo::ask::input::from_flags");
+
         Self {
             query: args.query.clone(),
             ids: args.ids.clone(),
@@ -104,6 +106,8 @@ impl Input {
 
     /// Entrada a partir de `--params`/linha de lote.
     pub(super) fn from_params(params: AskParams) -> Self {
+        let _span = katu_core::trace_fn!("cli::memo::ask::input::from_params");
+
         Self {
             query: params.query,
             ids: params.ids,
@@ -132,6 +136,8 @@ impl Input {
 
     /// Modo efetivo (a ordem espelha o `kd ask`).
     fn mode(&self) -> QueryMode {
+        let _span = katu_core::trace_fn!("cli::memo::ask::input::mode");
+
         if self.rank {
             QueryMode::Rank
         } else if self.tags_vocab {
@@ -149,6 +155,8 @@ impl Input {
 
     /// Converte em `QueryReq` (aplica o default de limite).
     pub(super) fn to_query(&self, default_limit: usize) -> Result<QueryReq, Error> {
+        let _span = katu_core::trace_fn!("cli::memo::ask::input::to_query");
+
         let mode = self.mode();
         let query = match mode {
             QueryMode::Recall => input::resolve(self.query.as_deref())?,
@@ -195,17 +203,23 @@ impl Input {
 
 /// Converte uma lista de tipos fechados.
 pub(super) fn parse_types(values: &[String]) -> Result<Vec<NoteType>, Error> {
+    let _span = katu_core::trace_fn!("cli::memo::ask::input::parse_types");
+
     values.iter().map(|raw| parse_note_type(raw)).collect()
 }
 
 /// Converte um tipo fechado.
 fn parse_note_type(raw: &str) -> Result<NoteType, Error> {
+    let _span = katu_core::trace_fn!("cli::memo::ask::input::parse_note_type");
+
     serde_json::from_value(Value::String(raw.to_string()))
         .map_err(|_| Error::invalid_input(format!("tipo inválido: `{raw}`")))
 }
 
 /// Converte um estado fechado.
 fn parse_status(raw: &str) -> Result<Status, Error> {
+    let _span = katu_core::trace_fn!("cli::memo::ask::input::parse_status");
+
     serde_json::from_value(Value::String(raw.to_string()))
         .map_err(|_| Error::invalid_input(format!("status inválido: `{raw}`")))
 }

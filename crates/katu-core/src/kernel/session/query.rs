@@ -24,6 +24,8 @@ impl Session<'_> {
         goal: &str,
         next_action: &str,
     ) -> Result<Checkpoint, CheckpointError> {
+        let _span = crate::trace_fn!("kernel::session::query::write_checkpoint");
+
         let checkpoint = Checkpoint::from_state(&self.state, goal, next_action);
         checkpoint::save(self.fs, &self.dir, &checkpoint)?;
         Ok(checkpoint)
@@ -34,6 +36,8 @@ impl Session<'_> {
     /// # Errors
     /// [`CheckpointError`] se o ficheiro existir mas não validar.
     pub fn read_checkpoint(&self) -> Result<Option<Checkpoint>, CheckpointError> {
+        let _span = crate::trace_fn!("kernel::session::query::read_checkpoint");
+
         checkpoint::load(self.fs, &self.dir)
     }
 
@@ -42,6 +46,8 @@ impl Session<'_> {
     /// # Errors
     /// [`SessionError::Log`] se o log estiver corrompido.
     pub fn messages(&self) -> Result<Vec<Message>, SessionError> {
+        let _span = crate::trace_fn!("kernel::session::query::messages");
+
         Ok(derive_messages(&self.log_events()?))
     }
 
@@ -51,6 +57,8 @@ impl Session<'_> {
     /// # Errors
     /// [`SessionError::Invariant`] se o estado divergir do log.
     pub fn verify(&self) -> Result<(), SessionError> {
+        let _span = crate::trace_fn!("kernel::session::query::verify");
+
         let replayed = state_of(&self.log_events()?)?;
         if replayed != self.state {
             return Err(SessionError::Invariant(
@@ -66,6 +74,8 @@ impl Session<'_> {
     /// # Errors
     /// [`SessionError`] se a cópia ou a abertura do destino falharem.
     pub fn fork(&self, dst_dir: &Path) -> Result<Self, SessionError> {
+        let _span = crate::trace_fn!("kernel::session::query::fork");
+
         match self.fs.read(&session_path(&self.dir)) {
             Ok(bytes) => self.fs.write_atomic(&session_path(dst_dir), &bytes)?,
             Err(FsError::NotFound) => {}
@@ -83,6 +93,8 @@ impl Session<'_> {
         budget: ContextBudget,
         mode: CompactionMode,
     ) -> Result<Option<Compaction>, SessionError> {
+        let _span = crate::trace_fn!("kernel::session::query::compact_context");
+
         Ok(compact(&self.log_events()?, budget, mode))
     }
 
@@ -97,6 +109,8 @@ impl Session<'_> {
         budget: ContextBudget,
         mode: CompactionMode,
     ) -> Result<Context, SessionError> {
+        let _span = crate::trace_fn!("kernel::session::query::context");
+
         let events = self.log_events()?;
         Ok(match compact(&events, budget, mode) {
             Some(compaction) if !compaction.replacements.is_empty() => compaction.context,
@@ -111,6 +125,8 @@ impl Session<'_> {
     /// # Errors
     /// [`SessionError::Log`] se o log estiver corrompido.
     pub fn changed_files(&self) -> Result<Vec<String>, SessionError> {
+        let _span = crate::trace_fn!("kernel::session::query::changed_files");
+
         let mut pending: Vec<(CallId, Vec<String>)> = Vec::new();
         let mut files = Vec::new();
         for event in self.log_events()? {
@@ -142,6 +158,8 @@ impl Session<'_> {
     /// # Errors
     /// [`SessionError::Log`] se o log estiver corrompido.
     pub fn recorded_commands(&self) -> Result<Vec<CommandRecord>, SessionError> {
+        let _span = crate::trace_fn!("kernel::session::query::recorded_commands");
+
         let mut commands = Vec::new();
         for event in self.log_events()? {
             if let Event::CommandRecorded { record } = event {
@@ -153,6 +171,8 @@ impl Session<'_> {
 
     /// Caminho relativo à raiz do projeto (ou o absoluto, se estiver fora dela).
     fn relative(&self, path: &str) -> String {
+        let _span = crate::trace_fn!("kernel::session::query::relative");
+
         Path::new(path).strip_prefix(&self.root).map_or_else(
             |_| path.to_string(),
             |relative| relative.to_string_lossy().into_owned(),
@@ -161,6 +181,8 @@ impl Session<'_> {
 
     /// Lê os eventos do log.
     pub(super) fn log_events(&self) -> Result<Vec<Event>, SessionError> {
+        let _span = crate::trace_fn!("kernel::session::query::log_events");
+
         let records = read_records(self.fs, &session_path(&self.dir))?;
         Ok(records.into_iter().map(|record| record.event).collect())
     }

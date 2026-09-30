@@ -12,6 +12,8 @@ pub(super) fn build_request(
     options: &TurnOptions,
     tools: &[ToolDef],
 ) -> Result<ProviderRequest, AgentError> {
+    let _span = katu_core::trace_fn!("agent::turn::request::build_request");
+
     let context = runtime.context()?;
     let system = system_for(
         options,
@@ -37,6 +39,8 @@ fn system_for(
     instructions: Option<&str>,
     skills: &str,
 ) -> Option<String> {
+    let _span = katu_core::trace_fn!("agent::turn::request::system_for");
+
     let mut system = String::new();
     if let Some(instructions) = instructions {
         system.push_str("# AGENTS.md (fonte de verdade do projeto)\n");

@@ -26,6 +26,8 @@ impl SessionId {
     /// Deriva o ID de `(root, created_ms)` de forma determinística.
     #[must_use]
     pub fn new(root: &Path, created_ms: u64) -> Self {
+        let _span = crate::trace_fn!("kernel::session::identity::new");
+
         let seed = format!("{}\n{created_ms}", root.display());
         Self(format!("s_{:016x}", fingerprint(seed.as_bytes())))
     }
@@ -33,12 +35,16 @@ impl SessionId {
     /// Texto do identificador.
     #[must_use]
     pub fn as_str(&self) -> &str {
+        let _span = crate::trace_fn!("kernel::session::identity::as_str");
+
         &self.0
     }
 
     /// Valida e reconstrói a partir do texto (`s_` + 16 hex).
     #[must_use]
     pub fn parse(text: &str) -> Option<Self> {
+        let _span = crate::trace_fn!("kernel::session::identity::parse");
+
         let hex = text.strip_prefix("s_")?;
         if hex.len() == 16 && hex.bytes().all(|b| b.is_ascii_hexdigit()) {
             Some(Self(text.to_string()))
@@ -66,42 +72,56 @@ pub struct SessionMeta {
 /// Diretório `.katu` do projeto.
 #[must_use]
 pub fn katu_dir(root: &Path) -> PathBuf {
+    let _span = crate::trace_fn!("kernel::session::identity::katu_dir");
+
     root.join(".katu")
 }
 
 /// Diretório de sessões.
 #[must_use]
 pub(super) fn sessions_dir(root: &Path) -> PathBuf {
+    let _span = crate::trace_fn!("kernel::session::identity::sessions_dir");
+
     katu_dir(root).join("sessions")
 }
 
 /// Diretório de uma sessão.
 #[must_use]
 pub(super) fn session_dir(root: &Path, id: &SessionId) -> PathBuf {
+    let _span = crate::trace_fn!("kernel::session::identity::session_dir");
+
     sessions_dir(root).join(id.as_str())
 }
 
 /// Caminho do `meta.json` de uma sessão.
 #[must_use]
 pub(super) fn meta_path(dir: &Path) -> PathBuf {
+    let _span = crate::trace_fn!("kernel::session::identity::meta_path");
+
     dir.join("meta.json")
 }
 
 /// Caminho do índice temporal.
 #[must_use]
 pub(super) fn index_path(root: &Path) -> PathBuf {
+    let _span = crate::trace_fn!("kernel::session::identity::index_path");
+
     sessions_dir(root).join("index.jsonl")
 }
 
 /// Diretório de auditoria (`<root>/.katu/audit`).
 #[must_use]
 pub fn audit_dir(root: &Path) -> PathBuf {
+    let _span = crate::trace_fn!("kernel::session::identity::audit_dir");
+
     katu_dir(root).join("audit")
 }
 
 /// Descobre a raiz do projeto subindo até `.katu` ou `.git`; devolve `start` se não encontrar.
 #[must_use]
 pub fn discover_root(fs: &dyn Fs, start: &Path) -> PathBuf {
+    let _span = crate::trace_fn!("kernel::session::identity::discover_root");
+
     let mut current = start.to_path_buf();
     loop {
         if fs.is_dir(&katu_dir(&current)) || fs.is_dir(&current.join(".git")) {
@@ -124,6 +144,8 @@ pub(super) fn create(
     created_ms: u64,
     goal: &str,
 ) -> Result<SessionMeta, FsError> {
+    let _span = crate::trace_fn!("kernel::session::identity::create");
+
     fs.create_dir_all(&sessions_dir(root))?;
     fs.create_dir_all(&audit_dir(root))?;
     let id = SessionId::new(root, created_ms);
@@ -146,6 +168,8 @@ pub(super) fn create(
 /// Lê o `meta.json` de um diretório de sessão, se existir e for válido.
 #[must_use]
 pub(super) fn load_meta(fs: &dyn Fs, dir: &Path) -> Option<SessionMeta> {
+    let _span = crate::trace_fn!("kernel::session::identity::load_meta");
+
     let bytes = fs.read(&meta_path(dir)).ok()?;
     let meta: SessionMeta = serde_json::from_slice(&bytes).ok()?;
     (meta.schema_version == SESSION_SCHEMA_VERSION).then_some(meta)
@@ -156,6 +180,8 @@ pub(super) fn load_meta(fs: &dyn Fs, dir: &Path) -> Option<SessionMeta> {
 /// # Errors
 /// [`FsError`] se o ficheiro existir mas for ilegível ou inválido.
 pub(super) fn read_index(fs: &dyn Fs, root: &Path) -> Result<Vec<SessionMeta>, FsError> {
+    let _span = crate::trace_fn!("kernel::session::identity::read_index");
+
     let path = index_path(root);
     if !fs.exists(&path) {
         return Ok(Vec::new());
@@ -175,6 +201,8 @@ pub(super) fn read_index(fs: &dyn Fs, root: &Path) -> Result<Vec<SessionMeta>, F
 /// # Errors
 /// [`FsError`] se o índice for ilegível.
 pub(super) fn list(fs: &dyn Fs, root: &Path) -> Result<Vec<SessionMeta>, FsError> {
+    let _span = crate::trace_fn!("kernel::session::identity::list");
+
     let mut metas = read_index(fs, root)?;
     metas.sort_by(|left, right| {
         left.created_ms
@@ -193,6 +221,8 @@ pub(super) fn find(
     root: &Path,
     id: &SessionId,
 ) -> Result<Option<SessionMeta>, FsError> {
+    let _span = crate::trace_fn!("kernel::session::identity::find");
+
     Ok(list(fs, root)?.into_iter().find(|meta| &meta.id == id))
 }
 
@@ -201,6 +231,8 @@ pub(super) fn find(
 /// # Errors
 /// [`FsError`] se a escrita falhar.
 pub(super) fn ensure_audit_excluded(fs: &dyn Fs, root: &Path) -> Result<(), FsError> {
+    let _span = crate::trace_fn!("kernel::session::identity::ensure_audit_excluded");
+
     let git = root.join(".git");
     if !fs.is_dir(&git) {
         return Ok(());
@@ -222,16 +254,22 @@ pub(super) fn ensure_audit_excluded(fs: &dyn Fs, root: &Path) -> Result<(), FsEr
 
 /// Anexa uma entrada ao índice temporal.
 fn append_index(fs: &dyn Fs, root: &Path, meta: &SessionMeta) -> Result<(), FsError> {
+    let _span = crate::trace_fn!("kernel::session::identity::append_index");
+
     let mut line = to_bytes(meta)?;
     line.push(b'\n');
     fs.append(&index_path(root), &line)
 }
 
 fn to_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, FsError> {
+    let _span = crate::trace_fn!("kernel::session::identity::to_bytes");
+
     serde_json::to_vec(value).map_err(|err| FsError::Io(err.to_string()))
 }
 
 fn from_parse(err: &serde_json::Error) -> FsError {
+    let _span = crate::trace_fn!("kernel::session::identity::from_parse");
+
     FsError::Io(format!("índice de sessões inválido: {err}"))
 }
 

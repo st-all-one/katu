@@ -1,5 +1,6 @@
 //! Construtores de relatório por view (`full`/`range`/`outline`/`summary`/`symbol`).
 
+use katu_core::diag::{Level, events};
 use katu_core::report::{Page, ToolReport, content_id};
 use katu_core::toon::Value;
 
@@ -11,6 +12,7 @@ use super::Meta;
 use super::helpers::{clip, flags, imports, language, len_u64, slice, to_i64};
 
 pub(super) fn full(lines: &[&str], meta: &Meta<'_>, budget: ReadBudget) -> ToolReport {
+    let _span = katu_core::fn_span!(Level::Debug, events::TOOL_READ, "read::views::full");
     let (text, truncated) = clip(lines, budget);
     let shown = len_u64(text.lines().count());
     // Sem conteúdo mostrado não há paginação possível: evita um cursor que não avança.
@@ -37,6 +39,7 @@ pub(super) fn full(lines: &[&str], meta: &Meta<'_>, budget: ReadBudget) -> ToolR
 }
 
 pub(super) fn range_report(lines: &[&str], meta: &Meta<'_>, span: LineRange) -> ToolReport {
+    let _span = katu_core::fn_span!(Level::Debug, events::TOOL_READ, "read::views::range");
     let last = u32::try_from(lines.len()).unwrap_or(u32::MAX);
     let start = span.start.max(1);
     let end = span.end.min(last).max(start);
@@ -53,6 +56,7 @@ pub(super) fn range_report(lines: &[&str], meta: &Meta<'_>, span: LineRange) -> 
 }
 
 pub(super) fn outline_report(lines: &[&str], meta: &Meta<'_>) -> ToolReport {
+    let _span = katu_core::fn_span!(Level::Debug, events::TOOL_READ, "read::views::outline");
     let data = Value::map(vec![
         ("path".to_string(), Value::str(meta.path)),
         ("loc".to_string(), Value::int(to_i64(meta.loc))),
@@ -64,6 +68,7 @@ pub(super) fn outline_report(lines: &[&str], meta: &Meta<'_>) -> ToolReport {
 }
 
 pub(super) fn summary(lines: &[&str], meta: &Meta<'_>) -> ToolReport {
+    let _span = katu_core::fn_span!(Level::Debug, events::TOOL_READ, "read::views::summary");
     let symbols = outline(&lines.join("\n"));
     let mut entries = vec![
         ("path".to_string(), Value::str(meta.path)),
@@ -114,6 +119,7 @@ pub(super) fn summary(lines: &[&str], meta: &Meta<'_>) -> ToolReport {
 }
 
 pub(super) fn symbol(lines: &[&str], meta: &Meta<'_>, wanted: &str) -> ToolReport {
+    let _span = katu_core::fn_span!(Level::Debug, events::TOOL_READ, "read::views::symbol");
     let symbols = outline(&lines.join("\n"));
     if let Some(found) = symbols.iter().find(|symbol| symbol.name == wanted) {
         let body = slice(lines, found.start, found.end).join("\n");
@@ -141,6 +147,8 @@ pub(super) fn symbol(lines: &[&str], meta: &Meta<'_>, wanted: &str) -> ToolRepor
 }
 
 fn symbols_value(path: &str, lines: &[&str]) -> Value {
+    let _span = katu_core::trace_fn!("read::views::reports::symbols_value");
+
     let symbols: Vec<Value> = outline(&lines.join("\n"))
         .iter()
         .map(|symbol| symbol_value(path, symbol))
@@ -149,6 +157,8 @@ fn symbols_value(path: &str, lines: &[&str]) -> Value {
 }
 
 fn symbol_value(path: &str, symbol: &Symbol) -> Value {
+    let _span = katu_core::trace_fn!("read::views::reports::symbol_value");
+
     let seed = format!("{path}:{}:{}", symbol.name, symbol.start);
     Value::map(vec![
         (
@@ -164,6 +174,7 @@ fn symbol_value(path: &str, symbol: &Symbol) -> Value {
 
 /// Diff contra uma versão anterior (`base`): só o delta (E06-T03, G6).
 pub(super) fn diff(base: &str, current: &str, meta: &Meta<'_>) -> ToolReport {
+    let _span = katu_core::fn_span!(Level::Debug, events::TOOL_READ, "read::views::diff");
     let delta = unified(base, current, 3);
     let hunks: Vec<Value> = delta.hunks.iter().map(hunk_value).collect();
     let data = Value::map(vec![
@@ -184,6 +195,8 @@ pub(super) fn diff(base: &str, current: &str, meta: &Meta<'_>) -> ToolReport {
 }
 
 fn hunk_value(hunk: &Hunk) -> Value {
+    let _span = katu_core::trace_fn!("read::views::reports::hunk_value");
+
     let lines: Vec<Value> = hunk
         .lines
         .iter()

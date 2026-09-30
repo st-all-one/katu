@@ -50,6 +50,8 @@ impl<'a> Session<'a> {
     /// # Errors
     /// [`SessionError`] se o log estiver corrompido ou contiver uma transição inválida.
     pub fn open(fs: &'a dyn Fs, dir: &Path) -> Result<Self, SessionError> {
+        let _span = crate::trace_fn!("kernel::session::open");
+
         Self::open_with_cap(fs, dir, BudgetCap::NONE)
     }
 
@@ -58,6 +60,8 @@ impl<'a> Session<'a> {
     /// # Errors
     /// [`SessionError`] se o log estiver corrompido ou contiver uma transição inválida.
     pub fn open_with_cap(fs: &'a dyn Fs, dir: &Path, cap: BudgetCap) -> Result<Self, SessionError> {
+        let _span = crate::trace_fn!("kernel::session::open_with_cap");
+
         Self::open_with_cost(
             fs,
             dir,
@@ -77,6 +81,11 @@ impl<'a> Session<'a> {
         dir: &Path,
         caps: CostCaps,
     ) -> Result<Self, SessionError> {
+        let _span = crate::fn_span!(
+            Level::Debug,
+            events::STORE_LOAD,
+            "kernel::session::open_with_cost"
+        );
         let path = session_path(dir);
         let meta = identity::load_meta(fs, dir);
         let root = meta
@@ -132,24 +141,32 @@ impl<'a> Session<'a> {
     /// Estado corrente (projeção do log).
     #[must_use]
     pub fn state(&self) -> &State {
+        let _span = crate::trace_fn!("kernel::session::state");
+
         &self.state
     }
 
     /// Cost governor (E09-T06): único dono dos tetos.
     #[must_use]
     pub fn cost(&self) -> &CostGovernor {
+        let _span = crate::trace_fn!("kernel::session::cost");
+
         &self.cost
     }
 
     /// Portão global/tarefa (único dono do teto de contexto).
     #[must_use]
     pub fn budget(&self) -> BudgetGate {
+        let _span = crate::trace_fn!("kernel::session::budget");
+
         self.cost.global()
     }
 
     /// Caminho do ficheiro de log da sessão.
     #[must_use]
     pub fn log_path(&self) -> &Path {
+        let _span = crate::trace_fn!("kernel::session::log_path");
+
         self.log.path()
     }
 
@@ -160,12 +177,14 @@ impl<'a> Session<'a> {
     /// atingido; [`SessionError::Log`] se a gravação falhar. Em qualquer caso o estado fica
     /// inalterado.
     pub fn apply(&mut self, event: &Event) -> Result<(), SessionError> {
+        let _span = crate::trace_fn!("kernel::session::apply");
+
         self.apply_at(event, None)
     }
 
     /// Aplica um evento com o instante (para as camadas temporais do governor).
     fn apply_at(&mut self, event: &Event, now_millis: Option<u64>) -> Result<(), SessionError> {
-        let _span = crate::span!(Level::Trace, events::KERNEL_TRANSITION, "event" => event.kind());
+        let _span = crate::fn_span!(Level::Trace, events::KERNEL_TRANSITION, "kernel::session::apply_at", "event" => event.kind());
         let charge = cost_charge_for(event).map(|charge| match now_millis {
             Some(now) => charge.at(now),
             None => charge,
@@ -197,7 +216,11 @@ impl<'a> Session<'a> {
         use_: &ToolUse,
         context: CallContext<'_>,
     ) -> Result<Dispatch, SessionError> {
-        let _span = crate::span!(Level::Trace, events::TOOL_CALL);
+        let _span = crate::fn_span!(
+            Level::Trace,
+            events::TOOL_CALL,
+            "kernel::session::tool_call"
+        );
         self.apply_at(
             &Event::ToolCall {
                 call: call.clone(),
@@ -227,6 +250,8 @@ impl<'a> Session<'a> {
     /// # Errors
     /// [`SessionError`] se o evento não puder ser logado.
     pub fn set_workspace(&mut self, root: &ResolvedPath) -> Result<(), SessionError> {
+        let _span = crate::trace_fn!("kernel::session::set_workspace");
+
         self.apply(&Event::WorkspaceSet { root: root.clone() })
     }
 
@@ -236,6 +261,8 @@ impl<'a> Session<'a> {
     /// # Errors
     /// [`SessionError`] se o evento não puder ser logado.
     pub fn record_verification(&mut self, report: &VerificationReport) -> Result<(), SessionError> {
+        let _span = crate::trace_fn!("kernel::session::record_verification");
+
         self.apply(&Event::VerificationRecorded {
             report: report.clone(),
         })
@@ -252,6 +279,11 @@ impl<'a> Session<'a> {
         call: CallId,
         request: MemoryWriteRequest<'_>,
     ) -> Result<Dispatch, SessionError> {
+        let _span = crate::fn_span!(
+            Level::Trace,
+            events::MEMORY_WRITE,
+            "kernel::session::memory_write"
+        );
         self.apply(&Event::ToolCall {
             call: call.clone(),
             tool: memory_write_use(request.cwd),

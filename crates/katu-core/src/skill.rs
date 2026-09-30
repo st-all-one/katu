@@ -7,6 +7,7 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::diag::{Level, events};
 use crate::ports::Fs;
 
 /// Diretórios de skills suportados (singular e plural, E20-T13), em ordem canônica.
@@ -26,6 +27,7 @@ pub struct Skill {
 /// Descobre skills sob a raiz do projeto (ordem canônica; o primeiro nome vence).
 #[must_use]
 pub fn discover(fs: &dyn Fs, root: &Path) -> Vec<Skill> {
+    let _span = crate::fn_span!(Level::Debug, events::SKILL_DISCOVER, "skill::discover");
     let mut skills: Vec<Skill> = Vec::new();
     for dir in SKILL_DIRS {
         let Ok(entries) = fs.list_dir(&root.join(dir)) else {
@@ -56,6 +58,7 @@ pub fn discover(fs: &dyn Fs, root: &Path) -> Vec<Skill> {
 /// Lê `name`/`description` do frontmatter. Sem descrição → `None` (não carregado).
 #[must_use]
 pub fn parse(content: &str, path: &Path, dir: &Path) -> Option<Skill> {
+    let _span = crate::fn_span!(Level::Trace, events::SKILL_READ, "skill::parse");
     let front = frontmatter(content)?;
     let fallback = dir.file_name()?.to_string_lossy().into_owned();
     let name = scalar(front, "name").unwrap_or(fallback);
@@ -72,6 +75,8 @@ pub fn parse(content: &str, path: &Path, dir: &Path) -> Option<Skill> {
 
 /// Bloco de frontmatter (entre o primeiro `---` e o `---` seguinte).
 fn frontmatter(content: &str) -> Option<&str> {
+    let _span = crate::trace_fn!("skill::frontmatter");
+
     let rest = content.strip_prefix("---")?;
     let rest = rest
         .strip_prefix('\n')
@@ -81,6 +86,8 @@ fn frontmatter(content: &str) -> Option<&str> {
 
 /// Valor de uma chave escalar (inline, ou `>`/`|` dobrado nas linhas indentadas seguintes).
 fn scalar(front: &str, key: &str) -> Option<String> {
+    let _span = crate::trace_fn!("skill::scalar");
+
     let prefix = format!("{key}:");
     let mut lines = front.lines();
     while let Some(line) = lines.next() {
@@ -111,6 +118,8 @@ fn scalar(front: &str, key: &str) -> Option<String> {
 /// Catálogo de skills para o prompt de sistema (vazio se não houver skills).
 #[must_use]
 pub fn catalog(skills: &[Skill]) -> String {
+    let _span = crate::trace_fn!("skill::catalog");
+
     if skills.is_empty() {
         return String::new();
     }

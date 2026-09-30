@@ -45,6 +45,8 @@ impl ToolOutput {
     /// Saída `Ok` com envelope.
     #[must_use]
     pub fn report(report: ToolReport) -> Self {
+        let _span = crate::trace_fn!("kernel::pipeline::report");
+
         Self {
             outcome: ToolOutcome::Ok,
             report: Some(report),
@@ -84,6 +86,8 @@ impl Dispatch {
     /// Efeito a devolver ao modelo: o da execução, ou o derivado do veredicto quando nada correu.
     #[must_use]
     pub fn outcome(&self) -> ToolOutcome {
+        let _span = crate::trace_fn!("kernel::pipeline::outcome");
+
         match &self.effect {
             Effect::Ran { output } => output.outcome.clone(),
             Effect::Skipped => skipped_outcome(&self.decision),
@@ -93,6 +97,8 @@ impl Dispatch {
     /// Envelope de sucesso, quando a tool correu e o produziu (DF12/E06-T12).
     #[must_use]
     pub fn report(&self) -> Option<&ToolReport> {
+        let _span = crate::trace_fn!("kernel::pipeline::report");
+
         match &self.effect {
             Effect::Ran { output } => output.report.as_ref(),
             Effect::Skipped => None,
@@ -102,6 +108,8 @@ impl Dispatch {
 
 /// Traduz um veredicto não-`Allow` num resultado de tool (recuperável).
 fn skipped_outcome(decision: &Decision) -> ToolOutcome {
+    let _span = crate::trace_fn!("kernel::pipeline::skipped_outcome");
+
     match decision {
         Decision::Deny {
             rule_id, evidence, ..
@@ -138,6 +146,8 @@ pub trait Tool {
 /// Monta os factos que a política avalia, a partir do estado do kernel.
 #[must_use]
 pub fn facts_for(state: &State, use_: &ToolUse, now_millis: u64) -> Facts {
+    let _span = crate::trace_fn!("kernel::pipeline::facts_for");
+
     facts_from(state, use_, now_millis, &state.capabilities)
 }
 
@@ -149,6 +159,8 @@ pub fn facts_from(
     now_millis: u64,
     capabilities: &[Capability],
 ) -> Facts {
+    let _span = crate::trace_fn!("kernel::pipeline::facts_from");
+
     let mut granted = capabilities.to_vec();
     if let Some(root) = &state.workspace {
         granted.extend(workspace_capabilities(root));
@@ -175,6 +187,8 @@ pub fn dispatch(
     now_millis: u64,
     tool: &dyn Tool,
 ) -> Result<Dispatch, PolicyError> {
+    let _span = crate::trace_fn!("kernel::pipeline::dispatch");
+
     dispatch_with(DispatchRequest {
         state,
         use_,
@@ -207,6 +221,8 @@ pub struct DispatchRequest<'a> {
 /// # Errors
 /// [`PolicyError`] se o `RuleSet` tiver vocabulário desconhecido (fail-closed).
 pub fn dispatch_with(request: DispatchRequest<'_>) -> Result<Dispatch, PolicyError> {
+    let _span = crate::trace_fn!("kernel::pipeline::dispatch_with");
+
     let facts = facts_from(
         request.state,
         request.use_,
@@ -240,6 +256,8 @@ pub fn dispatch_with(request: DispatchRequest<'_>) -> Result<Dispatch, PolicyErr
 /// O custo nunca decide nada (DF5): é uma heurística para o modelo orçamentar a leitura. Os bytes
 /// contam a renderização TOON e os tokens são estimados a 4 bytes/token.
 fn with_estimated_cost(mut output: ToolOutput) -> ToolOutput {
+    let _span = crate::trace_fn!("kernel::pipeline::with_estimated_cost");
+
     if let Some(report) = output.report.as_mut()
         && report.cost.is_none()
     {

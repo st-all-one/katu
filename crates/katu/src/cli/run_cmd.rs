@@ -5,6 +5,7 @@
 //! `--params`/`--batch` (E20-T08); a resolução vive em [`super::run_params`].
 
 use clap::Args;
+use katu_core::diag::{Level, events};
 
 use crate::agent::{RunArgs, run};
 use crate::report::Report;
@@ -86,11 +87,14 @@ pub(crate) struct TuiCli {
 
 /// Executa `katu run` (uma rodada ou um lote).
 pub(crate) fn execute_run(args: &RunCli) -> Report {
+    let _span = katu_core::trace_fn!("cli::run_cmd::execute_run");
+
     run_params::execute(args)
 }
 
 /// Executa `katu tui`: abre a UI sobre o loop de turnos.
 pub(crate) fn execute_tui(args: &TuiCli) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_TUI, "run_cmd::execute_tui");
     match run_params::resolve_tui(args) {
         Ok(config) => run_tui(&RunArgs {
             goal: &config.goal,
@@ -109,6 +113,7 @@ pub(crate) fn execute_tui(args: &TuiCli) -> Report {
 
 /// Corre **uma** rodada a partir de uma config resolvida.
 pub(crate) fn run_once(config: &run_params::RunConfig) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_RUN, "run_cmd::run_once");
     run(&RunArgs {
         goal: &config.goal,
         provider: &config.provider,

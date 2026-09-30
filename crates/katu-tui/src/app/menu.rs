@@ -4,6 +4,7 @@
 //! `app.rs` sob o teto de linhas; o parse é **puro** e devolve um [`Command`] quando a borda tem de
 //! agir.
 
+use katu_core::diag::{Level, events};
 use katu_core::provider::Thinking;
 
 use crate::action::{Action, Mode};
@@ -17,6 +18,8 @@ impl App {
     /// Mini-menu aberto, se houver (E20-T10).
     #[must_use]
     pub fn menu(&self) -> Option<&Menu> {
+        let _span = katu_core::trace_fn!("app::menu::menu");
+
         self.menu.as_ref()
     }
 
@@ -28,6 +31,8 @@ impl App {
 
     /// Abre o menu de modelos (a lista vem da borda, `Update::Models`).
     fn open_model_menu(&mut self) {
+        let _span = katu_core::trace_fn!("app::menu::open_model_menu");
+
         match Menu::models(self.controls.models(), self.controls.model()) {
             Some(menu) => {
                 self.menu = Some(menu);
@@ -39,6 +44,8 @@ impl App {
 
     /// Abre o menu de pensamento (só os graus suportados pelo modelo ativo).
     fn open_thinking_menu(&mut self) {
+        let _span = katu_core::trace_fn!("app::menu::open_thinking_menu");
+
         let options = if self.thinking_options.is_empty() {
             vec![Thinking::Off]
         } else {
@@ -53,6 +60,11 @@ impl App {
     /// Se o modelo acabou de mudar (`pending_menu`), abre o submenu de pensamento adaptado às
     /// novas capacidades — só quando há mais do que `off` para escolher.
     pub(super) fn apply_thinking_options(&mut self, options: Vec<Thinking>) {
+        let _span = katu_core::fn_span!(
+            Level::Debug,
+            events::TUI_ACTION,
+            "app::apply_thinking_options"
+        );
         self.thinking_options = options;
         if self.pending_menu == Some(MenuKind::Thinking) {
             self.pending_menu = None;
@@ -64,6 +76,7 @@ impl App {
 
     /// Trata as ações de sobreposição/menu (`OpenHelp`…`CloseOverlay`).
     pub(super) fn overlay_action(&mut self, action: Action) -> Option<Command> {
+        let _span = katu_core::fn_span!(Level::Debug, events::TUI_ACTION, "app::overlay_action");
         match action {
             Action::OpenHelp => self.mode = Mode::Help,
             Action::MenuUp => {
@@ -100,6 +113,7 @@ impl App {
 
     /// Confirma a escolha do menu e devolve o `Command` à borda.
     fn confirm_menu(&mut self) -> Option<Command> {
+        let _span = katu_core::fn_span!(Level::Debug, events::TUI_ACTION, "app::confirm_menu");
         let choice = self.menu.as_ref().and_then(|menu| menu.selected().cloned());
         self.menu = None;
         self.mode = Mode::Normal;
@@ -119,6 +133,7 @@ impl App {
 
     /// Trata a linha submetida quando começa por `/` (E20-T10).
     pub(super) fn slash(&mut self, command: &str) -> Option<Command> {
+        let _span = katu_core::fn_span!(Level::Debug, events::TUI_SLASH, "app::slash");
         let name = command.split_whitespace().next().unwrap_or("");
         if let Some(skill) = name.strip_prefix("skill:") {
             return self.skill(skill);
@@ -168,6 +183,7 @@ impl App {
     /// `@<path>` cita caminhos (E20-T12) e `!<cmd>` executa shell pela política (E20-T12); no modo
     /// plano a regra `plan-no-shell` recusa `!` com evidência.
     pub(super) fn submit(&mut self) -> Option<Command> {
+        let _span = katu_core::fn_span!(Level::Debug, events::TUI_ACTION, "app::submit");
         let text = self.input.trim().to_string();
         self.input.clear();
         self.mode = Mode::Normal;
@@ -197,11 +213,14 @@ impl App {
     /// Caminhos citados à espera do próximo turno (E20-T12).
     #[must_use]
     pub fn citations(&self) -> &[String] {
+        let _span = katu_core::trace_fn!("app::menu::citations");
+
         &self.citations
     }
 
     /// Enfileira os caminhos de uma linha `@<path>` (E20-T12).
     fn cite(&mut self, rest: &str) -> Option<Command> {
+        let _span = katu_core::fn_span!(Level::Debug, events::TUI_ACTION, "app::cite");
         let paths = parse_citations(rest);
         if paths.is_empty() {
             self.status = Status::Failure("uso: @<caminho> [@<caminho>…]".to_string());
@@ -217,6 +236,8 @@ impl App {
 
     /// Prefixa o objetivo com os caminhos citados pendentes e limpa-os (E20-T12).
     fn take_goal(&mut self, goal: String) -> String {
+        let _span = katu_core::trace_fn!("app::menu::take_goal");
+
         if self.citations.is_empty() {
             return goal;
         }
@@ -227,6 +248,7 @@ impl App {
 
     /// Força o carregamento de uma skill pelo nome (E20-T13).
     fn skill(&mut self, name: &str) -> Option<Command> {
+        let _span = katu_core::fn_span!(Level::Debug, events::TUI_ACTION, "app::skill");
         let name = name.trim();
         if name.is_empty() {
             self.status = Status::Failure("uso: /skill:<nome>".to_string());
@@ -244,6 +266,7 @@ impl App {
 
     /// Prepara um comando shell `!<cmd>` (E20-T12).
     fn shell(&mut self, rest: &str) -> Option<Command> {
+        let _span = katu_core::fn_span!(Level::Debug, events::TUI_ACTION, "app::shell");
         let command = rest.trim();
         if command.is_empty() {
             self.status = Status::Failure("uso: !<comando>".to_string());
@@ -262,6 +285,8 @@ impl App {
 
 /// Extrai os caminhos de uma linha de citação (`src @a` → `@src`, `@a`).
 fn parse_citations(rest: &str) -> Vec<String> {
+    let _span = katu_core::trace_fn!("app::menu::parse_citations");
+
     rest.split_whitespace()
         .filter(|token| !token.is_empty())
         .map(|token| {

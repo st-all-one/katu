@@ -31,6 +31,8 @@ pub struct SearchTool<'a> {
 /// política avaliar `DenyRead`/`DenySensitiveRead` sobre o que a busca vai varrer.
 #[must_use]
 pub fn search_use(root: &ResolvedPath, query: impl Into<String>, mode: SearchMode) -> ToolUse {
+    let _span = katu_core::trace_fn!("search::search_use");
+
     ToolUse {
         name: ToolName::Search,
         args: ToolArgs::Search {
@@ -46,11 +48,13 @@ pub fn search_use(root: &ResolvedPath, query: impl Into<String>, mode: SearchMod
 
 impl Tool for SearchTool<'_> {
     fn name(&self) -> ToolName {
+        let _span = katu_core::trace_fn!("search::name");
+
         ToolName::Search
     }
 
     fn execute(&self, use_: &ToolUse) -> ToolOutput {
-        let _span = katu_core::span!(Level::Trace, events::TOOL_SEARCH);
+        let _span = katu_core::fn_span!(Level::Trace, events::TOOL_SEARCH, "search::execute");
         let ToolArgs::Search { root, query, mode } = &use_.args else {
             return unavailable("search");
         };
@@ -70,6 +74,8 @@ impl Tool for SearchTool<'_> {
 }
 
 fn unavailable(control: &'static str) -> ToolOutput {
+    let _span = katu_core::trace_fn!("search::unavailable");
+
     ToolOutput::outcome(ToolOutcome::Unavailable {
         control: ControlId::new(control),
         rule_id: None,

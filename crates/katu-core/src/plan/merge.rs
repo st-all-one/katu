@@ -21,6 +21,8 @@ pub enum MergeError {
 
 impl std::fmt::Display for MergeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let _span = crate::trace_fn!("plan::merge::fmt");
+
         match self {
             Self::EmptyAllowedScope => {
                 f.write_str("merge de escopos sem `allowed` em comum (fail-closed)")
@@ -65,6 +67,8 @@ impl ScopeContract {
 /// Interseção de listas de globs: quando um lado é vazio ("tudo"), vence o outro; senão mantém
 /// os padrões cobertos pelo outro lado (ou iguais). Conservador: nunca alarga o escopo.
 fn intersect_allowed(a: &[String], b: &[String]) -> Vec<String> {
+    let _span = crate::trace_fn!("plan::merge::intersect_allowed");
+
     if a.is_empty() {
         return b.to_vec();
     }
@@ -87,6 +91,8 @@ fn intersect_allowed(a: &[String], b: &[String]) -> Vec<String> {
 
 /// União determinística (ordem: `a` depois `b`, sem duplicados).
 fn union(a: &[String], b: &[String]) -> Vec<String> {
+    let _span = crate::trace_fn!("plan::merge::union");
+
     let mut out: Vec<String> = Vec::new();
     for item in a.iter().chain(b) {
         push_unique(&mut out, item);
@@ -96,6 +102,8 @@ fn union(a: &[String], b: &[String]) -> Vec<String> {
 
 /// Acrescenta `item` se ainda não existir.
 fn push_unique(out: &mut Vec<String>, item: &str) {
+    let _span = crate::trace_fn!("plan::merge::push_unique");
+
     if !out.iter().any(|existing| existing == item) {
         out.push(item.to_string());
     }
@@ -103,6 +111,8 @@ fn push_unique(out: &mut Vec<String>, item: &str) {
 
 /// Mínimo de dois orçamentos (`None` = sem teto).
 fn min_budget(a: Option<u64>, b: Option<u64>) -> Option<u64> {
+    let _span = crate::trace_fn!("plan::merge::min_budget");
+
     match (a, b) {
         (Some(x), Some(y)) => Some(x.min(y)),
         (Some(x), None) | (None, Some(x)) => Some(x),
@@ -116,6 +126,8 @@ fn min_budget(a: Option<u64>, b: Option<u64>) -> Option<u64> {
 /// devolve `false` quando não consegue provar inclusão — a consequência é um escopo mais
 /// restrito, nunca mais permissivo.
 fn glob_covers(a: &str, b: &str) -> bool {
+    let _span = crate::trace_fn!("plan::merge::glob_covers");
+
     if a == b {
         return true;
     }
@@ -149,6 +161,8 @@ fn glob_covers(a: &str, b: &str) -> bool {
 
 /// `true` para `*` ou `?`.
 fn is_wildcard(c: char) -> bool {
+    let _span = crate::trace_fn!("plan::merge::is_wildcard");
+
     c == '*' || c == '?'
 }
 

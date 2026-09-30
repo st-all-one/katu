@@ -18,6 +18,8 @@ pub struct CollectSink {
 
 impl ProviderSink for CollectSink {
     fn on_event(&mut self, event: ProviderEvent) -> Flow {
+        let _span = crate::trace_fn!("provider::collect::on_event");
+
         match event {
             ProviderEvent::Text(delta) => self.text.push_str(&delta),
             ProviderEvent::Thinking(delta) => self.thinking.push_str(&delta),

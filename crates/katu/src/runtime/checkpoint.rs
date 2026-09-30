@@ -14,6 +14,8 @@ impl Runtime<'_> {
     /// # Errors
     /// [`RuntimeError::Session`] se a escrita/validação falhar.
     pub(crate) fn write_checkpoint(&self, next_action: &str) -> Result<Checkpoint, RuntimeError> {
+        let _span = katu_core::trace_fn!("runtime::checkpoint::write_checkpoint");
+
         self.session
             .write_checkpoint(&self.goal, next_action)
             .map_err(|error| RuntimeError::Session(SessionError::from(error)))
@@ -24,6 +26,8 @@ impl Runtime<'_> {
     /// # Errors
     /// [`RuntimeError::Session`] se o ficheiro existir mas não validar.
     pub(crate) fn checkpoint(&self) -> Result<Option<Checkpoint>, RuntimeError> {
+        let _span = katu_core::trace_fn!("runtime::checkpoint::checkpoint");
+
         self.session
             .read_checkpoint()
             .map_err(|error| RuntimeError::Session(SessionError::from(error)))

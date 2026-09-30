@@ -16,12 +16,16 @@ impl Runtime<'_> {
     /// # Errors
     /// [`RuntimeError::Session`] se o log não puder ser lido.
     pub(crate) fn transcript(&self) -> Result<Vec<String>, RuntimeError> {
+        let _span = katu_core::trace_fn!("runtime::transcript::transcript");
+
         Ok(render(&self.session.messages()?))
     }
 }
 
 /// Renderiza as mensagens visíveis ao modelo numa lista de linhas (determinístico).
 fn render(messages: &[Message]) -> Vec<String> {
+    let _span = katu_core::trace_fn!("runtime::transcript::render");
+
     let mut lines = vec!["# katu — transcrição durável".to_string(), String::new()];
     for message in messages {
         match message {
@@ -54,6 +58,8 @@ fn render(messages: &[Message]) -> Vec<String> {
 
 /// Resumo de uma tool call: `argv` quando há, senão caminhos resolvidos, senão o `cwd`.
 fn tool_summary(tool: &ToolUse) -> String {
+    let _span = katu_core::trace_fn!("runtime::transcript::tool_summary");
+
     if let Some(argv) = &tool.argv {
         return format!("`{}`", argv.as_slice().join(" "));
     }
@@ -70,6 +76,8 @@ fn tool_summary(tool: &ToolUse) -> String {
 
 /// Rótulo curto do efeito, com a regra quando a recusa é acionável (DF10).
 fn outcome_label(outcome: &ToolOutcome) -> String {
+    let _span = katu_core::trace_fn!("runtime::transcript::outcome_label");
+
     match outcome {
         ToolOutcome::Ok => "ok".to_string(),
         ToolOutcome::Partial => "parcial".to_string(),

@@ -41,6 +41,8 @@ pub struct ReadBudget {
 
 impl Default for ReadBudget {
     fn default() -> Self {
+        let _span = katu_core::trace_fn!("read::default");
+
         Self {
             max_lines: 400,
             max_bytes: 24_000,
@@ -66,11 +68,13 @@ pub struct ReadTool<'a> {
 
 impl Tool for ReadTool<'_> {
     fn name(&self) -> ToolName {
+        let _span = katu_core::trace_fn!("read::name");
+
         ToolName::Read
     }
 
     fn execute(&self, use_: &ToolUse) -> ToolOutput {
-        let _span = katu_core::span!(Level::Trace, events::TOOL_READ);
+        let _span = katu_core::fn_span!(Level::Trace, events::TOOL_READ, "read::execute");
         let ToolArgs::Read { path } = &use_.args else {
             return unavailable("read");
         };
@@ -96,6 +100,8 @@ impl Tool for ReadTool<'_> {
 
 /// Controlo em falta quando a leitura (ou a view) não pode ser servida.
 fn unavailable(control: &'static str) -> ToolOutput {
+    let _span = katu_core::trace_fn!("read::unavailable");
+
     ToolOutput::outcome(ToolOutcome::Unavailable {
         control: ControlId::new(control),
         rule_id: None,

@@ -17,6 +17,7 @@ use crate::runtime::VerifyRequest;
 impl AgentHandler<'_> {
     /// Corre o gate de verificação (E09-T03) e, se bloquear, pede override humano assinado.
     pub(super) fn verify(&mut self, painter: &mut Painter<'_>) -> Vec<Update> {
+        let _span = katu_core::fn_span!(Level::Debug, events::VERIFY_REPORT, "verify::verify");
         let report = match self.runtime.verify(VerifyRequest {
             coverage_floor_bps: 0,
             strict: false,
@@ -58,6 +59,8 @@ impl AgentHandler<'_> {
         painter: &mut Painter<'_>,
         report: &VerificationReport,
     ) -> Vec<Update> {
+        let _span = katu_core::trace_fn!("tui::verify::overrides");
+
         let granted_by = self.granted_by();
         let dir = audit_dir(self.runtime.root());
         let now = self.runtime.clock.now().as_millis();
@@ -100,6 +103,8 @@ impl AgentHandler<'_> {
 
     /// Quem assina (`USER`/`USERNAME`, ou `local`); o agente **nunca** assina.
     pub(super) fn granted_by(&self) -> String {
+        let _span = katu_core::trace_fn!("tui::verify::granted_by");
+
         self.env
             .var("USER")
             .or_else(|| self.env.var("USERNAME"))

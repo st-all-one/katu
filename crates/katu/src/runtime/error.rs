@@ -35,6 +35,8 @@ pub(crate) enum RuntimeError {
 
 impl From<RuntimeError> for Error {
     fn from(error: RuntimeError) -> Self {
+        let _span = katu_core::trace_fn!("runtime::error::from");
+
         match error {
             RuntimeError::Memory(source) => Self::unavailable(source.to_string()),
             RuntimeError::Policy(source) => Self::invalid_input(source.to_string()),

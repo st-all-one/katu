@@ -7,6 +7,7 @@
 use std::path::PathBuf;
 
 use clap::{Args, Subcommand};
+use katu_core::diag::{Level, events};
 use katu_core::error::Error;
 use katu_core::kernel::discover_root;
 use serde_json::json;
@@ -105,6 +106,8 @@ impl Scope {
 
     /// Caminho de escrita do escopo.
     fn path(self) -> Result<PathBuf, Error> {
+        let _span = katu_core::trace_fn!("cli::config_cmd::path");
+
         match self {
             Self::Global => config::global_path(),
             Self::Project => project_path(),
@@ -113,6 +116,11 @@ impl Scope {
 
     /// Tabela do escopo (no projeto, funde o global por baixo).
     fn table(self) -> Result<toml::Table, Error> {
+        let _span = katu_core::fn_span!(
+            Level::Trace,
+            events::CONFIG_LOAD,
+            "config_cmd::Scope::table"
+        );
         match self {
             Self::Global => config::load(&config::global_path()?),
             Self::Project => {
@@ -127,6 +135,7 @@ impl Scope {
 
 /// Executa `katu config`.
 pub(crate) fn execute(args: &ConfigArgs) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_CONFIG, "config_cmd::execute");
     match &args.command {
         Some(ConfigCommand::Get { key, global }) => get(key, Scope::new(*global)),
         Some(ConfigCommand::Set { key, value, global }) => set(key, value, Scope::new(*global)),
@@ -142,6 +151,8 @@ pub(crate) fn execute(args: &ConfigArgs) -> Report {
 
 /// Caminho da config do projeto (raiz descoberta a subir do diretório atual).
 fn project_path() -> Result<PathBuf, Error> {
+    let _span = katu_core::trace_fn!("cli::config_cmd::project_path");
+
     let fs = StdFs;
     let start = std::env::current_dir().map_err(|err| Error::io(".", err))?;
     let root = discover_root(&fs, &start);
@@ -150,6 +161,7 @@ fn project_path() -> Result<PathBuf, Error> {
 
 /// `config get`.
 fn get(key: &str, scope: Scope) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_CONFIG, "config_cmd::get");
     if config::find(key).is_none() {
         return Report::failed("config", &config::unknown_key(key));
     }
@@ -175,6 +187,7 @@ fn get(key: &str, scope: Scope) -> Report {
 
 /// `config set`.
 fn set(key: &str, raw: &str, scope: Scope) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::CONFIG_SET, "config_cmd::set");
     let Some(spec) = config::find(key) else {
         return Report::failed("config", &config::unknown_key(key));
     };
@@ -202,6 +215,7 @@ fn set(key: &str, raw: &str, scope: Scope) -> Report {
 
 /// `config unset`.
 fn unset(key: &str, scope: Scope) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::CONFIG_SET, "config_cmd::unset");
     if config::find(key).is_none() {
         return Report::failed("config", &config::unknown_key(key));
     }
@@ -225,6 +239,7 @@ fn unset(key: &str, scope: Scope) -> Report {
 
 /// `config list`.
 fn list(scope: Scope) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_CONFIG, "config_cmd::list");
     let table = match scope.table() {
         Ok(table) => table,
         Err(error) => return Report::failed("config", &error),

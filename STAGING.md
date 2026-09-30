@@ -133,6 +133,25 @@ buffer adaptativo (E18-T04).
   e as tools em curso ao vivo no painel de atividade (E10-T05 ☑); o `katu run` continua a acumular
   (turno único sem UI).
 
+### 3.6 Baseline E18 (medido)
+
+- **Servidores duradouros** (systemd `--user`): geral `katu-llama.service` (`qwen2.5-coder-1.5b`,
+  `127.0.0.1:8080/v1`) e embeddings `knudge-embed.service` (`granite-embedding-97m-r2`, 384d,
+  `127.0.0.1:8889/v1`); remoto `opencode-go`/`longcat-2.5-preview-free` por `KATU_OPENCODE_KEY`
+  (efémera). Config global do katu ligada a ambos; o *drift* do endpoint do knudge (`:8080` vs
+  `:8889`) foi corrigido.
+- **Baseline** (`bench/e18/`): turno e2e quente p50 **360 ms** (llama) / **343 ms** (opencode-go);
+  **overhead fora do provider 72 ms/turno** — `log.append` 18 ms (5 fsync), `fs.write` 26 ms
+  (7 escritas atómicas), `session.open` 8,5 ms; arranque 6,5 ms; embeddings 16 ms; prompt de
+  3265 tokens (`cached=3254` a quente; cold start local ~40 s). Números em `bench/published.toml`
+  (base `measured`, artefacto `bench/e18/raw.json`). Protocolo/relatório: `bench/e18/`.
+- **Pontos cegos de instrumentação** (a fechar antes de otimizar): `KnudgeMemory::open`,
+  `skills::discover`/`read_instructions`, `load_rules`, `HttpEmbedder` (2.ª IA), `context.build`
+  sem `tokens`, `provider.request` sem `prompt_tokens`; 11 ids do catálogo nunca emitidos
+  (`audit.index`, `contain.check/deny`, `context.trim`, `katu.shutdown`, `kernel.stop`,
+  `memory.read/compact`, `policy.waiver`, `store.load/save`); `cli.prime`/`memo.drain`/`tui.slash`/
+  `mouse.copy` prometidos no `SURFACE_IMPLEMENTATION` §7 e ausentes do catálogo.
+
 ---
 
 ## 4. Ordem recomendada (próximos passos)
@@ -145,6 +164,8 @@ buffer adaptativo (E18-T04).
    até existir caminho async; worker bloqueante por desenho). E01-T08/T09 fechados (ADRs 0016/0017).
 3. **E15-T01 + E18-T10** — `hyperfine`/`dhat` + gate de regressão no CI (o render e o provider já
    têm gates zero-dep); falta o micro-bench de seleção de regras e os orçamentos de heap/escala (§44).
+   **Baseline E18 medido** (§3.6, `bench/e18/`) — fechar primeiro os pontos cegos (§3.6), senão a
+   otimização fica às cegas.
 4. **E12-T06/T10** — validação ao vivo de `responses`/`messages`/`google` e `dynamic_models`
    (auto-*skip*; E12-T02 ☑); faltam WebSocket/HTTP2; `Control::{SetModel, SetThinking}` no kernel.
 5. Fechos core/policy/tools: **E06-T02/T03/T12**, **E07-T02/T03**, **E01-T07**, **E19-T04/T06** — ✅;

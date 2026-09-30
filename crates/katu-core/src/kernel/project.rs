@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use super::event::{CallId, Event};
 use super::state::{Refusal, State};
 use super::step::step;
+use crate::diag::{Level, events};
 use crate::error::ToolOutcome;
 use katu_policy::{Phase, ToolName, ToolUse};
 
@@ -45,11 +46,18 @@ pub enum Message {
 /// Projeta o histórico visível ao modelo a partir dos eventos (ordem do log).
 #[must_use]
 pub fn derive_messages(events: &[Event]) -> Vec<Message> {
+    let _span = crate::trace_fn!("kernel::project::derive_messages");
+
     events.iter().filter_map(project_event).collect()
 }
 
 /// Projeta um evento, se for visível ao modelo.
 fn project_event(event: &Event) -> Option<Message> {
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::MODEL_PROJECT,
+        "kernel::project::project_event"
+    );
     match event {
         Event::UserMessage { text } => Some(Message::User { text: text.clone() }),
         Event::AssistantMessage { text } => Some(Message::Assistant { text: text.clone() }),
@@ -70,6 +78,11 @@ fn project_event(event: &Event) -> Option<Message> {
 /// # Errors
 /// [`Refusal`] se a sequência contiver uma transição ilegal (log corrompido ou adulterado).
 pub fn state_of(events: &[Event]) -> Result<State, Refusal> {
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::LOG_REPLAY,
+        "kernel::project::state_of"
+    );
     let mut state = State::initial();
     for event in events {
         state = step(&state, event)?;
@@ -97,6 +110,8 @@ pub struct Snapshot {
 /// # Errors
 /// [`Refusal`] se a sequência de eventos for inválida.
 pub fn snapshot(events: &[Event]) -> Result<Snapshot, Refusal> {
+    let _span = crate::trace_fn!("kernel::project::snapshot");
+
     let state = state_of(events)?;
     Ok(Snapshot {
         phase: state.phase,

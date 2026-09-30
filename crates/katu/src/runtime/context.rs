@@ -11,6 +11,8 @@ impl Runtime<'_> {
     /// # Errors
     /// [`SessionError`] se o log estiver corrompido.
     pub(crate) fn compaction_preview(&self) -> Result<Option<Compaction>, SessionError> {
+        let _span = katu_core::trace_fn!("runtime::context::compaction_preview");
+
         self.session
             .compact_context(self.budget, CompactionMode::Enabled)
     }
@@ -20,6 +22,8 @@ impl Runtime<'_> {
     /// # Errors
     /// [`SessionError`] se o log estiver corrompido.
     pub(crate) fn context(&self) -> Result<Context, SessionError> {
+        let _span = katu_core::trace_fn!("runtime::context::context");
+
         self.session.context(self.budget, self.compaction)
     }
 

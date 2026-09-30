@@ -6,6 +6,7 @@
 
 use std::collections::BTreeMap;
 
+use katu_core::diag::{Level, events};
 use katu_providers::{Price, PriceTable};
 use serde::Deserialize;
 
@@ -33,6 +34,7 @@ struct PriceSpec {
 /// # Errors
 /// Mensagem se o ficheiro não for um TOML válido.
 pub(crate) fn price_table() -> Result<PriceTable, String> {
+    let _span = katu_core::fn_span!(Level::Trace, events::POLICY_LOAD, "pricing::price_table");
     let file: PricesFile =
         toml::from_str(PRICES).map_err(|err| format!("policy/prices.toml inválido: {err}"))?;
     let mut table = PriceTable::new();

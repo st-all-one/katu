@@ -4,6 +4,7 @@
 //! as tool calls só são emitidas **completas** (no `content_block_stop` ou no fecho). A
 //! contabilização vem repartida (`message_start` para a entrada, `message_delta` para a saída).
 
+use katu_core::diag::{Level, events};
 use katu_core::provider::{ProviderError, ProviderOutcome, ProviderSink};
 
 use crate::engine::Call;
@@ -25,6 +26,7 @@ pub(crate) fn stream<T: Transport>(
     call: &Call<'_>,
     sink: &mut dyn ProviderSink,
 ) -> Result<ProviderOutcome, ProviderError> {
+    let _span = katu_core::fn_span!(Level::Debug, events::PROVIDER_REQUEST, "anthropic::stream");
     let body = encode::encode_request(call.request, call.options)?;
     let http = HttpRequest::post(
         call.endpoint.url.clone(),

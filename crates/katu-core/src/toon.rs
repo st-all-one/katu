@@ -59,6 +59,8 @@ impl Value {
     /// Constrói um texto.
     #[must_use]
     pub fn str(text: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("toon::str");
+
         Self::Str(text.into())
     }
 
@@ -81,6 +83,8 @@ impl Value {
     /// Constrói um bloco literal (conteúdo de código, sem escapes).
     #[must_use]
     pub fn block(text: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("toon::block");
+
         Self::Block(text.into())
     }
 
@@ -98,6 +102,8 @@ impl Serialize for Value {
     where
         S: Serializer,
     {
+        let _span = crate::trace_fn!("toon::serialize");
+
         match self {
             Self::Map(entries) | Self::Flow(entries) => {
                 let mut map = serializer.serialize_map(Some(entries.len()))?;

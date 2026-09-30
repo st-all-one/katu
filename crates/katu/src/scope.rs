@@ -57,7 +57,7 @@ pub(crate) enum ScopeError {
 /// # Errors
 /// [`ScopeError`] em falha de leitura, JSON malformado, artefacto incompleto ou plano inválido.
 pub(crate) fn load(fs: &dyn Fs, root: &Path) -> Result<Option<Plan>, ScopeError> {
-    let _span = katu_core::span!(Level::Info, events::SCOPE_LOAD, "root" => root.to_str().unwrap_or_default());
+    let _span = katu_core::fn_span!(Level::Info, events::SCOPE_LOAD, "scope::load", "root" => root.to_str().unwrap_or_default());
     let scope_path = root.join(SCOPE_CONTRACT_FILE);
     let features_path = root.join(FEATURE_LIST_FILE);
     match (fs.exists(&scope_path), fs.exists(&features_path)) {
@@ -80,6 +80,7 @@ pub(crate) fn load(fs: &dyn Fs, root: &Path) -> Result<Option<Plan>, ScopeError>
 
 /// Lê e desserializa um ficheiro JSON através da porta `Fs`.
 fn read_json<T: DeserializeOwned>(fs: &dyn Fs, path: &Path) -> Result<T, ScopeError> {
+    let _span = katu_core::fn_span!(Level::Trace, events::SCOPE_LOAD, "scope::read_json");
     let bytes = fs.read(path).map_err(|source| ScopeError::Io {
         path: path.display().to_string(),
         source,
@@ -105,6 +106,7 @@ enum FeaturesFile {
 
 /// Lê a lista de features nas formas aceitas.
 fn read_features(fs: &dyn Fs, path: &Path) -> Result<Vec<Feature>, ScopeError> {
+    let _span = katu_core::fn_span!(Level::Trace, events::SCOPE_LOAD, "scope::read_features");
     match read_json::<FeaturesFile>(fs, path)? {
         FeaturesFile::Bare(features) | FeaturesFile::Wrapped { features } => Ok(features),
     }

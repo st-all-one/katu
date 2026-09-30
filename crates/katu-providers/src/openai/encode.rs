@@ -1,5 +1,6 @@
 //! Codificação do pedido no dialeto `chat/completions`.
 
+use katu_core::diag::{Level, events};
 use katu_core::kernel::Message;
 use katu_core::provider::{ProviderError, ProviderRequest, Thinking, ToolDef};
 use katu_policy::{SearchMode, ToolArgs, ToolName, ToolUse};
@@ -128,6 +129,11 @@ pub(crate) fn encode_request(
     request: &ProviderRequest,
     options: &EncodeOptions,
 ) -> Result<String, ProviderError> {
+    let _span = katu_core::fn_span!(
+        Level::Debug,
+        events::PROVIDER_REQUEST,
+        "openai::encode_request"
+    );
     let mut messages = Vec::with_capacity(request.messages.len().saturating_add(1));
     if let Some(system) = request.system.as_deref().filter(|s| !s.is_empty()) {
         messages.push(MessageJson::Text(TextMessage {
@@ -170,6 +176,8 @@ pub(crate) fn encode_request(
 
 /// Codifica uma tool no formato `OpenAI`.
 fn encode_tool(tool: &ToolDef) -> ToolJson<'_> {
+    let _span = katu_core::trace_fn!("openai::encode::encode_tool");
+
     ToolJson {
         kind: "function",
         function: FunctionJson {
@@ -182,6 +190,11 @@ fn encode_tool(tool: &ToolDef) -> ToolJson<'_> {
 
 /// Codifica uma mensagem do histórico (ou ignora se desconhecida).
 fn encode_message(message: &Message) -> Result<Option<MessageJson<'_>>, ProviderError> {
+    let _span = katu_core::fn_span!(
+        Level::Trace,
+        events::PROVIDER_REQUEST,
+        "openai::encode_message"
+    );
     let encoded = match message {
         Message::User { text } => MessageJson::Text(TextMessage {
             role: "user",
@@ -217,6 +230,8 @@ fn encode_message(message: &Message) -> Result<Option<MessageJson<'_>>, Provider
 /// Nome ao modelo de um uso de tool (registry: `exec`→`bash`, `search`→`grep|find|ls`).
 #[must_use]
 pub(crate) fn model_tool_name(tool: &ToolUse) -> String {
+    let _span = katu_core::trace_fn!("openai::encode::model_tool_name");
+
     match tool.name {
         ToolName::Exec => "bash".to_string(),
         ToolName::Search => match &tool.args {
@@ -241,6 +256,8 @@ pub(crate) fn model_tool_name(tool: &ToolUse) -> String {
 /// reconstrução é fiel para as chaves que o tipo preserva (E04/E12 — dívida registada).
 #[must_use]
 pub(crate) fn tool_arguments(tool: &ToolUse) -> Value {
+    let _span = katu_core::trace_fn!("openai::encode::tool_arguments");
+
     match &tool.args {
         ToolArgs::Read { path } | ToolArgs::Edit { path } | ToolArgs::Trash { path } => {
             json!({"path": path})
@@ -255,6 +272,8 @@ pub(crate) fn tool_arguments(tool: &ToolUse) -> Value {
 
 /// Mapeia o grau de pensamento para `reasoning_effort` (dialeto `OpenAI`).
 pub(crate) fn thinking_effort(thinking: Thinking) -> Option<&'static str> {
+    let _span = katu_core::trace_fn!("openai::encode::thinking_effort");
+
     match thinking {
         Thinking::Low => Some("low"),
         Thinking::Medium => Some("medium"),

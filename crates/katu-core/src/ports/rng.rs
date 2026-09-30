@@ -24,6 +24,8 @@ impl SeqRng {
 
 impl Rng for SeqRng {
     fn next_u64(&mut self) -> u64 {
+        let _span = crate::trace_fn!("ports::rng::next_u64");
+
         let value = self.next;
         self.next = self.next.wrapping_add(1);
         value

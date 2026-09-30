@@ -5,6 +5,7 @@
 //! logado como `PlanRecorded`, tornando a fase `Planned` alcançável. Sem artefacto, o roteador
 //! devolve `Unavailable{scope-contract}` e nada é executado.
 
+use katu_core::diag::{Level, events};
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::{CallId, Event, SessionError, dispatch};
 use katu_core::plan::Plan;
@@ -24,6 +25,7 @@ pub(super) fn execute(
     use_: &ToolUse,
     plan: &Plan,
 ) -> Result<ToolOutcome, AgentError> {
+    let _span = katu_core::fn_span!(Level::Trace, events::TOOL_PLAN, "plan::execute");
     runtime.session.apply(&Event::ToolCall {
         call: call.clone(),
         tool: use_.clone(),

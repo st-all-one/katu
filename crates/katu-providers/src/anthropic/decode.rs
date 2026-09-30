@@ -52,6 +52,8 @@ pub(crate) struct MessagesDecoder {
 impl MessagesDecoder {
     /// Novo decodificador.
     pub(crate) fn new() -> Self {
+        let _span = katu_core::trace_fn!("anthropic::decode::new");
+
         Self::default()
     }
 
@@ -61,6 +63,11 @@ impl MessagesDecoder {
         event: &Event,
         sink: &mut dyn ProviderSink,
     ) -> Result<Flow, ProviderError> {
+        let _span = katu_core::fn_span!(
+            Level::Trace,
+            events::PROVIDER_CHUNK,
+            "anthropic::decode::handle"
+        );
         match event.kind.as_str() {
             "message_start" => {
                 if let Some(usage) = event.message.as_ref().and_then(|m| m.usage.as_ref()) {
@@ -110,6 +117,11 @@ impl MessagesDecoder {
 
     /// Trata `content_block_delta` (texto, raciocínio ou argumentos de tool).
     fn handle_delta(&mut self, event: &Event, sink: &mut dyn ProviderSink) -> Flow {
+        let _span = katu_core::fn_span!(
+            Level::Trace,
+            events::PROVIDER_CHUNK,
+            "anthropic::decode::handle_delta"
+        );
         let Some(delta) = &event.delta else {
             return Flow::Continue;
         };
@@ -138,6 +150,8 @@ impl MessagesDecoder {
 
     /// Emite um evento marcando o **TTFT** na primeira ocorrência.
     fn emit(&mut self, sink: &mut dyn ProviderSink, event: ProviderEvent) -> Flow {
+        let _span = katu_core::trace_fn!("anthropic::decode::emit");
+
         if !self.announced {
             self.announced = true;
             katu_core::event!(Level::Debug, events::PROVIDER_TTFT);
@@ -155,6 +169,11 @@ impl MessagesDecoder {
         index: u32,
         sink: &mut dyn ProviderSink,
     ) -> Result<Flow, ProviderError> {
+        let _span = katu_core::fn_span!(
+            Level::Trace,
+            events::PROVIDER_CHUNK,
+            "anthropic::decode::emit_tool"
+        );
         let Some(tool) = self.tools.remove(&index) else {
             return Ok(Flow::Continue);
         };
@@ -177,6 +196,11 @@ impl MessagesDecoder {
 
     /// Absorve a contabilização (base `provider_reported`).
     fn absorb_usage(&mut self, json: &UsageJson) {
+        let _span = katu_core::fn_span!(
+            Level::Trace,
+            events::PROVIDER_CHUNK,
+            "anthropic::decode::absorb_usage"
+        );
         let mut usage = self
             .usage
             .unwrap_or_else(|| TokenUsage::new(EvidenceBasis::ProviderReported));
@@ -194,6 +218,8 @@ impl Wiring for MessagesDecoder {
         payload: &str,
         sink: &mut dyn ProviderSink,
     ) -> Result<Flow, ProviderError> {
+        let _span = katu_core::trace_fn!("anthropic::decode::feed_payload");
+
         if matches!(self.status, Status::Idle) {
             self.status = Status::Streaming;
         }
@@ -208,6 +234,8 @@ impl Wiring for MessagesDecoder {
     }
 
     fn finish_stream(&mut self, sink: &mut dyn ProviderSink) -> Result<Flow, ProviderError> {
+        let _span = katu_core::trace_fn!("anthropic::decode::finish_stream");
+
         let indices: Vec<u32> = self.tools.keys().copied().collect();
         for index in indices {
             if matches!(self.emit_tool(index, sink)?, Flow::Break) {
@@ -218,22 +246,32 @@ impl Wiring for MessagesDecoder {
     }
 
     fn has_emitted(&self) -> bool {
+        let _span = katu_core::trace_fn!("anthropic::decode::has_emitted");
+
         self.announced
     }
 
     fn has_data(&self) -> bool {
+        let _span = katu_core::trace_fn!("anthropic::decode::has_data");
+
         !matches!(self.status, Status::Idle)
     }
 
     fn is_cancelled(&self) -> bool {
+        let _span = katu_core::trace_fn!("anthropic::decode::is_cancelled");
+
         matches!(self.status, Status::Cancelled)
     }
 
     fn is_done(&self) -> bool {
+        let _span = katu_core::trace_fn!("anthropic::decode::is_done");
+
         matches!(self.status, Status::Done)
     }
 
     fn final_outcome(&self) -> ProviderOutcome {
+        let _span = katu_core::trace_fn!("anthropic::decode::final_outcome");
+
         ProviderOutcome {
             usage: self.usage,
             stop: self.stop.clone().unwrap_or(if self.tool_calls {
@@ -247,6 +285,8 @@ impl Wiring for MessagesDecoder {
 
 /// Mapeia o `stop_reason` do dialeto.
 fn map_stop(reason: &str) -> StopReason {
+    let _span = katu_core::trace_fn!("anthropic::decode::map_stop");
+
     match reason {
         "end_turn" | "stop_sequence" => StopReason::EndTurn,
         "tool_use" => StopReason::ToolCalls,

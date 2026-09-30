@@ -1,5 +1,7 @@
 //! Painel de atividade **efémero** (E10-T05): só estado de UI; nunca toca no log nem no transcript.
 
+use katu_core::diag::{Level, events};
+
 use crate::entry::Role;
 use crate::live::{Live, trim_tail};
 
@@ -11,6 +13,7 @@ const STREAM_TAIL_BYTES: usize = 8 * 1024;
 impl App {
     /// Aplica um evento efémero ao painel de atividade (não toca no transcript).
     pub(super) fn apply_live(&mut self, live: Live) {
+        let _span = katu_core::fn_span!(Level::Trace, events::TUI_LIVE, "app::apply_live");
         match live {
             Live::Text(delta) => {
                 self.streaming.push_str(&delta);
@@ -39,6 +42,8 @@ impl App {
 
     /// Limpa o painel de atividade.
     pub(super) fn clear_live(&mut self) {
+        let _span = katu_core::trace_fn!("app::panel::clear_live");
+
         self.streaming.clear();
         self.thinking.clear();
         self.live.clear();

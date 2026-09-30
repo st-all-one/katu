@@ -24,7 +24,7 @@ impl<'a> Session<'a> {
         created_ms: u64,
         goal: &str,
     ) -> Result<Self, SessionError> {
-        let _span = crate::span!(Level::Debug, events::SESSION_OPEN, "created_ms" => created_ms);
+        let _span = crate::fn_span!(Level::Debug, events::SESSION_OPEN, "kernel::session::create", "created_ms" => created_ms);
         let meta = identity::create(fs, root, created_ms, goal)?;
         Self::open_with_cost(
             fs,
@@ -38,7 +38,7 @@ impl<'a> Session<'a> {
     /// # Errors
     /// [`SessionError::UnknownSession`] se o id não existir; [`SessionError`] se o log falhar.
     pub fn resume(fs: &'a dyn Fs, root: &Path, id: &SessionId) -> Result<Self, SessionError> {
-        let _span = crate::span!(Level::Debug, events::SESSION_RESUME, "id" => id.as_str());
+        let _span = crate::fn_span!(Level::Debug, events::SESSION_RESUME, "kernel::session::resume", "id" => id.as_str());
         identity::find(fs, root, id)?
             .ok_or_else(|| SessionError::UnknownSession(id.as_str().to_string()))?;
         Self::open_with_cost(fs, &identity::session_dir(root, id), CostCaps::default())
@@ -49,24 +49,32 @@ impl<'a> Session<'a> {
     /// # Errors
     /// [`SessionError`] se o índice for ilegível.
     pub fn list(fs: &dyn Fs, root: &Path) -> Result<Vec<SessionMeta>, SessionError> {
+        let _span = crate::trace_fn!("kernel::session::resume::list");
+
         Ok(identity::list(fs, root)?)
     }
 
     /// Raiz do projeto vinculada (o diretório da sessão se não houver `meta.json`).
     #[must_use]
     pub fn root(&self) -> &Path {
+        let _span = crate::trace_fn!("kernel::session::resume::root");
+
         &self.root
     }
 
     /// Identificador da sessão, se estiver no layout `.katu/`.
     #[must_use]
     pub fn id(&self) -> Option<&SessionId> {
+        let _span = crate::trace_fn!("kernel::session::resume::id");
+
         self.meta.as_ref().map(|meta| &meta.id)
     }
 
     /// Metadados da sessão, se existirem.
     #[must_use]
     pub fn meta(&self) -> Option<&SessionMeta> {
+        let _span = crate::trace_fn!("kernel::session::resume::meta");
+
         self.meta.as_ref()
     }
 
@@ -75,6 +83,11 @@ impl<'a> Session<'a> {
     /// # Errors
     /// [`SessionError::Fs`] se a escrita falhar.
     pub fn write_snapshot(&self) -> Result<StateSnapshot, SessionError> {
+        let _span = crate::fn_span!(
+            Level::Debug,
+            events::STORE_SAVE,
+            "kernel::session::write_snapshot"
+        );
         let snapshot = StateSnapshot {
             schema_version: SNAPSHOT_SCHEMA_VERSION,
             seq: self.log.seq(),

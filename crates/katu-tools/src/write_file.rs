@@ -21,11 +21,13 @@ pub struct WriteFileTool<'a> {
 
 impl Tool for WriteFileTool<'_> {
     fn name(&self) -> ToolName {
+        let _span = katu_core::trace_fn!("write_file::name");
+
         ToolName::Write
     }
 
     fn execute(&self, use_: &ToolUse) -> ToolOutput {
-        let _span = katu_core::span!(Level::Trace, events::TOOL_WRITE);
+        let _span = katu_core::fn_span!(Level::Trace, events::TOOL_WRITE, "write_file::execute");
         let ToolArgs::Write { path, .. } = &use_.args else {
             return unavailable("write");
         };
@@ -57,6 +59,8 @@ impl Tool for WriteFileTool<'_> {
 }
 
 fn unavailable(control: &'static str) -> ToolOutput {
+    let _span = katu_core::trace_fn!("write_file::unavailable");
+
     ToolOutput::outcome(ToolOutcome::Unavailable {
         control: ControlId::new(control),
         rule_id: None,

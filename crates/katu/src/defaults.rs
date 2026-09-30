@@ -5,6 +5,7 @@
 
 use std::path::Path;
 
+use katu_core::diag::{Level, events};
 use katu_core::kernel::discover_root;
 
 use crate::config;
@@ -42,6 +43,7 @@ pub(crate) struct EmbeddingDefaults {
 
 /// Padrões do projeto atual (raiz descoberta a subir do diretório atual).
 pub(crate) fn current() -> Defaults {
+    let _span = katu_core::fn_span!(Level::Trace, events::CONFIG_LOAD, "defaults::current");
     let fs = StdFs;
     let start = std::env::current_dir().unwrap_or_default();
     let root = discover_root(&fs, &start);
@@ -50,6 +52,7 @@ pub(crate) fn current() -> Defaults {
 
 /// Padrões de um projeto.
 pub(crate) fn from_root(root: &Path) -> Defaults {
+    let _span = katu_core::fn_span!(Level::Trace, events::CONFIG_LOAD, "defaults::from_root");
     let mut table = match config::global_path() {
         Ok(path) => config::load(&path).unwrap_or_default(),
         Err(_) => toml::Table::new(),
@@ -75,6 +78,8 @@ pub(crate) fn from_root(root: &Path) -> Defaults {
 
 /// Texto **não vazio** de uma chave.
 fn text(table: &toml::Table, key: &str) -> Option<String> {
+    let _span = katu_core::trace_fn!("defaults::text");
+
     match config::get_key(table, key) {
         Some(toml::Value::String(value)) if !value.is_empty() => Some(value),
         _ => None,
@@ -83,6 +88,8 @@ fn text(table: &toml::Table, key: &str) -> Option<String> {
 
 /// Booleano de uma chave.
 fn boolean(table: &toml::Table, key: &str) -> Option<bool> {
+    let _span = katu_core::trace_fn!("defaults::boolean");
+
     match config::get_key(table, key) {
         Some(toml::Value::Boolean(value)) => Some(value),
         _ => None,
@@ -91,6 +98,8 @@ fn boolean(table: &toml::Table, key: &str) -> Option<bool> {
 
 /// Inteiro de uma chave.
 fn integer(table: &toml::Table, key: &str) -> Option<i64> {
+    let _span = katu_core::trace_fn!("defaults::integer");
+
     match config::get_key(table, key) {
         Some(toml::Value::Integer(value)) => Some(value),
         _ => None,

@@ -10,11 +10,15 @@ use serde_json::{Map, Value, json};
 
 /// Definições das 11 tools para o endpoint de modelo.
 pub(super) fn tool_defs() -> Vec<ToolDef> {
+    let _span = katu_core::trace_fn!("agent::catalog::tool_defs");
+
     SCHEMAS.iter().map(def).collect()
 }
 
 /// Converte um `ToolSchema` no `ToolDef` do provider (JSON Schema dos parâmetros).
 fn def(schema: &ToolSchema<'_>) -> ToolDef {
+    let _span = katu_core::trace_fn!("agent::catalog::def");
+
     let mut properties = Map::new();
     let mut required: Vec<Value> = Vec::new();
     for param in schema.params {
@@ -38,6 +42,8 @@ fn def(schema: &ToolSchema<'_>) -> ToolDef {
 
 /// JSON Schema de um parâmetro.
 fn property(kind: ParamKind<'_>) -> Value {
+    let _span = katu_core::trace_fn!("agent::catalog::property");
+
     match kind {
         ParamKind::Text | ParamKind::Path => json!({ "type": "string" }),
         ParamKind::Integer => json!({ "type": "integer" }),

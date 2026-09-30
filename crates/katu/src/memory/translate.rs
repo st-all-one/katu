@@ -12,6 +12,8 @@ use knudge_core::write::{DedupDecision, Draft};
 
 /// Converte o tipo de nota do katu no do knudge.
 pub(crate) fn note_type(note_type: NoteType) -> KnudgeNoteType {
+    let _span = katu_core::trace_fn!("memory::translate::note_type");
+
     match note_type {
         NoteType::Decision => KnudgeNoteType::Decision,
         NoteType::Question => KnudgeNoteType::Question,
@@ -28,6 +30,8 @@ pub(crate) fn note_type(note_type: NoteType) -> KnudgeNoteType {
 
 /// Converte o tipo de nota do knudge no do katu.
 pub(crate) fn from_note_type(note_type: KnudgeNoteType) -> NoteType {
+    let _span = katu_core::trace_fn!("memory::translate::from_note_type");
+
     match note_type {
         KnudgeNoteType::Fact => NoteType::Fact,
         KnudgeNoteType::Decision => NoteType::Decision,
@@ -44,6 +48,8 @@ pub(crate) fn from_note_type(note_type: KnudgeNoteType) -> NoteType {
 
 /// Converte o estado do knudge no do katu.
 pub(crate) fn from_status(status: KnudgeStatus) -> Status {
+    let _span = katu_core::trace_fn!("memory::translate::from_status");
+
     match status {
         KnudgeStatus::Active => Status::Active,
         KnudgeStatus::InProgress => Status::InProgress,
@@ -56,6 +62,8 @@ pub(crate) fn from_status(status: KnudgeStatus) -> Status {
 
 /// Converte um pedido de escrita no rascunho do knudge.
 pub(crate) fn draft(statement: &str, kind: NoteType, body: &str, anchor: Option<&str>) -> Draft {
+    let _span = katu_core::trace_fn!("memory::translate::draft");
+
     let mut draft = Draft::new(note_type(kind), statement.to_string());
     if !body.is_empty() {
         draft.body = body.to_string();
@@ -76,6 +84,8 @@ pub(crate) fn edit_outcome(
     original_statement: &str,
     new_statement: &str,
 ) -> PreEditOutcome {
+    let _span = katu_core::trace_fn!("memory::translate::edit_outcome");
+
     let canonical_id = note_id(note_type, original_statement);
     let new_id = note_id(note_type, new_statement);
     let content_key_changed = new_statement != original_statement;
@@ -94,6 +104,8 @@ pub(crate) fn edit_outcome(
 /// # Errors
 /// [`MemoryError::internal`] se a similaridade não couber nos pontos base (não deve acontecer).
 pub(crate) fn outcome(decision: DedupDecision) -> Result<PreWriteOutcome, MemoryError> {
+    let _span = katu_core::trace_fn!("memory::translate::outcome");
+
     Ok(match decision {
         DedupDecision::Create => PreWriteOutcome::Create,
         DedupDecision::Merge { candidate, score } => PreWriteOutcome::Merge {
@@ -114,6 +126,8 @@ pub(crate) fn outcome(decision: DedupDecision) -> Result<PreWriteOutcome, Memory
 /// # Errors
 /// [`MemoryError::internal`] se a confiança não couber nos pontos base.
 pub(crate) fn hit(hit: &KnudgeHit) -> Result<RecallHit, MemoryError> {
+    let _span = katu_core::trace_fn!("memory::translate::hit");
+
     Ok(RecallHit {
         note: NoteRef::new(hit.id.clone()),
         statement: hit.statement.clone(),
@@ -131,6 +145,8 @@ pub(crate) fn hit(hit: &KnudgeHit) -> Result<RecallHit, MemoryError> {
     reason = "confidence ∈ [0,1] × 10000 cabe em u16; conversão documentada na borda do adaptador"
 )]
 pub(crate) fn points(confidence: f64) -> Result<Score, MemoryError> {
+    let _span = katu_core::trace_fn!("memory::translate::points");
+
     let clamped = confidence.clamp(0.0, 1.0);
     let scaled = (clamped * f64::from(Score::MAX_BASIS_POINTS)).round() as i64;
     let raw = u16::try_from(scaled).unwrap_or(Score::MAX_BASIS_POINTS);

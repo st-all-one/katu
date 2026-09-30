@@ -43,6 +43,8 @@ pub struct Diff {
 /// Diff unificado com `context` linhas de contexto à volta do miolo alterado.
 #[must_use]
 pub fn unified(old: &str, new: &str, context: usize) -> Diff {
+    let _span = katu_core::trace_fn!("diff::unified");
+
     let a: Vec<&str> = old.lines().collect();
     let b: Vec<&str> = new.lines().collect();
     let prefix = common_prefix(&a, &b);
@@ -81,6 +83,8 @@ struct Change {
 
 /// Comprimento do prefixo comum de linhas.
 fn common_prefix(a: &[&str], b: &[&str]) -> usize {
+    let _span = katu_core::trace_fn!("diff::common_prefix");
+
     let mut index = 0;
     while index < a.len() && index < b.len() && a.get(index) == b.get(index) {
         index = index.saturating_add(1);
@@ -90,6 +94,8 @@ fn common_prefix(a: &[&str], b: &[&str]) -> usize {
 
 /// Comprimento do sufixo comum de linhas (sem sobrepor o prefixo).
 fn common_suffix(a: &[&str], b: &[&str], prefix: usize) -> usize {
+    let _span = katu_core::trace_fn!("diff::common_suffix");
+
     let mut count = 0;
     while count < a.len().saturating_sub(prefix)
         && count < b.len().saturating_sub(prefix)
@@ -103,6 +109,8 @@ fn common_suffix(a: &[&str], b: &[&str], prefix: usize) -> usize {
 
 /// Constrói o único bloco: contexto antes + removidas + adicionadas + contexto depois.
 fn build_hunk(a: &[&str], b: &[&str], change: Change, context: usize) -> Hunk {
+    let _span = katu_core::trace_fn!("diff::build_hunk");
+
     let Change {
         prefix,
         removed,
@@ -137,6 +145,8 @@ fn build_hunk(a: &[&str], b: &[&str], change: Change, context: usize) -> Hunk {
 
 /// Converte um comprimento para `u32` (satura; nunca falha).
 fn to_u32(value: usize) -> u32 {
+    let _span = katu_core::trace_fn!("diff::to_u32");
+
     u32::try_from(value).unwrap_or(u32::MAX)
 }
 

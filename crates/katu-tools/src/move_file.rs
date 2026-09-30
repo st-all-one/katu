@@ -21,11 +21,13 @@ pub struct MoveFileTool<'a> {
 
 impl Tool for MoveFileTool<'_> {
     fn name(&self) -> ToolName {
+        let _span = katu_core::trace_fn!("move_file::name");
+
         ToolName::Move
     }
 
     fn execute(&self, use_: &ToolUse) -> ToolOutput {
-        let _span = katu_core::span!(Level::Trace, events::TOOL_MOVE);
+        let _span = katu_core::fn_span!(Level::Trace, events::TOOL_MOVE, "move_file::execute");
         let ToolArgs::Move { from, to } = &use_.args else {
             return unavailable("move");
         };
@@ -65,6 +67,8 @@ impl Tool for MoveFileTool<'_> {
 }
 
 fn unavailable(control: &'static str) -> ToolOutput {
+    let _span = katu_core::trace_fn!("move_file::unavailable");
+
     ToolOutput::outcome(ToolOutcome::Unavailable {
         control: ControlId::new(control),
         rule_id: None,

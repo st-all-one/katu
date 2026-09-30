@@ -12,6 +12,8 @@
 //!
 //! Não há contentor de DI geral: o bus é uma lista de referências com um terminal.
 
+use crate::diag::{Level, events};
+
 /// Resultado de um handler do bus.
 pub type HandlerResult = Result<(), HandlerError>;
 
@@ -62,6 +64,8 @@ pub struct Next<'a, E> {
 impl<'a, E> Next<'a, E> {
     /// Cria a continuação (uso interno do [`EventBus`]).
     fn new(downstream: &'a mut dyn FnMut(&E) -> HandlerResult) -> Self {
+        let _span = crate::trace_fn!("kernel::bus::new");
+
         Self {
             downstream,
             calls: 0,
@@ -73,6 +77,8 @@ impl<'a, E> Next<'a, E> {
     /// # Errors
     /// [`HandlerError::CalledTwice`] numa segunda chamada; caso contrário propaga o erro a jusante.
     pub fn run(&mut self, event: &E) -> HandlerResult {
+        let _span = crate::trace_fn!("kernel::bus::run");
+
         self.calls = self.calls.saturating_add(1);
         if self.calls > 1 {
             return Err(HandlerError::CalledTwice);
@@ -83,6 +89,8 @@ impl<'a, E> Next<'a, E> {
     /// Número de vezes que [`Next::run`] foi chamado.
     #[must_use]
     pub fn calls(&self) -> u32 {
+        let _span = crate::trace_fn!("kernel::bus::calls");
+
         self.calls
     }
 }
@@ -97,6 +105,8 @@ pub struct EventBus<'a, E> {
 impl<'a, E> EventBus<'a, E> {
     /// Cria um bus com o terminal dado (o fim da cadeia).
     pub fn new(terminal: &'a dyn Fn(&E) -> HandlerResult) -> Self {
+        let _span = crate::trace_fn!("kernel::bus::new");
+
         Self {
             observers: Vec::new(),
             middleware: Vec::new(),
@@ -107,6 +117,8 @@ impl<'a, E> EventBus<'a, E> {
     /// Acrescenta um observador.
     #[must_use]
     pub fn with_observer(mut self, observer: &'a dyn Observer<E>) -> Self {
+        let _span = crate::trace_fn!("kernel::bus::with_observer");
+
         self.observers.push(observer);
         self
     }
@@ -114,12 +126,15 @@ impl<'a, E> EventBus<'a, E> {
     /// Acrescenta um middleware ao fim da cadeia.
     #[must_use]
     pub fn with_middleware(mut self, middleware: &'a dyn Middleware<E>) -> Self {
+        let _span = crate::trace_fn!("kernel::bus::with_middleware");
+
         self.middleware.push(middleware);
         self
     }
 
     /// Notifica todos os observadores (infalível).
     pub fn emit(&self, event: &E) {
+        let _span = crate::fn_span!(Level::Trace, events::BUS_DELIVER, "kernel::bus::emit");
         for observer in &self.observers {
             observer.on_event(event);
         }
@@ -130,12 +145,15 @@ impl<'a, E> EventBus<'a, E> {
     /// # Errors
     /// [`HandlerError`] se um middleware violar a regra de `next` ou devolver erro.
     pub fn dispatch(&self, event: &E) -> HandlerResult {
+        let _span = crate::fn_span!(Level::Debug, events::BUS_PUBLISH, "kernel::bus::dispatch");
         self.emit(event);
         self.invoke(0, event)
     }
 
     /// Invoca o middleware em `index` (ou o terminal, no fim da cadeia).
     fn invoke(&self, index: usize, event: &E) -> HandlerResult {
+        let _span = crate::trace_fn!("kernel::bus::invoke");
+
         let Some(middleware) = self.middleware.get(index) else {
             return (self.terminal)(event);
         };

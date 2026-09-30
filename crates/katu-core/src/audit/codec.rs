@@ -16,6 +16,8 @@ const US: char = '\u{1f}';
 
 /// Lê o manifesto (default se ausente; erro se a versão não for suportada).
 pub(super) fn read_manifest(fs: &dyn Fs, dir: &Path) -> Result<Manifest, AuditError> {
+    let _span = crate::trace_fn!("audit::codec::read_manifest");
+
     let path = dir.join("manifest.json");
     if !fs.exists(&path) {
         return Ok(Manifest::default());
@@ -38,6 +40,8 @@ pub(super) fn write_manifest(
     dir: &Path,
     manifest: &Manifest,
 ) -> Result<(), AuditError> {
+    let _span = crate::trace_fn!("audit::codec::write_manifest");
+
     let bytes =
         serde_json::to_vec(manifest).map_err(|err| AuditError::Manifest(err.to_string()))?;
     fs.write_atomic(&dir.join("manifest.json"), &bytes)?;
@@ -46,6 +50,8 @@ pub(super) fn write_manifest(
 
 /// Reconstrói uma linha de auditoria a partir da tabela `a`.
 pub(super) fn parse_record(row: &[String]) -> Result<AuditRecord, AuditError> {
+    let _span = crate::trace_fn!("audit::codec::parse_record");
+
     let get = |index: usize| row.get(index).cloned().unwrap_or_default();
     let seq = get(0)
         .parse::<u64>()
@@ -63,6 +69,8 @@ pub(super) fn parse_record(row: &[String]) -> Result<AuditRecord, AuditError> {
 
 /// Mapeia o `kind` textual de volta ao domínio fechado.
 fn kind_of(text: &str) -> &'static str {
+    let _span = crate::trace_fn!("audit::codec::kind_of");
+
     match text {
         "turn" => "turn",
         "user" => "user",
@@ -83,12 +91,16 @@ fn kind_of(text: &str) -> &'static str {
 
 /// Lê um ficheiro como texto.
 pub(super) fn read_text(fs: &dyn Fs, path: &Path) -> Result<String, AuditError> {
+    let _span = crate::trace_fn!("audit::codec::read_text");
+
     let bytes = fs.read(path)?;
     String::from_utf8(bytes).map_err(|err| AuditError::Parse(err.to_string()))
 }
 
 /// Lê as linhas de uma secção de tabela (`\x1eNOME\n` + linhas `\x1f` até à secção seguinte).
 pub(super) fn parse_rows(text: &str, name: &str) -> Vec<Vec<String>> {
+    let _span = crate::trace_fn!("audit::codec::parse_rows");
+
     let marker = format!("{RS}{name}\n");
     let Some(start) = text.find(&marker) else {
         return Vec::new();

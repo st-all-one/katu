@@ -92,3 +92,77 @@ value = 743122.0
 unit = "nanos"
 basis = "measured"
 artifact = { path = "bench/render/frame.json", note = "p95 de 400 quadros, TestBackend 120×40, 200 entradas" }
+
+# --- Baseline de arranque do E18 (otimização profunda) ---
+# Protocolo em `bench/e18/PROTOCOL.md`; relatório em `bench/e18/REPORT.md`; artefacto cru em
+# `bench/e18/raw.json`. CPU-local (o remoto é o built-in `opencode-go`); percentis variam por
+# máquina. O cold start do modelo local (~40 s) não é publicado: o p50 é a quente (prefix-cache).
+[[metrics]]
+name = "e18.startup.version.p50_ms"
+value = 6.469
+unit = "millis"
+basis = "measured"
+artifact = { path = "bench/e18/raw.json", note = "100× `katu --version` (release)" }
+
+[[metrics]]
+name = "e18.embeddings.p50_ms"
+value = 16.102
+unit = "millis"
+basis = "measured"
+artifact = { path = "bench/e18/raw.json", note = "30× POST /v1/embeddings (granite-97m, CPU)" }
+
+[[metrics]]
+name = "e18.provider.llama.ttft.p50_ms"
+value = 68.0
+unit = "millis"
+basis = "measured"
+artifact = { path = "bench/e18/raw.json", note = "5× provider-smoke --warm, quente" }
+
+[[metrics]]
+name = "e18.provider.opencode.ttft.p50_ms"
+value = 2304.0
+unit = "millis"
+basis = "measured"
+artifact = { path = "bench/e18/raw.json", note = "5× provider-smoke --warm (longcat-2.5-preview-free)" }
+
+[[metrics]]
+name = "e18.turn.llama.p50_ms"
+value = 360.0
+unit = "millis"
+basis = "measured"
+artifact = { path = "bench/e18/raw.json", note = "10× `katu run` quente (llama local)" }
+
+[[metrics]]
+name = "e18.turn.opencode.p50_ms"
+value = 343.0
+unit = "millis"
+basis = "measured"
+artifact = { path = "bench/e18/raw.json", note = "10× `katu run` quente (opencode-go)" }
+
+[[metrics]]
+name = "e18.turn.nonprovider.p50_ms"
+value = 72.306
+unit = "millis"
+basis = "measured"
+artifact = { path = "bench/e18/raw.json", note = "5× turno instrumentado; soma dos spans exceto provider" }
+
+[[metrics]]
+name = "e18.log_append.p50_ms"
+value = 18.3
+unit = "millis"
+basis = "measured"
+artifact = { path = "bench/e18/raw.json", note = "5× turno; 5 appends com fsync cada" }
+
+[[metrics]]
+name = "e18.fs_write.p50_ms"
+value = 25.792
+unit = "millis"
+basis = "measured"
+artifact = { path = "bench/e18/raw.json", note = "5× turno; 7 escritas atómicas (tmp→fsync→rename)" }
+
+[[metrics]]
+name = "e18.session_open.p50_ms"
+value = 8.468
+unit = "millis"
+basis = "measured"
+artifact = { path = "bench/e18/raw.json", note = "5× turno; memory.open+identity+log (interno por instrumentar)" }

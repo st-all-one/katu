@@ -49,12 +49,32 @@ fn records_span_and_event() {
         .records
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    assert_eq!(records.len(), 4);
-    assert_eq!(records.first().map(|r| r.1), Some(Kind::SpanStart));
-    assert_eq!(records.get(1).map(|r| r.1), Some(Kind::Event));
-    assert_eq!(records.get(2).map(|r| r.0), Some(events::CONTAIN_MODE));
-    assert_eq!(records.get(3).map(|r| r.1), Some(Kind::SpanEnd));
+    // O sink é global e os testes correm em paralelo: outras threads podem emitir (sobretudo
+    // `katu.fn`, agora que quase toda a função abre um span). Exigimos que a **nossa** sequência
+    // apareça **em ordem** (subsequência), tolerando ruído intercalado.
+    let got: Vec<(&str, Kind)> = records
+        .iter()
+        .map(|(event, kind)| (*event, *kind))
+        .collect();
+    // `announce` abre um span de função (`trace_fn!` → `katu.fn`) em torno de `contain.mode`.
+    let expected = [
+        (events::KATU_RUN, Kind::SpanStart),
+        (events::TOOL_OK, Kind::Event),
+        (events::KATU_FN, Kind::SpanStart),
+        (events::CONTAIN_MODE, Kind::Event),
+        (events::KATU_RUN, Kind::SpanEnd),
+    ];
+    assert!(is_subsequence(&expected, &got), "ordem inesperada: {got:?}");
     set_enabled(false);
+}
+
+/// `true` se `needle` ocorre em `haystack` pela mesma ordem (sem exigir contiguidade).
+#[cfg(feature = "instrument")]
+fn is_subsequence(needle: &[(&str, Kind)], haystack: &[(&str, Kind)]) -> bool {
+    let mut it = haystack.iter();
+    needle
+        .iter()
+        .all(|item| it.any(|candidate| candidate == item))
 }
 
 #[cfg(not(feature = "instrument"))]

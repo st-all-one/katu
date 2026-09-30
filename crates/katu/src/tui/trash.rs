@@ -12,6 +12,7 @@ use super::AgentHandler;
 impl AgentHandler<'_> {
     /// Lista a lixeira do projeto para a UI (E10-T07/E06-T09).
     pub(super) fn trash_list(&self) -> Vec<Update> {
+        let _span = katu_core::fn_span!(Level::Trace, events::TOOL_TRASH, "trash::trash_list");
         let items = trash::list(self.fs, self.runtime.root())
             .into_iter()
             .map(|item| TrashEntry {
@@ -24,6 +25,7 @@ impl AgentHandler<'_> {
 
     /// Restaura um item da lixeira e devolve a lista atualizada (E06-T09).
     pub(super) fn restore(&self, token: &str) -> Vec<Update> {
+        let _span = katu_core::fn_span!(Level::Trace, events::TOOL_TRASH, "trash::restore");
         match trash::restore(self.fs, self.runtime.root(), token) {
             Ok(path) => {
                 let mut updates = vec![Update::Info(format!("restaurado: {}", path.display()))];
@@ -36,6 +38,7 @@ impl AgentHandler<'_> {
 
     /// Esvazia a lixeira **permanentemente**, após challenge humano (E10-T07, §33).
     pub(super) fn empty_trash(&self, painter: &mut Painter<'_>) -> Vec<Update> {
+        let _span = katu_core::fn_span!(Level::Trace, events::TOOL_TRASH, "trash::empty_trash");
         let count = trash::list(self.fs, self.runtime.root()).len();
         if count == 0 {
             return vec![Update::Info("lixeira vazia".to_string())];

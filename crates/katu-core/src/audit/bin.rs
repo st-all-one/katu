@@ -14,6 +14,8 @@ const MAGIC: &[u8; 4] = b"KAI1";
 
 /// Serializa índice + Bloom.
 pub(super) fn encode(index: &Index, bloom: &Bloom) -> Vec<u8> {
+    let _span = crate::trace_fn!("audit::bin::encode");
+
     let mut out = Vec::new();
     out.extend_from_slice(MAGIC);
     put_varint(
@@ -43,6 +45,8 @@ pub(super) fn encode(index: &Index, bloom: &Bloom) -> Vec<u8> {
 
 /// Desserializa; `None` se o formato não for reconhecido (o chamador reconstrói).
 pub(super) fn decode(bytes: &[u8]) -> Option<(Index, Bloom)> {
+    let _span = crate::trace_fn!("audit::bin::decode");
+
     let mut cursor = Cursor::new(bytes);
     if cursor.take(4)? != MAGIC.as_slice() {
         return None;
@@ -84,6 +88,8 @@ impl<'a> Cursor<'a> {
     }
 
     fn take(&mut self, len: usize) -> Option<&'a [u8]> {
+        let _span = crate::trace_fn!("audit::bin::take");
+
         let end = self.pos.checked_add(len)?;
         let slice = self.bytes.get(self.pos..end)?;
         self.pos = end;
@@ -91,12 +97,16 @@ impl<'a> Cursor<'a> {
     }
 
     fn byte(&mut self) -> Option<u8> {
+        let _span = crate::trace_fn!("audit::bin::byte");
+
         let byte = *self.bytes.get(self.pos)?;
         self.pos = self.pos.checked_add(1)?;
         Some(byte)
     }
 
     fn varint(&mut self) -> Option<u64> {
+        let _span = crate::trace_fn!("audit::bin::varint");
+
         let mut result = 0_u64;
         let mut shift = 0_u32;
         loop {
@@ -116,6 +126,8 @@ impl<'a> Cursor<'a> {
 
 /// Escreve um varint LEB128.
 fn put_varint(out: &mut Vec<u8>, mut value: u64) {
+    let _span = crate::trace_fn!("audit::bin::put_varint");
+
     loop {
         let low = u8::try_from(value & 0x7f).unwrap_or(0);
         value = value.checked_shr(7).unwrap_or(0);

@@ -31,11 +31,12 @@
 | `mem-recall-before-write` | enforced | Memória: não gravar nota sem ter consultado o conhecimento (recall) na mesma fase |
 | `mem-single-claim` | enforced | Memória: uma afirmação por nota |
 
-## Eventos de diag (86)
+## Eventos de diag (114)
 
 - `katu.run`
 - `katu.setup`
 - `katu.shutdown`
+- `katu.fn`
 - `fs.read`
 - `fs.write`
 - `fs.rename`
@@ -119,6 +120,33 @@
 - `tui.steer`
 - `tui.approval`
 - `tui.trash_empty`
+- `tui.action`
+- `tui.slash`
+- `mouse.copy`
+- `cli.prime`
+- `cli.run`
+- `cli.tui`
+- `cli.memo`
+- `cli.config`
+- `cli.upgrade`
+- `cli.sessions`
+- `cli.input`
+- `bootstrap.init`
+- `bootstrap.fix`
+- `config.load`
+- `config.set`
+- `watch.tick`
+- `watch.drain`
+- `skill.discover`
+- `skill.read`
+- `embed.request`
+- `agent.route`
+- `memory.open`
+- `bus.publish`
+- `bus.deliver`
+- `policy.load`
+- `policy.audit`
+- `policy.capability`
 
 ## ADRs (23)
 

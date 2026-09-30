@@ -8,6 +8,7 @@
 use std::iter::once;
 use std::path::{Path, PathBuf};
 
+use katu_core::diag::{Level, events};
 use katu_core::error::Error;
 use katu_core::ports::{Env, ExecRequest, ExecResult, Process};
 use serde_json::{Value, json};
@@ -52,6 +53,8 @@ struct Paths {
 impl Paths {
     /// Deriva os caminhos de `XDG_DATA_HOME`/`XDG_CONFIG_HOME` (com fallback para `HOME`).
     fn from_env(env: &dyn Env) -> Self {
+        let _span = katu_core::trace_fn!("watch_service::from_env");
+
         let base = env
             .var("XDG_DATA_HOME")
             .map_or_else(|| home(env).join(".local/share"), PathBuf::from)
@@ -64,24 +67,34 @@ impl Paths {
     }
 
     fn script(&self) -> PathBuf {
+        let _span = katu_core::trace_fn!("watch_service::script");
+
         self.base.join(SCRIPT_NAME)
     }
 
     fn watched(&self) -> PathBuf {
+        let _span = katu_core::trace_fn!("watch_service::watched");
+
         self.base.join(WATCHED_NAME)
     }
 
     fn service(&self) -> PathBuf {
+        let _span = katu_core::trace_fn!("watch_service::service");
+
         self.systemd.join(SERVICE_NAME)
     }
 
     fn timer(&self) -> PathBuf {
+        let _span = katu_core::trace_fn!("watch_service::timer");
+
         self.systemd.join(TIMER_NAME)
     }
 }
 
 /// `HOME` com fallback determinístico (nunca vazio).
 fn home(env: &dyn Env) -> PathBuf {
+    let _span = katu_core::trace_fn!("watch_service::home");
+
     env.var("HOME")
         .map_or_else(|| PathBuf::from("."), PathBuf::from)
 }
@@ -96,6 +109,7 @@ struct Context<'a> {
 
 /// Executa a ação pedida (borda real: `StdProcess`/`StdEnv`).
 pub(crate) fn run(action: Action) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::WATCH_TICK, "watch_service::run");
     let process = StdProcess;
     let env = StdEnv;
     let paths = Paths::from_env(&env);
@@ -114,6 +128,8 @@ pub(crate) fn run(action: Action) -> Report {
 
 /// Despacha a ação para o handler correspondente.
 fn dispatch(action: Action, context: &Context<'_>) -> Result<Value, Error> {
+    let _span = katu_core::trace_fn!("watch_service::dispatch");
+
     match action {
         Action::Status => status(context),
         Action::Install => install(context),
@@ -125,6 +141,7 @@ fn dispatch(action: Action, context: &Context<'_>) -> Result<Value, Error> {
 
 /// `--status`: instalação, estado do timer e projetos subscritos (read-only).
 fn status(context: &Context<'_>) -> Result<Value, Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::WATCH_TICK, "watch_service::status");
     let installed = context.paths.script().is_file() && context.paths.timer().is_file();
     Ok(json!({
         "action": "status",
@@ -138,6 +155,7 @@ fn status(context: &Context<'_>) -> Result<Value, Error> {
 
 /// `--install`: materializa o script + unidades e ativa o timer.
 fn install(context: &Context<'_>) -> Result<Value, Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::WATCH_TICK, "watch_service::install");
     write_script(&context.paths.script())?;
     write_file(
         &context.paths.service(),
@@ -157,6 +175,7 @@ fn install(context: &Context<'_>) -> Result<Value, Error> {
 
 /// `--subscribe`: adiciona o projeto atual à lista (idempotente).
 fn subscribe(context: &Context<'_>) -> Result<Value, Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::WATCH_TICK, "watch_service::subscribe");
     let mut watched = read_watched(context.paths)?;
     let root = context.project.display().to_string();
     if !watched.iter().any(|entry| entry == &root) {
@@ -168,6 +187,11 @@ fn subscribe(context: &Context<'_>) -> Result<Value, Error> {
 
 /// `--unsubscribe`: remove o projeto atual da lista.
 fn unsubscribe(context: &Context<'_>) -> Result<Value, Error> {
+    let _span = katu_core::fn_span!(
+        Level::Trace,
+        events::WATCH_TICK,
+        "watch_service::unsubscribe"
+    );
     let root = context.project.display().to_string();
     let watched: Vec<String> = read_watched(context.paths)?
         .into_iter()
@@ -179,6 +203,7 @@ fn unsubscribe(context: &Context<'_>) -> Result<Value, Error> {
 
 /// `--uninstall`: desativa e remove o timer + script (mantém a lista de subscrições).
 fn uninstall(context: &Context<'_>) -> Result<Value, Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::WATCH_TICK, "watch_service::uninstall");
     if context.paths.timer().is_file() {
         systemctl(context, &["disable", "--now", TIMER_NAME])?;
     }
@@ -191,6 +216,8 @@ fn uninstall(context: &Context<'_>) -> Result<Value, Error> {
 
 /// Corre `systemctl --user <args>` e recusa em erro (fail-closed).
 fn systemctl(context: &Context<'_>, args: &[&str]) -> Result<ExecResult, Error> {
+    let _span = katu_core::trace_fn!("watch_service::systemctl");
+
     let result = context
         .process
         .run(&systemctl_request(context, args))
@@ -207,6 +234,8 @@ fn systemctl(context: &Context<'_>, args: &[&str]) -> Result<ExecResult, Error> 
 
 /// `systemctl --user is-active <timer>` como texto (`unknown` se indisponível).
 fn probe_active(context: &Context<'_>) -> String {
+    let _span = katu_core::trace_fn!("watch_service::probe_active");
+
     match context
         .process
         .run(&systemctl_request(context, &["is-active", TIMER_NAME]))
@@ -218,6 +247,8 @@ fn probe_active(context: &Context<'_>) -> String {
 
 /// Pedido de execução para o `systemctl --user`.
 fn systemctl_request(context: &Context<'_>, args: &[&str]) -> ExecRequest {
+    let _span = katu_core::trace_fn!("watch_service::systemctl_request");
+
     ExecRequest {
         argv: once("systemctl")
             .chain(once("--user"))

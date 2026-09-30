@@ -22,11 +22,13 @@ pub struct PlanTool {
 
 impl Tool for PlanTool {
     fn name(&self) -> ToolName {
+        let _span = katu_core::trace_fn!("plan::name");
+
         ToolName::Plan
     }
 
     fn execute(&self, _use_: &ToolUse) -> ToolOutput {
-        let _span = katu_core::span!(Level::Trace, events::TOOL_PLAN);
+        let _span = katu_core::fn_span!(Level::Trace, events::TOOL_PLAN, "plan::execute");
         match self.plan.validate() {
             Ok(()) => ToolOutput::report(build(&self.plan)),
             Err(error) => unavailable(control_of(&error)),
@@ -36,6 +38,8 @@ impl Tool for PlanTool {
 
 /// Controlo acionável correspondente ao erro (DF10).
 fn control_of(error: &PlanError) -> &'static str {
+    let _span = katu_core::trace_fn!("plan::control_of");
+
     match error {
         PlanError::EmptyFeatureList => "plan-features",
         PlanError::MissingForbiddenFiles => "plan-forbidden",
@@ -46,6 +50,7 @@ fn control_of(error: &PlanError) -> &'static str {
 }
 
 fn build(plan: &Plan) -> ToolReport {
+    let _span = katu_core::fn_span!(Level::Trace, events::TOOL_PLAN, "plan::build");
     let features: Vec<Value> = plan
         .feature_list
         .iter()
@@ -99,6 +104,8 @@ fn build(plan: &Plan) -> ToolReport {
 }
 
 fn unavailable(control: &'static str) -> ToolOutput {
+    let _span = katu_core::trace_fn!("plan::unavailable");
+
     ToolOutput::outcome(ToolOutcome::Unavailable {
         control: ControlId::new(control),
         rule_id: None,

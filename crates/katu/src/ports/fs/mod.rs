@@ -21,12 +21,12 @@ pub(crate) struct StdFs;
 
 impl Fs for StdFs {
     fn read(&self, path: &Path) -> Result<Vec<u8>, FsError> {
-        let _span = katu_core::span!(Level::Trace, events::FS_READ);
+        let _span = katu_core::fn_span!(Level::Trace, events::FS_READ, "fs::read");
         fs::read(path).map_err(|err| FsError::from_io(&err))
     }
 
     fn read_from(&self, path: &Path, offset: u64) -> Result<Vec<u8>, FsError> {
-        let _span = katu_core::span!(Level::Trace, events::FS_READ);
+        let _span = katu_core::fn_span!(Level::Trace, events::FS_READ, "fs::read_from");
         let mut file = fs::File::open(path).map_err(|err| FsError::from_io(&err))?;
         file.seek(SeekFrom::Start(offset))
             .map_err(|err| FsError::from_io(&err))?;
@@ -37,7 +37,7 @@ impl Fs for StdFs {
     }
 
     fn canonicalize(&self, path: &Path) -> Result<PathBuf, FsError> {
-        let _span = katu_core::span!(Level::Trace, events::FS_STAT);
+        let _span = katu_core::fn_span!(Level::Trace, events::FS_STAT, "fs::canonicalize");
         match fs::canonicalize(path) {
             Ok(canonical) => Ok(canonical),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
@@ -54,12 +54,12 @@ impl Fs for StdFs {
     }
 
     fn write_atomic(&self, path: &Path, bytes: &[u8]) -> Result<(), FsError> {
-        let _span = katu_core::span!(Level::Trace, events::FS_WRITE);
+        let _span = katu_core::fn_span!(Level::Trace, events::FS_WRITE, "fs::write_atomic");
         write_bytes_atomic(path, bytes)
     }
 
     fn write_atomic_if(&self, path: &Path, bytes: &[u8], expected: &[u8]) -> Result<(), FsError> {
-        let _span = katu_core::span!(Level::Trace, events::FS_WRITE);
+        let _span = katu_core::fn_span!(Level::Trace, events::FS_WRITE, "fs::write_atomic_if");
         let current = fs::read(path).map_err(|err| FsError::from_io(&err))?;
         if current.as_slice() != expected {
             return Err(FsError::Stale);
@@ -69,7 +69,7 @@ impl Fs for StdFs {
     }
 
     fn append(&self, path: &Path, bytes: &[u8]) -> Result<(), FsError> {
-        let _span = katu_core::span!(Level::Trace, events::FS_WRITE);
+        let _span = katu_core::fn_span!(Level::Trace, events::FS_WRITE, "fs::append");
         let mut file = OpenOptions::new()
             .create(true)
             .append(true)
@@ -81,25 +81,29 @@ impl Fs for StdFs {
     }
 
     fn exists(&self, path: &Path) -> bool {
+        let _span = katu_core::trace_fn!("ports::fs::exists");
+
         path.exists()
     }
 
     fn is_dir(&self, path: &Path) -> bool {
+        let _span = katu_core::trace_fn!("ports::fs::is_dir");
+
         path.is_dir()
     }
 
     fn rename(&self, from: &Path, to: &Path) -> Result<(), FsError> {
-        let _span = katu_core::span!(Level::Trace, events::FS_RENAME);
+        let _span = katu_core::fn_span!(Level::Trace, events::FS_RENAME, "fs::rename");
         fs::rename(from, to).map_err(|err| FsError::from_io(&err))
     }
 
     fn create_dir_all(&self, path: &Path) -> Result<(), FsError> {
-        let _span = katu_core::span!(Level::Trace, events::FS_MKDIR);
+        let _span = katu_core::fn_span!(Level::Trace, events::FS_MKDIR, "fs::create_dir_all");
         fs::create_dir_all(path).map_err(|err| FsError::from_io(&err))
     }
 
     fn mtime(&self, path: &Path) -> Result<Timestamp, FsError> {
-        let _span = katu_core::span!(Level::Trace, events::FS_STAT);
+        let _span = katu_core::fn_span!(Level::Trace, events::FS_STAT, "fs::mtime");
         let meta = fs::metadata(path).map_err(|err| FsError::from_io(&err))?;
         let modified = meta.modified().map_err(|err| FsError::from_io(&err))?;
         let elapsed = modified
@@ -110,7 +114,7 @@ impl Fs for StdFs {
     }
 
     fn list_dir(&self, path: &Path) -> Result<Vec<PathBuf>, FsError> {
-        let _span = katu_core::span!(Level::Trace, events::FS_LIST);
+        let _span = katu_core::fn_span!(Level::Trace, events::FS_LIST, "fs::list_dir");
         let mut entries: Vec<PathBuf> = fs::read_dir(path)
             .map_err(|err| FsError::from_io(&err))?
             .map(|entry| entry.map(|item| item.path()))
@@ -121,7 +125,7 @@ impl Fs for StdFs {
     }
 
     fn remove(&self, path: &Path) -> Result<(), FsError> {
-        let _span = katu_core::span!(Level::Trace, events::FS_REMOVE);
+        let _span = katu_core::fn_span!(Level::Trace, events::FS_REMOVE, "fs::remove");
         // Recusa diretórios: a remoção é sempre de um ficheiro concreto (fail-closed).
         let meta = fs::symlink_metadata(path).map_err(|err| FsError::from_io(&err))?;
         if meta.is_dir() {
@@ -133,6 +137,8 @@ impl Fs for StdFs {
 
 /// Caminho temporário **imprevisível**, no **mesmo diretório** do alvo (rename no mesmo FS).
 fn temp_path(path: &Path) -> PathBuf {
+    let _span = katu_core::trace_fn!("ports::fs::temp_path");
+
     let counter = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
     let pid = std::process::id();
     let mut name = path.as_os_str().to_owned();
@@ -145,6 +151,8 @@ fn temp_path(path: &Path) -> PathBuf {
 /// O `O_EXCL` recusa um temporário pré-existente (inclusive um **symlink plantado**), pelo que a
 /// escrita nunca segue links; o nome imprevisível evita a corrida de adivinhação (E07-T04).
 fn write_atomic_via(path: &Path, temporary: &Path, bytes: &[u8]) -> Result<(), FsError> {
+    let _span = katu_core::trace_fn!("ports::fs::write_atomic_via");
+
     {
         let mut options = OpenOptions::new();
         options.write(true).create_new(true);
@@ -162,6 +170,8 @@ fn write_atomic_via(path: &Path, temporary: &Path, bytes: &[u8]) -> Result<(), F
 
 /// Escrita atómica com um temporário derivado do alvo.
 fn write_bytes_atomic(path: &Path, bytes: &[u8]) -> Result<(), FsError> {
+    let _span = katu_core::trace_fn!("ports::fs::write_bytes_atomic");
+
     write_atomic_via(path, &temp_path(path), bytes)
 }
 

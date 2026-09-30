@@ -48,6 +48,8 @@ pub(crate) struct ChatDecoder {
 impl ChatDecoder {
     /// Novo decodificador.
     pub(crate) fn new() -> Self {
+        let _span = katu_core::trace_fn!("openai::decode::new");
+
         Self::default()
     }
 
@@ -80,6 +82,11 @@ impl ChatDecoder {
         payload: &str,
         sink: &mut dyn ProviderSink,
     ) -> Result<Flow, ProviderError> {
+        let _span = katu_core::fn_span!(
+            Level::Trace,
+            events::PROVIDER_CHUNK,
+            "openai::decode::on_payload"
+        );
         if matches!(self.status, Status::Idle) {
             self.status = Status::Streaming;
         }
@@ -133,6 +140,11 @@ impl ChatDecoder {
         &mut self,
         sink: &mut dyn ProviderSink,
     ) -> Result<Flow, ProviderError> {
+        let _span = katu_core::fn_span!(
+            Level::Trace,
+            events::PROVIDER_CHUNK,
+            "openai::decode::flush_tools"
+        );
         if self.tools.is_empty() {
             return Ok(Flow::Continue);
         }
@@ -159,6 +171,8 @@ impl ChatDecoder {
 
     /// Emite o evento, marcando o **TTFT** na primeira ocorrência (E12-T07).
     fn announce(&mut self, sink: &mut dyn ProviderSink, event: ProviderEvent) -> Flow {
+        let _span = katu_core::trace_fn!("openai::decode::announce");
+
         if !self.announced {
             self.announced = true;
             katu_core::event!(Level::Debug, events::PROVIDER_TTFT);
@@ -168,6 +182,8 @@ impl ChatDecoder {
 
     /// Resultado final (após o fim do stream).
     pub(crate) fn outcome(&self) -> ProviderOutcome {
+        let _span = katu_core::trace_fn!("openai::decode::outcome");
+
         ProviderOutcome {
             usage: self.usage,
             stop: self.stop.clone().unwrap_or(StopReason::EndTurn),
@@ -176,6 +192,11 @@ impl ChatDecoder {
 
     /// Absorve o `usage` de um chunk (base `provider_reported`).
     fn absorb_usage(&mut self, json: &UsageJson) {
+        let _span = katu_core::fn_span!(
+            Level::Trace,
+            events::PROVIDER_CHUNK,
+            "openai::decode::absorb_usage"
+        );
         let mut usage = self
             .usage
             .unwrap_or_else(|| TokenUsage::new(EvidenceBasis::ProviderReported));
@@ -199,6 +220,8 @@ impl ChatDecoder {
 
     /// Acumula fragmentos de tool calls por índice.
     fn absorb_tools(&mut self, calls: &[ToolCallDelta]) {
+        let _span = katu_core::trace_fn!("openai::decode::absorb_tools");
+
         for call in calls {
             let entry = self.tools.entry(call.index).or_default();
             if let Some(id) = call.id.as_deref().filter(|id| !id.is_empty()) {
@@ -218,6 +241,8 @@ impl ChatDecoder {
 
 /// Decodifica os argumentos acumulados (string JSON; vazio = objeto vazio).
 fn parse_arguments(raw: &str) -> Result<Value, ProviderError> {
+    let _span = katu_core::trace_fn!("openai::decode::parse_arguments");
+
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return Ok(Value::Object(serde_json::Map::new()));
@@ -227,6 +252,8 @@ fn parse_arguments(raw: &str) -> Result<Value, ProviderError> {
 
 /// Mapeia o `finish_reason` do dialeto.
 fn map_stop(reason: &str) -> StopReason {
+    let _span = katu_core::trace_fn!("openai::decode::map_stop");
+
     match reason {
         "stop" => StopReason::EndTurn,
         "tool_calls" | "function_call" => StopReason::ToolCalls,
@@ -242,30 +269,44 @@ impl Wiring for ChatDecoder {
         payload: &str,
         sink: &mut dyn ProviderSink,
     ) -> Result<Flow, ProviderError> {
+        let _span = katu_core::trace_fn!("openai::decode::feed_payload");
+
         self.on_payload(payload, sink)
     }
 
     fn finish_stream(&mut self, sink: &mut dyn ProviderSink) -> Result<Flow, ProviderError> {
+        let _span = katu_core::trace_fn!("openai::decode::finish_stream");
+
         self.flush_tools(sink)
     }
 
     fn has_emitted(&self) -> bool {
+        let _span = katu_core::trace_fn!("openai::decode::has_emitted");
+
         self.emitted()
     }
 
     fn has_data(&self) -> bool {
+        let _span = katu_core::trace_fn!("openai::decode::has_data");
+
         self.saw_data()
     }
 
     fn is_cancelled(&self) -> bool {
+        let _span = katu_core::trace_fn!("openai::decode::is_cancelled");
+
         self.cancelled()
     }
 
     fn is_done(&self) -> bool {
+        let _span = katu_core::trace_fn!("openai::decode::is_done");
+
         self.done()
     }
 
     fn final_outcome(&self) -> ProviderOutcome {
+        let _span = katu_core::trace_fn!("openai::decode::final_outcome");
+
         self.outcome()
     }
 }

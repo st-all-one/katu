@@ -43,12 +43,16 @@ pub struct TableSpec {
 /// Registo de todas as secções emitidas (modo + colunas por ordem).
 #[must_use]
 pub fn registry() -> &'static [TableSpec] {
+    let _span = crate::trace_fn!("toon::schema::registry");
+
     REGISTRY
 }
 
 /// Esquema de uma secção pelo nome (inclui filhos qualificados, ex.: `clusters.hits`).
 #[must_use]
 pub fn spec(name: &str) -> Option<&'static TableSpec> {
+    let _span = crate::trace_fn!("toon::schema::spec");
+
     REGISTRY.iter().find(|spec| spec.name == name)
 }
 
@@ -57,6 +61,8 @@ pub fn spec(name: &str) -> Option<&'static TableSpec> {
 /// É o gate que impede uma secção nova de sair sem esquema (o prime deixaria de a ensinar).
 #[must_use]
 pub fn validate() -> Vec<&'static str> {
+    let _span = crate::trace_fn!("toon::schema::validate");
+
     let mut issues = Vec::new();
     for (index, spec) in REGISTRY.iter().enumerate() {
         if spec.name.is_empty() {

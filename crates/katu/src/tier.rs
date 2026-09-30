@@ -45,6 +45,8 @@ impl TierPolicy {
     /// # Errors
     /// Mensagem legível se o TOML for inválido ou a versão do vocabulário desconhecida.
     pub(crate) fn load() -> Result<Self, String> {
+        let _span = katu_core::trace_fn!("tier::load");
+
         Self::from_toml(TIER_POLICY)
     }
 
@@ -53,6 +55,11 @@ impl TierPolicy {
     /// # Errors
     /// Mensagem legível se o TOML for inválido ou a versão do vocabulário desconhecida.
     pub(crate) fn from_toml(text: &str) -> Result<Self, String> {
+        let _span = katu_core::fn_span!(
+            Level::Trace,
+            events::POLICY_LOAD,
+            "tier::TierPolicy::from_toml"
+        );
         let doc: TierDoc =
             toml::from_str(text).map_err(|error| format!("policy/tiers.toml: {error}"))?;
         if doc.vocab != TIER_VOCAB_VERSION {
@@ -74,6 +81,8 @@ impl TierPolicy {
     /// Tier da fase (primeira rota que casa; senão, o default).
     #[must_use]
     pub(crate) fn tier_for(&self, phase: Phase) -> Tier {
+        let _span = katu_core::trace_fn!("tier::tier_for");
+
         self.routes
             .iter()
             .find(|(route, _)| *route == phase)
@@ -85,6 +94,8 @@ impl TierPolicy {
     /// Instrumentado (`provider.tier`); **não** sobrepõe controlo do utilizador — quem chama só
     /// chega aqui quando o controlo não fixou modelo.
     pub(crate) fn model_for(&self, provider: &dyn Provider, phase: Phase, default: &str) -> String {
+        let _span = katu_core::trace_fn!("tier::model_for");
+
         let tier = self.tier_for(phase);
         let selected = provider.model_for_tier(tier);
         katu_core::event!(

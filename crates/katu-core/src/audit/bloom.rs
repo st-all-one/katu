@@ -18,6 +18,8 @@ pub(super) struct Bloom {
 impl Bloom {
     /// Constrói a partir de um conjunto de termos (≈10 bits por termo, mínimo [`MIN_BITS`]).
     pub(super) fn from_terms<'t>(terms: impl Iterator<Item = &'t str>) -> Self {
+        let _span = crate::trace_fn!("audit::bloom::from_terms");
+
         let terms: Vec<&str> = terms.collect();
         let bits = MIN_BITS
             .max(terms.len().saturating_mul(10))
@@ -34,22 +36,30 @@ impl Bloom {
 
     /// Reconstrói a partir de bits já lidos.
     pub(super) fn from_bits(bits: Vec<u8>) -> Self {
+        let _span = crate::trace_fn!("audit::bloom::from_bits");
+
         Self { bits, k: K }
     }
 
     /// Bytes do filtro.
     pub(super) fn bits(&self) -> &[u8] {
+        let _span = crate::trace_fn!("audit::bloom::bits");
+
         &self.bits
     }
 
     /// `true` se o termo **pode** estar no segmento (`false` = garantidamente ausente).
     pub(super) fn might_contain(&self, term: &str) -> bool {
+        let _span = crate::trace_fn!("audit::bloom::might_contain");
+
         let (h1, h2) = hashes(term);
         (0..self.k).all(|index| self.test(h1, h2, index))
     }
 
     /// Insere um termo.
     fn insert(&mut self, term: &str) {
+        let _span = crate::trace_fn!("audit::bloom::insert");
+
         let (h1, h2) = hashes(term);
         for index in 0..self.k {
             if let Some((byte, mask)) = self.position(h1, h2, index)
@@ -62,12 +72,16 @@ impl Bloom {
 
     /// Testa um termo.
     fn test(&self, h1: u64, h2: u64, index: u8) -> bool {
+        let _span = crate::trace_fn!("audit::bloom::test");
+
         self.position(h1, h2, index)
             .is_some_and(|(byte, mask)| self.bits.get(byte).is_some_and(|value| value & mask != 0))
     }
 
     /// Posição `(byte, máscara)` do hash `index`.
     fn position(&self, h1: u64, h2: u64, index: u8) -> Option<(usize, u8)> {
+        let _span = crate::trace_fn!("audit::bloom::position");
+
         let bits = u64::try_from(self.bits.len()).ok()?.checked_mul(8)?;
         let position = h1
             .wrapping_add(h2.wrapping_mul(u64::from(index)))
@@ -81,6 +95,8 @@ impl Bloom {
 
 /// Duplo hashing determinístico: `(h1, h2)` a partir de FNV-1a.
 fn hashes(term: &str) -> (u64, u64) {
+    let _span = crate::trace_fn!("audit::bloom::hashes");
+
     let first = fnv1a(term.as_bytes());
     let second = fnv1a(&first.to_le_bytes());
     (first, if second == 0 { 1 } else { second })
@@ -88,6 +104,8 @@ fn hashes(term: &str) -> (u64, u64) {
 
 /// FNV-1a de 64 bits.
 fn fnv1a(bytes: &[u8]) -> u64 {
+    let _span = crate::trace_fn!("audit::bloom::fnv1a");
+
     let mut hash = 0xcbf2_9ce4_8422_2325_u64;
     for byte in bytes {
         hash ^= u64::from(*byte);

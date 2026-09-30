@@ -21,11 +21,13 @@ pub struct WriteNoteTool<'a> {
 
 impl Tool for WriteNoteTool<'_> {
     fn name(&self) -> ToolName {
+        let _span = katu_core::trace_fn!("write::name");
+
         ToolName::MemoryWrite
     }
 
     fn execute(&self, _use_: &ToolUse) -> ToolOutput {
-        let _span = katu_core::span!(Level::Trace, events::TOOL_WRITE);
+        let _span = katu_core::fn_span!(Level::Trace, events::TOOL_WRITE, "write::execute");
         match self.memory.record(&self.req) {
             Ok(note) => ToolOutput::report(record_report(&note)),
             Err(err) if err.retryable() => ToolOutput::outcome(ToolOutcome::Timeout),
@@ -39,6 +41,8 @@ impl Tool for WriteNoteTool<'_> {
 
 /// Envelope AI-first do commit de memória (DF12).
 fn record_report(note: &NoteRef) -> ToolReport {
+    let _span = katu_core::trace_fn!("write::record_report");
+
     let data = Value::map(vec![(
         "note".to_string(),
         Value::str(note.as_str().to_string()),

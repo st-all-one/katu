@@ -80,6 +80,8 @@ impl CommandRecord {
 /// Guarda os **últimos** `max` bytes, num limite de caractere válido.
 #[must_use]
 pub fn tail(text: &str, max: usize) -> String {
+    let _span = crate::trace_fn!("feedback::tail");
+
     if text.len() <= max {
         return text.to_string();
     }
@@ -93,10 +95,14 @@ pub fn tail(text: &str, max: usize) -> String {
 /// Redige segredos do texto, linha a linha (chaves `*KEY*`/`*TOKEN*`/`Authorization`, …).
 #[must_use]
 pub fn redact(text: &str) -> String {
+    let _span = crate::trace_fn!("feedback::redact");
+
     text.lines().map(redact_line).collect::<Vec<_>>().join("\n")
 }
 
 fn redact_line(line: &str) -> String {
+    let _span = crate::trace_fn!("feedback::redact_line");
+
     for separator in [':', '='] {
         if let Some((left, _)) = line.split_once(separator) {
             let key = left.trim().to_ascii_uppercase();

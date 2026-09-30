@@ -8,6 +8,7 @@
 //! O transporte é injetado ([`Transport`]): os testes servem bytes canónicos sem rede. O retry e
 //! a captura de erro vivem no [`crate::wire`] comum aos dialetos.
 
+use katu_core::diag::{Level, events};
 use katu_core::provider::{ProviderError, ProviderOutcome, ProviderSink};
 
 use super::engine::Call;
@@ -41,6 +42,11 @@ pub(crate) fn stream_chat<T: Transport>(
     call: &Call<'_>,
     sink: &mut dyn ProviderSink,
 ) -> Result<ProviderOutcome, ProviderError> {
+    let _span = katu_core::fn_span!(
+        Level::Debug,
+        events::PROVIDER_REQUEST,
+        "openai::stream_chat"
+    );
     let body = encode_request(call.request, call.options)?;
     let http = HttpRequest::post(
         call.endpoint.url.clone(),

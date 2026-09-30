@@ -1,5 +1,6 @@
 //! Execução de um turno (E12-T05/E10): pedido ao provider, observação efémera e tools §42.
 
+use katu_core::diag::{Level, events};
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::CallId;
 use katu_policy::ApprovalRequest;
@@ -58,6 +59,8 @@ pub(crate) trait ActivitySink {
     /// Pede **aprovação humana** (challenge-and-response, §33). Devolve o override assinado ou
     /// `None` (fail-closed: sem resposta, a recusa mantém-se). Por omissão, não aprova nada.
     fn approve(&mut self, _prompt: &ApprovalPrompt<'_>) -> Option<Approval> {
+        let _span = katu_core::trace_fn!("agent::turn::approve");
+
         None
     }
 
@@ -66,6 +69,8 @@ pub(crate) trait ActivitySink {
     /// O loop verifica-o em cada fronteira (antes de cada passo e de cada tool call) e o sink do
     /// provider devolve [`Flow::Break`] quando cancelado. Por omissão, nunca cancela.
     fn cancelled(&self) -> bool {
+        let _span = katu_core::trace_fn!("agent::turn::cancelled");
+
         false
     }
 
@@ -73,6 +78,8 @@ pub(crate) trait ActivitySink {
     ///
     /// O loop consulta-o **entre passos** e injeta-o como mensagem de utilizador no passo seguinte.
     fn steer(&mut self) -> Option<String> {
+        let _span = katu_core::trace_fn!("agent::turn::steer");
+
         None
     }
 }
@@ -97,7 +104,9 @@ pub(crate) struct Approval {
 struct NoActivity;
 
 impl ActivitySink for NoActivity {
-    fn activity(&mut self, _activity: Activity<'_>) {}
+    fn activity(&mut self, _activity: Activity<'_>) {
+        let _span = katu_core::trace_fn!("agent::turn::activity");
+    }
 }
 
 /// Executa um turno completo sem observador externo.
@@ -108,6 +117,8 @@ pub(crate) fn run_turn(
     runtime: &mut Runtime<'_>,
     request: TurnRequest<'_>,
 ) -> Result<TurnReport, AgentError> {
+    let _span = katu_core::trace_fn!("agent::turn::run_turn");
+
     run_turn_with(runtime, request, &mut NoActivity)
 }
 
@@ -120,6 +131,8 @@ fn run_calls(
     calls: Vec<(CallId, String, Value)>,
     activity: &mut dyn ActivitySink,
 ) -> Result<bool, AgentError> {
+    let _span = katu_core::trace_fn!("agent::turn::run_calls");
+
     for (call, name, arguments) in calls {
         if activity.cancelled() {
             return Ok(false);
@@ -142,6 +155,8 @@ fn run_calls(
 /// Reencaminha o resultado de uma tool ao observador: sucesso, recusa ou indisponibilidade
 /// (E10-T04). Uma recusa **não** mostra "concluída".
 pub(super) fn emit_outcome(activity: &mut dyn ActivitySink, name: &str, outcome: &ToolOutcome) {
+    let _span = katu_core::trace_fn!("agent::turn::emit_outcome");
+
     match outcome {
         ToolOutcome::Denied { rule_id, evidence } => {
             activity.activity(Activity::Refused {
@@ -178,6 +193,11 @@ fn retry_with_approval(
     arguments: &Value,
     activity: &mut dyn ActivitySink,
 ) -> Result<(), AgentError> {
+    let _span = katu_core::fn_span!(
+        Level::Debug,
+        events::POLICY_CAPABILITY,
+        "turn::retry_with_approval"
+    );
     let (Some(request), Some(use_)) = (outcome.approval.clone(), outcome.use_.clone()) else {
         return Ok(());
     };

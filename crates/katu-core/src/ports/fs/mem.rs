@@ -35,11 +35,15 @@ impl MemFs {
     /// Cria um sistema de ficheiros em memória vazio.
     #[must_use]
     pub fn new() -> Self {
+        let _span = crate::trace_fn!("ports::fs::mem::new");
+
         Self::default()
     }
 
     /// Regista um symlink `link` → `target` (auxiliar de teste, E07-T02).
     pub fn symlink(&self, link: &Path, target: &Path) {
+        let _span = crate::trace_fn!("ports::fs::mem::symlink");
+
         let mut inner = lock(&self.inner);
         inner.links.insert(link.to_path_buf(), target.to_path_buf());
     }
@@ -47,6 +51,8 @@ impl MemFs {
 
 /// Bloqueia um `Mutex`, recuperando o valor mesmo que o lock esteja envenenado.
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    let _span = crate::trace_fn!("ports::fs::mem::lock");
+
     mutex
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -54,6 +60,8 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 
 /// Normaliza lexicalmente um caminho (resolve `.`/`..`, sem tocar no SO).
 fn normalize(path: &Path) -> PathBuf {
+    let _span = crate::trace_fn!("ports::fs::mem::normalize");
+
     let mut out = PathBuf::from("/");
     for component in path.components() {
         match component {
@@ -69,6 +77,8 @@ fn normalize(path: &Path) -> PathBuf {
 
 impl Fs for MemFs {
     fn read(&self, path: &Path) -> Result<Vec<u8>, FsError> {
+        let _span = crate::trace_fn!("ports::fs::mem::read");
+
         let inner = lock(&self.inner);
         inner
             .files
@@ -78,6 +88,8 @@ impl Fs for MemFs {
     }
 
     fn read_from(&self, path: &Path, offset: u64) -> Result<Vec<u8>, FsError> {
+        let _span = crate::trace_fn!("ports::fs::mem::read_from");
+
         let inner = lock(&self.inner);
         let entry = inner.files.get(path).ok_or(FsError::NotFound)?;
         let start =
@@ -90,6 +102,8 @@ impl Fs for MemFs {
     }
 
     fn canonicalize(&self, path: &Path) -> Result<PathBuf, FsError> {
+        let _span = crate::trace_fn!("ports::fs::mem::canonicalize");
+
         let inner = lock(&self.inner);
         let mut current = normalize(path);
         for _ in 0..MAX_SYMLINKS {
@@ -121,6 +135,8 @@ impl Fs for MemFs {
     }
 
     fn write_atomic(&self, path: &Path, bytes: &[u8]) -> Result<(), FsError> {
+        let _span = crate::trace_fn!("ports::fs::mem::write_atomic");
+
         let mut inner = lock(&self.inner);
         let next = inner.clock_ms.saturating_add(1);
         inner.clock_ms = next;
@@ -133,6 +149,8 @@ impl Fs for MemFs {
     }
 
     fn write_atomic_if(&self, path: &Path, bytes: &[u8], expected: &[u8]) -> Result<(), FsError> {
+        let _span = crate::trace_fn!("ports::fs::mem::write_atomic_if");
+
         let mut inner = lock(&self.inner);
         let matches = inner
             .files
@@ -154,6 +172,8 @@ impl Fs for MemFs {
     }
 
     fn append(&self, path: &Path, bytes: &[u8]) -> Result<(), FsError> {
+        let _span = crate::trace_fn!("ports::fs::mem::append");
+
         let mut inner = lock(&self.inner);
         let next = inner.clock_ms.saturating_add(1);
         inner.clock_ms = next;
@@ -170,6 +190,8 @@ impl Fs for MemFs {
     }
 
     fn exists(&self, path: &Path) -> bool {
+        let _span = crate::trace_fn!("ports::fs::mem::exists");
+
         let inner = lock(&self.inner);
         inner.files.contains_key(path)
             || inner
@@ -179,6 +201,8 @@ impl Fs for MemFs {
     }
 
     fn is_dir(&self, path: &Path) -> bool {
+        let _span = crate::trace_fn!("ports::fs::mem::is_dir");
+
         let inner = lock(&self.inner);
         !inner.files.contains_key(path)
             && inner
@@ -188,6 +212,8 @@ impl Fs for MemFs {
     }
 
     fn rename(&self, from: &Path, to: &Path) -> Result<(), FsError> {
+        let _span = crate::trace_fn!("ports::fs::mem::rename");
+
         let mut inner = lock(&self.inner);
         let Some(mut entry) = inner.files.remove(from) else {
             return Err(FsError::NotFound);
@@ -200,10 +226,14 @@ impl Fs for MemFs {
     }
 
     fn create_dir_all(&self, _path: &Path) -> Result<(), FsError> {
+        let _span = crate::trace_fn!("ports::fs::mem::create_dir_all");
+
         Ok(())
     }
 
     fn mtime(&self, path: &Path) -> Result<Timestamp, FsError> {
+        let _span = crate::trace_fn!("ports::fs::mem::mtime");
+
         let inner = lock(&self.inner);
         inner
             .files
@@ -213,6 +243,8 @@ impl Fs for MemFs {
     }
 
     fn list_dir(&self, path: &Path) -> Result<Vec<PathBuf>, FsError> {
+        let _span = crate::trace_fn!("ports::fs::mem::list_dir");
+
         let inner = lock(&self.inner);
         let mut entries: BTreeSet<PathBuf> = BTreeSet::new();
         for key in inner.files.keys() {
@@ -226,6 +258,8 @@ impl Fs for MemFs {
     }
 
     fn remove(&self, path: &Path) -> Result<(), FsError> {
+        let _span = crate::trace_fn!("ports::fs::mem::remove");
+
         let mut inner = lock(&self.inner);
         if inner.links.remove(path).is_some() {
             return Ok(());

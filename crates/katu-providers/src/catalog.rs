@@ -95,6 +95,8 @@ impl ModelEntry {
     /// Entrada mínima (dialeto explícito).
     #[must_use]
     pub fn new(id: impl Into<String>, dialect: Dialect) -> Self {
+        let _span = katu_core::trace_fn!("catalog::new");
+
         Self {
             id: id.into(),
             dialect,
@@ -125,6 +127,8 @@ impl ModelEntry {
     /// Fixa a retenção do cache de prefixo (ex.: `"24h"`).
     #[must_use]
     pub fn with_prompt_cache_retention(mut self, retention: impl Into<String>) -> Self {
+        let _span = katu_core::trace_fn!("catalog::with_prompt_cache_retention");
+
         self.prompt_cache = true;
         self.prompt_cache_retention = Some(retention.into());
         self
@@ -147,6 +151,8 @@ impl ModelEntry {
     /// Fixa um `reasoning_format` para o gateway.
     #[must_use]
     pub fn with_reasoning_format(mut self, format: impl Into<String>) -> Self {
+        let _span = katu_core::trace_fn!("catalog::with_reasoning_format");
+
         self.reasoning_format = Some(format.into());
         self
     }
@@ -169,35 +175,47 @@ impl Catalog {
     /// Catálogo vazio.
     #[must_use]
     pub fn new() -> Self {
+        let _span = katu_core::trace_fn!("catalog::new");
+
         Self::default()
     }
 
     /// Insere/substitui uma entrada.
     pub fn insert(&mut self, entry: ModelEntry) {
+        let _span = katu_core::trace_fn!("catalog::insert");
+
         self.entries.insert(entry.id.clone(), entry);
     }
 
     /// Procura um modelo.
     #[must_use]
     pub fn lookup(&self, model: &str) -> Option<&ModelEntry> {
+        let _span = katu_core::trace_fn!("catalog::lookup");
+
         self.entries.get(model)
     }
 
     /// Número de entradas.
     #[must_use]
     pub fn len(&self) -> usize {
+        let _span = katu_core::trace_fn!("catalog::len");
+
         self.entries.len()
     }
 
     /// Identificadores dos modelos, em ordem determinística (`BTreeMap`) — `dynamic_models` (E12-T02).
     #[must_use]
     pub fn models(&self) -> Vec<&str> {
+        let _span = katu_core::trace_fn!("catalog::models");
+
         self.entries.keys().map(String::as_str).collect()
     }
 
     /// Primeiro modelo de um `tier` (E12-T03), em ordem determinística (`BTreeMap`).
     #[must_use]
     pub fn select_tier(&self, tier: Tier) -> Option<&str> {
+        let _span = katu_core::trace_fn!("catalog::select_tier");
+
         self.entries
             .values()
             .find(|entry| entry.tier == tier)
@@ -207,6 +225,8 @@ impl Catalog {
     /// `true` se vazio.
     #[must_use]
     pub fn is_empty(&self) -> bool {
+        let _span = katu_core::trace_fn!("catalog::is_empty");
+
         self.entries.is_empty()
     }
 }

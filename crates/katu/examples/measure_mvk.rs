@@ -190,6 +190,7 @@ fn main() -> HarnessResult<()> {
         },
         "timings": timings.iter().map(|s| json!({
             "event": s.event,
+            "function": s.function,
             "count": s.count,
             "total_nanos": s.total_nanos,
             "min_nanos": s.min_nanos,

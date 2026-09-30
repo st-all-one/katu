@@ -8,6 +8,7 @@ mod convert;
 mod map;
 mod suggest;
 
+use katu_core::diag::{Level, events};
 use katu_core::memory::{
     MemoryError, MemoryErrorKind, QueryMode, QueryOutcome, QueryReq, QueryResult, TagCount,
 };
@@ -20,6 +21,7 @@ use convert::{anchors, convert_hits, filter, meta_map, note_hit, universe};
 
 /// Executa a consulta rica no backend aberto.
 pub(super) fn run(inner: &mut Inner, req: &QueryReq) -> Result<QueryResult, MemoryError> {
+    let _span = katu_core::fn_span!(Level::Trace, events::MEMORY_RECALL, "query::run");
     match req.mode {
         QueryMode::Tags => tags(inner, req),
         QueryMode::Map => map::map(inner, req),
@@ -33,6 +35,8 @@ pub(super) fn run(inner: &mut Inner, req: &QueryReq) -> Result<QueryResult, Memo
 
 /// Modo `recall` textual (filtros + universo + escopo).
 fn recall_text(inner: &mut Inner, req: &QueryReq) -> Result<QueryResult, MemoryError> {
+    let _span = katu_core::trace_fn!("memory::query::recall_text");
+
     inner.ensure_index()?;
     inner.ensure_graph()?;
     let (Some(index), Some(graph)) = (inner.index.as_ref(), inner.graph.as_ref()) else {
@@ -58,6 +62,8 @@ fn recall_text(inner: &mut Inner, req: &QueryReq) -> Result<QueryResult, MemoryE
 
 /// Modo `rank` (notas mais confiáveis, sem query).
 fn ranked(inner: &mut Inner, req: &QueryReq) -> Result<QueryResult, MemoryError> {
+    let _span = katu_core::trace_fn!("memory::query::ranked");
+
     inner.ensure_index()?;
     inner.ensure_graph()?;
     let (Some(index), Some(graph)) = (inner.index.as_ref(), inner.graph.as_ref()) else {
@@ -86,6 +92,8 @@ fn ranked(inner: &mut Inner, req: &QueryReq) -> Result<QueryResult, MemoryError>
 
 /// Modo `--tags` (vocabulário).
 fn tags(inner: &mut Inner, req: &QueryReq) -> Result<QueryResult, MemoryError> {
+    let _span = katu_core::trace_fn!("memory::query::tags");
+
     inner.ensure_index()?;
     let Some(index) = inner.index.as_ref() else {
         return Err(MemoryError::internal("índice ausente após construção"));
@@ -106,6 +114,8 @@ fn tags(inner: &mut Inner, req: &QueryReq) -> Result<QueryResult, MemoryError> {
 
 /// Modo `--id` (recupera corpos por id).
 fn get_ids(inner: &Inner, req: &QueryReq) -> Result<QueryResult, MemoryError> {
+    let _span = katu_core::trace_fn!("memory::query::get_ids");
+
     let store = inner.kd.store();
     let out = get(&store, &req.ids).map_err(to_memory_error)?;
     let hits = out
@@ -121,6 +131,8 @@ fn get_ids(inner: &Inner, req: &QueryReq) -> Result<QueryResult, MemoryError> {
 
 /// Modo `--around` (expande o grafo a partir de um id).
 fn expand(inner: &mut Inner, req: &QueryReq) -> Result<QueryResult, MemoryError> {
+    let _span = katu_core::trace_fn!("memory::query::expand");
+
     inner.ensure_graph()?;
     let Some(around) = req.around.as_deref() else {
         return Err(MemoryError::new(

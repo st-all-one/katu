@@ -2,6 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
+use katu_core::diag::{Level, events};
 use katu_core::ports::Fs;
 
 /// Profundidade máxima da recursão.
@@ -12,6 +13,7 @@ const IGNORED: &[&str] = &["target", "node_modules", ".katu", ".venv", "dist", "
 
 /// Recolhe até `max_files` ficheiros sob `root`, em ordem canónica.
 pub(super) fn walk(fs: &dyn Fs, root: &Path, max_files: usize) -> Vec<PathBuf> {
+    let _span = katu_core::fn_span!(Level::Trace, events::TOOL_SEARCH, "search::walk::walk");
     let walker = Walker {
         fs,
         ignores: read_ignores(fs, root),
@@ -31,6 +33,7 @@ struct Walker<'a> {
 
 impl Walker<'_> {
     fn visit(&self, dir: &Path, depth: u8, out: &mut Vec<PathBuf>) {
+        let _span = katu_core::fn_span!(Level::Trace, events::TOOL_SEARCH, "search::walk::visit");
         if depth > MAX_DEPTH || out.len() >= self.max_files {
             return;
         }
@@ -58,6 +61,8 @@ impl Walker<'_> {
 }
 
 fn ignored(name: &str, ignores: &[String]) -> bool {
+    let _span = katu_core::trace_fn!("search::walk::ignored");
+
     if name.is_empty() || name.starts_with('.') || IGNORED.contains(&name) {
         return true;
     }
@@ -65,6 +70,8 @@ fn ignored(name: &str, ignores: &[String]) -> bool {
 }
 
 fn matches_pattern(name: &str, pattern: &str) -> bool {
+    let _span = katu_core::trace_fn!("search::walk::matches_pattern");
+
     pattern
         .strip_prefix('*')
         .map_or(name == pattern, |suffix| name.ends_with(suffix))
@@ -72,6 +79,11 @@ fn matches_pattern(name: &str, pattern: &str) -> bool {
 
 /// Lê `.gitignore` da raiz (padrões simples; `!`/comentários ignorados).
 fn read_ignores(fs: &dyn Fs, root: &Path) -> Vec<String> {
+    let _span = katu_core::fn_span!(
+        Level::Trace,
+        events::TOOL_SEARCH,
+        "search::walk::read_ignores"
+    );
     let Ok(bytes) = fs.read(&root.join(".gitignore")) else {
         return Vec::new();
     };

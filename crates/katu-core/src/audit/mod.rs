@@ -20,6 +20,8 @@ pub use store::{
 /// Codifica o índice no formato binário (delta+varint+Bloom) — ferramentas/testes (ADR 0009).
 #[must_use]
 pub fn encode_index(index: &Index) -> Vec<u8> {
+    let _span = crate::trace_fn!("audit::encode_index");
+
     let bloom = bloom::Bloom::from_terms(index.postings().keys().map(String::as_str));
     bin::encode(index, &bloom)
 }
@@ -27,5 +29,7 @@ pub fn encode_index(index: &Index) -> Vec<u8> {
 /// Descarta o Bloom e devolve o índice (o armazenamento usa a via interna com Bloom).
 #[must_use]
 pub fn decode_index(bytes: &[u8]) -> Option<Index> {
+    let _span = crate::trace_fn!("audit::decode_index");
+
     bin::decode(bytes).map(|(index, _)| index)
 }

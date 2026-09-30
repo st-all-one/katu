@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
+use katu_core::diag::{Level, events};
 use katu_core::ports::Fs;
 use katu_core::report::{ToolReport, content_id};
 use katu_core::toon::Value;
@@ -39,6 +40,7 @@ enum Origin {
 }
 
 pub(super) fn run(fs: &dyn Fs, root: &Path, query: &str, limit: usize) -> ToolReport {
+    let _span = katu_core::fn_span!(Level::Debug, events::TOOL_SEARCH, "search::grep::run");
     let files = walk::walk(fs, root, MAX_FILES);
     let mut hits = Vec::new();
     let mut scanned = 0_usize;
@@ -75,6 +77,7 @@ pub(super) fn run(fs: &dyn Fs, root: &Path, query: &str, limit: usize) -> ToolRe
 }
 
 fn build(root: &Path, query: &str, files: &[PathBuf], scanned: usize, hits: &[Hit]) -> ToolReport {
+    let _span = katu_core::fn_span!(Level::Trace, events::TOOL_SEARCH, "search::grep::build");
     let mut clusters: BTreeMap<String, Vec<&Hit>> = BTreeMap::new();
     for hit in hits {
         let key = hit
@@ -119,6 +122,8 @@ fn build(root: &Path, query: &str, files: &[PathBuf], scanned: usize, hits: &[Hi
 }
 
 fn cluster_value(name: &str, items: &[&Hit]) -> Value {
+    let _span = katu_core::trace_fn!("search::grep::cluster_value");
+
     let symbol = content_id("s", name.as_bytes());
     let hits: Vec<Value> = items.iter().map(|hit| hit_value(hit)).collect();
     Value::map(vec![
@@ -129,6 +134,8 @@ fn cluster_value(name: &str, items: &[&Hit]) -> Value {
 }
 
 fn hit_value(hit: &Hit) -> Value {
+    let _span = katu_core::trace_fn!("search::grep::hit_value");
+
     let mut entries = vec![
         ("path".to_string(), Value::str(hit.path.clone())),
         ("ln".to_string(), Value::int(i64::from(hit.line))),
@@ -142,6 +149,7 @@ fn hit_value(hit: &Hit) -> Value {
 }
 
 fn classify(line: &str, origin: Origin) -> &'static str {
+    let _span = katu_core::fn_span!(Level::Trace, events::TOOL_SEARCH, "search::grep::classify");
     let trimmed = line.trim_start();
     if matches!(origin, Origin::Test) && trimmed.contains("fn ") {
         return "test";
@@ -178,6 +186,8 @@ fn preview(line: &str) -> String {
 
 /// Símbolo mais **interior** que contém a linha.
 fn enclosing(symbols: &[Symbol], line: u32) -> Option<String> {
+    let _span = katu_core::trace_fn!("search::grep::enclosing");
+
     symbols
         .iter()
         .filter(|symbol| symbol.start <= line && line <= symbol.end)

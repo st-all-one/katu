@@ -1,5 +1,6 @@
 //! O provider declarativo: reusa os adaptadores de dialeto do built-in.
 
+use katu_core::diag::{Level, events};
 use katu_core::provider::{
     ModelCapabilities, Provider, ProviderError, ProviderOutcome, ProviderRequest, ProviderSink,
     Tier,
@@ -27,6 +28,8 @@ impl<T: Transport> Declarative<T> {
     /// Constrói a partir de uma definição.
     #[must_use]
     pub fn new(transport: T, spec: ProviderSpec) -> Self {
+        let _span = katu_core::trace_fn!("declarative::provider::new");
+
         let catalog = spec.catalog();
         Self {
             transport,
@@ -42,12 +45,16 @@ impl<T: Transport> Declarative<T> {
     /// # Errors
     /// [`SpecError`] se o JSON for inválido.
     pub fn from_json(transport: T, json: &str) -> Result<Self, SpecError> {
+        let _span = katu_core::trace_fn!("declarative::provider::from_json");
+
         Ok(Self::new(transport, ProviderSpec::from_json(json)?))
     }
 
     /// Fornece a chave de API (a borda lê-a do ambiente).
     #[must_use]
     pub fn with_api_key(mut self, key: impl Into<String>) -> Self {
+        let _span = katu_core::trace_fn!("declarative::provider::with_api_key");
+
         self.api_key = Some(key.into());
         self
     }
@@ -55,6 +62,8 @@ impl<T: Transport> Declarative<T> {
     /// Substitui a política de retry.
     #[must_use]
     pub fn with_retry(mut self, retry: RetryPolicy) -> Self {
+        let _span = katu_core::trace_fn!("declarative::provider::with_retry");
+
         self.retry = retry;
         self
     }
@@ -62,17 +71,23 @@ impl<T: Transport> Declarative<T> {
     /// Definição em uso.
     #[must_use]
     pub fn spec(&self) -> &ProviderSpec {
+        let _span = katu_core::trace_fn!("declarative::provider::spec");
+
         &self.spec
     }
 
     /// Pré-aquece a ligação (TCP/TLS) ao endpoint; ignora erros.
     pub fn warm(&self) {
+        let _span = katu_core::trace_fn!("declarative::provider::warm");
+
         self.transport
             .warm(&engine::models_request(&self.wire(None)));
     }
 
     /// Vista de wire (para o despacho).
     fn wire<'a>(&'a self, entry: Option<&'a ModelEntry>) -> WireConfig<'a> {
+        let _span = katu_core::trace_fn!("declarative::provider::wire");
+
         WireConfig {
             base_url: &self.spec.base_url,
             api_key: self.api_key.as_deref(),
@@ -89,10 +104,14 @@ impl<T: Transport> Declarative<T> {
 
 impl<T: Transport> Provider for Declarative<T> {
     fn id(&self) -> &str {
+        let _span = katu_core::trace_fn!("declarative::provider::id");
+
         self.spec.name.as_str()
     }
 
     fn models(&self) -> Vec<String> {
+        let _span = katu_core::trace_fn!("declarative::provider::models");
+
         self.catalog
             .models()
             .into_iter()
@@ -101,6 +120,11 @@ impl<T: Transport> Provider for Declarative<T> {
     }
 
     fn dynamic_models(&self) -> Result<Vec<String>, ProviderError> {
+        let _span = katu_core::fn_span!(
+            Level::Debug,
+            events::PROVIDER_MODELS,
+            "declarative::provider::Declarative::dynamic_models"
+        );
         let request = engine::models_request(&self.wire(None));
         let (status, body) = self.transport.get(&request).map_err(ProviderError::from)?;
         if !(200..300).contains(&status) {
@@ -114,6 +138,8 @@ impl<T: Transport> Provider for Declarative<T> {
     }
 
     fn capabilities(&self, model: &str) -> ModelCapabilities {
+        let _span = katu_core::trace_fn!("declarative::provider::capabilities");
+
         ModelCapabilities {
             model: model.to_string(),
             reasoning: self
@@ -124,6 +150,8 @@ impl<T: Transport> Provider for Declarative<T> {
     }
 
     fn model_for_tier(&self, tier: Tier) -> Option<String> {
+        let _span = katu_core::trace_fn!("declarative::provider::model_for_tier");
+
         self.catalog.select_tier(tier).map(str::to_string)
     }
 
@@ -132,6 +160,11 @@ impl<T: Transport> Provider for Declarative<T> {
         request: &ProviderRequest,
         sink: &mut dyn ProviderSink,
     ) -> Result<ProviderOutcome, ProviderError> {
+        let _span = katu_core::fn_span!(
+            Level::Debug,
+            events::PROVIDER_REQUEST,
+            "declarative::provider::Declarative::stream"
+        );
         let entry = self.catalog.lookup(&request.model.model);
         let dialect = entry.map_or_else(|| self.spec.engine.dialect(), |entry| entry.dialect);
         let dispatch = Dispatch {

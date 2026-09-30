@@ -4,6 +4,7 @@
 //! usa `{"models":[{"name":"models/…"}]}`. A leitura é **defensiva** (nunca falha por forma
 //! inesperada: devolve o que reconhecer) e **determinística** (ordena e deduplica).
 
+use katu_core::diag::{Level, events};
 use serde_json::Value;
 
 /// Extrai os ids de modelo de um corpo JSON, em ordem determinística.
@@ -12,6 +13,11 @@ use serde_json::Value;
 /// topo. Um corpo que não seja JSON devolve vazio (o chamador cai no catálogo estático).
 #[must_use]
 pub(crate) fn parse_models(body: &str) -> Vec<String> {
+    let _span = katu_core::fn_span!(
+        Level::Trace,
+        events::PROVIDER_MODELS,
+        "models::parse_models"
+    );
     let Ok(value) = serde_json::from_str::<Value>(body) else {
         return Vec::new();
     };
@@ -32,6 +38,8 @@ pub(crate) fn parse_models(body: &str) -> Vec<String> {
 
 /// Recolhe `id`/`name` (ou o próprio texto) de cada entrada.
 fn collect(entries: &[Value], out: &mut Vec<String>) {
+    let _span = katu_core::trace_fn!("models::collect");
+
     for entry in entries {
         if let Some(text) = entry.as_str() {
             out.push(strip_prefix(text));
@@ -45,6 +53,8 @@ fn collect(entries: &[Value], out: &mut Vec<String>) {
 
 /// Remove o prefixo `models/` do Google.
 fn strip_prefix(name: &str) -> String {
+    let _span = katu_core::trace_fn!("models::strip_prefix");
+
     name.strip_prefix("models/").unwrap_or(name).to_string()
 }
 

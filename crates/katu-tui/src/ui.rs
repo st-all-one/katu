@@ -24,7 +24,7 @@ const MAX_ACTIVITY_LINES: usize = 100;
 
 /// Desenha um quadro completo a partir do estado.
 pub fn render(frame: &mut Frame<'_>, app: &App) {
-    let _span = katu_core::span!(Level::Trace, events::TUI_RENDER);
+    let _span = katu_core::fn_span!(Level::Trace, events::TUI_RENDER, "ui::render");
     let [header, body, input, footer] = Layout::vertical([
         Constraint::Length(1),
         Constraint::Min(1),
@@ -90,6 +90,8 @@ pub fn render(frame: &mut Frame<'_>, app: &App) {
 
 /// Deslocamento que mostra o **fundo** de um painel (mensagem mais recente).
 fn bottom_offset(total: usize, area: Rect) -> u16 {
+    let _span = katu_core::trace_fn!("ui::bottom_offset");
+
     let inner = area.height.saturating_sub(2);
     let total = u16::try_from(total).unwrap_or(u16::MAX);
     total.saturating_sub(inner)
@@ -97,12 +99,16 @@ fn bottom_offset(total: usize, area: Rect) -> u16 {
 
 /// Número de linhas do painel de atividade (sem o histórico de raciocínio).
 fn activity_len(app: &App) -> usize {
+    let _span = katu_core::trace_fn!("ui::activity_len");
+
     let live = usize::min(app.live().len(), MAX_ACTIVITY_LINES);
     live.saturating_add(app.streaming().lines().count())
 }
 
 /// Cabeçalho: identidade, modelo, pensamento, fase, pendência e próxima ação.
 fn header_line(app: &App) -> Line<'static> {
+    let _span = katu_core::trace_fn!("ui::header_line");
+
     let state = if app.pending() {
         "a pensar…"
     } else {
@@ -133,6 +139,8 @@ fn header_line(app: &App) -> Line<'static> {
 
 /// Título do painel de entrada, dependente do modo.
 fn input_title(app: &App) -> &'static str {
+    let _span = katu_core::trace_fn!("ui::input_title");
+
     if app.mode() == Mode::Insert {
         "mensagem (Enter envia, Esc cancela)"
     } else {
@@ -142,6 +150,8 @@ fn input_title(app: &App) -> &'static str {
 
 /// Barra de estado.
 fn status_line(app: &App) -> Line<'static> {
+    let _span = katu_core::trace_fn!("ui::status_line");
+
     match app.status() {
         Status::Idle if app.plan_mode() => Line::from(Span::styled(
             "PLANO (escrita só sob .katu/)  ·  q sai  ·  /plan desliga  ·  ? ajuda".to_string(),
@@ -165,6 +175,8 @@ fn status_line(app: &App) -> Line<'static> {
 
 /// Projeta a conversa em linhas, com prefixo por papel.
 fn transcript_lines(app: &App) -> Vec<Line<'static>> {
+    let _span = katu_core::trace_fn!("ui::transcript_lines");
+
     let mut lines: Vec<Line<'static>> = Vec::new();
     let start = app
         .transcript()
@@ -195,6 +207,8 @@ fn transcript_lines(app: &App) -> Vec<Line<'static>> {
 
 /// Painel de atividade (E10-T05): tools em curso + texto do modelo a chegar (efémero).
 fn activity_lines(app: &App) -> Vec<Line<'static>> {
+    let _span = katu_core::trace_fn!("ui::activity_lines");
+
     let start = app.live().len().saturating_sub(MAX_ACTIVITY_LINES);
     let mut lines: Vec<Line<'static>> = app
         .live()
@@ -228,6 +242,8 @@ fn activity_lines(app: &App) -> Vec<Line<'static>> {
 
 /// Cor de cada papel.
 fn role_style(role: Role) -> Style {
+    let _span = katu_core::trace_fn!("ui::role_style");
+
     let color = match role {
         Role::User => Color::Cyan,
         Role::Assistant => Color::Green,

@@ -23,6 +23,8 @@ pub enum ResolveError {
 
 impl fmt::Display for ResolveError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let _span = katu_core::trace_fn!("resolve::fmt");
+
         match self {
             Self::Fs(err) => write!(f, "resolução de caminho: {err}"),
             Self::Policy(err) => write!(f, "caminho resolvido inválido: {err}"),
@@ -32,6 +34,8 @@ impl fmt::Display for ResolveError {
 
 impl std::error::Error for ResolveError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        let _span = katu_core::trace_fn!("resolve::source");
+
         match self {
             Self::Fs(err) => Some(err),
             Self::Policy(err) => Some(err),
@@ -41,12 +45,16 @@ impl std::error::Error for ResolveError {
 
 impl From<FsError> for ResolveError {
     fn from(value: FsError) -> Self {
+        let _span = katu_core::trace_fn!("resolve::from");
+
         Self::Fs(value)
     }
 }
 
 impl From<PolicyError> for ResolveError {
     fn from(value: PolicyError) -> Self {
+        let _span = katu_core::trace_fn!("resolve::from");
+
         Self::Policy(value)
     }
 }
@@ -56,6 +64,8 @@ impl From<PolicyError> for ResolveError {
 /// # Errors
 /// [`ResolveError`] se a canonicalização falhar (`NotFound`/ciclo) ou o resultado não for absoluto.
 pub fn resolve(fs: &dyn Fs, path: &Path) -> Result<ResolvedPath, ResolveError> {
+    let _span = katu_core::trace_fn!("resolve::resolve");
+
     let canonical = fs.canonicalize(path)?;
     Ok(ResolvedPath::from_canonical(canonical)?)
 }

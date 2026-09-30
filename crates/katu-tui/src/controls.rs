@@ -4,6 +4,7 @@
 //! **próximo** turno. O log/estado do kernel não muda por trocar de modelo. Na TUI v2 a escolha
 //! faz-se pelos mini-menus de `/model` e `/thinking` (E20-T10).
 
+use katu_core::diag::{Level, events};
 use katu_core::provider::Thinking;
 
 /// Seleção de modelo e grau de pensamento para os próximos turnos.
@@ -18,6 +19,8 @@ impl Controls {
     /// Estado inicial: pensamento desligado, sem lista de modelos publicada.
     #[must_use]
     pub(crate) fn new() -> Self {
+        let _span = katu_core::trace_fn!("controls::new");
+
         Self::default()
     }
 
@@ -30,23 +33,29 @@ impl Controls {
     /// Modelo selecionado, se a borda já publicou a lista (E10-T07).
     #[must_use]
     pub(crate) fn model(&self) -> Option<&str> {
+        let _span = katu_core::trace_fn!("controls::model");
+
         self.models.get(self.index).map(String::as_str)
     }
 
     /// Lista de modelos publicada pela borda (E12-T02/T10).
     #[must_use]
     pub(crate) fn models(&self) -> &[String] {
+        let _span = katu_core::trace_fn!("controls::models");
+
         &self.models
     }
 
     /// Publica a lista de modelos (o **primeiro** é o default).
     pub(crate) fn set_models(&mut self, models: Vec<String>) {
+        let _span = katu_core::fn_span!(Level::Debug, events::TUI_ACTION, "controls::set_models");
         self.models = models;
         self.index = 0;
     }
 
     /// Seleciona um modelo da lista publicada (se existir).
     pub(crate) fn set_model(&mut self, model: &str) {
+        let _span = katu_core::fn_span!(Level::Debug, events::TUI_ACTION, "controls::set_model");
         if let Some(index) = self.models.iter().position(|name| name == model) {
             self.index = index;
         }
@@ -54,6 +63,7 @@ impl Controls {
 
     /// Define o grau de pensamento escolhido no menu.
     pub(crate) fn set_thinking(&mut self, thinking: Thinking) {
+        let _span = katu_core::fn_span!(Level::Debug, events::TUI_ACTION, "controls::set_thinking");
         self.reasoning = thinking;
     }
 }

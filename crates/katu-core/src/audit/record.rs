@@ -147,6 +147,8 @@ impl AuditRecord {
     /// Campos pesquisáveis por ordem de `field_id`.
     #[must_use]
     pub fn fields(&self) -> [&str; 6] {
+        let _span = crate::trace_fn!("audit::record::fields");
+
         [
             &self.text,
             &self.path,
@@ -160,6 +162,8 @@ impl AuditRecord {
     /// Linha da tabela `a`.
     #[must_use]
     pub fn cells(&self) -> Vec<Cell> {
+        let _span = crate::trace_fn!("audit::record::cells");
+
         vec![
             Cell::int(i64::try_from(self.seq).unwrap_or(i64::MAX)),
             Cell::text(self.kind),
@@ -174,6 +178,8 @@ impl AuditRecord {
 
 /// Trunca num limite de carácter válido.
 fn truncate(text: &str, max_bytes: usize) -> String {
+    let _span = crate::trace_fn!("audit::record::truncate");
+
     if text.len() <= max_bytes {
         return text.to_string();
     }
@@ -186,6 +192,8 @@ fn truncate(text: &str, max_bytes: usize) -> String {
 
 /// Constrói a tabela `a` a partir de linhas de auditoria.
 pub(super) fn table(records: &[AuditRecord]) -> RowTable {
+    let _span = crate::trace_fn!("audit::record::table");
+
     let mut table = RowTable::new("a");
     for record in records {
         table.push(record.cells());

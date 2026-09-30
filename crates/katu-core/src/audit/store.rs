@@ -65,6 +65,8 @@ pub struct Manifest {
 
 impl Default for Manifest {
     fn default() -> Self {
+        let _span = crate::trace_fn!("audit::store::default");
+
         Self {
             schema_version: AUDIT_SCHEMA_VERSION,
             segments: Vec::new(),
@@ -108,6 +110,8 @@ impl<'a> AuditStore<'a> {
     /// # Errors
     /// [`AuditError`] se o manifesto existente for inválido.
     pub fn open(fs: &'a dyn Fs, root: &Path) -> Result<Self, AuditError> {
+        let _span = crate::trace_fn!("audit::store::open");
+
         let dir = audit_dir(root);
         fs.create_dir_all(&dir)?;
         let manifest = codec::read_manifest(fs, &dir)?;
@@ -122,6 +126,8 @@ impl<'a> AuditStore<'a> {
     /// Manifesto corrente.
     #[must_use]
     pub fn manifest(&self) -> &Manifest {
+        let _span = crate::trace_fn!("audit::store::manifest");
+
         &self.manifest
     }
 
@@ -130,6 +136,8 @@ impl<'a> AuditStore<'a> {
     /// # Errors
     /// [`AuditError`] se a selagem falhar.
     pub fn append_event(&mut self, seq: u64, event: &Event) -> Result<(), AuditError> {
+        let _span = crate::trace_fn!("audit::store::append_event");
+
         self.buffer.push(AuditRecord::from_event(seq, event));
         if self.buffer.len() >= SEGMENT_EVENTS {
             self.flush()?;
@@ -142,12 +150,15 @@ impl<'a> AuditStore<'a> {
     /// # Errors
     /// [`AuditError`] se a escrita falhar.
     pub fn flush(&mut self) -> Result<(), AuditError> {
+        let _span = crate::trace_fn!("audit::store::flush");
+
         if self.buffer.is_empty() {
             return Ok(());
         }
-        let _span = crate::span!(
+        let _span = crate::fn_span!(
             Level::Debug,
             events::AUDIT_SEAL,
+            "audit::store::flush",
             "events" => self.buffer.len(),
         );
         let index = Index::build(&self.buffer);
@@ -179,7 +190,7 @@ impl<'a> AuditStore<'a> {
     /// # Errors
     /// [`AuditError`] se um segmento for ilegível.
     pub fn search(&self, query: &Query, limit: usize) -> Result<Vec<Hit>, AuditError> {
-        let _span = crate::span!(Level::Debug, events::AUDIT_QUERY);
+        let _span = crate::fn_span!(Level::Debug, events::AUDIT_QUERY, "audit::store::search");
         let mut hits = Vec::new();
         for info in self.manifest.segments.iter().rev() {
             let (index, bloom) = if let Some(stored) = self.read_index(&info.name)? {
@@ -212,6 +223,8 @@ impl<'a> AuditStore<'a> {
 
     /// Lê as linhas de um segmento.
     fn read_records(&self, name: &str) -> Result<Vec<AuditRecord>, AuditError> {
+        let _span = crate::trace_fn!("audit::store::read_records");
+
         let text = codec::read_text(self.fs, &self.dir.join(format!("{name}.rec")))?;
         let rows = codec::parse_rows(&text, "a");
         rows.iter().map(|row| codec::parse_record(row)).collect()
@@ -219,6 +232,8 @@ impl<'a> AuditStore<'a> {
 
     /// Lê o índice derivado (ausente → `None`; o chamador reconstrói).
     fn read_index(&self, name: &str) -> Result<Option<StoredIndex>, AuditError> {
+        let _span = crate::trace_fn!("audit::store::read_index");
+
         let path = self.dir.join(format!("{name}.idx"));
         if !self.fs.exists(&path) {
             return Ok(None);
@@ -232,6 +247,8 @@ type StoredIndex = (Index, Bloom);
 
 /// `true` se algum grupo da consulta pode existir no segmento (o Bloom só prova ausência).
 fn might_match(bloom: &Bloom, query: &Query) -> bool {
+    let _span = crate::trace_fn!("audit::store::might_match");
+
     query.groups.is_empty()
         || query.groups.iter().any(|group| {
             group.terms.iter().all(|term| bloom.might_contain(term))
@@ -243,6 +260,8 @@ fn might_match(bloom: &Bloom, query: &Query) -> bool {
 }
 
 fn hit(seg: &str, ln: u32, record: &AuditRecord) -> Hit {
+    let _span = crate::trace_fn!("audit::store::hit");
+
     Hit {
         seg: seg.to_string(),
         ln,

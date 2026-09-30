@@ -5,6 +5,7 @@
 
 mod input;
 
+use katu_core::diag::{Level, events};
 use katu_core::error::Error;
 use katu_core::memory::{Anchor, QueryFilter, QueryMode, QueryReq, QueryUniverse};
 use serde_json::Value;
@@ -19,6 +20,7 @@ use input::{AskParams, Input, parse_types};
 
 /// Executa `memo ask` (uma consulta ou um lote).
 pub(super) fn report(args: &AskArgs) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_MEMO, "ask::report");
     if let Some(path) = &args.batch {
         return batch(args, path);
     }
@@ -30,6 +32,7 @@ pub(super) fn report(args: &AskArgs) -> Report {
 
 /// Executa `memo knowledge` (mapa estrutural).
 pub(super) fn knowledge(args: &KnowledgeArgs) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_MEMO, "ask::knowledge");
     let fallback = defaults::current().recall_limit.unwrap_or(5);
     match knowledge_query(args, fallback) {
         Ok(req) => memory_query("memo.knowledge", &req),
@@ -39,6 +42,7 @@ pub(super) fn knowledge(args: &KnowledgeArgs) -> Report {
 
 /// Constrói o `QueryReq` do mapa.
 fn knowledge_query(args: &KnowledgeArgs, default_limit: usize) -> Result<QueryReq, Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::CLI_MEMO, "ask::knowledge_query");
     Ok(QueryReq {
         mode: QueryMode::Map,
         filter: QueryFilter {
@@ -69,6 +73,7 @@ fn knowledge_query(args: &KnowledgeArgs, default_limit: usize) -> Result<QueryRe
 
 /// Resolve uma consulta a partir das flags e/ou de `--params` (XOR).
 fn resolve(args: &AskArgs) -> Result<QueryReq, Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::CLI_MEMO, "ask::resolve");
     if args.params.is_some() && flags_used(args) {
         return Err(Error::invalid_input(
             "--params é exclusivo com flags explícitas (não se infere)",
@@ -84,6 +89,8 @@ fn resolve(args: &AskArgs) -> Result<QueryReq, Error> {
 
 /// `true` se alguma flag explícita (fora do posicional) foi usada.
 fn flags_used(args: &AskArgs) -> bool {
+    let _span = katu_core::trace_fn!("cli::memo::ask::flags_used");
+
     !args.ids.is_empty()
         || args.around.is_some()
         || args.via.is_some()
@@ -111,6 +118,7 @@ fn flags_used(args: &AskArgs) -> bool {
 
 /// Processa um lote JSONL: valida tudo **antes** de executar.
 fn batch(args: &AskArgs, path: &str) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_MEMO, "ask::batch");
     if args.params.is_some() || flags_used(args) || args.query.is_some() {
         return Report::failed(
             "memo.ask",

@@ -4,6 +4,7 @@
 //! callback. Suporta `\r\n`, comentários (`:`) e múltiplas linhas `data:` por evento. O estado
 //! incompleto fica em `pending` — o fragmento seguinte continua exatamente onde parou.
 
+use katu_core::diag::{Level, events};
 use katu_core::provider::Flow;
 
 /// Serviço de um `data:` completo.
@@ -25,6 +26,8 @@ impl SseParser {
     /// Cria um parser vazio.
     #[must_use]
     pub fn new() -> Self {
+        let _span = katu_core::trace_fn!("sse::new");
+
         Self::default()
     }
 
@@ -32,6 +35,8 @@ impl SseParser {
     ///
     /// Devolve [`Flow::Break`] se `on_data` o devolver (cancelamento propagado).
     pub fn push(&mut self, chunk: &[u8], on_data: &mut dyn FnMut(&str) -> Flow) -> Flow {
+        let _span =
+            katu_core::fn_span!(Level::Trace, events::PROVIDER_CHUNK, "sse::SseParser::push");
         self.pending.extend_from_slice(chunk);
         let mut consumed = 0_usize;
         let mut flow = Flow::Continue;
@@ -70,6 +75,8 @@ impl SseParser {
 
 /// Classifica a linha (já sem `\r`).
 fn classify(line: &[u8]) -> Line {
+    let _span = katu_core::trace_fn!("sse::classify");
+
     if line.is_empty() {
         Line::Dispatch
     } else {
@@ -79,6 +86,8 @@ fn classify(line: &[u8]) -> Line {
 
 /// Extrai o valor de uma linha `data:` (remove um espaço inicial).
 fn data_value(line: &[u8]) -> Option<String> {
+    let _span = katu_core::trace_fn!("sse::data_value");
+
     let text = std::str::from_utf8(line).ok()?;
     let value = text.strip_prefix("data:")?;
     let value = value.strip_prefix(' ').unwrap_or(value);
@@ -87,6 +96,8 @@ fn data_value(line: &[u8]) -> Option<String> {
 
 /// Remove o `\r` final, se existir.
 fn strip_cr(line: &[u8]) -> &[u8] {
+    let _span = katu_core::trace_fn!("sse::strip_cr");
+
     match line.last() {
         Some(b'\r') => line.get(..line.len().saturating_sub(1)).unwrap_or(&[]),
         _ => line,

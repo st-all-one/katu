@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Gate de tamanho de arquivo (D92): arquivos de produção em crates/*/src e xtask/src ≤ 300 linhas.
+# Gate de tamanho de arquivo (D92): arquivos de produção em crates/*/src e xtask/src ≤ 400 linhas.
 # Módulos de teste embutidos (#[cfg(test)]) contam; por isso o limite é aplicado ao arquivo.
+# Subido de 300→400 para acomodar a instrumentação transversal `fn_span!` (E19-T03) sem fragmentar
+# módulos coesos só por causa do diag.
 set -euo pipefail
 
-limit=300
+limit=400
 status=0
 
 while IFS= read -r -d '' file; do

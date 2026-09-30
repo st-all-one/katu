@@ -7,6 +7,8 @@
 
 use std::fmt::Write;
 
+use crate::diag::{Level, events};
+
 /// Prefixo de uma secção de linhas (Record Separator).
 const RS: char = '\u{1e}';
 /// Prefixo de um bloco literal (Group Separator).
@@ -29,6 +31,8 @@ impl Cell {
     /// Texto.
     #[must_use]
     pub fn text(value: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("toon::colunar::text");
+
         Self::Text(value.into())
     }
 
@@ -51,6 +55,8 @@ impl Cell {
     /// Texto opcional (`None` vira célula vazia).
     #[must_use]
     pub fn optional(value: Option<String>) -> Self {
+        let _span = crate::trace_fn!("toon::colunar::optional");
+
         Self::Text(value.unwrap_or_default())
     }
 }
@@ -68,6 +74,8 @@ impl RowTable {
     /// Tabela vazia.
     #[must_use]
     pub fn new(name: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("toon::colunar::new");
+
         Self {
             name: name.into(),
             rows: Vec::new(),
@@ -76,6 +84,8 @@ impl RowTable {
 
     /// Acrescenta uma linha.
     pub fn push(&mut self, row: Vec<Cell>) {
+        let _span = crate::trace_fn!("toon::colunar::push");
+
         self.rows.push(row);
     }
 }
@@ -98,6 +108,8 @@ impl Section {
     /// Bloco literal a partir do nome e do texto.
     #[must_use]
     pub fn literal(name: impl Into<String>, text: &str) -> Self {
+        let _span = crate::trace_fn!("toon::colunar::literal");
+
         Self::Literal {
             name: name.into(),
             lines: text.lines().map(str::to_string).collect(),
@@ -108,6 +120,7 @@ impl Section {
 /// Emite o *stream* D39 (secções vazias omitidas; termina em `\n`).
 #[must_use]
 pub fn emit(sections: &[Section]) -> String {
+    let _span = crate::fn_span!(Level::Trace, events::TOON_EMIT, "toon::colunar::emit");
     let mut out = String::new();
     for section in sections {
         match section {
@@ -124,6 +137,7 @@ pub fn emit(sections: &[Section]) -> String {
 }
 
 fn emit_rows(out: &mut String, table: &RowTable) {
+    let _span = crate::fn_span!(Level::Trace, events::TOON_EMIT, "toon::colunar::emit_rows");
     out.reserve(table.name.len().saturating_add(1));
     out.push(RS);
     out.push_str(&table.name);
@@ -141,6 +155,8 @@ fn emit_rows(out: &mut String, table: &RowTable) {
 
 /// Escreve uma célula diretamente no buffer (sem alocação intermédia).
 fn emit_cell(out: &mut String, cell: &Cell) {
+    let _span = crate::trace_fn!("toon::colunar::emit_cell");
+
     match cell {
         Cell::Text(text) => push_sanitized(out, text),
         Cell::Int(number) => {
@@ -151,6 +167,11 @@ fn emit_cell(out: &mut String, cell: &Cell) {
 }
 
 fn emit_literal(out: &mut String, name: &str, lines: &[String]) {
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::TOON_EMIT,
+        "toon::colunar::emit_literal"
+    );
     out.push(GS);
     out.push_str(name);
     out.push('\n');
@@ -168,6 +189,8 @@ fn emit_literal(out: &mut String, name: &str, lines: &[String]) {
 /// Escreve texto sanitizado (delimitadores/quebras → espaço) sem alocar se não houver nada a
 /// substituir; o comprimento em bytes é preservado (todos os substituídos são de 1 byte).
 fn push_sanitized(out: &mut String, text: &str) {
+    let _span = crate::trace_fn!("toon::colunar::push_sanitized");
+
     if !has_delimiter(text) {
         out.push_str(text);
         return;
@@ -181,6 +204,8 @@ fn push_sanitized(out: &mut String, text: &str) {
 }
 
 fn has_delimiter(text: &str) -> bool {
+    let _span = crate::trace_fn!("toon::colunar::has_delimiter");
+
     text.chars()
         .any(|ch| matches!(ch, RS | GS | US | '\n' | '\r'))
 }

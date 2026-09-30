@@ -5,6 +5,7 @@
 
 use std::path::{Path, PathBuf};
 
+use katu_core::diag::{Level, events};
 use katu_core::error::Error;
 
 /// Tipo de valor de uma chave canônica.
@@ -94,11 +95,15 @@ pub(crate) const KEYS: &[KeySpec] = &[
 
 /// Devolve a especificação de uma chave canônica.
 pub(crate) fn find(key: &str) -> Option<&'static KeySpec> {
+    let _span = katu_core::trace_fn!("config::find");
+
     KEYS.iter().find(|spec| spec.key == key)
 }
 
 /// Erro de chave desconhecida, listando o conjunto fechado (e uma sugestão por prefixo).
 pub(crate) fn unknown_key(key: &str) -> Error {
+    let _span = katu_core::trace_fn!("config::unknown_key");
+
     let prefix = key.split('.').next().unwrap_or(key);
     let hint = KEYS
         .iter()
@@ -121,6 +126,7 @@ pub(crate) fn unknown_key(key: &str) -> Error {
 
 /// Converte um valor textual para o tipo da chave.
 pub(crate) fn parse_value(kind: Kind, raw: &str) -> Result<toml::Value, Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::CONFIG_SET, "config::parse_value");
     match kind {
         Kind::Text => Ok(toml::Value::String(raw.to_owned())),
         Kind::Bool => match raw {
@@ -139,6 +145,8 @@ pub(crate) fn parse_value(kind: Kind, raw: &str) -> Result<toml::Value, Error> {
 
 /// Renderiza um valor para `get`/`list` (texto simples, sem TOML).
 pub(crate) fn display(value: &toml::Value) -> String {
+    let _span = katu_core::trace_fn!("config::display");
+
     match value {
         toml::Value::String(text) => text.clone(),
         other => other.to_string(),
@@ -147,6 +155,7 @@ pub(crate) fn display(value: &toml::Value) -> String {
 
 /// Lê a chave pontuada de uma tabela (navegando sub-tabelas).
 pub(crate) fn get_key(table: &toml::Table, key: &str) -> Option<toml::Value> {
+    let _span = katu_core::fn_span!(Level::Trace, events::CONFIG_LOAD, "config::get_key");
     let mut parts = key.split('.');
     let first = parts.next()?;
     let mut value = table.get(first)?;
@@ -158,6 +167,7 @@ pub(crate) fn get_key(table: &toml::Table, key: &str) -> Option<toml::Value> {
 
 /// Escreve a chave pontuada numa tabela, criando sub-tabelas em falta.
 pub(crate) fn set_key(table: &mut toml::Table, key: &str, value: toml::Value) {
+    let _span = katu_core::fn_span!(Level::Trace, events::CONFIG_SET, "config::set_key");
     let mut parts: Vec<&str> = key.split('.').collect();
     let Some(leaf) = parts.pop() else {
         return;
@@ -177,6 +187,7 @@ pub(crate) fn set_key(table: &mut toml::Table, key: &str, value: toml::Value) {
 
 /// Remove a chave pontuada; devolve `true` se existia.
 pub(crate) fn unset_key(table: &mut toml::Table, key: &str) -> bool {
+    let _span = katu_core::fn_span!(Level::Trace, events::CONFIG_SET, "config::unset_key");
     let mut parts: Vec<&str> = key.split('.').collect();
     let Some(leaf) = parts.pop() else {
         return false;
@@ -193,6 +204,7 @@ pub(crate) fn unset_key(table: &mut toml::Table, key: &str) -> bool {
 
 /// Funde `over` sobre `base` (o projeto vence o global, chave a chave).
 pub(crate) fn merge(base: &mut toml::Table, over: &toml::Table) {
+    let _span = katu_core::fn_span!(Level::Trace, events::CONFIG_LOAD, "config::merge");
     for (key, value) in over {
         match (base.get_mut(key), value) {
             (Some(toml::Value::Table(base_table)), toml::Value::Table(over_table)) => {
@@ -207,11 +219,14 @@ pub(crate) fn merge(base: &mut toml::Table, over: &toml::Table) {
 
 /// Caminho da config do projeto (`<root>/.katu/katu.toml`).
 pub(crate) fn project_path(root: &Path) -> PathBuf {
+    let _span = katu_core::trace_fn!("config::project_path");
+
     root.join(".katu").join("katu.toml")
 }
 
 /// Lê uma tabela TOML; ficheiro ausente é uma tabela vazia (fail-soft na leitura).
 pub(crate) fn load(path: &Path) -> Result<toml::Table, Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::CONFIG_LOAD, "config::load");
     match std::fs::read_to_string(path) {
         Ok(text) => text.parse::<toml::Table>().map_err(|err| {
             Error::invalid_input(format!("config inválida em {}: {err}", path.display()))
@@ -223,6 +238,7 @@ pub(crate) fn load(path: &Path) -> Result<toml::Table, Error> {
 
 /// Escreve uma tabela TOML, criando a cadeia de pastas em falta.
 pub(crate) fn save(path: &Path, table: &toml::Table) -> Result<(), Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::CONFIG_SET, "config::save");
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|err| Error::io(parent.display().to_string(), err))?;
@@ -235,6 +251,8 @@ pub(crate) fn save(path: &Path, table: &toml::Table) -> Result<(), Error> {
 /// Caminho da config global (por sistema operativo).
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub(crate) fn global_path() -> Result<PathBuf, Error> {
+    let _span = katu_core::trace_fn!("config::global_path");
+
     if let Some(xdg) = std::env::var_os("XDG_CONFIG_HOME") {
         return Ok(PathBuf::from(xdg).join("local/katu/katu.toml"));
     }
@@ -244,12 +262,16 @@ pub(crate) fn global_path() -> Result<PathBuf, Error> {
 /// Caminho da config global no macOS.
 #[cfg(target_os = "macos")]
 pub(crate) fn global_path() -> Result<PathBuf, Error> {
+    let _span = katu_core::trace_fn!("config::global_path");
+
     Ok(home()?.join("Library/Application Support/katu/katu.toml"))
 }
 
 /// Caminho da config global no Windows.
 #[cfg(target_os = "windows")]
 pub(crate) fn global_path() -> Result<PathBuf, Error> {
+    let _span = katu_core::trace_fn!("config::global_path");
+
     let appdata = std::env::var_os("APPDATA").ok_or_else(|| {
         Error::invalid_input("APPDATA ausente: não sei onde fica a config global")
     })?;
@@ -258,6 +280,8 @@ pub(crate) fn global_path() -> Result<PathBuf, Error> {
 
 /// Diretório pessoal (`HOME`, com queda para `USERPROFILE`).
 fn home() -> Result<PathBuf, Error> {
+    let _span = katu_core::trace_fn!("config::home");
+
     std::env::var_os("HOME")
         .or_else(|| std::env::var_os("USERPROFILE"))
         .map(PathBuf::from)
@@ -266,6 +290,8 @@ fn home() -> Result<PathBuf, Error> {
 
 /// Diretório das travas padrão globais (`<config>/katu/guardrails`).
 pub(crate) fn guardrails_dir() -> Result<PathBuf, Error> {
+    let _span = katu_core::trace_fn!("config::guardrails_dir");
+
     let global = global_path()?;
     let parent = global
         .parent()

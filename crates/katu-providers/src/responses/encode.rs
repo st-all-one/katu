@@ -3,6 +3,7 @@
 //! Ver a forma usada pelo `pi` (`api/openai-responses.ts`): `instructions` para o sistema,
 //! `input` para o histórico, `max_output_tokens` (mínimo 16), `store: false` e `reasoning.effort`.
 
+use katu_core::diag::{Level, events};
 use katu_core::kernel::Message;
 use katu_core::provider::{ProviderError, ProviderRequest, ToolDef};
 use serde_json::{Map, Value, json};
@@ -20,6 +21,11 @@ pub(crate) fn encode_request(
     request: &ProviderRequest,
     options: &EncodeOptions,
 ) -> Result<String, ProviderError> {
+    let _span = katu_core::fn_span!(
+        Level::Debug,
+        events::PROVIDER_REQUEST,
+        "responses::encode_request"
+    );
     let mut input = Vec::new();
     for message in &request.messages {
         if let Some(encoded) = encode_message(message)? {
@@ -63,6 +69,8 @@ pub(crate) fn encode_request(
 
 /// Codifica uma tool no formato da Responses API (plana).
 fn encode_tool(tool: &ToolDef) -> Value {
+    let _span = katu_core::trace_fn!("responses::encode::encode_tool");
+
     json!({
         "type": "function",
         "name": tool.name,
@@ -73,6 +81,8 @@ fn encode_tool(tool: &ToolDef) -> Value {
 
 /// Codifica uma mensagem do histórico (ou ignora se desconhecida).
 fn encode_message(message: &Message) -> Result<Option<Value>, ProviderError> {
+    let _span = katu_core::trace_fn!("responses::encode::encode_message");
+
     let encoded = match message {
         Message::User { text } => json!({"role": "user", "content": text}),
         Message::Assistant { text } => json!({"role": "assistant", "content": text}),

@@ -78,12 +78,16 @@ pub struct NoteRef(String);
 impl NoteRef {
     /// Constrói uma referência a partir do identificador.
     pub fn new(id: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("memory::types::new");
+
         Self(id.into())
     }
 
     /// Identificador da nota.
     #[must_use]
     pub fn as_str(&self) -> &str {
+        let _span = crate::trace_fn!("memory::types::as_str");
+
         &self.0
     }
 }
@@ -96,12 +100,16 @@ pub struct Anchor(String);
 impl Anchor {
     /// Constrói uma âncora a partir do caminho/glob.
     pub fn new(path: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("memory::types::new");
+
         Self(path.into())
     }
 
     /// Caminho/glob.
     #[must_use]
     pub fn as_str(&self) -> &str {
+        let _span = crate::trace_fn!("memory::types::as_str");
+
         &self.0
     }
 }

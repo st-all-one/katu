@@ -4,6 +4,7 @@
 //! ser específico do projeto — E20-T13); o prime é o contrato da superfície, não o do repositório.
 
 use clap::{Args, ValueEnum};
+use katu_core::diag::{Level, events};
 use katu_core::error::Error;
 use serde::Deserialize;
 use serde_json::json;
@@ -62,6 +63,7 @@ struct PrimeParams {
 
 /// Executa `katu prime` (um prime ou um lote).
 pub(crate) fn execute(args: &PrimeArgs) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_PRIME, "prime::execute");
     if let Some(path) = &args.batch {
         return batch(args, path);
     }
@@ -73,6 +75,7 @@ pub(crate) fn execute(args: &PrimeArgs) -> Report {
 
 /// Resolve grupo e `long` a partir das flags e/ou de `--params` (XOR).
 fn resolve(args: &PrimeArgs) -> Result<(Group, bool), Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::CLI_PRIME, "prime::resolve");
     if args.params.is_some() && (args.long.is_some() || args.group.is_some()) {
         return Err(Error::invalid_input(
             "--params é exclusivo com flags explícitas (não se infere)",
@@ -90,6 +93,7 @@ fn resolve(args: &PrimeArgs) -> Result<(Group, bool), Error> {
 
 /// Processa um lote JSONL: valida tudo **antes** de emitir.
 fn batch(args: &PrimeArgs, path: &str) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_PRIME, "prime::batch");
     if args.params.is_some() || args.long.is_some() || args.group.is_some() {
         return Report::failed(
             "prime",
@@ -119,6 +123,7 @@ fn batch(args: &PrimeArgs, path: &str) -> Report {
     reason = "`long` é o flag de clap do prime"
 )]
 pub(crate) fn report(group: Group, long: bool) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_PRIME, "prime::report");
     Report::ok(
         "prime",
         Some(json!({ "group": name(group), "prime": text(group, long) })),
@@ -143,6 +148,8 @@ pub(crate) const fn name(group: Group) -> &'static str {
     reason = "`long` é o flag de clap do prime"
 )]
 pub(crate) fn text(group: Group, long: bool) -> String {
+    let _span = katu_core::trace_fn!("cli::prime::text");
+
     let mut text = base(group).to_owned();
     if long {
         text.push_str(GRAMMAR);

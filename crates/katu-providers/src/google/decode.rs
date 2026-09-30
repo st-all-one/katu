@@ -43,11 +43,18 @@ pub(crate) struct GoogleDecoder {
 impl GoogleDecoder {
     /// Novo decodificador.
     pub(crate) fn new() -> Self {
+        let _span = katu_core::trace_fn!("google::decode::new");
+
         Self::default()
     }
 
     /// Trata um `Chunk` do stream.
     fn handle(&mut self, chunk: &Chunk, sink: &mut dyn ProviderSink) -> Flow {
+        let _span = katu_core::fn_span!(
+            Level::Trace,
+            events::PROVIDER_CHUNK,
+            "google::decode::handle"
+        );
         if let Some(usage) = &chunk.usage_metadata {
             self.absorb_usage(usage);
         }
@@ -89,6 +96,11 @@ impl GoogleDecoder {
         call: &super::chunk::FunctionCall,
         sink: &mut dyn ProviderSink,
     ) -> Flow {
+        let _span = katu_core::fn_span!(
+            Level::Trace,
+            events::PROVIDER_CHUNK,
+            "google::decode::emit_call"
+        );
         self.tool_calls = true;
         let id = call
             .id
@@ -115,6 +127,8 @@ impl GoogleDecoder {
 
     /// Emite um evento marcando o **TTFT** na primeira ocorrência.
     fn emit(&mut self, sink: &mut dyn ProviderSink, event: ProviderEvent) -> Flow {
+        let _span = katu_core::trace_fn!("google::decode::emit");
+
         if !self.announced {
             self.announced = true;
             katu_core::event!(Level::Debug, events::PROVIDER_TTFT);
@@ -128,6 +142,11 @@ impl GoogleDecoder {
 
     /// Absorve a contabilização (base `provider_reported`).
     fn absorb_usage(&mut self, json: &UsageJson) {
+        let _span = katu_core::fn_span!(
+            Level::Trace,
+            events::PROVIDER_CHUNK,
+            "google::decode::absorb_usage"
+        );
         let mut usage = self
             .usage
             .unwrap_or_else(|| TokenUsage::new(EvidenceBasis::ProviderReported));
@@ -145,6 +164,8 @@ impl Wiring for GoogleDecoder {
         payload: &str,
         sink: &mut dyn ProviderSink,
     ) -> Result<Flow, ProviderError> {
+        let _span = katu_core::trace_fn!("google::decode::feed_payload");
+
         if matches!(self.status, Status::Idle) {
             self.status = Status::Streaming;
         }
@@ -159,26 +180,38 @@ impl Wiring for GoogleDecoder {
     }
 
     fn finish_stream(&mut self, _sink: &mut dyn ProviderSink) -> Result<Flow, ProviderError> {
+        let _span = katu_core::trace_fn!("google::decode::finish_stream");
+
         Ok(Flow::Continue)
     }
 
     fn has_emitted(&self) -> bool {
+        let _span = katu_core::trace_fn!("google::decode::has_emitted");
+
         self.announced
     }
 
     fn has_data(&self) -> bool {
+        let _span = katu_core::trace_fn!("google::decode::has_data");
+
         !matches!(self.status, Status::Idle)
     }
 
     fn is_cancelled(&self) -> bool {
+        let _span = katu_core::trace_fn!("google::decode::is_cancelled");
+
         matches!(self.status, Status::Cancelled)
     }
 
     fn is_done(&self) -> bool {
+        let _span = katu_core::trace_fn!("google::decode::is_done");
+
         matches!(self.status, Status::Done)
     }
 
     fn final_outcome(&self) -> ProviderOutcome {
+        let _span = katu_core::trace_fn!("google::decode::final_outcome");
+
         let stop = if self.tool_calls {
             StopReason::ToolCalls
         } else {
@@ -193,6 +226,8 @@ impl Wiring for GoogleDecoder {
 
 /// Mapeia o `finishReason` do dialeto.
 fn map_stop(reason: &str) -> StopReason {
+    let _span = katu_core::trace_fn!("google::decode::map_stop");
+
     match reason {
         "STOP" => StopReason::EndTurn,
         "MAX_TOKENS" => StopReason::Length,

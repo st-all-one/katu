@@ -5,6 +5,7 @@
 
 use std::sync::{Mutex, PoisonError};
 
+use katu_core::diag::{Level, events};
 use katu_core::provider::{
     Flow, Provider, ProviderError, ProviderEvent, ProviderOutcome, ProviderRequest, ProviderSink,
     StopReason,
@@ -23,6 +24,8 @@ impl Turn {
     /// Turno que só diz `text` e termina.
     #[must_use]
     pub fn text(text: &str) -> Self {
+        let _span = katu_core::trace_fn!("fake::text");
+
         Self {
             events: vec![ProviderEvent::Text(text.to_string())],
             stop: StopReason::EndTurn,
@@ -42,6 +45,8 @@ impl FakeProvider {
     /// Constrói a partir de um guião.
     #[must_use]
     pub fn new(id: &'static str, turns: Vec<Turn>) -> Self {
+        let _span = katu_core::trace_fn!("fake::new");
+
         Self {
             id,
             turns,
@@ -52,12 +57,16 @@ impl FakeProvider {
     /// Guião de um só turno textual.
     #[must_use]
     pub fn text(text: &str) -> Self {
+        let _span = katu_core::trace_fn!("fake::text");
+
         Self::new("fake", vec![Turn::text(text)])
     }
 }
 
 impl Provider for FakeProvider {
     fn id(&self) -> &str {
+        let _span = katu_core::trace_fn!("fake::id");
+
         self.id
     }
 
@@ -66,6 +75,11 @@ impl Provider for FakeProvider {
         _request: &ProviderRequest,
         sink: &mut dyn ProviderSink,
     ) -> Result<ProviderOutcome, ProviderError> {
+        let _span = katu_core::fn_span!(
+            Level::Debug,
+            events::PROVIDER_REQUEST,
+            "fake::FakeProvider::stream"
+        );
         let index = {
             let mut cursor = self.cursor.lock().unwrap_or_else(PoisonError::into_inner);
             let index = *cursor;

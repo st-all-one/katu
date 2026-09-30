@@ -4,6 +4,7 @@
 //! [`Endpoint`] com a autenticação/afinidade certas. O built-in e os providers declarativos
 //! partilham este caminho.
 
+use katu_core::diag::{Level, events};
 use katu_core::provider::{ProviderError, ProviderOutcome, ProviderRequest, ProviderSink};
 
 use crate::anthropic;
@@ -66,6 +67,7 @@ pub(crate) fn stream<T: Transport>(
     dispatch: &Dispatch<'_>,
     sink: &mut dyn ProviderSink,
 ) -> Result<ProviderOutcome, ProviderError> {
+    let _span = katu_core::fn_span!(Level::Debug, events::PROVIDER_REQUEST, "engine::stream");
     let endpoint = endpoint_for(
         &dispatch.wire,
         dispatch.dialect,
@@ -88,11 +90,18 @@ pub(crate) fn stream<T: Transport>(
 
 /// Constrói o endpoint (URL + cabeçalhos) para o dialeto (modelo vazio usa o default do gateway).
 pub(crate) fn endpoint(wire: &WireConfig<'_>, dialect: Dialect) -> Endpoint {
+    let _span = katu_core::trace_fn!("engine::endpoint");
+
     endpoint_for(wire, dialect, "")
 }
 
 /// Constrói o endpoint (URL + cabeçalhos) para o dialeto, com o id de modelo (Google: caminho).
 pub(crate) fn endpoint_for(wire: &WireConfig<'_>, dialect: Dialect, model: &str) -> Endpoint {
+    let _span = katu_core::fn_span!(
+        Level::Trace,
+        events::PROVIDER_REQUEST,
+        "engine::endpoint_for"
+    );
     let base = wire.base_url.trim_end_matches('/');
     let path = match dialect {
         Dialect::ChatCompletions => "/chat/completions".to_string(),
@@ -129,6 +138,8 @@ pub(crate) fn endpoint_for(wire: &WireConfig<'_>, dialect: Dialect, model: &str)
 
 /// Opções de wire derivadas da entrada de catálogo.
 pub(crate) fn options(wire: &WireConfig<'_>) -> EncodeOptions {
+    let _span = katu_core::trace_fn!("engine::options");
+
     let max_tokens_field = wire
         .entry
         .map_or(MaxTokensField::MaxTokens, |entry| entry.max_tokens_field);
@@ -160,6 +171,11 @@ pub(crate) fn options(wire: &WireConfig<'_>) -> EncodeOptions {
 
 /// Pedido `GET .../models` (barato) para pré-aquecer a ligação (TCP/TLS) ao gateway.
 pub(crate) fn models_request(wire: &WireConfig<'_>) -> HttpRequest {
+    let _span = katu_core::fn_span!(
+        Level::Trace,
+        events::PROVIDER_MODELS,
+        "engine::models_request"
+    );
     let mut endpoint = endpoint(wire, Dialect::ChatCompletions);
     endpoint.url = format!("{}/models", wire.base_url.trim_end_matches('/'));
     HttpRequest {
@@ -172,6 +188,8 @@ pub(crate) fn models_request(wire: &WireConfig<'_>) -> HttpRequest {
 
 /// Acrescenta os cabeçalhos de autenticação que o dialeto espera.
 fn push_auth(headers: &mut Vec<(String, String)>, dialect: Dialect, key: &str) {
+    let _span = katu_core::trace_fn!("engine::push_auth");
+
     match dialect {
         Dialect::Messages => {
             headers.push(("x-api-key".to_string(), key.to_string()));

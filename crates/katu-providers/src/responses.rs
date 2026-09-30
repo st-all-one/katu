@@ -5,6 +5,7 @@
 //! pelo que o parser SSE só precisa dos payloads `data:`. As tool calls só são emitidas
 //! **completas** (em `response.output_item.done` ou no fecho).
 
+use katu_core::diag::{Level, events};
 use katu_core::provider::{ProviderError, ProviderOutcome, ProviderSink};
 
 use crate::engine::Call;
@@ -26,6 +27,7 @@ pub(crate) fn stream<T: Transport>(
     call: &Call<'_>,
     sink: &mut dyn ProviderSink,
 ) -> Result<ProviderOutcome, ProviderError> {
+    let _span = katu_core::fn_span!(Level::Debug, events::PROVIDER_REQUEST, "responses::stream");
     let body = encode::encode_request(call.request, call.options)?;
     let http = HttpRequest::post(
         call.endpoint.url.clone(),

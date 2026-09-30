@@ -3,6 +3,8 @@
 /// Linguagem a partir da extensão do caminho.
 #[must_use]
 pub fn language(path: &str) -> &'static str {
+    let _span = katu_core::trace_fn!("lang::language");
+
     match path.rsplit('.').next() {
         Some("rs") => "rust",
         Some("py") => "python",
@@ -19,11 +21,15 @@ pub fn language(path: &str) -> &'static str {
 /// `usize` → `u64`, saturante.
 #[must_use]
 pub fn len_u64(value: usize) -> u64 {
+    let _span = katu_core::trace_fn!("lang::len_u64");
+
     u64::try_from(value).unwrap_or(u64::MAX)
 }
 
 /// `u64` → `i64`, saturante.
 #[must_use]
 pub fn to_i64(value: u64) -> i64 {
+    let _span = katu_core::trace_fn!("lang::to_i64");
+
     i64::try_from(value).unwrap_or(i64::MAX)
 }

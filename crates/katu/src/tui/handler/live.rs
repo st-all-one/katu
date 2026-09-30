@@ -12,14 +12,20 @@ pub(super) struct LivePainter<'p, 'a> {
 
 impl ActivitySink for LivePainter<'_, '_> {
     fn cancelled(&self) -> bool {
+        let _span = katu_core::trace_fn!("tui::handler::live::cancelled");
+
         self.painter.cancelled()
     }
 
     fn steer(&mut self) -> Option<String> {
+        let _span = katu_core::trace_fn!("tui::handler::live::steer");
+
         self.painter.take_steer()
     }
 
     fn approve(&mut self, prompt: &ApprovalPrompt<'_>) -> Option<Approval> {
+        let _span = katu_core::trace_fn!("tui::handler::live::approve");
+
         let request = ChallengePrompt {
             tool: prompt.tool.to_string(),
             rule: prompt.request.rule_id.as_str().to_string(),
@@ -39,6 +45,8 @@ impl ActivitySink for LivePainter<'_, '_> {
     }
 
     fn activity(&mut self, activity: Activity<'_>) {
+        let _span = katu_core::trace_fn!("tui::handler::live::activity");
+
         let live = match activity {
             Activity::Text(delta) => {
                 katu_core::event!(Level::Trace, events::TUI_LIVE, "kind" => "text");

@@ -1,10 +1,16 @@
 //! Verificações concretas do gate (E09-T03): escopo, feedback e cobertura.
 
 use super::{BPS, Check, CheckStatus, VerificationInput};
+use crate::diag::{Level, events};
 use crate::plan::matches_glob;
 
 /// Verificações de escopo (proibido vence; fora do permitido é aviso).
 pub(super) fn scope_checks(input: &VerificationInput<'_>) -> Vec<Check> {
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::VERIFY_REPORT,
+        "verify::checks::scope_checks"
+    );
     let mut forbidden = 0usize;
     let mut outside = 0usize;
     for path in input.changed_files {
@@ -51,6 +57,11 @@ pub(super) fn scope_checks(input: &VerificationInput<'_>) -> Vec<Check> {
 
 /// Verificações de feedback de comando (`exit_code: null` bloqueia, §31).
 pub(super) fn feedback_checks(input: &VerificationInput<'_>) -> Vec<Check> {
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::VERIFY_REPORT,
+        "verify::checks::feedback_checks"
+    );
     let mut timeouts = 0usize;
     let mut ambiguous = 0usize;
     let mut failures = 0usize;
@@ -97,6 +108,8 @@ fn count_check(
     detail_pass: &str,
     failure: CheckStatus,
 ) -> Check {
+    let _span = crate::trace_fn!("verify::checks::count_check");
+
     if count == 0 {
         Check::new(id, CheckStatus::Pass, detail_pass)
     } else {
@@ -106,6 +119,11 @@ fn count_check(
 
 /// Cobertura de escopo: fração dos ficheiros alterados que estão no escopo permitido.
 pub(super) fn coverage_bps(input: &VerificationInput<'_>) -> u16 {
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::VERIFY_REPORT,
+        "verify::checks::coverage_bps"
+    );
     let total = input.changed_files.len();
     if total == 0 {
         return u16::try_from(BPS).unwrap_or(u16::MAX);
@@ -126,6 +144,11 @@ pub(super) fn coverage_bps(input: &VerificationInput<'_>) -> u16 {
 
 /// Verificação da cobertura contra o piso.
 pub(super) fn coverage_check(coverage_bps: u16, floor_bps: u16) -> Check {
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::VERIFY_REPORT,
+        "verify::checks::coverage_check"
+    );
     if coverage_bps >= floor_bps {
         Check::new(
             "coverage",

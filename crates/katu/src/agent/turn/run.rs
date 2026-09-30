@@ -25,6 +25,8 @@ struct TurnSink<'a> {
 
 impl ProviderSink for TurnSink<'_> {
     fn on_event(&mut self, event: ProviderEvent) -> Flow {
+        let _span = katu_core::trace_fn!("agent::turn::run::on_event");
+
         if self.activity.cancelled() {
             return Flow::Break;
         }
@@ -59,6 +61,8 @@ const MAX_ARGS_CHARS: usize = 200;
 
 /// Renderiza os argumentos **crus** do modelo de forma compacta (transparência), com teto.
 fn render_args(arguments: &Value) -> String {
+    let _span = katu_core::trace_fn!("agent::turn::run::render_args");
+
     let raw = serde_json::to_string(arguments).unwrap_or_else(|_| "<inválido>".to_string());
     if raw.chars().count() <= MAX_ARGS_CHARS {
         return raw;
@@ -76,13 +80,15 @@ pub(crate) fn run_turn_with(
     request: TurnRequest<'_>,
     activity: &mut dyn ActivitySink,
 ) -> Result<TurnReport, AgentError> {
+    let _span = katu_core::trace_fn!("agent::turn::run::run_turn_with");
+
     let TurnRequest {
         provider,
         ports,
         goal,
         options,
     } = request;
-    let _span = katu_core::span!(Level::Info, events::KERNEL_TURN);
+    let _span = katu_core::fn_span!(Level::Info, events::KERNEL_TURN, "run::run_turn_with");
     if !runtime.session.state().turn_open {
         runtime.begin_turn()?;
     }
@@ -99,6 +105,8 @@ fn drive(
     options: &TurnOptions,
     activity: &mut dyn ActivitySink,
 ) -> Result<Accum, AgentError> {
+    let _span = katu_core::trace_fn!("agent::turn::run::drive");
+
     let tools = catalog::tool_defs();
     let mut accum = Accum {
         text: String::new(),
@@ -161,6 +169,8 @@ fn stream_step(
     request: &ProviderRequest,
     activity: &mut dyn ActivitySink,
 ) -> Result<Step, AgentError> {
+    let _span = katu_core::trace_fn!("agent::turn::run::stream_step");
+
     let mut sink = TurnSink {
         activity: &mut *activity,
         text: String::new(),
@@ -205,6 +215,7 @@ struct Accum {
 
 /// Fecha o turno e devolve o relatório (comum ao fim natural e ao cancelamento).
 fn finish(runtime: &mut Runtime<'_>, accum: Accum) -> Result<TurnReport, AgentError> {
+    let _span = katu_core::fn_span!(Level::Debug, events::KERNEL_STOP, "run::finish");
     let turn = runtime.turn();
     runtime.record_turn_end(turn)?;
     Ok(TurnReport {

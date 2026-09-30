@@ -6,6 +6,7 @@
 
 use std::path::Path;
 
+use katu_core::diag::{Level, events};
 use katu_core::error::Error;
 use katu_core::kernel::discover_root;
 
@@ -60,6 +61,11 @@ const PRESERVED: &[&str] = &["knowledge", "guardrails", "audit"];
     reason = "`force` é o flag `--init --force` do clap"
 )]
 pub(crate) fn ensure_current(mode: GitMode, force: bool) -> Result<BootstrapReport, Error> {
+    let _span = katu_core::fn_span!(
+        Level::Debug,
+        events::BOOTSTRAP_INIT,
+        "bootstrap::ensure_current"
+    );
     let fs = StdFs;
     let start = std::env::current_dir().map_err(|err| Error::io(".", err))?;
     let root = discover_root(&fs, &start);
@@ -75,6 +81,7 @@ pub(crate) fn ensure_current(mode: GitMode, force: bool) -> Result<BootstrapRepo
     reason = "`force` é o flag `--init --force` do clap"
 )]
 pub(crate) fn ensure(root: &Path, mode: GitMode, force: bool) -> Result<BootstrapReport, Error> {
+    let _span = katu_core::fn_span!(Level::Debug, events::BOOTSTRAP_INIT, "bootstrap::ensure");
     let base = root.join(".katu");
     let mut report = BootstrapReport::default();
     if force {
@@ -96,6 +103,11 @@ pub(crate) fn ensure(root: &Path, mode: GitMode, force: bool) -> Result<Bootstra
 
 /// Remove tudo em `.katu/` exceto o conhecimento personalizado ([`PRESERVED`]).
 fn remove_unpreserved(base: &Path) -> Result<(), Error> {
+    let _span = katu_core::fn_span!(
+        Level::Trace,
+        events::BOOTSTRAP_INIT,
+        "bootstrap::remove_unpreserved"
+    );
     if !base.is_dir() {
         return Ok(());
     }
@@ -122,6 +134,11 @@ fn remove_unpreserved(base: &Path) -> Result<(), Error> {
 
 /// Escreve o snapshot da config do projeto se ainda não existir (1:1 da global, ou default).
 fn ensure_config(root: &Path) -> Result<bool, Error> {
+    let _span = katu_core::fn_span!(
+        Level::Trace,
+        events::BOOTSTRAP_INIT,
+        "bootstrap::ensure_config"
+    );
     let project = config::project_path(root);
     if project.exists() {
         return Ok(false);
@@ -144,6 +161,11 @@ fn ensure_config(root: &Path) -> Result<bool, Error> {
 
 /// Copia as travas padrão globais para o projeto (só as que faltarem).
 fn copy_guardrails(root: &Path) -> Result<(), Error> {
+    let _span = katu_core::fn_span!(
+        Level::Trace,
+        events::BOOTSTRAP_INIT,
+        "bootstrap::copy_guardrails"
+    );
     let Ok(global) = config::guardrails_dir() else {
         return Ok(());
     };
@@ -169,6 +191,8 @@ fn copy_guardrails(root: &Path) -> Result<(), Error> {
 
 /// Config default escrita quando não há global.
 fn default_config() -> toml::Table {
+    let _span = katu_core::trace_fn!("bootstrap::default_config");
+
     let mut table = toml::Table::new();
     config::set_key(
         &mut table,

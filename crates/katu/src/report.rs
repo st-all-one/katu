@@ -39,6 +39,8 @@ pub(crate) struct ErrorBody {
 impl Report {
     /// Relatório de sucesso.
     pub(crate) fn ok(command: &'static str, data: Option<Value>) -> Self {
+        let _span = katu_core::trace_fn!("report::ok");
+
         Self {
             success: true,
             command,
@@ -50,6 +52,8 @@ impl Report {
 
     /// Relatório de falha (código de saída derivado da categoria).
     pub(crate) fn failed(command: &'static str, error: &Error) -> Self {
+        let _span = katu_core::trace_fn!("report::failed");
+
         Self {
             success: false,
             command,
@@ -69,6 +73,8 @@ impl Report {
     reason = "o flag `--json` é um booleano explícito da borda"
 )]
 pub(crate) fn emit(report: &Report, json: bool) -> u8 {
+    let _span = katu_core::trace_fn!("report::emit");
+
     let written = if json {
         emit_json(report)
     } else {
@@ -82,6 +88,8 @@ pub(crate) fn emit(report: &Report, json: bool) -> u8 {
 
 /// Envelope JSON numa linha, em `stdout`.
 fn emit_json(report: &Report) -> Result<(), Error> {
+    let _span = katu_core::trace_fn!("report::emit_json");
+
     let mut bytes = serde_json::to_vec(report)
         .map_err(|err| Error::internal(format!("serializando envelope: {err}")))?;
     bytes.push(b'\n');
@@ -90,6 +98,8 @@ fn emit_json(report: &Report) -> Result<(), Error> {
 
 /// Saída humana: erro em `stderr`, dados em `stdout`.
 fn emit_human(report: &Report) -> Result<(), Error> {
+    let _span = katu_core::trace_fn!("report::emit_human");
+
     if let Some(error) = &report.error {
         let mut line = error.message.clone();
         line.push('\n');
@@ -103,6 +113,8 @@ fn emit_human(report: &Report) -> Result<(), Error> {
 /// O campo `session` (quando presente) é impresso **em destaque**, após uma linha em branco — é o
 /// id que o `run` devolve para `--resume`.
 fn human_data(data: Option<&Value>) -> String {
+    let _span = katu_core::trace_fn!("report::human_data");
+
     match data {
         Some(Value::String(text)) => format!("{text}\n"),
         Some(Value::Object(map)) => {
@@ -130,18 +142,24 @@ fn human_data(data: Option<&Value>) -> String {
 
 /// Escreve em `stdout`.
 fn write_stdout(bytes: &[u8]) -> Result<(), Error> {
+    let _span = katu_core::trace_fn!("report::write_stdout");
+
     let stdout = io::stdout();
     write_line(&mut stdout.lock(), bytes)
 }
 
 /// Escreve em `stderr`.
 fn write_stderr(bytes: &[u8]) -> Result<(), Error> {
+    let _span = katu_core::trace_fn!("report::write_stderr");
+
     let stderr = io::stderr();
     write_line(&mut stderr.lock(), bytes)
 }
 
 /// Escreve todos os bytes; `BrokenPipe` é sucesso (o consumidor fechou o *pipe*).
 fn write_line<W: Write>(writer: &mut W, bytes: &[u8]) -> Result<(), Error> {
+    let _span = katu_core::trace_fn!("report::write_line");
+
     match writer.write_all(bytes) {
         Ok(()) => Ok(()),
         Err(err) if err.kind() == io::ErrorKind::BrokenPipe => Ok(()),

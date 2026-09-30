@@ -157,6 +157,8 @@ pub const TOOLS: &[ToolSpec] = &[
 /// `true` se a tool pertence à superfície fechada.
 #[must_use]
 pub fn is_registered(name: ToolName) -> bool {
+    let _span = katu_core::trace_fn!("registry::is_registered");
+
     TOOLS.iter().any(|spec| spec.names.contains(&name))
 }
 

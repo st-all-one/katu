@@ -4,6 +4,7 @@
 //! `ask`/`doctor` recusam (fail-closed); `sessions`/`prime` continuam a funcionar.
 
 use clap::{Args, Subcommand};
+use katu_core::diag::{Level, events};
 use katu_core::error::Error;
 use serde_json::json;
 
@@ -104,6 +105,7 @@ pub(crate) struct DrainArgs {
 
 /// Executa `katu memo`.
 pub(crate) fn execute(args: &MemoArgs) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_MEMO, "memo::execute");
     match &args.command {
         MemoCommand::Ask(args) => ask_report(args),
         MemoCommand::Knowledge(args) => knowledge_report(args),
@@ -117,12 +119,16 @@ pub(crate) fn execute(args: &MemoArgs) -> Report {
 /// `memo ask`: resolve a consulta rica (E20-T06).
 #[cfg(feature = "memory-in-process")]
 fn ask_report(args: &AskArgs) -> Report {
+    let _span = katu_core::trace_fn!("cli::memo::ask_report");
+
     ask::report(args)
 }
 
 /// Sem adaptador de memória, `ask` recusa (fail-closed).
 #[cfg(not(feature = "memory-in-process"))]
 fn ask_report(_args: &AskArgs) -> Report {
+    let _span = katu_core::trace_fn!("cli::memo::ask_report");
+
     Report::failed(
         "memo.ask",
         &Error::unavailable("adaptador de memória não compilado (feature `memory-in-process`)"),
@@ -132,12 +138,16 @@ fn ask_report(_args: &AskArgs) -> Report {
 /// `memo knowledge`: visão geral do mapa estrutural (E20-T06).
 #[cfg(feature = "memory-in-process")]
 fn knowledge_report(args: &KnowledgeArgs) -> Report {
+    let _span = katu_core::trace_fn!("cli::memo::knowledge_report");
+
     ask::knowledge(args)
 }
 
 /// Sem adaptador de memória, `knowledge` recusa (fail-closed).
 #[cfg(not(feature = "memory-in-process"))]
 fn knowledge_report(_args: &KnowledgeArgs) -> Report {
+    let _span = katu_core::trace_fn!("cli::memo::knowledge_report");
+
     Report::failed(
         "memo.knowledge",
         &Error::unavailable("adaptador de memória não compilado (feature `memory-in-process`)"),
@@ -146,6 +156,8 @@ fn knowledge_report(_args: &KnowledgeArgs) -> Report {
 
 /// Estado do serviço de embeddings (E20-T17): a **segunda IA**, externa e plugável.
 fn embeddings_status() -> serde_json::Value {
+    let _span = katu_core::trace_fn!("cli::memo::embeddings_status");
+
     let embeddings = defaults::current().embeddings;
     let enabled = embeddings.url.as_deref().is_some_and(|url| !url.is_empty());
     json!({
@@ -161,6 +173,7 @@ fn embeddings_status() -> serde_json::Value {
 fn diagnose(args: &DoctorArgs) -> Report {
     use katu_core::diag;
 
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_MEMO, "memo::diagnose");
     if args.fix {
         return fix_report();
     }
@@ -178,6 +191,7 @@ fn diagnose(args: &DoctorArgs) -> Report {
 fn diagnose(args: &DoctorArgs) -> Report {
     use katu_core::diag;
 
+    let _span = katu_core::fn_span!(Level::Debug, events::CLI_MEMO, "memo::diagnose");
     if args.fix {
         return fix_report();
     }
@@ -194,6 +208,7 @@ fn diagnose(args: &DoctorArgs) -> Report {
 fn fix_report() -> Report {
     use crate::bootstrap::{self, GitMode};
 
+    let _span = katu_core::fn_span!(Level::Debug, events::BOOTSTRAP_FIX, "memo::fix_report");
     match bootstrap::ensure_current(GitMode::Default, false) {
         Ok(report) => Report::ok(
             "memo.doctor",
@@ -210,6 +225,7 @@ fn fix_report() -> Report {
 /// `memo drain --status`/`--digest`: estado sem tocar no índice ou dreno real (E20-T20).
 #[cfg(feature = "memory-in-process")]
 fn drain(args: &DrainArgs) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::WATCH_DRAIN, "memo::drain");
     if args.watch_service {
         return watch_action(args);
     }
@@ -226,6 +242,7 @@ fn drain(args: &DrainArgs) -> Report {
 #[cfg(feature = "memory-in-process")]
 fn watch_action(args: &DrainArgs) -> Report {
     use crate::watch_service::{self, Action};
+    let _span = katu_core::fn_span!(Level::Debug, events::WATCH_TICK, "memo::watch_action");
     let action = if args.install {
         Action::Install
     } else if args.subscribe {
@@ -243,6 +260,8 @@ fn watch_action(args: &DrainArgs) -> Report {
 /// Sem adaptador, `drain` recusa (fail-closed).
 #[cfg(not(feature = "memory-in-process"))]
 fn drain(args: &DrainArgs) -> Report {
+    let _span = katu_core::trace_fn!("cli::memo::drain");
+
     if args.status {
         return Report::failed(
             "memo.drain",
@@ -254,6 +273,8 @@ fn drain(args: &DrainArgs) -> Report {
 
 /// `drain` sem modo é help.
 fn drain_unavailable() -> Report {
+    let _span = katu_core::trace_fn!("cli::memo::drain_unavailable");
+
     Report::failed(
         "memo.drain",
         &Error::unavailable("memo drain exige --status, --digest ou --watch-service"),

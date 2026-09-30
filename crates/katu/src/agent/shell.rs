@@ -4,6 +4,7 @@
 //! runtime. No modo plano, a regra `plan-no-shell` nega com evidência; fora dele, corre como a tool
 //! `exec` (soft containment).
 
+use katu_core::diag::{Level, events};
 use katu_core::kernel::{CallContext, CallId, Dispatch};
 use serde_json::json;
 
@@ -20,6 +21,7 @@ pub(crate) fn dispatch(
     ports: &Ports<'_>,
     command: &str,
 ) -> Result<Dispatch, AgentError> {
+    let _span = katu_core::fn_span!(Level::Trace, events::TOOL_EXEC, "shell::dispatch");
     let args = json!({ "argv": ["sh", "-c", command] });
     let root = runtime.root().to_path_buf();
     let route_ports = router::Ports {

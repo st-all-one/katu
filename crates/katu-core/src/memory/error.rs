@@ -30,6 +30,8 @@ pub struct MemoryError {
 impl MemoryError {
     /// Constrói um erro com a natureza e a mensagem dadas.
     pub fn new(kind: MemoryErrorKind, message: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("memory::error::new");
+
         Self {
             kind,
             message: message.into(),
@@ -38,21 +40,29 @@ impl MemoryError {
 
     /// Backend indisponível.
     pub fn unavailable(message: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("memory::error::unavailable");
+
         Self::new(MemoryErrorKind::Unavailable, message)
     }
 
     /// Operação excedeu o tempo-limite.
     pub fn timeout(message: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("memory::error::timeout");
+
         Self::new(MemoryErrorKind::Timeout, message)
     }
 
     /// Pedido inválido.
     pub fn invalid(message: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("memory::error::invalid");
+
         Self::new(MemoryErrorKind::Invalid, message)
     }
 
     /// Falha interna.
     pub fn internal(message: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("memory::error::internal");
+
         Self::new(MemoryErrorKind::Internal, message)
     }
 

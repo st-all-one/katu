@@ -86,6 +86,8 @@ pub struct ToolSchema<'a> {
 /// Valida um esquema e devolve todos os problemas (agregados, com o caminho exato).
 #[must_use]
 pub fn lint(schema: &ToolSchema<'_>) -> Issues {
+    let _span = katu_core::trace_fn!("schema::lint");
+
     let mut issues = Vec::new();
     check_name(schema.name, &mut issues);
     check_description(schema.name, schema.description, &mut issues);
@@ -96,6 +98,8 @@ pub fn lint(schema: &ToolSchema<'_>) -> Issues {
 /// Valida **todos** os esquemas do registry, com o caminho prefixado por `tools[i]`.
 #[must_use]
 pub fn lint_all() -> Issues {
+    let _span = katu_core::trace_fn!("schema::lint_all");
+
     let mut issues = Vec::new();
     for (index, schema) in SCHEMAS.iter().enumerate() {
         let report = lint(schema);
@@ -111,6 +115,8 @@ pub fn lint_all() -> Issues {
 
 /// Nome: `snake_case`, não vazio, e a primeira palavra tem de ser um verbo do conjunto fechado.
 fn check_name(name: &str, issues: &mut Vec<Issue>) {
+    let _span = katu_core::trace_fn!("schema::check_name");
+
     if name.is_empty() {
         issues.push(Issue::new("name", "nome obrigatório em falta"));
         return;
@@ -138,6 +144,8 @@ fn check_name(name: &str, issues: &mut Vec<Issue>) {
 
 /// Descrição: obrigatória, `Use when … Do not use for …`, com teto e sem *poisoning*.
 fn check_description(name: &str, description: &str, issues: &mut Vec<Issue>) {
+    let _span = katu_core::trace_fn!("schema::check_description");
+
     let path = format!("{name}.description");
     if description.is_empty() {
         issues.push(Issue::new(
@@ -174,6 +182,8 @@ fn check_description(name: &str, description: &str, issues: &mut Vec<Issue>) {
 
 /// Parâmetros: nomes únicos `snake_case`, descrição não vazia, enums fechados com `pattern` para ids.
 fn check_params(schema: &ToolSchema<'_>, issues: &mut Vec<Issue>) {
+    let _span = katu_core::trace_fn!("schema::check_params");
+
     let mut seen: BTreeSet<&str> = BTreeSet::new();
     for param in schema.params {
         let path = format!("{}.params.{}", schema.name, param.name);
@@ -231,9 +241,10 @@ fn check_params(schema: &ToolSchema<'_>, issues: &mut Vec<Issue>) {
 /// o modelo vê o contrato sem repetir as descrições longas. Fonte única: [`SCHEMAS`].
 #[must_use]
 pub fn catalog() -> String {
-    let _span = katu_core::span!(
+    let _span = katu_core::fn_span!(
         Level::Debug,
         events::SCHEMA_CATALOG,
+        "schema::catalog",
         "tools" => SCHEMAS.len(),
     );
     let mut table = RowTable::new("tool");
@@ -245,6 +256,8 @@ pub fn catalog() -> String {
 
 /// Assinatura compacta dos parâmetros de uma tool.
 fn signature(schema: &ToolSchema<'_>) -> String {
+    let _span = katu_core::trace_fn!("schema::signature");
+
     let mut sig = String::new();
     for param in schema.params {
         if !sig.is_empty() {
@@ -265,12 +278,16 @@ fn signature(schema: &ToolSchema<'_>) -> String {
 
 /// `true` se o texto contém um marcador de *poisoning* (comparação em minúsculas).
 fn contains_poison(text: &str) -> bool {
+    let _span = katu_core::trace_fn!("schema::contains_poison");
+
     let lowered = text.to_ascii_lowercase();
     POISON.iter().any(|marker| lowered.contains(marker))
 }
 
 /// `true` para `snake_case` simples (minúsculas/dígitos, sem `__` nem extremos `_`).
 fn is_snake_case(name: &str) -> bool {
+    let _span = katu_core::trace_fn!("schema::is_snake_case");
+
     !name.is_empty()
         && !name.starts_with('_')
         && !name.ends_with('_')

@@ -103,6 +103,8 @@ impl Challenge {
     /// Cria um challenge para o pedido `prompt`.
     #[must_use]
     pub fn new(prompt: ChallengePrompt) -> Self {
+        let _span = katu_core::trace_fn!("approval::new");
+
         Self {
             prompt,
             checked: vec![false; QUESTIONS.len()],
@@ -115,12 +117,16 @@ impl Challenge {
     /// Pedido apresentado.
     #[must_use]
     pub fn prompt(&self) -> &ChallengePrompt {
+        let _span = katu_core::trace_fn!("approval::prompt");
+
         &self.prompt
     }
 
     /// Estado de cada pergunta.
     #[must_use]
     pub fn checked(&self) -> &[bool] {
+        let _span = katu_core::trace_fn!("approval::checked");
+
         &self.checked
     }
 
@@ -139,17 +145,23 @@ impl Challenge {
     /// Justificação escrita.
     #[must_use]
     pub fn reason(&self) -> &str {
+        let _span = katu_core::trace_fn!("approval::reason");
+
         &self.reason
     }
 
     /// `true` se todas as perguntas foram respondidas e há justificação.
     #[must_use]
     pub fn is_complete(&self) -> bool {
+        let _span = katu_core::trace_fn!("approval::is_complete");
+
         self.checked.iter().all(|checked| *checked) && !self.reason.trim().is_empty()
     }
 
     /// Aplica uma tecla, devolvendo o passo seguinte.
     pub fn apply(&mut self, key: Key) -> Step {
+        let _span = katu_core::trace_fn!("approval::apply");
+
         match key {
             Key::Cancel => return Step::Cancelled,
             Key::Tab => self.focus = toggle_focus(self.focus),
@@ -174,6 +186,8 @@ impl Challenge {
     /// Assinatura final, quando o challenge está completo.
     #[must_use]
     pub fn signature(&self, granted_by: &str) -> Option<ChallengeSignature> {
+        let _span = katu_core::trace_fn!("approval::signature");
+
         self.is_complete().then(|| ChallengeSignature {
             reason: self.reason.trim().to_string(),
             granted_by: granted_by.to_string(),
@@ -181,6 +195,8 @@ impl Challenge {
     }
 
     fn move_cursor(&mut self, direction: Move) {
+        let _span = katu_core::trace_fn!("approval::move_cursor");
+
         if self.focus != Focus::Checklist {
             return;
         }
@@ -203,6 +219,8 @@ const fn toggle_focus(focus: Focus) -> Focus {
 /// Normaliza uma tecla do terminal (o `Ctrl-C` cancela sempre).
 #[must_use]
 pub(super) fn map_key(key: KeyEvent) -> Option<Key> {
+    let _span = katu_core::trace_fn!("approval::map_key");
+
     if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
         return Some(Key::Cancel);
     }

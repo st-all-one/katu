@@ -5,6 +5,7 @@
 
 use std::io::{IsTerminal, Read};
 
+use katu_core::diag::{Level, events};
 use katu_core::error::Error;
 
 /// Resolve o *body* posicional a partir do literal, de `stdin` ou de um *pipe*.
@@ -13,6 +14,7 @@ use katu_core::error::Error;
 /// [`Error::invalid_input`] quando não há conteúdo e o `stdin` é um TTY; [`Error::io`] quando a
 /// leitura de `stdin` falha.
 pub(crate) fn resolve(body: Option<&str>) -> Result<String, Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::CLI_INPUT, "input::resolve");
     match body {
         Some("-") => read_stdin(),
         Some(text) => Ok(text.to_owned()),
@@ -25,6 +27,7 @@ pub(crate) fn resolve(body: Option<&str>) -> Result<String, Error> {
 
 /// Lê todo o `stdin` como texto (UTF-8).
 fn read_stdin() -> Result<String, Error> {
+    let _span = katu_core::fn_span!(Level::Trace, events::CLI_INPUT, "input::read_stdin");
     let mut buffer = String::new();
     std::io::stdin()
         .read_to_string(&mut buffer)

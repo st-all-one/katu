@@ -1,9 +1,12 @@
-//! Sink agregador (E19-T02): contagens e durações por evento, com percentis.
+//! Sink agregador (E19-T02/E19-T03): contagens e durações por evento **e por função**, com
+//! percentis.
 //!
-//! Agrega apenas registos de [`Kind::SpanEnd`](super::Kind) (têm duração). O instantâneo é
-//! **determinístico** — ordem canónica por identificador de evento — e destina-se a ser gravado
-//! como artefacto com base `measured` (DF5). Sem alocação no caminho quente além do `push` do
-//! vetor de durações; os percentis calculam-se no *dump*, não na recolha.
+//! Agrega apenas registos de [`Kind::SpanEnd`](super::Kind) (têm duração), com chave
+//! `(event, function)` — onde `function` é o rótulo opcional de [`fn_span!`](crate::fn_span). O
+//! instantâneo é **determinístico** — ordem canónica por identificador de evento e, depois, por
+//! função — e destina-se a ser gravado como artefacto com base `measured` (DF5). Sem alocação no
+//! caminho quente além do `push` do vetor de durações; os percentis calculam-se no *dump*, não na
+//! recolha.
 
 use std::collections::BTreeMap;
 use std::sync::{Mutex, PoisonError};
@@ -15,6 +18,8 @@ use super::{Kind, Record, Sink};
 pub struct EventSummary {
     /// Identificador do catálogo.
     pub event: &'static str,
+    /// Rótulo de função (`fn_span!`), quando o span o declara; `None` caso contrário.
+    pub function: Option<&'static str>,
     /// Número de amostras.
     pub count: u64,
     /// Soma das durações (ns).
@@ -37,10 +42,13 @@ struct Stat {
     total_nanos: u64,
 }
 
-/// Sink que agrega contagens e durações por evento (thread-safe).
+/// Chave de agregação: identificador de evento + rótulo de função (opcional).
+type StatKey = (&'static str, Option<&'static str>);
+
+/// Sink que agrega contagens e durações por evento (e por função) (thread-safe).
 #[derive(Debug, Default)]
 pub struct AggregatingSink {
-    stats: Mutex<BTreeMap<&'static str, Stat>>,
+    stats: Mutex<BTreeMap<StatKey, Stat>>,
 }
 
 impl Sink for AggregatingSink {
@@ -53,7 +61,7 @@ impl Sink for AggregatingSink {
         };
         let nanos = u64::try_from(nanos).unwrap_or(u64::MAX);
         let mut stats = self.stats.lock().unwrap_or_else(PoisonError::into_inner);
-        let stat = stats.entry(record.event).or_default();
+        let stat = stats.entry((record.event, record.function)).or_default();
         stat.total_nanos = stat.total_nanos.saturating_add(nanos);
         stat.durations.push(nanos);
     }
@@ -66,11 +74,11 @@ impl AggregatingSink {
         let stats = self.stats.lock().unwrap_or_else(PoisonError::into_inner);
         stats
             .iter()
-            .map(|(event, stat)| summarize(event, stat))
+            .map(|((event, function), stat)| summarize(event, *function, stat))
             .collect()
     }
 
-    /// Número de eventos distintos agregados.
+    /// Número de chaves `(evento, função)` distintas agregadas.
     #[must_use]
     pub fn events(&self) -> usize {
         self.stats
@@ -93,11 +101,12 @@ fn len_u64(stat: &Stat) -> u64 {
     u64::try_from(stat.durations.len()).unwrap_or(u64::MAX)
 }
 
-fn summarize(event: &'static str, stat: &Stat) -> EventSummary {
+fn summarize(event: &'static str, function: Option<&'static str>, stat: &Stat) -> EventSummary {
     let mut sorted = stat.durations.clone();
     sorted.sort_unstable();
     EventSummary {
         event,
+        function,
         count: len_u64(stat),
         total_nanos: stat.total_nanos,
         min_nanos: sorted.first().copied().unwrap_or(0),
@@ -132,6 +141,7 @@ mod tests {
         Record {
             level: Level::Info,
             event,
+            function: None,
             kind: Kind::SpanEnd,
             duration_nanos: Some(nanos),
             fields: &[],
@@ -142,6 +152,7 @@ mod tests {
         Record {
             level: Level::Info,
             event,
+            function: None,
             kind: Kind::Event,
             duration_nanos: None,
             fields: &[],
@@ -177,6 +188,27 @@ mod tests {
         assert_eq!(percentile(&data, 9_500), 95);
         assert_eq!(percentile(&data, 9_900), 99);
         assert_eq!(percentile(&[], 5_000), 0);
+    }
+
+    #[test]
+    fn groups_by_function_label() {
+        let sink = AggregatingSink::default();
+        let with_fn = |function: &'static str, nanos: u128| Record {
+            level: Level::Info,
+            event: events::KERNEL_STEP,
+            function: Some(function),
+            kind: Kind::SpanEnd,
+            duration_nanos: Some(nanos),
+            fields: &[],
+        };
+        sink.record(&with_fn("a::one", 10));
+        sink.record(&with_fn("a::two", 20));
+        sink.record(&span_end(events::KERNEL_STEP, 30));
+        let snapshot = sink.snapshot();
+        assert_eq!(snapshot.len(), 3);
+        assert_eq!(snapshot.first().map(|s| s.function), Some(None));
+        assert_eq!(snapshot.get(1).map(|s| s.function), Some(Some("a::one")));
+        assert_eq!(snapshot.get(2).map(|s| s.function), Some(Some("a::two")));
     }
 
     #[test]

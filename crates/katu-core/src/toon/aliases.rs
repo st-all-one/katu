@@ -43,17 +43,23 @@ impl Aliases {
     /// Registo vazio.
     #[must_use]
     pub fn new() -> Self {
+        let _span = crate::trace_fn!("toon::aliases::new");
+
         Self::default()
     }
 
     /// `true` se não há aliases.
     #[must_use]
     pub fn is_empty(&self) -> bool {
+        let _span = crate::trace_fn!("toon::aliases::is_empty");
+
         self.ids.is_empty() && self.paths.is_empty()
     }
 
     /// Interna um id: devolve o alias a partir do limiar e, se for novo, o par.
     pub fn intern_id(&mut self, raw: &str) -> (String, Fresh) {
+        let _span = crate::trace_fn!("toon::aliases::intern_id");
+
         if let Some(alias) = self.ids.get(raw) {
             return (alias.clone(), None);
         }
@@ -70,6 +76,8 @@ impl Aliases {
 
     /// Interna um caminho: devolve o alias a partir do limiar e, se for novo, o par.
     pub fn intern_path(&mut self, raw: &str) -> (String, Fresh) {
+        let _span = crate::trace_fn!("toon::aliases::intern_path");
+
         if let Some(alias) = self.paths.get(raw) {
             return (alias.clone(), None);
         }
@@ -87,12 +95,16 @@ impl Aliases {
     /// Substitui ids/paths por aliases; devolve o valor e os pares novos.
     #[must_use]
     pub fn substitute(&mut self, value: &Value) -> (Value, Pairs) {
+        let _span = crate::trace_fn!("toon::aliases::substitute");
+
         let mut new = Vec::new();
         let out = self.walk(value, None, &mut new);
         (out, new)
     }
 
     fn walk(&mut self, value: &Value, key: Option<&str>, new: &mut Pairs) -> Value {
+        let _span = crate::trace_fn!("toon::aliases::walk");
+
         match value {
             Value::Map(entries) => Value::Map(
                 entries
@@ -136,6 +148,8 @@ impl Aliases {
     /// Secção `sym` com todos os aliases da sessão (para o prime).
     #[must_use]
     pub fn symbol_section(&self) -> Section {
+        let _span = crate::trace_fn!("toon::aliases::symbol_section");
+
         let mut table = RowTable::new("sym");
         for (alias, value) in self.ids.iter().chain(self.paths.iter()) {
             table.push(vec![Cell::text(alias.clone()), Cell::text(value.clone())]);

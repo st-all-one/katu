@@ -9,6 +9,8 @@ use super::{Memory, NoteType, PreWriteOutcome, PreWriteReq, RecallReq, SessionEn
 
 /// Pedido de escrita válido, reutilizado pelos testes de conformidade.
 fn sample_write() -> PreWriteReq {
+    let _span = crate::trace_fn!("memory::conformance::sample_write");
+
     PreWriteReq {
         statement: "cache usa LRU".to_string(),
         note_type: NoteType::Decision,
@@ -23,6 +25,8 @@ fn sample_write() -> PreWriteReq {
 /// Se alguma invariante do contrato for violada (backend indisponível, id vazio, `pre_write` não
 /// determinístico).
 pub fn assert_contract(memory: &dyn Memory) -> Result<(), Box<dyn std::error::Error>> {
+    let _span = crate::trace_fn!("memory::conformance::assert_contract");
+
     let status = memory.status()?;
     if status.backend.trim().is_empty() {
         return Err("status.backend vazio".into());

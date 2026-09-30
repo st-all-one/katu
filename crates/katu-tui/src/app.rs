@@ -7,6 +7,7 @@
 //! O **painel de atividade** (E10-T05) é efémero: mostra o stream do modelo e as tools em curso,
 //! e **nunca** entra no transcript durável nem no contexto do modelo.
 
+use katu_core::diag::{Level, events};
 use katu_core::provider::Thinking;
 
 use crate::action::{Action, Mode};
@@ -69,6 +70,8 @@ pub struct App {
 
 impl Default for App {
     fn default() -> Self {
+        let _span = katu_core::trace_fn!("app::default");
+
         Self::new()
     }
 }
@@ -77,6 +80,8 @@ impl App {
     /// Estado inicial vazio.
     #[must_use]
     pub fn new() -> Self {
+        let _span = katu_core::trace_fn!("app::new");
+
         Self {
             input: String::new(),
             citations: Vec::new(),
@@ -111,6 +116,8 @@ impl App {
     /// Modelo selecionado no seletor (E10-T07); `None` até a borda publicar a lista.
     #[must_use]
     pub fn model(&self) -> Option<&str> {
+        let _span = katu_core::trace_fn!("app::model");
+
         self.controls.model()
     }
 
@@ -129,6 +136,8 @@ impl App {
     /// Entradas da lixeira listadas (mais recentes primeiro).
     #[must_use]
     pub fn trash_items(&self) -> &[TrashEntry] {
+        let _span = katu_core::trace_fn!("app::trash_items");
+
         self.trash.items()
     }
 
@@ -141,12 +150,16 @@ impl App {
     /// Linha de mensagem em edição.
     #[must_use]
     pub fn input(&self) -> &str {
+        let _span = katu_core::trace_fn!("app::input");
+
         &self.input
     }
 
     /// Buffer de *steering* em curso durante um turno (E20-T16).
     #[must_use]
     pub fn steering(&self) -> &str {
+        let _span = katu_core::trace_fn!("app::steering");
+
         &self.steering
     }
 
@@ -158,6 +171,7 @@ impl App {
 
     /// Substitui o buffer de *steering* (chamado pelo pintor durante o turno).
     pub fn set_steering(&mut self, text: &str) {
+        let _span = katu_core::fn_span!(Level::Trace, events::TUI_LIVE, "app::set_steering");
         self.steering.clear();
         self.steering.push_str(text);
     }
@@ -165,6 +179,8 @@ impl App {
     /// Conversa mostrada.
     #[must_use]
     pub fn transcript(&self) -> &[Entry] {
+        let _span = katu_core::trace_fn!("app::transcript");
+
         &self.transcript
     }
 
@@ -177,24 +193,32 @@ impl App {
     /// Fase do kernel (E10-T06).
     #[must_use]
     pub fn phase(&self) -> &str {
+        let _span = katu_core::trace_fn!("app::phase");
+
         &self.phase
     }
 
     /// Texto em curso do modelo (painel de atividade, E10-T05).
     #[must_use]
     pub fn streaming(&self) -> &str {
+        let _span = katu_core::trace_fn!("app::streaming");
+
         &self.streaming
     }
 
     /// Raciocínio em curso (efémero, fora do ecrã por omissão).
     #[must_use]
     pub fn thinking(&self) -> &str {
+        let _span = katu_core::trace_fn!("app::thinking");
+
         &self.thinking
     }
 
     /// Linhas discretas do painel de atividade.
     #[must_use]
     pub fn live(&self) -> &[String] {
+        let _span = katu_core::trace_fn!("app::live");
+
         &self.live
     }
 
@@ -207,12 +231,16 @@ impl App {
     /// Próxima ação declarada no checkpoint (E10-T06); `None` antes do primeiro turno.
     #[must_use]
     pub fn next_action(&self) -> Option<&str> {
+        let _span = katu_core::trace_fn!("app::next_action");
+
         self.next_action.as_deref()
     }
 
     /// Uso/custo do último turno (E12-T03/T10); `None` antes do primeiro turno.
     #[must_use]
     pub fn usage(&self) -> Option<&str> {
+        let _span = katu_core::trace_fn!("app::usage");
+
         self.usage.as_deref()
     }
 
@@ -230,6 +258,7 @@ impl App {
 
     /// Aplica uma ação: muda só o estado; devolve [`Command`] quando a borda tem de agir.
     pub fn apply_action(&mut self, action: Action) -> Option<Command> {
+        let _span = katu_core::fn_span!(Level::Debug, events::TUI_ACTION, "app::apply_action");
         match action {
             Action::EnterInsert => self.mode = Mode::Insert,
             Action::StartCommand => {

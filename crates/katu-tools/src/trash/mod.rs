@@ -35,11 +35,13 @@ pub struct TrashTool<'a> {
 
 impl Tool for TrashTool<'_> {
     fn name(&self) -> ToolName {
+        let _span = katu_core::trace_fn!("trash::name");
+
         ToolName::Trash
     }
 
     fn execute(&self, use_: &ToolUse) -> ToolOutput {
-        let _span = katu_core::span!(Level::Trace, events::TOOL_TRASH);
+        let _span = katu_core::fn_span!(Level::Trace, events::TOOL_TRASH, "trash::execute");
         let ToolArgs::Trash { path } = &use_.args else {
             return unavailable("trash");
         };
@@ -75,11 +77,14 @@ impl Tool for TrashTool<'_> {
 impl TrashTool<'_> {
     /// Diretório da lixeira (por projeto).
     fn trash_dir(&self) -> PathBuf {
+        let _span = katu_core::trace_fn!("trash::trash_dir");
+
         self.root.join(".katu").join("trash")
     }
 
     /// Caminho guardado livre (preserva o relativo; desambigua em colisão).
     fn unique(&self, original: &Path, now: u64) -> Option<PathBuf> {
+        let _span = katu_core::fn_span!(Level::Trace, events::TOOL_TRASH, "trash::unique");
         let base = self.stored_base(original);
         if !self.fs.exists(&base) {
             return Some(base);
@@ -98,6 +103,8 @@ impl TrashTool<'_> {
 
     /// Caminho base na lixeira (com o caminho relativo preservado).
     fn stored_base(&self, original: &Path) -> PathBuf {
+        let _span = katu_core::trace_fn!("trash::stored_base");
+
         let relative = original
             .strip_prefix(&self.root)
             .ok()
@@ -128,6 +135,7 @@ pub struct TrashItem {
 /// ficheiro guardado, preservando o índice append-only como rasto de auditoria.
 #[must_use]
 pub fn list(fs: &dyn Fs, root: &Path) -> Vec<TrashItem> {
+    let _span = katu_core::fn_span!(Level::Trace, events::TOOL_TRASH, "trash::list");
     let mut items: Vec<TrashItem> = index::read(fs, root)
         .into_iter()
         .filter(|record| fs.exists(Path::new(&record.stored)))
@@ -146,6 +154,7 @@ pub fn list(fs: &dyn Fs, root: &Path) -> Vec<TrashItem> {
 /// # Errors
 /// Devolve [`TrashError`] se o token for desconhecido, o original estiver ocupado ou houver I/O.
 pub fn restore(fs: &dyn Fs, root: &Path, token: &str) -> Result<PathBuf, TrashError> {
+    let _span = katu_core::fn_span!(Level::Trace, events::TOOL_TRASH, "trash::restore");
     let records = index::read(fs, root);
     let record = records
         .iter()
@@ -172,6 +181,7 @@ pub fn restore(fs: &dyn Fs, root: &Path, token: &str) -> Result<PathBuf, TrashEr
 /// # Errors
 /// [`TrashError::Io`] se uma remoção falhar.
 pub fn empty(fs: &dyn Fs, root: &Path) -> Result<usize, TrashError> {
+    let _span = katu_core::fn_span!(Level::Trace, events::TOOL_TRASH, "trash::empty");
     let records = index::read(fs, root);
     let mut removed = 0usize;
     for record in &records {
@@ -199,6 +209,8 @@ pub enum TrashError {
 
 impl std::fmt::Display for TrashError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let _span = katu_core::trace_fn!("trash::fmt");
+
         match self {
             Self::Unknown => f.write_str("token de lixeira desconhecido"),
             Self::Occupied => f.write_str("o caminho original já está ocupado"),
@@ -210,6 +222,8 @@ impl std::fmt::Display for TrashError {
 impl std::error::Error for TrashError {}
 
 fn build(original: &str, stored: &Path, bytes: &[u8], now: u64) -> ToolReport {
+    let _span = katu_core::trace_fn!("trash::build");
+
     let id = content_id("f", original.as_bytes());
     let hash = content_hash(bytes);
     let token = stored.display().to_string();
@@ -234,6 +248,8 @@ fn build(original: &str, stored: &Path, bytes: &[u8], now: u64) -> ToolReport {
 }
 
 fn unavailable(control: &'static str) -> ToolOutput {
+    let _span = katu_core::trace_fn!("trash::unavailable");
+
     ToolOutput::outcome(ToolOutcome::Unavailable {
         control: ControlId::new(control),
         rule_id: None,

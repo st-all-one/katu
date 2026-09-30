@@ -65,6 +65,8 @@ impl MemProcess {
     /// Cria com o resultado devolvido em cada execução.
     #[must_use]
     pub fn new(result: Result<ExecResult, ProcessError>) -> Self {
+        let _span = crate::trace_fn!("ports::process::new");
+
         Self {
             result,
             runs: Mutex::new(Vec::new()),
@@ -74,6 +76,8 @@ impl MemProcess {
     /// Cria um processo que devolve sucesso com `stdout`.
     #[must_use]
     pub fn ok(stdout: &str) -> Self {
+        let _span = crate::trace_fn!("ports::process::ok");
+
         Self::new(Ok(ExecResult {
             exit_code: Some(0),
             signal: None,
@@ -87,18 +91,24 @@ impl MemProcess {
     /// Cria um processo que falha sempre com `error`.
     #[must_use]
     pub fn failing(error: ProcessError) -> Self {
+        let _span = crate::trace_fn!("ports::process::failing");
+
         Self::new(Err(error))
     }
 
     /// Pedidos registados, por ordem.
     #[must_use]
     pub fn runs(&self) -> Vec<ExecRequest> {
+        let _span = crate::trace_fn!("ports::process::runs");
+
         lock(&self.runs).clone()
     }
 }
 
 impl Process for MemProcess {
     fn run(&self, request: &ExecRequest) -> Result<ExecResult, ProcessError> {
+        let _span = crate::trace_fn!("ports::process::run");
+
         lock(&self.runs).push(request.clone());
         self.result.clone()
     }
@@ -106,6 +116,8 @@ impl Process for MemProcess {
 
 /// Bloqueia um `Mutex`, recuperando o valor mesmo que o lock esteja envenenado.
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    let _span = crate::trace_fn!("ports::process::lock");
+
     mutex
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)

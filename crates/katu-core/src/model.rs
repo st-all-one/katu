@@ -12,6 +12,8 @@ use crate::verify::VerificationReport;
 
 /// Par `(chave, valor)` de um mapa TOON.
 fn field(name: &str, value: Value) -> (String, Value) {
+    let _span = crate::trace_fn!("model::field");
+
     (name.to_string(), value)
 }
 
@@ -31,6 +33,8 @@ impl ToolOutcome {
     /// Resumo de uma linha (usado no digest da compactação; nunca `Debug`).
     #[must_use]
     pub fn summary(&self) -> String {
+        let _span = crate::trace_fn!("model::summary");
+
         match self {
             Self::Ok | Self::Partial | Self::Timeout => self.status_str().to_string(),
             Self::Denied { rule_id, evidence } => {
@@ -45,7 +49,7 @@ impl ToolOutcome {
     /// Projeção TOON do outcome: escalares explícitos, com a regra/argumento quando acionável.
     #[must_use]
     pub fn to_value(&self) -> Value {
-        let _span = crate::span!(Level::Debug, events::MODEL_PROJECT, "target" => "outcome");
+        let _span = crate::fn_span!(Level::Debug, events::MODEL_PROJECT, "model::outcome::to_value", "target" => "outcome");
         let mut entries = vec![field("status", Value::str(self.status_str()))];
         match self {
             Self::Denied { rule_id, evidence } => {
@@ -72,7 +76,7 @@ impl Error {
     /// Projeção TOON do erro: `kind` do vocabulário fechado + mensagem de uma linha.
     #[must_use]
     pub fn to_value(&self) -> Value {
-        let _span = crate::span!(Level::Debug, events::MODEL_PROJECT, "target" => "error");
+        let _span = crate::fn_span!(Level::Debug, events::MODEL_PROJECT, "model::error::to_value", "target" => "error");
         Value::map(vec![
             field("kind", Value::str(self.kind().as_str())),
             field("msg", Value::str(self.to_string())),
@@ -84,7 +88,12 @@ impl VerificationReport {
     /// Projeção TOON do gate: resumo escalar + tabela `checks` (ordem determinística).
     #[must_use]
     pub fn to_value(&self) -> Value {
-        let _span = crate::span!(Level::Debug, events::MODEL_PROJECT, "target" => "verification");
+        let _span = crate::fn_span!(
+            Level::Debug,
+            events::MODEL_PROJECT,
+            "model::verification::to_value",
+            "target" => "verification"
+        );
         let checks = self
             .checks
             .iter()

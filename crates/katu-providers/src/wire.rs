@@ -61,6 +61,7 @@ where
     W: Wiring,
     M: FnMut() -> W,
 {
+    let _span = katu_core::fn_span!(Level::Debug, events::PROVIDER_REQUEST, "wire::stream");
     let mut attempt = 0_u32;
     loop {
         match run_attempt(transport, http, make(), sink) {
@@ -81,6 +82,8 @@ where
 
 /// Decodifica argumentos de tool acumulados (string JSON; vazio = objeto vazio).
 pub(crate) fn parse_arguments(raw: &str) -> Result<serde_json::Value, ProviderError> {
+    let _span = katu_core::trace_fn!("wire::parse_arguments");
+
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return Ok(serde_json::Value::Object(serde_json::Map::new()));
@@ -102,6 +105,7 @@ fn run_attempt<T: Transport, W: Wiring>(
     mut decoder: W,
     sink: &mut dyn ProviderSink,
 ) -> Result<ProviderOutcome, Failure> {
+    let _span = katu_core::fn_span!(Level::Trace, events::PROVIDER_REQUEST, "wire::run_attempt");
     let attempt = send_and_feed(transport, http, &mut decoder, sink);
     let (result, failure, error_body) = (attempt.result, attempt.failure, attempt.error_body);
     let meta = match result {
@@ -141,6 +145,8 @@ fn run_attempt<T: Transport, W: Wiring>(
 
 /// Classifica uma resposta HTTP não-2xx (corpo de erro, retry e atraso pedido).
 fn http_failure<W: Wiring>(meta: &HttpMeta, body: &str, decoder: &W) -> Failure {
+    let _span = katu_core::trace_fn!("wire::http_failure");
+
     Failure {
         error: ProviderError::Http {
             status: meta.status,
@@ -165,6 +171,8 @@ fn send_and_feed<T: Transport, W: Wiring>(
     decoder: &mut W,
     sink: &mut dyn ProviderSink,
 ) -> Attempt {
+    let _span = katu_core::trace_fn!("wire::send_and_feed");
+
     let mut parser = SseParser::new();
     let mut error_body = String::new();
     let mut failure = None;

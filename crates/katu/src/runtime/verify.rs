@@ -1,5 +1,6 @@
 //! Gate de verificação sobre o log da sessão (E09-T03).
 
+use katu_core::diag::{Level, events};
 use katu_core::kernel::SessionError;
 use katu_core::verify::{VerificationInput, VerificationReport, verify};
 
@@ -18,6 +19,7 @@ impl Runtime<'_> {
         &self,
         request: VerifyRequest,
     ) -> Result<VerificationReport, RuntimeError> {
+        let _span = katu_core::fn_span!(Level::Debug, events::VERIFY_REPORT, "verify::verify");
         let Some(plan) = self.plan() else {
             return Err(RuntimeError::Verification(
                 "sem `scope_contract.json` (o gate exige escopo)".to_string(),
@@ -42,6 +44,8 @@ impl Runtime<'_> {
         &mut self,
         report: &VerificationReport,
     ) -> Result<(), SessionError> {
+        let _span = katu_core::trace_fn!("runtime::verify::record_verification");
+
         self.session.record_verification(report)
     }
 }

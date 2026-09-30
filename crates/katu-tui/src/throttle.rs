@@ -37,6 +37,8 @@ impl<'c> Throttle<'c> {
 
     /// `true` se já passou o intervalo (ou há um quadro forçado); consome a marca de forçado.
     pub(crate) fn due(&self) -> bool {
+        let _span = katu_core::trace_fn!("throttle::due");
+
         let now = self.clock.now().as_millis();
         let forced = self.pending.swap(false, Ordering::Relaxed);
         if forced || now.saturating_sub(self.last_ms.load(Ordering::Relaxed)) >= self.interval_ms {
@@ -48,6 +50,8 @@ impl<'c> Throttle<'c> {
 
     /// Força o próximo quadro (mudança estrutural: entrada, fim de turno).
     pub(crate) fn request(&self) {
+        let _span = katu_core::trace_fn!("throttle::request");
+
         self.pending.store(true, Ordering::Relaxed);
     }
 }

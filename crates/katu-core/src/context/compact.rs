@@ -79,12 +79,15 @@ pub fn compact(
     budget: ContextBudget,
     mode: CompactionMode,
 ) -> Option<Compaction> {
+    let _span = crate::trace_fn!("context::compact::compact");
+
     if mode == CompactionMode::Disabled {
         return None;
     }
-    let _span = crate::span!(
+    let _span = crate::fn_span!(
         Level::Debug,
         events::CONTEXT_COMPACT,
+        "context::compact::compact",
         "raw_min" => budget.raw_min,
         "summary_max" => budget.summary_max,
     );
@@ -134,6 +137,8 @@ pub fn compact(
 /// Recupera a mensagem original pelo seu id de conteúdo (o log é a fonte).
 #[must_use]
 pub fn recover(events: &[Event], id: &str) -> Option<Message> {
+    let _span = crate::trace_fn!("context::compact::recover");
+
     derive_messages(events)
         .into_iter()
         .find(|message| message_id(message) == id)
@@ -142,11 +147,18 @@ pub fn recover(events: &[Event], id: &str) -> Option<Message> {
 /// Id de conteúdo de uma mensagem (endereçável no log).
 #[must_use]
 pub fn message_id(message: &Message) -> String {
+    let _span = crate::trace_fn!("context::compact::message_id");
+
     content_id("m", &serde_json::to_vec(message).unwrap_or_default())
 }
 
 /// Constrói as linhas do digest e o mapeamento original→substituto (determinístico).
 fn digest_rows(prefix: &[Message]) -> (Vec<Replacement>, Vec<DigestRow>) {
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::CONTEXT_DIGEST,
+        "context::compact::digest_rows"
+    );
     let mut replacements = Vec::with_capacity(prefix.len());
     let mut rows = Vec::with_capacity(prefix.len());
     for message in prefix {
@@ -168,9 +180,10 @@ fn digest_rows(prefix: &[Message]) -> (Vec<Replacement>, Vec<DigestRow>) {
 /// O comprimento emitido é exato: a sanitização de células preserva bytes, pelo que o orçamento é
 /// respeitado sem re-renderizar.
 fn fit_digest(rows: &[DigestRow], summary_max: usize) -> String {
-    let _span = crate::span!(
+    let _span = crate::fn_span!(
         Level::Trace,
         events::CONTEXT_DIGEST,
+        "context::compact::fit_digest",
         "rows" => rows.len(),
         "max" => summary_max,
     );
@@ -193,6 +206,8 @@ fn fit_digest(rows: &[DigestRow], summary_max: usize) -> String {
 
 /// Tipo estável de uma mensagem.
 fn message_kind(message: &Message) -> &'static str {
+    let _span = crate::trace_fn!("context::compact::message_kind");
+
     match message {
         Message::User { .. } => "user",
         Message::Assistant { .. } => "assistant",
@@ -203,6 +218,8 @@ fn message_kind(message: &Message) -> &'static str {
 
 /// Excerto curto e determinístico (sem `Debug`).
 fn excerpt(message: &Message) -> String {
+    let _span = crate::trace_fn!("context::compact::excerpt");
+
     let text = match message {
         Message::User { text } | Message::Assistant { text } => text.clone(),
         Message::ToolCall { tool, .. } => tool_call_text(tool),
@@ -213,6 +230,8 @@ fn excerpt(message: &Message) -> String {
 
 /// Texto de um pedido de tool: nome estável + primeiro caminho resolvido.
 fn tool_call_text(tool: &ToolUse) -> String {
+    let _span = crate::trace_fn!("context::compact::tool_call_text");
+
     let name = tool.name.as_str();
     match tool.resolved_paths.first() {
         Some(path) => format!("{name} {}", path.as_str()),
@@ -222,6 +241,8 @@ fn tool_call_text(tool: &ToolUse) -> String {
 
 /// Corta em fronteira de caractere e marca a elipse.
 fn truncate(text: &str, max_bytes: usize) -> String {
+    let _span = crate::trace_fn!("context::compact::truncate");
+
     if text.len() <= max_bytes {
         return text.to_string();
     }

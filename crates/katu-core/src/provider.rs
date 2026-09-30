@@ -53,6 +53,8 @@ impl Thinking {
     /// Interpreta um grau pelo nome estável (`off`/`low`/`medium`/`high`).
     #[must_use]
     pub fn parse(raw: &str) -> Option<Self> {
+        let _span = crate::trace_fn!("provider::parse");
+
         match raw {
             "off" => Some(Self::Off),
             "low" => Some(Self::Low),
@@ -88,6 +90,8 @@ impl ModelSpec {
     /// Constrói a partir do id, com pensamento desligado.
     #[must_use]
     pub fn new(model: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("provider::new");
+
         Self {
             model: model.into(),
             thinking: Thinking::Off,
@@ -197,6 +201,8 @@ pub trait Provider: Send + Sync {
     ///
     /// Vazio por omissão: `dynamic_models` por descobrir.
     fn models(&self) -> Vec<String> {
+        let _span = crate::trace_fn!("provider::models");
+
         Vec::new()
     }
 
@@ -208,6 +214,8 @@ pub trait Provider: Send + Sync {
     /// # Errors
     /// [`ProviderError`] em falha de transporte/HTTP/decode.
     fn dynamic_models(&self) -> Result<Vec<String>, ProviderError> {
+        let _span = crate::trace_fn!("provider::dynamic_models");
+
         Ok(self.models())
     }
 
@@ -215,6 +223,8 @@ pub trait Provider: Send + Sync {
     ///
     /// Conservador por omissão: um modelo desconhecido **não** anuncia raciocínio.
     fn capabilities(&self, model: &str) -> ModelCapabilities {
+        let _span = crate::trace_fn!("provider::capabilities");
+
         ModelCapabilities {
             model: model.to_string(),
             reasoning: false,
@@ -226,6 +236,8 @@ pub trait Provider: Send + Sync {
     /// Por omissão `None`: um provider sem catálogo de tiers não escolhe; a borda cai no modelo
     /// configurado. Implementado pelos providers com [`crate::provider::Tier`] no catálogo.
     fn model_for_tier(&self, _tier: Tier) -> Option<String> {
+        let _span = crate::trace_fn!("provider::model_for_tier");
+
         None
     }
 
@@ -277,6 +289,8 @@ pub enum ProviderError {
 
 impl From<ProviderError> for Error {
     fn from(error: ProviderError) -> Self {
+        let _span = crate::trace_fn!("provider::from");
+
         match error {
             ProviderError::Timeout { millis } => Self::Timeout {
                 operation: "provider",
