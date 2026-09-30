@@ -49,7 +49,6 @@ impl Report {
     }
 
     /// Relatório de falha (código de saída derivado da categoria).
-    #[allow(dead_code, reason = "usado pelos subcomandos reais a partir de E04")]
     pub(crate) fn failed(command: &'static str, error: &Error) -> Self {
         Self {
             success: false,

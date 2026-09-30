@@ -94,7 +94,12 @@ impl<'a> Session<'a> {
         });
         let (mut state, mut cost, records, total) =
             if let (Some(snapshot), Some((records, len))) = (snapshot, tail) {
-                let cost = CostGovernor::with_usage(caps, snapshot.budget, snapshot.per_tool);
+                let cost = CostGovernor::with_history(
+                    caps,
+                    snapshot.budget,
+                    snapshot.per_tool,
+                    snapshot.history,
+                );
                 (snapshot.state, cost, records, len)
             } else {
                 let (records, len) = read_records_with_len(fs, &path)?;

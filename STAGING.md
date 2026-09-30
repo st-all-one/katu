@@ -7,8 +7,8 @@
 ## 0. Snapshot
 
 - **6 crates + `xtask`**: `katu-policy`, `katu-core`, `katu-tools`, `katu` (bin), `katu-providers`*, `katu-tui`*.
-- **405 testes** · catálogo de instrumentação **73 ids** · **11 tools** · **8 regras** (5 memória + 3 contenção) · **9 ADRs**.
-- `make check` verde (fmt + clippy `-D warnings` + testes + `check-layers` + `check-diag` + `check-schemas` + `check-docs` + `policy:audit` + `gate:bench` + file-length ≤300) · `make instrument` verde.
+- **411 testes** · catálogo de instrumentação **73 ids** · **11 tools** · **8 regras** (5 memória + 3 contenção) · **10 ADRs**.
+- `make check` verde (fmt + clippy `-D warnings` + testes + `check-layers` + `check-diag` + `check-schemas` + `check-docs` + `check-memory-swap` + `policy:audit` + `gate:bench` + file-length ≤300) · `make instrument` verde.
 - **O MVK passou** ([ADR 0001](docs/adr/0001-mvk-gate-aprovado.md)); o kernel (E04) e a política (E02) estão completos.
 
 \* `katu-providers` e `katu-tui` são **stubs vazios**.
@@ -23,7 +23,8 @@
 - Contenção soft: sensíveis negados, fora do workspace → aprovação, busca como leitura, `Capability::Net`; **symlink resolvido via porta `Fs` antes do veredicto** (`katu-tools::resolve`).
 - Instrumentação transversal zero-custo (DF9): **redação por allowlist** no sink (E01-T07), **fingerprint determinístico** (`fingerprint!`, E19-T04) e **filtro por subsistema** (E19-T06).
 - **Saída ao modelo colunar v3** (ADR 0006/0007): **sem headers** no *stream* (o prime v3 é o registo de esquema, re-emitido no início e após compactação), blocos literais (`\x1d`) para código, escalares explícitos em `k`, domínios no registo e **aliases de sessão** `#N`/`@N` (lazy, limiar 3). Projeções model-facing canónicas de `ToolOutcome`/`Error`/`VerificationReport`; digest de compactação em tabela `m` (sem `Debug`); catálogo de tools no prime (`prime_with_catalog`, anti-drift). JSON de máquina inalterado.
-- **Sessões e auditoria** (ADR 0008/0009): sessões vinculadas ao projeto em `.katu/sessions/<id>` (id `s_<16hex>` determinístico, índice temporal `(created_ms, id)`, **snapshot de estado com offset** por fase, retomada que lê só a cauda, `Session::create`/`resume`/`list`); auditoria permanente e pesquisável em `.katu/audit` (**segmentos colunares imutáveis** + **índice invertido binário `KAI1`** com posições e **Bloom** por segmento — termos, frases, filtros), local e em `.git/info/exclude`.
+- **Sessões e auditoria** (ADR 0008/0009): sessões vinculadas ao projeto em `.katu/sessions/<id>` (id `s_<16hex>` determinístico, índice temporal `(created_ms, id)`, **snapshot de estado com offset** por fase — inclui o histórico temporal `rolling`/`velocity` que o log não reproduz —, retomada que lê só a cauda, `Session::create`/`resume`/`list`); auditoria permanente e pesquisável em `.katu/audit` (**segmentos colunares imutáveis** + **índice invertido binário `KAI1`** com posições e **Bloom** por segmento — termos, frases, filtros), local e em `.git/info/exclude`.
+- **Memória de primeira classe** (ADR 0010): porta `Memory` com tipos do katu + adaptador in-process sobre `knudge-core` isolado no binário (`src/memory/`); `Runtime::open` (`src/runtime.rs`) monta a sessão com o adaptador e **recusa arrancar** sem memória saudável (fail-closed, E03-T03/T07); `katu remember`/`katu recall` exercitam o caminho §42; gate `check-memory-swap` (E03-T06).
 
 ---
 
@@ -36,11 +37,11 @@
 | **E01-T09** | ☐ | Política de recursos e runtime mínimo. |
 | **E01-T10** | ◐ | `xtask` e CI em camadas (fecho). |
 | **E03-T02** | ☑ | **Adaptador in-process do `knudge-core`** (primário, no binário; feature default). |
-| **E03-T03** | ◐ | Seleção por feature feita; falta `build_with_memory(adapter)` no kernel (E10). |
-| **E03-T04** | ☐ | `spawn_blocking` + timeout no caminho async. |
+| **E03-T03** | ☑ | `Runtime::open` monta sessão + adaptador + regras; `recall`/`remember` pelo §42 (E10/E12). |
+| **E03-T04** | ☐ | `spawn_blocking` + timeout; **gated** em E12/E01-T09 (worker bloqueante por desenho). |
 | **E03-T05** | ☑ | Suíte de conformidade corre contra o fake **e** o adaptador in-process. |
-| **E03-T06** | ☐ | Gate de substituibilidade (`check-memory-swap`). |
-| **E03-T07** | ◐ | `status()` exposto no `doctor`; falta fail-closed no arranque do loop (E10). |
+| **E03-T06** | ☑ | Gate de substituibilidade (`xtask check-memory-swap` + `make memory-swap`). |
+| **E03-T07** | ☑ | `Runtime::open` recusa sem memória saudável (fail-closed); comandos falham com exit 10 sem adaptador. |
 | **E06-T02** | ☑ | Linter de schema (`katu-tools::schema`) + `xtask check-schemas` em `make check`. |
 | **E06-T03** | ☑ | Matriz multibyte (§45.22); `edit.hunks`/`added`/`removed` reais; chunk único truncado em limite UTF-8. `read.diff` sem `base` é integração CLI (§3.2). |
 | **E06-T12** | ☑ | Formato ao modelo **colunar v3** (ADR 0006): sem headers (registo no prime), blocos literais, `k` explícito, aliases de sessão; qualidade (`rank`/`basis`/`ev`/`sym`). A/B: **-21%** vs JSON; aliases neutros no corpus sintético (§3.4). |
@@ -102,9 +103,9 @@ Nenhuma fórmula implementada: contexto submodular+MMR (T02), compactação por 
 
 1. **E10 (CLI/TUI)** — transforma o kernel+toolset num agente executável e destranca as autorizações de E07/E09.
 2. **E12-T01/T05** — port `Provider` + provider fake (desbloqueia testes de loop reais).
-3. **E03-T02 feito** — adaptador in-process do knudge no binário (memória real, feature default); falta o wiring do kernel (E10) e `check-memory-swap` (E03-T06).
+3. **E03-T02/T03/T06/T07 feitos** — adaptador in-process, runtime que monta a sessão com o adaptador (fail-closed), gate de substituibilidade e comandos `remember`/`recall`; falta o loop de turnos (provider, E12) e o `spawn_blocking`+timeout (E03-T04).
 4. **E15-T01 + E18-T10** — harness de medição antes de qualquer otimização.
-5. Fechos core/policy/tools: **E06-T02/T03/T12**, **E07-T02/T03**, **E01-T07**, **E19-T04/T06** — ✅; faltam **E06-T07** (rotação gated), **E03-T03/T04/T06/T07** (wiring do kernel e gate de *swap*), a iteração de densidade colunar (§3.4) e a integração de `read.diff`/CLI.
+5. Fechos core/policy/tools: **E06-T02/T03/T12**, **E07-T02/T03**, **E01-T07**, **E19-T04/T06** — ✅; faltam **E06-T07** (rotação gated), **E03-T04** (timeout async), a iteração de densidade colunar (§3.4) e a integração de `read.diff`/CLI.
 
 ## 5. Regras que não se quebram
 

@@ -27,11 +27,12 @@ fase. Faltava: **identidade** de sessão, **vinculação** ao projeto (para reab
 3. **Ordenação temporal**: `index.jsonl` é a lista canónica de sessões; a ordenação é
    `(created_ms, id)` (e `updated_ms` para "recentes"). `list()` devolve já ordenado.
 4. **Snapshot do `State` agora** (F5): a cada **transição de fase**, grava-se
-   `snapshot.v1.json` atomicamente com `{seq, offset, budget, per_tool, state}` (esquema v2). O
-   `offset` é o byte onde começa a linha `seq+1`, pelo que `resume` **lê só a cauda**
-   (`Fs::read_from`) e não relê o prefixo; o `budget`/`per_tool` reconstroem o cost governor sem
-   varrer o log. Sem snapshot (ou offset desalinhado), replay total (fallback fail-safe).
-   **A/B (DF5, dev-only):** retomada ~8–9× mais rápida que o replay total
+   `snapshot.v1.json` atomicamente com `{seq, offset, budget, per_tool, history, state}` (esquema
+   v3). O `offset` é o byte onde começa a linha `seq+1`, pelo que `resume` **lê só a cauda**
+   (`Fs::read_from`) e não relê o prefixo; o `budget`/`per_tool` e o `history` temporal
+   `(ms, micros)` reconstroem o cost governor (incluindo `rolling`/`velocity`, que o log não
+   reproduz) sem varrer o log. Sem snapshot (ou offset desalinhado), replay total (fallback
+   fail-safe). **A/B (DF5, dev-only):** retomada ~8–9× mais rápida que o replay total
    (20k turnos: 26 ms vs 237 ms; 2k: 2,7 ms vs 23,6 ms) — `cargo run -p xtask -- bench-resume`.
 5. **Retomada exata**: `resume(id)` restaura `root` (path exato), `State`, orçamento e o contexto
    (via `assemble`/`compact`) — "último estado exato".
@@ -57,8 +58,7 @@ fase. Faltava: **identidade** de sessão, **vinculação** ao projeto (para reab
 - **Positivas:** reabertura rápida e ordenável no tempo; `resume` exato; audit local sem poluir o
   git; snapshot reduz o custo de retomada.
 - **Negativas/dívida:** o snapshot pode divergir do log — a invariante `state_of(replay)` é
-  validada na retomada (`verify`) e o snapshot é reconstruível; o histórico temporal
-  (`rolling`/`velocity`) não é reprodutível do log (já era assim) e não entra no snapshot; a poda
-  fica gated.
+  validada na retomada (`verify`) e o snapshot é reconstruível; o esquema do snapshot é versionado
+  (v3), pelo que snapshots antigos caem em replay total; a poda fica gated.
 - **Travas:** `session::identity`/`snapshot` com testes determinísticos (`MemFs`); `index.jsonl`
   canónico; `check-diag`/firewall intactos.

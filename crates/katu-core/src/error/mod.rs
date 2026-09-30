@@ -182,6 +182,13 @@ impl Error {
         }
     }
 
+    /// Serviço indisponível (fail-closed, E03-T07).
+    pub fn unavailable(service: impl Into<String>) -> Self {
+        Self::Unavailable {
+            service: service.into(),
+        }
+    }
+
     /// Erro interno.
     pub fn internal(message: impl Into<String>) -> Self {
         Self::Internal {

@@ -3,10 +3,10 @@
 CARGO ?= cargo
 
 .PHONY: check fmt clippy test build file-length layers diag docs policy bench measure clean \
-        deny audit machete typos miri instrument ci
+        deny audit machete typos miri instrument ci memory-swap
 
 ## Portão completo local: formatação, lints, testes, camadas, diag, docs, política e tamanho.
-check: fmt clippy test layers diag schemas docs policy bench file-length
+check: fmt clippy test layers diag schemas docs policy memory-swap bench file-length
 
 ## Verifica formatação sem alterar.
 fmt:
@@ -53,6 +53,12 @@ policy:
 ## Números publicados: nenhum valor sem base e artefacto (DF5/E15-T02).
 bench:
 	$(CARGO) run -q -p xtask -- gate:bench
+
+## Substituibilidade da memória (E03-T06): o knudge só acopla no adaptador; o binário também
+## compila sem o adaptador (memória é invariante em produção, G4/E03-T07).
+memory-swap:
+	$(CARGO) run -q -p xtask -- check-memory-swap
+	$(CARGO) check -p katu --no-default-features
 
 ## Medição do MVK (E05-T06): gera o artefacto cru e valida o manifesto.
 measure:

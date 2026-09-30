@@ -98,13 +98,23 @@ impl Memory for KnudgeMemory {
     fn pre_edit(&self, req: &PreEditReq) -> Result<PreEditOutcome, MemoryError> {
         let _span = katu_core::span!(Level::Trace, events::MEMORY_WRITE, "op" => "pre_edit");
         let inner = lock(&self.inner);
-        match inner.kd.store().read(req.note.as_str()) {
-            Ok(_) => Ok(PreEditOutcome::Update),
-            Err(KnudgeError::NotFound(_)) => Ok(PreEditOutcome::Reject {
-                reason: format!("nota ausente: {}", req.note.as_str()),
-            }),
-            Err(error) => Err(to_memory_error(error)),
-        }
+        let note = match inner.kd.store().read(req.note.as_str()) {
+            Ok(note) => note,
+            Err(KnudgeError::NotFound(_)) => {
+                return Ok(PreEditOutcome::Reject {
+                    reason: format!("nota ausente: {}", req.note.as_str()),
+                });
+            }
+            Err(error) => return Err(to_memory_error(error)),
+        };
+        let note_type = note.frontmatter.note_type().map_err(to_memory_error)?;
+        let original = note.frontmatter.statement().map_err(to_memory_error)?;
+        Ok(translate::edit_outcome(
+            req.note.as_str(),
+            note_type,
+            original,
+            &req.statement,
+        ))
     }
 
     fn record(&self, req: &PreWriteReq) -> Result<NoteRef, MemoryError> {

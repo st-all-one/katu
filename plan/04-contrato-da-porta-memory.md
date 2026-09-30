@@ -125,15 +125,23 @@ pub enum MemoryErrorKind { Unavailable, Timeout, Invalid, Internal }
 - **Aceite:** nenhum tipo do knudge vaza para a API pública; `cargo tree` mostra `knudge-core`
   **apenas** em `katu/src/memory/`.
 
-### E03-T03 ☐ Construtor à moda `build_with_transport()`
+### E03-T03 ☑ Construtor à moda `build_with_transport()`
 - **Entregáveis:** `build_with_memory(adapter)` (molde do `HttpTransport` do open-mtr, §16);
   seleção por feature; `FakeMemory` no núcleo para teste.
+- **Estado:** `crates/katu/src/runtime.rs` (`Runtime::open`) é o ponto de composição: descobre a
+  raiz, abre o adaptador (`KnudgeMemory`), valida `status()` e monta a `Session` + regras do
+  protocolo; expõe `recall`/`remember` pelo caminho §42. A costura do kernel é
+  `Session::memory_write(&dyn Memory)` e o teste de kernel com `FakeMemory` é
+  `crates/katu/tests/loop.rs`. O loop de turnos (provider) chega em E12.
 - **Aceite:** um teste de kernel usa `FakeMemory` e **não** puxa `knudge-core`; o binário de
   produção usa o adaptador in-process.
 
 ### E03-T04 ☐ `spawn_blocking` + timeout no caminho async
 - **Entregáveis:** wrapper que executa o adaptador fora do hot path, com timeout e cancelamento
   (o núcleo do knudge é bloqueante, embedding HTTP inclusive).
+- **Estado:** **gated** em E12/E01-T09 — não existe runtime assíncrono (decisão: *worker
+  bloqueante por padrão*; `tokio` mínimo só se necessário). O `Runtime` atual chama o adaptador
+  de forma síncrona, que é o caminho de produção até haver caminho async.
 - **Aceite:** um adaptador artificialmente bloqueante **não** congela o loop; o timeout é
   observável e não vaza tarefas.
 
@@ -146,16 +154,24 @@ pub enum MemoryErrorKind { Unavailable, Timeout, Invalid, Internal }
 - **Aceite:** a suíte passa com o fake **e** com o adaptador in-process; fica pronta para reuso
   pelo futuro adaptador MCP (E08), testando paridade entre backends (§16.6).
 
-### E03-T06 ☐ **Gate do épico:** substituibilidade
+### E03-T06 ☑ **Gate do épico:** substituibilidade
 - **Objetivo:** provar DF6 com um teste de sanidade.
 - **Entregáveis:** uma ADR (em E14) e um script `xtask check-memory-swap` que compila o binário
   **uma vez com `memory-in-process`** e **outra com a feature desligada** (`FakeMemory`).
+- **Estado:** `xtask check-memory-swap` verifica estaticamente que o vocabulário do knudge só
+  aparece sob `katu/src/memory/`, que a dependência é opcional atrás da feature e que nenhum crate
+  de núcleo a declara; `make memory-swap` fecha com `cargo check -p katu --no-default-features`.
+  ADR [0010](../docs/adr/0010-porta-memory-e-substituibilidade.md).
 - **Aceite (gate):** as duas compilações diferem **só** no adaptador; nenhum ficheiro do kernel
   muda. Este é o "se amanhã voltarmos ao MCP, quantos ficheiros mudam?" (§13).
 
-### E03-T07 ☐ Memória como invariante, não como plugin (G4)
+### E03-T07 ☑ Memória como invariante, não como plugin (G4)
 - **Entregáveis:** o binário de produção **sempre** com memória ativa; não existe modo "sem
   knudge"; `status()` exposto ao kernel para a UI/estado.
+- **Estado:** o build **default** (produção) inclui sempre o adaptador; `Runtime::open` **recusa
+  arrancar** se `Memory::status()` falhar (fail-closed, DF4) e `katu remember`/`recall` usam-no.
+  Sem o adaptador compilado os comandos falham fechados (`ErrorKind::Unavailable`, exit 10);
+  `memory`/`doctor` expõem `status()`. O modo sem adaptador existe **só** para o gate E03-T06.
 - **Aceite:** o build de produção não compila sem um adaptador de memória; o kernel recusa
   arrancar se `status()` falhar (fail-closed, DF4).
 

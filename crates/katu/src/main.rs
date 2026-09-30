@@ -22,6 +22,9 @@ mod ports;
 
 mod report;
 
+#[cfg(feature = "memory-in-process")]
+mod runtime;
+
 use std::process::ExitCode;
 
 use clap::Parser;

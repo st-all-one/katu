@@ -1,8 +1,11 @@
 //! Tradução de tipos katu ↔ knudge (E03-T02) — o único sítio com o vocabulário do knudge.
 
-use katu_core::memory::{Basis, MemoryError, NoteRef, NoteType, PreWriteOutcome, RecallHit, Score};
+use katu_core::memory::{
+    Basis, MemoryError, NoteRef, NoteType, PreEditOutcome, PreWriteOutcome, RecallHit, Score,
+};
 use knudge_core::retrieval::RecallHit as KnudgeHit;
 use knudge_core::schema::NoteType as KnudgeNoteType;
+use knudge_core::schema::id::note_id;
 use knudge_core::write::{DedupDecision, Draft};
 
 /// Converte o tipo de nota do katu no do knudge.
@@ -31,6 +34,29 @@ pub(crate) fn draft(statement: &str, kind: NoteType, body: &str, anchor: Option<
         draft.anchors = vec![anchor.to_string()];
     }
     draft
+}
+
+/// Decide o `pre_edit` em *dry-run*, espelhando a regra de `write::update` (D01/D48).
+///
+/// Muda a **chave de conteúdo** (`type` + `statement`) → `Supersede` (novo `id`); caso contrário,
+/// revisa no lugar. Ids não-deriváveis (históricos) revisam no lugar quando a afirmação não muda.
+pub(crate) fn edit_outcome(
+    id: &str,
+    note_type: KnudgeNoteType,
+    original_statement: &str,
+    new_statement: &str,
+) -> PreEditOutcome {
+    let canonical_id = note_id(note_type, original_statement);
+    let new_id = note_id(note_type, new_statement);
+    let content_key_changed = new_statement != original_statement;
+    let revises_in_place = new_id == id || (canonical_id != id && !content_key_changed);
+    if revises_in_place {
+        PreEditOutcome::Update
+    } else {
+        PreEditOutcome::Supersede {
+            target: NoteRef::new(new_id),
+        }
+    }
 }
 
 /// Converte a decisão de dedup do knudge no resultado de `pre_write`.

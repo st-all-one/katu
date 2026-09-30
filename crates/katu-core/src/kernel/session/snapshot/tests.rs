@@ -18,6 +18,7 @@ fn round_trips_and_defaults_to_absent() -> Result<(), Box<dyn std::error::Error>
         offset: 0,
         budget: Budget::ZERO,
         per_tool: std::collections::BTreeMap::new(),
+        history: Vec::new(),
         state: State::initial(),
     };
     save(&fs, dir, &snapshot)?;

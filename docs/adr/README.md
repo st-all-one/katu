@@ -29,6 +29,7 @@
 | [0007](0007-projecoes-model-facing.md) | Projeções model-facing, digest `m`, catálogo de tools e emissor direto | aceite |
 | [0008](0008-sessoes-identidade-e-retomada.md) | Sessões: identidade, vinculação ao projeto, snapshot e retomada | aceite |
 | [0009](0009-auditoria-densa.md) | Auditoria densa e pesquisável (`.katu/audit`, completa sob compactação) | aceite |
+| [0010](0010-porta-memory-e-substituibilidade.md) | Memória de primeira classe e substituível (porta `Memory` + adaptador knudge) | aceite |
 
 ## Template
 

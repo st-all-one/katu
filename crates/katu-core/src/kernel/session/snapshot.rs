@@ -15,7 +15,7 @@ use crate::kernel::state::State;
 use crate::ports::{Fs, FsError};
 
 /// Versão do esquema do snapshot.
-pub(super) const SNAPSHOT_SCHEMA_VERSION: u32 = 2;
+pub(super) const SNAPSHOT_SCHEMA_VERSION: u32 = 3;
 
 /// Estado persistido numa fronteira de fase.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -30,6 +30,8 @@ pub struct StateSnapshot {
     pub budget: Budget,
     /// Chamadas por ferramenta até `seq`.
     pub per_tool: BTreeMap<ToolName, u32>,
+    /// Histórico temporal `(ms, micros)` das camadas rolante/velocidade até `seq`.
+    pub history: Vec<(u64, u64)>,
     /// Estado reconstruído.
     pub state: State,
 }

@@ -13,6 +13,7 @@
 //! traz `now_millis` (o log não é reprodutível nesse eixo).
 
 mod caps;
+mod history;
 mod refusal;
 
 use std::collections::{BTreeMap, VecDeque};
@@ -240,50 +241,6 @@ impl CostGovernor {
             });
         }
         Ok(())
-    }
-
-    /// Chamadas registadas estritamente dentro da janela.
-    fn calls_in_window(&self, now: u64, window_ms: u64) -> u32 {
-        let count = self
-            .history
-            .iter()
-            .filter(|entry| now.saturating_sub(entry.0) < window_ms)
-            .count();
-        u32::try_from(count).unwrap_or(u32::MAX)
-    }
-
-    /// Custo registado estritamente dentro da janela.
-    fn micros_in_window(&self, now: u64, window_ms: u64) -> u64 {
-        self.history
-            .iter()
-            .filter(|entry| now.saturating_sub(entry.0) < window_ms)
-            .fold(0_u64, |acc, entry| acc.saturating_add(entry.1))
-    }
-
-    /// Descarta histórico fora da maior janela configurada.
-    fn prune(&mut self, now: u64) {
-        let retention = self.retention_ms();
-        if retention == 0 {
-            return;
-        }
-        while self
-            .history
-            .front()
-            .is_some_and(|entry| now.saturating_sub(entry.0) >= retention)
-        {
-            self.history.pop_front();
-        }
-    }
-
-    /// Maior janela configurada (0 = sem camadas temporais).
-    fn retention_ms(&self) -> u64 {
-        let rolling = self.caps.rolling.map_or(0, |rolling| rolling.window_ms);
-        let velocity = if self.caps.velocity.is_some() {
-            VELOCITY_WINDOW_MS
-        } else {
-            0
-        };
-        rolling.max(velocity)
     }
 }
 /// Débito implícito de um evento (turnos e chamadas; as temporais vêm do clock).

@@ -2,7 +2,9 @@
 
 use std::path::PathBuf;
 
-use katu_core::memory::{Memory, NoteRef, PreEditOutcome, PreEditReq, assert_contract};
+use katu_core::memory::{
+    Memory, NoteRef, NoteType, PreEditOutcome, PreEditReq, PreWriteReq, assert_contract,
+};
 
 use super::KnudgeMemory;
 
@@ -32,6 +34,35 @@ fn pre_edit_on_a_missing_note_rejects() -> Result<(), Box<dyn std::error::Error>
         anchor: None,
     })?;
     assert!(matches!(outcome, PreEditOutcome::Reject { .. }));
+    std::fs::remove_dir_all(&root)?;
+    Ok(())
+}
+
+#[test]
+fn pre_edit_decides_update_or_supersede_in_dry_run() -> Result<(), Box<dyn std::error::Error>> {
+    let root = root("edit-decision")?;
+    let memory = KnudgeMemory::open(&root)?;
+    let note = memory.record(&PreWriteReq {
+        statement: "cache usa LRU".to_string(),
+        note_type: NoteType::Fact,
+        anchor: None,
+        body: String::new(),
+    })?;
+    let same = memory.pre_edit(&PreEditReq {
+        note: note.clone(),
+        statement: "cache usa LRU".to_string(),
+        anchor: None,
+    })?;
+    assert!(matches!(same, PreEditOutcome::Update));
+    let changed = memory.pre_edit(&PreEditReq {
+        note,
+        statement: "cache usa FIFO".to_string(),
+        anchor: None,
+    })?;
+    assert!(
+        matches!(changed, PreEditOutcome::Supersede { .. }),
+        "afirmação nova tem de superseder para um id derivado"
+    );
     std::fs::remove_dir_all(&root)?;
     Ok(())
 }

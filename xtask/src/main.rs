@@ -6,6 +6,7 @@
 //! - `check-diag` — logs só estruturados (nenhuma macro de texto livre fora do sink);
 //! - `check-schemas` — schema das tools válido (E06-T02);
 //! - `check-docs` — todos os links de `*.md` resolvem;
+//! - `check-memory-swap` — o knudge só acopla em `katu/src/memory/` (E03-T06);
 //! - `gate:bench` — nenhum número publicado sem base e artefacto (DF5/E15-T02);
 //! - `policy:audit` — regras `Enforced`/`Advisory` coerentes (E02-T04);
 //! - `ledger:validate` — ledger de cobertura consistente com `policy/` (E02-T06).
@@ -23,6 +24,7 @@ mod bench;
 mod diag;
 mod docs;
 mod ledger;
+mod memory_swap;
 mod policy;
 mod schemas;
 mod session_bench;
@@ -61,6 +63,7 @@ fn main() -> ExitCode {
         Some("check-diag") => check_diag(),
         Some("check-schemas") => schemas::check_schemas(),
         Some("check-docs") => check_docs(),
+        Some("check-memory-swap") => memory_swap::check_memory_swap(),
         Some("gate:bench") => bench::gate_bench(&rest),
         Some("policy:audit") => policy::policy_audit(&rest),
         Some("ledger:validate") => ledger::ledger_validate(&rest),
@@ -76,7 +79,7 @@ fn main() -> ExitCode {
         Some("bench-toon") => toon_bench::run(),
         Some(other) => Err(format!("tarefa desconhecida: {other}")),
         None => Err(
-            "uso: xtask <check-layers|check-crate-coverage|check-diag|check-schemas|check-docs|gate:bench|policy:audit|ledger:validate|bench-audit|bench-resume>"
+            "uso: xtask <check-layers|check-crate-coverage|check-diag|check-schemas|check-docs|check-memory-swap|gate:bench|policy:audit|ledger:validate|bench-audit|bench-resume>"
                 .to_string(),
         ),
     };

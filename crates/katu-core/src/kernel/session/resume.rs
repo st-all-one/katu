@@ -81,6 +81,7 @@ impl<'a> Session<'a> {
             offset: self.log.offset(),
             budget: self.cost.global().usage(),
             per_tool: self.cost.per_tool_used().clone(),
+            history: self.cost.history().collect(),
             state: self.state.clone(),
         };
         super::snapshot::save(self.fs, &self.dir, &snapshot)?;

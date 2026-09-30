@@ -91,6 +91,35 @@ fn snapshot_offset_resumes_the_tail_and_cost() -> Result<(), Box<dyn std::error:
 }
 
 #[test]
+fn snapshot_retains_the_temporal_history() -> Result<(), Box<dyn std::error::Error>> {
+    let fs = MemFs::new();
+    let root = Path::new("/work/proj");
+    repo(&fs, root)?;
+    let id = {
+        let mut session = Session::create(&fs, root, 1_000, "objetivo")?;
+        let id = session.id().cloned().ok_or("sessão sem id")?;
+        // As camadas temporais só veem débitos com relógio (`apply_at`), que o log não reproduz.
+        session.apply_at(&Event::TurnStart { turn: 1 }, Some(5_000))?;
+        session.apply(&Event::Waiver {
+            transition: Phase::KnowledgeConsulted,
+            reason: "teste".to_string(),
+        })?;
+        session.apply(&Event::PhaseTransition {
+            to: Phase::KnowledgeConsulted,
+            outcome: None,
+        })?;
+        id
+    };
+    let resumed = Session::resume(&fs, root, &id)?;
+    assert_eq!(
+        resumed.cost().history().collect::<Vec<_>>(),
+        vec![(5_000_u64, 0_u64)],
+        "o snapshot retém o histórico temporal que o log não reproduz"
+    );
+    Ok(())
+}
+
+#[test]
 fn list_is_temporal() -> Result<(), Box<dyn std::error::Error>> {
     let fs = MemFs::new();
     let root = Path::new("/work/proj");

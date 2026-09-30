@@ -14,8 +14,14 @@ todo o código impuro confinado.
   symlink plantado — E07-T04). Sem FFI no MVP (ADR 0004).
 - Adaptador in-process da porta `Memory` sobre o `knudge-core` (`src/memory/`, feature
   `memory-in-process` **default**) — o único sítio com dependência do knudge. A fachada `Knudge`
-  (`!Sync`) é protegida por `Mutex` com cache de índice/grafo; `doctor --json` expõe
-  `memory.status()` e a suíte de conformidade corre contra o adaptador (E03-T02/T05/T07).
+  (`!Sync`) é protegida por `Mutex` com cache de índice/grafo; `pre_edit` decide *supersede* em
+  *dry-run* fiel ao `update`; `doctor --json` e `katu memory` expõem `memory.status()` e a suíte de
+  conformidade corre contra o adaptador (E03-T02/T05/T06/T07). Sem o adaptador, `katu memory`
+  **falha fechado** (`unavailable`, exit 10) — a memória é invariante de produção (G4).
+- **Runtime** (`src/runtime.rs`, feature `memory-in-process`): ponto de composição do loop
+  (E03-T03/T07) — descobre a raiz, abre o adaptador, **recusa arrancar** sem memória saudável
+  (fail-closed) e expõe `recall`/`remember` pelo caminho §42. Os comandos `katu remember` e
+  `katu recall` exercitam-no; o loop de turnos (provider) chega em E12.
 - Exit codes na borda (a lógica propaga `Result`).
 - Harness de medição do MVK (`examples/measure_mvk.rs`, feature `profile`, E05-T06): corre o
   caminho real e grava `bench/mvk/raw.json` (evidência tipada, DF5).

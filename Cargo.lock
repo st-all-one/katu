@@ -320,6 +320,7 @@ dependencies = [
  "knudge-core",
  "serde",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]
