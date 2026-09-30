@@ -247,6 +247,22 @@ bloqueado pelo `ureq` (HTTP/1.1). Os dialetos `responses`/`messages`/`google` es
   turno); grau de pensamento inválido para o modelo é recusado com erro que ensina; nenhum caminho
   deixa o agente escolher um modelo mais caro sem aprovação.
 
+## Modelo local recomendado (llama.cpp)
+
+Para desenvolvimento/teste sem rede, o modelo local é o **Qwen2.5-Coder-1.5B-Instruct** com
+quantização **Q4_K_M** (~1.1 GB), servido pelo `llama-server` (dialeto `chat/completions`):
+
+- **Baixar**: `scripts/llama.sh fetch` (binário pré-compilado do llama.cpp + o GGUF do
+  `Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF`) para `~/.local/share/katu/`.
+- **Servir**: `scripts/llama.sh serve 8080` (por omissão o katu aponta para
+  `http://127.0.0.1:8080/v1`).
+- **Ativar**: `katu config set base http://127.0.0.1:8080/v1` e `katu config set provider llama`;
+  depois `katu run "olá"`. Alternativa por invocação: `katu run "olá" --base .../v1`.
+- **Smoke**: `scripts/llama.sh chat 8080`.
+
+O `llama-server` ignora o nome do modelo no pedido (serve o que estiver carregado); o nome em
+`katu` é cosmético. Testes live do provider: `KATU_LLAMA_URL=http://127.0.0.1:8080/v1 cargo test`.
+
 ## Definition of Done
 
 - [ ] E12-T01…T10 concluídas.

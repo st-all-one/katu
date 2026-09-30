@@ -1,270 +1,213 @@
-//! Superfície de linha de comando (E01-T04).
+//! Superfície de linha de comando (E01-T04, E20): verbos exclusivos, sem inferência.
 //!
-//! `clap` faz o parsing; aqui vive a **decisão** de cada subcomando. Nada de I/O de saída — isso é
-//! de [`crate::report`]. Os comandos `recall`/`remember` montam o **runtime** (E03-T03) e passam
-//! pelo caminho §42; sem o adaptador de memória **recusam** (fail-closed, E03-T07).
+//! `clap` faz o parsing; aqui vive a **decisão** de cada verbo. Nada de I/O de saída — isso é de
+//! [`crate::report`]. Sem subcomando, `katu` abre a TUI; `--init` faz o bootstrap e sai.
 
 use clap::{Parser, Subcommand};
-use serde_json::{Value, json};
+use serde_json::json;
 
-use katu_core::diag;
-use katu_policy::POLICY_VOCAB_VERSION;
-
-#[cfg(feature = "memory-in-process")]
-use crate::agent::{RunArgs, run};
-#[cfg(feature = "memory-in-process")]
-use crate::memory::commands::{memory_command, memory_recall, memory_remember, memory_status};
-#[cfg(feature = "memory-in-process")]
-use crate::tui::run_tui;
-
+use crate::bootstrap::{self, GitMode};
 use crate::report::Report;
 
+mod config_cmd;
+#[cfg(feature = "memory-in-process")]
+mod input;
+mod memo;
+mod params;
+mod prime;
+#[cfg(feature = "memory-in-process")]
+mod run_cmd;
+#[cfg(feature = "memory-in-process")]
+mod run_params;
 mod sessions;
+#[cfg(test)]
+mod tests;
+mod upgrade;
 
-/// `katu` — loop possuído, política e memória.
-#[derive(Debug, Parser)]
-#[command(name = "katu", version, about, long_about = None, arg_required_else_help = true)]
-pub(crate) struct Cli {
-    /// Emite envelope JSON em `stdout` (dados) em vez de texto humano.
-    #[arg(long, global = true)]
-    pub(crate) json: bool,
-    /// Subcomando a executar.
-    #[command(subcommand)]
-    pub(crate) command: Command,
+/// Nível de log emitido em `stderr` (default `quiet`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub(crate) enum LogLevel {
+    /// Sem logs.
+    Quiet,
+    /// Só erros.
+    Error,
+    /// Erros e avisos.
+    Warn,
+    /// Erros, avisos e informação.
+    Info,
+    /// Inclui depuração.
+    Debug,
+    /// Inclui rastreio fino.
+    Trace,
 }
 
-/// Subcomandos do `katu`.
+/// `katu` — loop possuído, política e memória.
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "flags de bootstrap do clap (--init/--git-excluded/--git-tracked)"
+)]
+#[derive(Debug, Parser)]
+#[command(
+    name = "katu",
+    version,
+    about = "katu — agente de código com loop possuído",
+    long_about = "katu — agente de código com loop possuído, política e memória.\n\n\
+                  Verbos exclusivos: `prime`, `upgrade`, `config`, `memo`, `run`, `tui`. Sem\n\
+                  subcomando abre a TUI; `--init` faz o bootstrap e sai.",
+    after_help = "Ciclo de uso:\n\
+                  katu prime            contexto de arranque (estático)\n\
+                  katu --init           bootstrap do projeto (.katu/)\n\
+                  katu                  abre a TUI (multi-turno)\n\
+                  katu run \"...\"        uma rodada: id da sessão + exit code\n\
+                  katu memo ask \"...\"   consulta a memória (só leitura)\n\
+                  katu config list      configuração efetiva (projeto > global)\n\n\
+                  Use `katu help <verbo>` para o detalhe de cada verbo."
+)]
+pub(crate) struct Cli {
+    /// Nível de log em `stderr` (default `quiet`).
+    #[arg(long, global = true, default_value = "quiet")]
+    pub(crate) log_level: LogLevel,
+    /// Faz o bootstrap do `.katu/` e sai.
+    #[arg(long)]
+    pub(crate) init: bool,
+    /// Com `--init`, exclui o `.katu/` do git.
+    #[arg(long, requires = "init")]
+    pub(crate) git_excluded: bool,
+    /// Com `--init`, versiona o `.katu/`.
+    #[arg(long, requires = "init", conflicts_with = "git_excluded")]
+    pub(crate) git_tracked: bool,
+    /// Com `--init`, refaz o bootstrap preservando só o conhecimento personalizado
+    /// (`knowledge/`, `guardrails/`, `audit/`).
+    #[arg(long, requires = "init")]
+    pub(crate) force: bool,
+    /// Subcomando a executar (sem subcomando, abre a TUI).
+    #[command(subcommand)]
+    pub(crate) command: Option<Command>,
+}
+
+/// Verbos do `katu`.
 #[derive(Debug, Clone, Subcommand)]
 pub(crate) enum Command {
-    /// Imprime a versão e as versões de vocabulário.
-    Version,
-    /// Diagnóstico de portas, ambiente e instrumentação.
-    Doctor,
-    /// Estado da memória de primeira classe (fail-closed sem adaptador).
-    Memory,
-    /// Lista as sessões do projeto (id, instante, objetivo) para retomar com `--resume`.
-    Sessions,
-    /// Consulta a memória (recall pelo caminho §42).
-    Recall {
-        /// Consulta em linguagem natural.
-        query: String,
-        /// Número máximo de resultados.
-        #[arg(long, default_value_t = 5)]
-        limit: usize,
-    },
-    /// Regista uma nota (recall antes da escrita, pelo gate §42).
-    Remember {
-        /// Afirmação (uma por nota).
-        statement: String,
-        /// Âncora de código (ex.: `src/x.rs`), quando a nota é sobre código.
-        #[arg(long)]
-        anchor: Option<String>,
-    },
-    /// Executa um turno do agente (provider ↔ kernel ↔ tools).
+    /// Contexto de arranque estático para IA.
+    Prime(prime::PrimeArgs),
+    /// Sincronização de versão (canal ainda não configurado).
+    Upgrade(upgrade::UpgradeArgs),
+    /// Configuração global e do projeto.
+    Config(config_cmd::ConfigArgs),
+    /// Memória: consulta e visão geral (sem escrita).
+    Memo(memo::MemoArgs),
+    /// Executa uma rodada e sai (id da sessão + exit code).
     #[cfg(feature = "memory-in-process")]
-    Run {
-        /// Objetivo/mensagem do utilizador.
-        goal: String,
-        /// Provider (`llama`, `opencode-go`, `opencode-zen`).
-        #[arg(long, default_value = "llama")]
-        provider: String,
-        /// Modelo (por omissão depende do provider).
-        #[arg(long)]
-        model: Option<String>,
-        /// Base URL do endpoint (por omissão depende do provider).
-        #[arg(long)]
-        base: Option<String>,
-        /// Teto de tokens de saída.
-        #[arg(long, default_value_t = 512)]
-        max_tokens: u32,
-        /// Máximo de passos (tool calls) por turno.
-        #[arg(long, default_value_t = 8)]
-        max_steps: u32,
-        /// Liga a compactação do histórico no turno (E09-T07).
-        #[arg(long)]
-        compact: bool,
-        /// Retoma a sessão: sem valor usa a mais recente; com valor, o id indicado.
-        #[arg(long, num_args = 0..=1, default_missing_value = "last")]
-        resume: Option<String>,
-    },
-    /// Abre a UI de terminal sobre o loop de turnos (E10).
+    Run(run_cmd::RunCli),
+    /// Abre a UI de terminal.
     #[cfg(feature = "memory-in-process")]
-    Tui {
-        /// Provider (`llama`, `opencode-go`, `opencode-zen`).
-        #[arg(long, default_value = "llama")]
-        provider: String,
-        /// Modelo (por omissão depende do provider).
-        #[arg(long)]
-        model: Option<String>,
-        /// Base URL do endpoint (por omissão depende do provider).
-        #[arg(long)]
-        base: Option<String>,
-        /// Teto de tokens de saída.
-        #[arg(long, default_value_t = 512)]
-        max_tokens: u32,
-        /// Máximo de passos (tool calls) por turno.
-        #[arg(long, default_value_t = 8)]
-        max_steps: u32,
-        /// Liga a compactação do histórico no turno (E09-T07).
-        #[arg(long)]
-        compact: bool,
-        /// Retoma a sessão: sem valor usa a mais recente; com valor, o id indicado.
-        #[arg(long, num_args = 0..=1, default_missing_value = "last")]
-        resume: Option<String>,
-    },
+    Tui(run_cmd::TuiCli),
+}
+
+impl Cli {
+    /// Se o comando pede envelope JSON em `stdout` (**por comando**, não global).
+    pub(crate) const fn json(&self) -> bool {
+        match &self.command {
+            Some(command) => command.json(),
+            None => false,
+        }
+    }
 }
 
 impl Command {
-    /// Nome estável do comando (para o envelope de máquina).
-    pub(crate) const fn name(&self) -> &'static str {
+    /// Se o verbo pede envelope JSON.
+    pub(crate) const fn json(&self) -> bool {
         match self {
-            Self::Version => "version",
-            Self::Doctor => "doctor",
-            Self::Memory => "memory",
-            Self::Sessions => "sessions",
-            Self::Recall { .. } => "recall",
-            Self::Remember { .. } => "remember",
+            Self::Prime(args) => args.json,
+            Self::Upgrade(args) => args.json,
+            Self::Config(args) => args.json,
+            Self::Memo(args) => args.json,
             #[cfg(feature = "memory-in-process")]
-            Self::Run { .. } => "run",
+            Self::Run(args) => args.json,
             #[cfg(feature = "memory-in-process")]
-            Self::Tui { .. } => "tui",
+            Self::Tui(_) => false,
         }
     }
 }
 
 /// Executa o comando pedido e devolve o relatório.
 pub(crate) fn execute(cli: &Cli) -> Report {
+    if cli.init {
+        return init_project(cli);
+    }
     match &cli.command {
-        Command::Version => Report::ok(
-            Command::Version.name(),
+        Some(Command::Prime(args)) => prime::execute(args),
+        Some(Command::Upgrade(args)) => upgrade::execute(args),
+        Some(Command::Config(args)) => config_cmd::execute(args),
+        Some(Command::Memo(args)) => memo::execute(args),
+        #[cfg(feature = "memory-in-process")]
+        Some(Command::Run(args)) => {
+            ensure_project("run").unwrap_or_else(|| run_cmd::execute_run(args))
+        }
+        #[cfg(feature = "memory-in-process")]
+        Some(Command::Tui(args)) => {
+            ensure_project("tui").unwrap_or_else(|| run_cmd::execute_tui(args))
+        }
+        None => default_tui(),
+    }
+}
+
+/// Garante o `.katu/` antes de abrir sessão; devolve um relatório de erro, se falhar.
+#[cfg(feature = "memory-in-process")]
+fn ensure_project(command: &'static str) -> Option<Report> {
+    bootstrap::ensure_current(GitMode::Default, false)
+        .err()
+        .map(|error| Report::failed(command, &error))
+}
+
+/// `katu --init`: bootstrap do projeto e saída (E20-T19).
+fn init_project(cli: &Cli) -> Report {
+    let mode = if cli.git_excluded {
+        GitMode::Excluded
+    } else if cli.git_tracked {
+        GitMode::Tracked
+    } else {
+        GitMode::Default
+    };
+    match bootstrap::ensure_current(mode, cli.force) {
+        Ok(report) => Report::ok(
+            "init",
             Some(json!({
-                "katu": env!("CARGO_PKG_VERSION"),
-                "policy_vocab": POLICY_VOCAB_VERSION,
+                "created": report.created,
+                "config": report.config,
+                "git": report.git,
             })),
         ),
-        Command::Doctor => doctor(),
-        Command::Memory => memory_command(),
-        Command::Sessions => sessions::list(),
-        Command::Recall { query, limit } => memory_recall(query, *limit),
-        Command::Remember { statement, anchor } => memory_remember(statement, anchor.as_deref()),
-        #[cfg(feature = "memory-in-process")]
-        Command::Run {
-            goal,
-            provider,
-            model,
-            base,
-            max_tokens,
-            max_steps,
-            compact,
-            resume,
-        } => run(&RunArgs {
-            goal,
-            provider,
-            model: model.as_deref(),
-            base: base.as_deref(),
-            max_tokens: *max_tokens,
-            max_steps: *max_steps,
-            compact: *compact,
-            resume: resume.as_deref(),
-        }),
-        #[cfg(feature = "memory-in-process")]
-        Command::Tui {
-            provider,
-            model,
-            base,
-            max_tokens,
-            max_steps,
-            compact,
-            resume,
-        } => run_tui(&RunArgs {
-            goal: "tui",
-            provider,
-            model: model.as_deref(),
-            base: base.as_deref(),
-            max_tokens: *max_tokens,
-            max_steps: *max_steps,
-            compact: *compact,
-            resume: resume.as_deref(),
-        }),
+        Err(error) => Report::failed("init", &error),
     }
 }
 
-/// Diagnóstico de arranque: portas, instrumentação, MSRV efetivo e memória.
-fn doctor() -> Report {
-    #[cfg_attr(
-        not(feature = "memory-in-process"),
-        allow(unused_mut, reason = "sem o adaptador, `data` não é mutado")
-    )]
-    let mut data: Value = json!({
-        "instrumented": diag::enabled(),
-        "rust_version": env!("CARGO_PKG_RUST_VERSION"),
-    });
-    #[cfg(feature = "memory-in-process")]
-    if let Some(object) = data.as_object_mut() {
-        object.insert("memory".to_string(), memory_status());
+/// `katu` sem subcomando: abre a TUI (E20-T03), falhando fechado sem TTY.
+#[cfg(feature = "memory-in-process")]
+fn default_tui() -> Report {
+    use std::io::IsTerminal;
+
+    use katu_core::error::Error;
+
+    if !std::io::stdout().is_terminal() {
+        return Report::failed(
+            "tui",
+            &Error::io("<stdout>", std::io::Error::other("sem TTY")),
+        );
     }
-    Report::ok(Command::Doctor.name(), Some(data))
+    if let Some(report) = ensure_project("tui") {
+        return report;
+    }
+    run_cmd::execute_tui(&run_cmd::TuiCli::default())
 }
 
-/// Sem o adaptador compilado, a memória é invariante: os comandos **recusam** (DF4, fail-closed).
+/// Sem o adaptador, não há TUI.
 #[cfg(not(feature = "memory-in-process"))]
-fn memory_command() -> Report {
-    unavailable_report(Command::Memory.name())
-}
-
-#[cfg(not(feature = "memory-in-process"))]
-fn memory_recall(_query: &str, _limit: usize) -> Report {
-    unavailable_report("recall")
-}
-
-#[cfg(not(feature = "memory-in-process"))]
-fn memory_remember(_statement: &str, _anchor: Option<&str>) -> Report {
-    unavailable_report("remember")
-}
-
-#[cfg(not(feature = "memory-in-process"))]
-fn unavailable_report(command: &'static str) -> Report {
+fn default_tui() -> Report {
     use katu_core::error::Error;
 
     Report::failed(
-        command,
-        &Error::unavailable("adaptador de memória não compilado (feature `memory-in-process`)"),
+        "tui",
+        &Error::unavailable("TUI não compilada (feature `memory-in-process`)"),
     )
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{Cli, Command, execute};
-    use clap::Parser;
-
-    #[test]
-    fn version_report_is_ok() {
-        let cli = Cli::parse_from(["katu", "version", "--json"]);
-        let report = execute(&cli);
-        assert!(report.success);
-        assert_eq!(report.command, "version");
-    }
-
-    #[test]
-    fn command_names_are_stable() {
-        assert_eq!(Command::Version.name(), "version");
-        assert_eq!(Command::Doctor.name(), "doctor");
-        assert_eq!(Command::Memory.name(), "memory");
-        assert_eq!(
-            Command::Recall {
-                query: String::new(),
-                limit: 5
-            }
-            .name(),
-            "recall"
-        );
-        assert_eq!(
-            Command::Remember {
-                statement: String::new(),
-                anchor: None
-            }
-            .name(),
-            "remember"
-        );
-    }
 }

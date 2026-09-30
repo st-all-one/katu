@@ -113,7 +113,10 @@ pub(crate) fn run(args: &RunArgs<'_>) -> Report {
             options: &options,
         },
     ) {
-        Ok(turn) => Report::ok("run", Some(turn_value(&model, &turn))),
+        Ok(turn) => {
+            let value = turn_value(&model, &turn, runtime.session_id());
+            Report::ok("run", Some(value))
+        }
         Err(error) => Report::failed("run", &error.into()),
     }
 }
@@ -172,8 +175,8 @@ pub(crate) fn build_provider(
     }
 }
 
-/// Envelope do resultado de um turno.
-fn turn_value(model: &str, turn: &super::TurnReport) -> Value {
+/// Envelope do resultado de um turno (id da sessão + exit da rodada).
+fn turn_value(model: &str, turn: &super::TurnReport, session: Option<&str>) -> Value {
     let usage = turn.usage.as_ref().map(|usage| {
         json!({
             "input": usage.input,
@@ -183,6 +186,8 @@ fn turn_value(model: &str, turn: &super::TurnReport) -> Value {
         })
     });
     json!({
+        "session": session,
+        "round_exit": 0,
         "model": model,
         "steps": turn.steps,
         "chars": turn.text.chars().count(),

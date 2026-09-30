@@ -2,71 +2,112 @@
 
 > **Revisão da superfície de utilizador** (comandos, flags e teclas) do binário `katu`, derivada do
 > código em [`crates/katu/src/cli.rs`](../crates/katu/src/cli.rs),
-> [`crates/katu/src/agent/command.rs`](../crates/katu/src/agent/command.rs),
-> [`crates/katu/src/tui.rs`](../crates/katu/src/tui.rs) e
+> [`crates/katu/src/cli/`](../crates/katu/src/cli/),
+> [`crates/katu/src/agent/command.rs`](../crates/katu/src/agent/command.rs) e
 > [`crates/katu-tui/src/action.rs`](../crates/katu-tui/src/action.rs). É um **mapa**, não um
-> manual: cada facto continua a ter o seu lar no código/plan.
+> manual. O épico que reformula esta superfície é
+> [`SURFACE_IMPLEMENTATION.md`](../SURFACE_IMPLEMENTATION.md) (E20); a decisão está na
+> [ADR 0019](adr/0019-superficie-cli-tui-v2.md).
 
 ## 0. Convenções transversais
 
-- **Feature `memory-in-process`** (default): sem ela, os comandos `run`/`tui` **não compilam** e
-  `memory`/`recall`/`remember` **falham fechado** (exit 10 `unavailable`).
-- **Feature `profile`** (opt-in): liga o diagnóstico estruturado (ver `KATU_INSTRUMENT`).
+- **Verbos exclusivos:** `prime`, `upgrade`, `config`, `memo`, `run`, `tui` (+ `help`). `version`
+  deixa de ser verbo (`--version`/`-V` são do `clap`). `katu` **sem subcomando** abre a TUI.
+- **Posicional = conteúdo** (`run`, `memo ask`): `-` lê `stdin`; ausente + `stdin` não-TTY lê
+  `stdin`; ausente + TTY → `invalid_input` (exit 2). Nunca se inventa conteúdo (I1).
+- **`--json` é por comando** (não global): existe em `prime`/`upgrade`/`config`/`memo`/`run`; a
+  `tui` **não** tem. `katu --json` (sem verbo) deixa de existir.
+- **`--log-level <NÍVEL>` é global** (stderr), default **`quiet`**; **não** existe `--quiet`.
 - **stdout = dados, stderr = logs.** Um *pipe* fechado (`katu … | head`) é **sucesso**.
-- `--json` é **global** (pode vir antes ou depois do subcomando): emite um envelope de máquina de
-  uma linha em `stdout`. Sem `--json`, os objetos são impressos como `chave = valor`.
+- **Feature `memory-in-process`** (default): sem ela, `run`/`tui` **não compilam** e `memo ask`
+  **falha fechado** (exit 10 `unavailable`).
+- **Feature `profile`** (opt-in): liga o diagnóstico estruturado.
 - **Códigos de saída** (contrato estável, `ErrorKind::exit_code`): `0` ok · `2` `invalid_input` ·
   `3` `io` · `4` `not_found` · `5` `conflict` · `6` `timeout` · `7` `config` · `8` `schema` ·
   `9` `unsafe_blocked` · `10` `unavailable` · `70` `internal`.
 
 ## 1. Comandos do CLI
 
-| Comando | O que faz | Argumentos | Envelope (`data`) |
-| --- | --- | --- | --- |
-| `version` | Versão do binário + versão do vocabulário de política. | — | `{katu, policy_vocab}` |
-| `doctor` | Diagnóstico de arranque: instrumentação, MSRV efetivo e saúde da memória. | — | `{instrumented, rust_version, memory?}` |
-| `memory` | Estado do backend de memória (adaptador in-process do knudge). | — | `{backend, health, warnings, knowledge_dir}` |
-| `sessions` | Lista as sessões do projeto (id, instante, objetivo, raiz), ordem temporal. | — | `{root, sessions:[{id, created_ms, goal, root}]}` |
-| `recall` | Consulta a memória pelo caminho §42 (recall). | `query` (posicional) · `--limit` | `{project, ran, outcome, report}` |
-| `remember` | Regista uma nota (recall prévio + escrita pelo gate §42). | `statement` (posicional) · `--anchor` | `{project, ran, outcome, report}` |
-| `run` | Executa **um** turno do agente (provider ↔ kernel ↔ tools). | `goal` (posicional) · ver §3 | `{model, steps, chars, calls, cancelled, usage}` |
-| `tui` | Abre a UI de terminal sobre o loop (multi-turno). | ver §3 | *(nenhum; sucesso vazio)* |
+| Comando | O que faz | Envelope (`data`) |
+| --- | --- | --- |
+| `prime [--long] [--group <g>]` | Contexto de arranque **estático** (byte-idêntico por versão) para IA/utilizador. | `{group, prime}` |
+| `upgrade` | Sincronização de versão. **Canal ainda não configurado** → recusa (exit 10). | — |
+| `config <get\|set\|unset\|list>` | Configuração global e do projeto (efetiva = projeto > global). | `{key, value\|entries, scope}` |
+| `memo <sub>` | Memória: **consulta/visão geral** (nunca escreve). | ver §1.1 |
+| `run [BODY]` | Executa **uma** rodada e sai; devolve id da sessão + exit code. | `{session, round_exit, model, steps, chars, calls, cancelled, usage}` |
+| `tui` | Abre a UI de terminal (multi-turno). | *(nenhum; sucesso vazio)* |
+| *(sem verbo)* | Abre a TUI; **sem TTY falha fechado** (exit 3). | — |
 
-`katu` sem subcomando imprime a ajuda (`arg_required_else_help`). `katu --version`/`-V` e
-`katu --help`/`-h` são do `clap`.
+Verbos antigos (`version`, `doctor`, `memory`, `sessions`, `recall`, `remember`) **deixam de
+existir** no topo → `invalid_input` (exit 2), sem retrocompatibilidade.
 
 ### 1.1 Detalhe por comando
 
-- **`version`** — não toca em portas nem em ficheiros. `policy_vocab` é o `POLICY_VOCAB_VERSION`.
-- **`doctor`** — sempre `instrumented` + `rust_version`; `memory` só com o adaptador compilado.
-  Nunca falha por a memória estar indisponível (reporta-a dentro de `memory`).
-- **`memory`** — abre o adaptador na **raiz do projeto**; sem adaptador, exit 10. Não cria sessão.
-- **`sessions`** — só **lê** `<root>/.katu/sessions/index.jsonl`; nunca cria sessão nem toca no log.
-  A raiz é descoberta a subir a partir do diretório atual.
-- **`recall`** — monta o **runtime** (sessão + regras + memória) e consulta pelo caminho §42.
-- **`remember`** — monta o runtime e escreve uma nota `Fact`, com `--anchor` opcional para código.
-- **`run`** — monta o runtime, escolhe o modelo (explícito ou por **tier**), monta o pedido a partir
-  do log e corre **um** turno; as tool calls passam pela ordem §42. O `usage` vem com `basis`
-  (`provider_reported`/`estimated`/…).
+- **`prime`** — grupos: `global`, `memo`, `run`, `tui`, `config`, `upgrade`. Texto **estático**
+  (não inclui o `AGENTS.md`, que entra no contexto do turno — E20-T13). `--long` acrescenta
+  gramática e escopo. Cada grupo expõe `<grupo> prime` **equivalente** a
+  `katu prime --group <grupo>` (`memo prime`, `config prime`); os verbos-folha usam
+  `katu prime --group <g>`. Aceita `--params`/`--batch`.
+- **`upgrade`** — fail-closed: reporta que o canal não está configurado; não inventa origem
+  (sincronização futura contra GitHub Releases).
+- **`config`** — `get`/`list` leem a config **efetiva** (projeto > global); `set`/`unset` escrevem
+  no projeto (ou na global com `--global`). Conjunto **fechado** de chaves (E20-T09); chave/valor
+  inválido → exit 2. O `init` copia a global 1:1 (snapshot, E20-T18).
+- **`memo`** — só consulta, espelhando o `kd`:
+  - `memo ask [QUERY] [--limit N]` — recall pelo caminho §42 (posicional = body).
+  - `memo knowledge [--axis <e>]` — visão geral do mapa (**E20-T06**; recusa até lá).
+  - `memo doctor [--fix]` — diagnóstico do backend; `--fix` garante o layout do projeto (**E20-T07**).
+  - `memo sessions` — lista as sessões do projeto (para `--resume`).
+  - `memo drain [--status\|--digest [--force]]` — `--status` é read-only (não toca no índice);
+    `--digest` drena a fila de embeddings (`--force` apaga `.idx/` e redigeri; **E20-T20**);
+    `--watch-service` recusa (contrato presente, fail-closed).
+  - `memo prime [--long]` — prime do grupo.
+  A **escrita** de memória é do **agente** (tools no loop) e do `kd`; o `memo` nunca cria notas.
+- **`run`** — monta o runtime, escolhe o modelo (explícito ou por **tier**), corre **uma** rodada;
+  as tool calls passam pela ordem §42. Saída humana: texto + **id da sessão em destaque** (após uma
+  linha em branco); envelope: `session` + `round_exit`. O `usage` vem com `basis`.
 - **`tui`** — igual ao `run`, mas entra no loop de eventos da UI (multi-turno). O `goal` interno é
   `"tui"`; o objetivo real de cada turno é a mensagem escrita na UI.
 
 ## 2. Flags do CLI
 
-| Flag | Comandos | O que faz | O que espera / default |
-| --- | --- | --- | --- |
-| `--json` | **global** | Envelope de máquina em `stdout`. | booleano; default `false` |
-| `--limit <N>` | `recall` | Máximo de resultados do recall. | inteiro `usize`; default `5` |
-| `--anchor <PATH>` | `remember` | Âncora de código da nota. | caminho opcional; default ausente |
-| `--provider <NAME>` | `run`, `tui` | Provider a usar. | `llama` \| `opencode-go` \| `opencode-zen`; default `llama` |
-| `--model <MODEL>` | `run`, `tui` | Modelo explícito (vence o tier). | string; default pelo **tier** da fase |
-| `--base <URL>` | `run`, `tui` | Base URL do endpoint. | URL; default por provider (§2.1) |
-| `--max-tokens <N>` | `run`, `tui` | Teto de tokens de saída. | `u32`; default `512` |
-| `--max-steps <N>` | `run`, `tui` | Máximo de passos (tool calls) por turno. | `u32`; default `8` |
-| `--compact` | `run`, `tui` | Liga a compactação do histórico no turno (E09-T07). | booleano; default `false` |
-| `--resume [<ID>]` | `run`, `tui` | Retoma sessão. | sem valor = `last` (mais recente); com valor = id `s_<16hex>` |
+### 2.1 Globais
 
-### 2.1 Defaults de provider/modelo/base
+| Flag | O que faz | Default |
+| --- | --- | --- |
+| `--log-level <quiet\|error\|warn\|info\|debug\|trace>` | Nível do diagnóstico em `stderr`. | `quiet` |
+| `--init` | Faz o bootstrap do `.katu/` e sai (layout + snapshot da config). | `false` |
+| `--git-excluded` | Com `--init`: exclui o `.katu/` do git. | — |
+| `--git-tracked` | Com `--init`: versiona o `.katu/` (default global). | — |
+| `--force` | Com `--init`: refaz o bootstrap preservando só o conhecimento (`knowledge/`, `guardrails/`, `audit/`). | `false` |
+
+### 2.2 Por comando
+
+| Flag | Comandos | O que faz | Default |
+| --- | --- | --- | --- |
+| `--json` | `prime`, `upgrade`, `config`, `memo`, `run` | Envelope de máquina em `stdout`. | `false` |
+| `--long` | `prime` | Acrescenta gramática e escopo. | `false` |
+| `--group <g>` | `prime` | Grupo a emitir. | `global` |
+| `--limit <N>` | `memo ask` | Máximo de resultados do recall. | `5` |
+| `--params <JSON\|->` | `prime`, `run`, `tui`, `memo ask` | Config universal do comando (**XOR** com as flags; `-` = stdin). | ausente |
+| `--batch <ficheiro\|->` | `prime`, `run`, `memo ask` | Lote JSONL (uma linha = um item). | ausente |
+| `--provider <NAME>` | `run`, `tui` | Provider a usar. | `llama` |
+| `--model <MODEL>` | `run`, `tui` | Modelo explícito (vence o tier). | pelo **tier** da fase |
+| `--base <URL>` | `run`, `tui` | Base URL do endpoint. | por provider (§2.3) |
+| `--max-tokens <N>` | `run`, `tui` | Teto de tokens de saída. | `512` |
+| `--max-steps <N>` | `run`, `tui` | Máximo de passos (tool calls) por turno. | `8` |
+| `--compact` | `run`, `tui` | Liga a compactação do histórico no turno (E09-T07). | `false` |
+| `--resume [<ID>]` | `run`, `tui` | Retoma sessão. | sem valor = `last` |
+
+**`--params`/`--batch` (E20-T08):** `--params '{…}'` (config universal do comando, **XOR** com as
+flags explícitas; `-` = stdin) existe em `prime`/`run`/`tui`/`memo ask`; `--batch <ficheiro|->`
+(JSONL; valida tudo antes de executar) em `prime`/`run`/`memo ask`.
+
+**Defaults da config (E20-T17):** `provider`, `model`, `base`, `behavior.auto_compact` e
+`recall.default_limit` da config efetiva (projeto > global) são o default de `run`/`tui`/`memo ask`
+(flags > `--params` > config > default do comando).
+
+### 2.3 Defaults de provider/modelo/base
 
 | Provider | Base por omissão | Modelo por omissão | Credencial |
 | --- | --- | --- | --- |
@@ -81,15 +122,21 @@ Provider desconhecido → `invalid_input` (exit 2). `opencode-*` sem `KATU_OPENC
 
 | Variável | Efeito |
 | --- | --- |
-| `KATU_INSTRUMENT=1\|true` | Liga o sink de diagnóstico para `stderr` (feature `profile`). |
+| `KATU_INSTRUMENT=1\|true` | Liga o sink de diagnóstico para `stderr` (feature `profile`), mesmo com `--log-level quiet`. |
 | `KATU_INSTRUMENT_FILTER=<prefixo>` | Filtra os eventos por subsistema (ex.: `tui`, `provider`). |
 | `KATU_OPENCODE_KEY` | Chave dos providers `opencode-go`/`opencode-zen` (**obrigatória**). |
 | `USER` / `USERNAME` | Assinante (`granted_by`) de aprovações/overrides; default `local`. |
 
 ## 4. A TUI
 
-Abre com `katu tui [flags de §2]`. A UI é **pura** (estado + keymap + render em `katu-tui`); a
-borda (`crates/katu/src/tui/handler.rs`) é quem fala com o modelo e executa os efeitos.
+Abre com `katu tui [flags de §2]` ou `katu` (sem verbo). A UI é **pura** (estado + keymap + render
+em `katu-tui`); a borda (`crates/katu/src/tui/handler.rs`) é quem fala com o modelo e executa os
+efeitos.
+
+> **Nota (E20-T10…T16, onda S3):** a entrada por `/` (mini-menus), `/plan`, `!`/`@`, cópia por
+> rato (OSC 52), *steering* e a ajuda por `?` ainda **não** estão implementados; as teclas abaixo
+> são as atuais. Quando entrar, **`?`** abre uma sobreposição com todos os comandos `/` e padrões
+> (`!<cmd>`, `@<path>`, `/<comando>`) — E20-T10.
 
 ### 4.1 Layout
 
@@ -180,9 +227,13 @@ o `verify` grava o relatório e, se bloqueado, regista `overrides.jsonl` por cha
 
 ## 6. Lacunas conhecidas (superfície reservada)
 
+- **Verbos em esqueleto:** `upgrade`, `memo knowledge`, `memo drain --watch-service` — existem no
+  contrato mas **recusam** (exit 10) até às tarefas E20-T02/T06/T20.
+- **`--params`/`--batch`** existem em `prime`/`run`/`tui`/`memo ask`; `config` (subcomandos) e os
+  verbos em esqueleto ficam para quando tiverem dados.
 - **Modo `Confirm`** existe no keymap (`y`/`n`) mas **nenhum fluxo o ativa** hoje: `Action::Confirm`
-  apenas mostra `nada a confirmar`. É superfície **reservada**, não funcionalidade.
+  apenas mostra `nada a confirmar`. É superfície **reservada**.
 - **`run` é de um só turno**; o multi-turno vive na TUI.
-- **Cancelamento é cooperativo** e só é lido durante o stream (a UI corre o turno na sua thread).
+- **Cancelamento é cooperativo** e só é lido durante o stream.
 - **Kill do grupo de processos** (E07-T04) é o **único** ponto `unsafe` do projeto
   ([ADR 0018](adr/0018-kill-do-grupo-com-unsafe-unico.md)).

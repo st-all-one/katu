@@ -75,3 +75,24 @@ fn status_names_the_in_process_backend() -> Result<(), Box<dyn std::error::Error
     std::fs::remove_dir_all(&root)?;
     Ok(())
 }
+
+#[test]
+fn knowledge_lives_under_katu_and_drain_reconciles() -> Result<(), Box<dyn std::error::Error>> {
+    let root = root("drain")?;
+    let memory = KnudgeMemory::open(&root)?;
+    assert!(
+        memory.knowledge_dir().ends_with(".katu/knowledge"),
+        "conhecimento em .katu/knowledge (E20-T19), não .knudge"
+    );
+    memory.record(&PreWriteReq {
+        statement: "cache usa LRU".to_string(),
+        note_type: NoteType::Fact,
+        anchor: None,
+        body: String::new(),
+    })?;
+    let summary = memory.drain(false)?;
+    assert!(summary.enabled, "provedor http ligado por omissão");
+    assert!(summary.batches >= 1, "o dreno corre pelo menos um lote");
+    std::fs::remove_dir_all(&root)?;
+    Ok(())
+}

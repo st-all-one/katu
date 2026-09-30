@@ -6,7 +6,10 @@
 //! envolve-o com `spawn_blocking` + timeout (E03-T04).
 
 pub(crate) mod commands;
+mod drain;
 mod translate;
+
+pub(crate) use drain::DrainSummary;
 
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, PoisonError};
@@ -21,6 +24,9 @@ use knudge_core::graph::Graph;
 use knudge_core::retrieval::{Index, RecallQuery, recall};
 use knudge_core::write::{Draft, propose, write};
 use knudge_core::{Error as KnudgeError, ErrorKind, Knudge};
+
+/// Layout do conhecimento dentro de `.katu/` (E20-T19): `notas/` + `.idx/`.
+const KNOWLEDGE_LAYOUT: &str = ".katu/knowledge";
 
 /// Estado com cache do índice/grafo (invalidado a cada commit).
 struct Inner {
@@ -59,6 +65,7 @@ impl KnudgeMemory {
     pub(crate) fn open(root: &Path) -> Result<Self, MemoryError> {
         let kd = Knudge::builder()
             .root(root)
+            .knowledge_dir(KNOWLEDGE_LAYOUT)
             .open()
             .map_err(to_memory_error)?;
         // `behavior.strict` fixado na abertura: avisos *soft* do knudge promovem a erro.
@@ -76,6 +83,17 @@ impl KnudgeMemory {
     /// Diretório de conhecimento (para diagnóstico).
     pub(crate) fn knowledge_dir(&self) -> PathBuf {
         lock(&self.inner).kd.knowledge_dir()
+    }
+
+    /// Drena a fila de embeddings do projeto (E20-T20).
+    #[allow(
+        clippy::fn_params_excessive_bools,
+        reason = "`force` é o modo `--force` do dreno"
+    )]
+    pub(crate) fn drain(&self, force: bool) -> Result<DrainSummary, MemoryError> {
+        let _span = katu_core::span!(Level::Trace, events::MEMORY_WRITE, "op" => "drain");
+        let inner = lock(&self.inner);
+        drain::run(&inner.kd, force)
     }
 }
 

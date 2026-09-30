@@ -7,7 +7,20 @@ todo o código impuro confinado.
 
 ## Responsabilidade
 
-- CLI (`clap`) e wiring das portas (`Clock`, `Rng`, `Fs`, `Env`, `Logger`).
+- CLI (`clap`) e wiring das portas (`Clock`, `Rng`, `Fs`, `Env`, `Logger`). A superfície v2 (E20)
+  vive em `src/cli.rs` + `src/cli/`: verbos exclusivos `prime`/`upgrade`/`config`/`memo`/`run`/`tui`,
+  `prime` estático por grupo (`prime.rs`), `memo` só consulta (`memo.rs`), body/stdin (`input.rs`),
+  `--json` por comando e `--log-level` global (default `quiet`); sem subcomando, `katu` abre a TUI.
+  A **configuração** vive em `src/config.rs` (conjunto fechado de chaves, paths por SO, merge
+  projeto > global) e `cli/config_cmd.rs` (`get/set/unset/list [--global]`, ADR 0020); a entrada
+  estruturada `--params` (XOR com flags) e `--batch` JSONL vive em `cli/params.rs` +
+  `cli/run_params.rs` (E20-T08). Cada grupo expõe `<grupo> prime` (`memo prime`, `config prime`),
+  equivalente a `katu prime --group <g>`. Os **padrões** da config efetiva
+  (`provider`/`model`/`base`/`behavior.auto_compact`/`recall.default_limit`) alimentam
+  `run`/`tui`/`memo ask` via `src/defaults.rs` (E20-T17). O **bootstrap** do `.katu/` vive em `src/bootstrap.rs` (layout
+  idempotente, snapshot 1:1 da config, guardrails e blocos geridos em `.gitignore`/`.gitattributes`/
+  `.git/info/exclude`, ADR 0021); `--init` e o arranque de sessão (`run`/`tui`/default TUI) correm-no
+  antes do primeiro turno, e `memo doctor --fix` é o mesmo caminho.
 - Adaptadores das portas em `src/ports/` (`mod.rs` = relógio/RNG/env; `process.rs` = `StdProcess`
   com timeout, `process_group` e leitura limitada — E07-T04; `fs/` = `StdFs` com escrita atómica
   **endurecida**: temporário exclusivo `O_EXCL`/`0600` e nome imprevisível, para não seguir um
@@ -17,13 +30,17 @@ todo o código impuro confinado.
 - Adaptador in-process da porta `Memory` sobre o `knudge-core` (`src/memory/`, feature
   `memory-in-process` **default**) — o único sítio com dependência do knudge. A fachada `Knudge`
   (`!Sync`) é protegida por `Mutex` com cache de índice/grafo; `pre_edit` decide *supersede* em
-  *dry-run* fiel ao `update`; `doctor --json` e `katu memory` expõem `memory.status()` e a suíte de
-  conformidade corre contra o adaptador (E03-T02/T05/T06/T07). Sem o adaptador, `katu memory`
-  **falha fechado** (`unavailable`, exit 10) — a memória é invariante de produção (G4).
+  *dry-run* fiel ao `update`; `memo doctor` expõe `memory.status()` e a suíte de
+  conformidade corre contra o adaptador (E03-T02/T05/T06/T07). O conhecimento vive em
+  `.katu/knowledge` (E20-T19) e `memo drain --digest [--force]` drena a fila de embeddings pelo
+  pipeline do `knudge-core` (`src/memory/drain.rs`, E20-T20), fail-closed sem provedor. Sem o
+  adaptador, `katu memory` **falha fechado** (`unavailable`, exit 10) — a memória é invariante de
+  produção (G4).
 - **Runtime** (`src/runtime.rs`, feature `memory-in-process`): ponto de composição do loop
   (E03-T03/T07) — descobre a raiz, abre o adaptador, **recusa arrancar** sem memória saudável
-  (fail-closed) e expõe `recall`/`remember` pelo caminho §42 (`src/runtime/memory.rs`). Os comandos
-  `katu remember` e `katu recall` exercitam-no. `Runtime::open` cria sessão; `Runtime::resume`
+  (fail-closed) e expõe `recall`/`remember` pelo caminho §42 (`src/runtime/memory.rs`). O comando
+  `memo ask` exercita o recall; a escrita (`remember`) é do agente/`kd` (a superfície `memo` só
+  consulta). `Runtime::open` cria sessão; `Runtime::resume`
   (por id ou a mais recente) retoma o log durável e **fecha** um turno aberto antes do seguinte.
   Os submodules `src/runtime/context.rs` (contexto efetivo + compactação, E09-T01/T07),
   `src/runtime/verify.rs` (gate de verificação sobre o log, E09-T03) e `src/runtime/memory.rs`
@@ -69,7 +86,7 @@ todo o código impuro confinado.
   (Esc/Ctrl-C durante o stream → `ActivitySink::cancelled` → `Flow::Break`, diag `tui.cancel`); o
   **uso/custo** do turno aparece no cabeçalho (`usage_line`, `src/pricing.rs` + `policy/prices.toml`)
   e os **argumentos crus** do modelo no painel (`Activity::Tool { args }`). `--resume [last|id]`
-  retoma uma sessão e `katu sessions` lista-as. O turno é **síncrono** nesta fatia (executor em
+  retoma uma sessão e `memo sessions` lista-as. O turno é **síncrono** nesta fatia (executor em
   background é trabalho futuro).
 - Exit codes na borda (a lógica propaga `Result`).
 - Harness de medição do MVK (`examples/measure_mvk.rs`, feature `profile`, E05-T06): corre o

@@ -99,15 +99,26 @@ fn emit_human(report: &Report) -> Result<(), Error> {
 }
 
 /// Renderiza os dados em texto humano (strings, objetos chave-valor ou JSON compacto).
+///
+/// O campo `session` (quando presente) é impresso **em destaque**, após uma linha em branco — é o
+/// id que o `run` devolve para `--resume`.
 fn human_data(data: Option<&Value>) -> String {
     match data {
         Some(Value::String(text)) => format!("{text}\n"),
         Some(Value::Object(map)) => {
             let mut out = String::new();
             for (key, value) in map {
+                if key == "session" {
+                    continue;
+                }
                 out.push_str(key);
                 out.push_str(" = ");
                 out.push_str(&value.to_string());
+                out.push('\n');
+            }
+            if let Some(Value::String(session)) = map.get("session") {
+                out.push('\n');
+                out.push_str(session);
                 out.push('\n');
             }
             out

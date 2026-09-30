@@ -11,6 +11,12 @@
 
 mod cli;
 
+mod bootstrap;
+mod config;
+
+#[cfg(feature = "memory-in-process")]
+mod defaults;
+
 #[cfg(feature = "memory-in-process")]
 mod agent;
 
@@ -46,32 +52,52 @@ use clap::Parser;
 use katu_core::diag::{Level, events};
 
 fn main() -> ExitCode {
-    #[cfg(feature = "profile")]
-    setup_diag();
-    let _span = katu_core::span!(Level::Info, events::KATU_RUN);
     let cli = cli::Cli::parse();
+    #[cfg(feature = "profile")]
+    setup_diag(&cli);
+    let _span = katu_core::span!(Level::Info, events::KATU_RUN);
     let report = cli::execute(&cli);
-    ExitCode::from(report::emit(&report, cli.json))
+    ExitCode::from(report::emit(&report, cli.json()))
 }
 
-/// Instala o diagnóstico estruturado quando `KATU_INSTRUMENT` o pede (DF9/E19).
+/// Instala o diagnóstico estruturado conforme `--log-level` (DF9/E19).
+///
+/// `--log-level=quiet` (default) desliga; qualquer outro nível liga o sink de `stderr`. A variável
+/// `KATU_INSTRUMENT` continua a forçar a ligação, e `KATU_INSTRUMENT_FILTER` restringe por prefixo.
 #[cfg(feature = "profile")]
-fn setup_diag() {
+fn setup_diag(cli: &cli::Cli) {
     use std::sync::Arc;
 
-    use katu_core::diag::{Sink, install, set_filter};
+    use katu_core::diag::{Sink, install, set_filter, set_level};
     use katu_core::ports::Env;
 
     let _span = katu_core::span!(Level::Info, events::KATU_SETUP);
     let env = ports::StdEnv;
-    let requested = env
-        .var("KATU_INSTRUMENT")
-        .is_some_and(|value| value == "1" || value == "true");
-    if requested {
-        let sink: Arc<dyn Sink> = Arc::new(diag::StderrSink);
-        install(sink);
-        if let Some(prefix) = env.var("KATU_INSTRUMENT_FILTER") {
-            set_filter(&prefix);
-        }
+    let requested = cli.log_level != cli::LogLevel::Quiet
+        || env
+            .var("KATU_INSTRUMENT")
+            .is_some_and(|value| value == "1" || value == "true");
+    if !requested {
+        return;
+    }
+    let sink: Arc<dyn Sink> = Arc::new(diag::StderrSink);
+    install(sink);
+    set_level(level(cli.log_level));
+    if let Some(prefix) = env.var("KATU_INSTRUMENT_FILTER") {
+        set_filter(&prefix);
+    }
+}
+
+/// Traduz o nível da borda para o nível do núcleo.
+#[cfg(feature = "profile")]
+const fn level(log: cli::LogLevel) -> Level {
+    use cli::LogLevel;
+
+    match log {
+        LogLevel::Quiet | LogLevel::Error => Level::Error,
+        LogLevel::Warn => Level::Warn,
+        LogLevel::Info => Level::Info,
+        LogLevel::Debug => Level::Debug,
+        LogLevel::Trace => Level::Trace,
     }
 }

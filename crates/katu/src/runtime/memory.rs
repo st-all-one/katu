@@ -41,8 +41,15 @@ impl Runtime<'_> {
 
     /// Regista uma nota: recall prévio (protocolo) + escrita pelo gate de E05 (ordem §42).
     ///
+    /// Reservado ao caminho de escrita (agente/`kd`); hoje exercido pelos testes do runtime — a
+    /// superfície `memo` só consulta (E20-T06).
+    ///
     /// # Errors
     /// [`RuntimeError`] se o recall, a transição, o custo ou a política falharem.
+    #[allow(
+        dead_code,
+        reason = "caminho de escrita reservado (agente/kd); exercido pelos testes do runtime"
+    )]
     pub(crate) fn remember(&mut self, req: &PreWriteReq) -> Result<Dispatch, RuntimeError> {
         self.recall(&req.statement, 5)?;
         let call = self.call("write");
@@ -63,6 +70,10 @@ impl Runtime<'_> {
     }
 
     /// Constrói o `PreWriteReq` de uma nota simples (afirmação; tipo e âncora opcionais).
+    #[allow(
+        dead_code,
+        reason = "construtor do caminho de escrita reservado; exercido pelos testes do runtime"
+    )]
     pub(crate) fn note(statement: &str, note_type: NoteType, anchor: Option<&str>) -> PreWriteReq {
         PreWriteReq {
             statement: statement.to_string(),

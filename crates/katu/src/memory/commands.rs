@@ -11,7 +11,7 @@ use crate::report::Report;
 use crate::runtime::{Runtime, RuntimeError};
 use katu_core::error::Error;
 use katu_core::kernel::Dispatch;
-use katu_core::memory::{Memory, NoteType};
+use katu_core::memory::Memory;
 
 /// Estado do backend de memória (adaptador in-process do knudge, E03-T07).
 pub(crate) fn memory_status() -> Value {
@@ -30,27 +30,7 @@ pub(crate) fn memory_status() -> Value {
     }
 }
 
-/// Comando de memória de primeira classe (E03-T07): falha fechada sem adaptador.
-pub(crate) fn memory_command() -> Report {
-    let root = std::env::current_dir().unwrap_or_default();
-    match KnudgeMemory::open(&root) {
-        Ok(memory) => match memory.status() {
-            Ok(status) => Report::ok(
-                "memory",
-                Some(json!({
-                    "backend": status.backend,
-                    "health": format!("{:?}", status.health),
-                    "warnings": status.warnings,
-                    "knowledge_dir": memory.knowledge_dir().display().to_string(),
-                })),
-            ),
-            Err(error) => runtime_failure("memory", RuntimeError::Memory(error)),
-        },
-        Err(error) => runtime_failure("memory", RuntimeError::Memory(error)),
-    }
-}
-
-/// Comando `recall`: monta o runtime e consulta a memória pelo caminho §42.
+/// Comando `memo ask`: monta o runtime e consulta a memória pelo caminho §42.
 pub(crate) fn memory_recall(query: &str, limit: usize) -> Report {
     let fs = StdFs;
     let clock = SystemClock;
@@ -61,25 +41,36 @@ pub(crate) fn memory_recall(query: &str, limit: usize) -> Report {
     };
     let project = runtime.root().display().to_string();
     match runtime.recall(query, limit) {
-        Ok(dispatch) => Report::ok("recall", Some(dispatch_value(&project, &dispatch))),
+        Ok(dispatch) => Report::ok("memo.ask", Some(dispatch_value(&project, &dispatch))),
         Err(error) => runtime_failure("recall", error),
     }
 }
 
-/// Comando `remember`: recall prévio + escrita pelo gate de E05.
-pub(crate) fn memory_remember(statement: &str, anchor: Option<&str>) -> Report {
-    let fs = StdFs;
-    let clock = SystemClock;
-    let start = std::env::current_dir().unwrap_or_default();
-    let mut runtime = match Runtime::open(&fs, &clock, &start, "cli: remember") {
-        Ok(runtime) => runtime,
-        Err(error) => return runtime_failure("remember", error),
-    };
-    let project = runtime.root().display().to_string();
-    let req = Runtime::note(statement, NoteType::Fact, anchor);
-    match runtime.remember(&req) {
-        Ok(dispatch) => Report::ok("remember", Some(dispatch_value(&project, &dispatch))),
-        Err(error) => runtime_failure("remember", error),
+/// Comando `memo drain --digest`: drena a fila de embeddings pelo pipeline do `knudge-core`
+/// (E20-T20). Fail-closed: sem provedor ligado, devolve `enabled=false` sem tocar no índice.
+#[allow(
+    clippy::fn_params_excessive_bools,
+    reason = "`force` é o modo `--force` do dreno"
+)]
+pub(crate) fn memory_drain(force: bool) -> Report {
+    let root = std::env::current_dir().unwrap_or_default();
+    match KnudgeMemory::open(&root) {
+        Ok(memory) => match memory.drain(force) {
+            Ok(summary) => Report::ok(
+                "memo.drain",
+                Some(json!({
+                    "enabled": summary.enabled,
+                    "batches": summary.batches,
+                    "indexed": summary.indexed,
+                    "cache_hits": summary.cache_hits,
+                    "rebuilt": summary.rebuilt,
+                    "removed": summary.removed,
+                    "warnings": summary.warnings,
+                })),
+            ),
+            Err(error) => runtime_failure("memo.drain", RuntimeError::Memory(error)),
+        },
+        Err(error) => runtime_failure("memo.drain", RuntimeError::Memory(error)),
     }
 }
 

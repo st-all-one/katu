@@ -102,7 +102,13 @@ impl From<RuntimeError> for Error {
                 Self::invalid_input(message)
             }
             RuntimeError::Control(source) => Self::invalid_input(source.to_string()),
-            RuntimeError::Session(source) => Self::internal(source.to_string()),
+            RuntimeError::Session(source) => {
+                if matches!(source, SessionError::UnknownSession(_)) {
+                    Self::invalid_input(source.to_string())
+                } else {
+                    Self::internal(source.to_string())
+                }
+            }
         }
     }
 }
