@@ -11,6 +11,7 @@ use katu_core::provider::{
 use serde_json::Value;
 
 use super::chunk::{Chunk, ToolCallDelta, UsageJson, text_of};
+use crate::wire::Wiring;
 
 /// Cycle de vida da decodificação.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -232,5 +233,39 @@ fn map_stop(reason: &str) -> StopReason {
         "length" => StopReason::Length,
         "content_filter" => StopReason::ContentFilter,
         other => StopReason::Other(other.to_string()),
+    }
+}
+
+impl Wiring for ChatDecoder {
+    fn feed_payload(
+        &mut self,
+        payload: &str,
+        sink: &mut dyn ProviderSink,
+    ) -> Result<Flow, ProviderError> {
+        self.on_payload(payload, sink)
+    }
+
+    fn finish_stream(&mut self, sink: &mut dyn ProviderSink) -> Result<Flow, ProviderError> {
+        self.flush_tools(sink)
+    }
+
+    fn has_emitted(&self) -> bool {
+        self.emitted()
+    }
+
+    fn has_data(&self) -> bool {
+        self.saw_data()
+    }
+
+    fn is_cancelled(&self) -> bool {
+        self.cancelled()
+    }
+
+    fn is_done(&self) -> bool {
+        self.done()
+    }
+
+    fn final_outcome(&self) -> ProviderOutcome {
+        self.outcome()
     }
 }

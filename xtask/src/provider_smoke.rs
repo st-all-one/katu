@@ -61,9 +61,13 @@ pub(crate) fn run(args: &[String]) {
     let max_tokens = value(args, "--max-tokens")
         .and_then(|value| value.parse::<u32>().ok())
         .unwrap_or(64);
+    let turns = value(args, "--turns")
+        .and_then(|value| value.parse::<u32>().ok())
+        .unwrap_or(1);
+    let warm = args.iter().any(|arg| arg == "--warm");
     let transport = UreqTransport::new(Duration::from_secs(5), Duration::from_secs(120));
 
-    let result = match provider {
+    match provider {
         "llama" => {
             let base = value(args, "--base").unwrap_or("http://127.0.0.1:8080/v1");
             let model = value(args, "--model").unwrap_or("qwen");
@@ -72,9 +76,13 @@ pub(crate) fn run(args: &[String]) {
                 health_url: health_of(base),
                 max_tokens: Some(max_tokens),
                 temperature: Some(0.0),
+                reasoning_format: None,
             };
             let llama = Llama::new(transport, config);
-            measure(&llama, model, prompt, max_tokens)
+            if warm {
+                llama.warm();
+            }
+            report(&llama, model, prompt, max_tokens, turns);
         }
         "opencode-go" | "opencode-zen" => {
             let Some(key) = std::env::var_os("KATU_OPENCODE_KEY") else {
@@ -90,19 +98,30 @@ pub(crate) fn run(args: &[String]) {
             let base = value(args, "--base").unwrap_or(default_base);
             let model = value(args, "--model").unwrap_or("longcat-2.5-preview-free");
             let session = value(args, "--session").unwrap_or("katu-provider-smoke");
-            let config = OpenCodeConfig::at(base, key).with_session(session);
+            let config = if provider == "opencode-go" {
+                OpenCodeConfig::go(key)
+            } else {
+                OpenCodeConfig::zen(key)
+            }
+            .with_base_url(base)
+            .with_session(session);
             let opencode = OpenCode::new(transport, config);
-            measure(&opencode, model, prompt, max_tokens)
+            if warm {
+                opencode.warm();
+            }
+            report(&opencode, model, prompt, max_tokens, turns);
         }
-        other => {
-            println!("{{\"error\":\"provider desconhecido: {other}\"}}");
-            return;
-        }
-    };
+        other => println!("{{\"error\":\"provider desconhecido: {other}\"}}"),
+    }
+}
 
-    match result {
-        Ok(line) => println!("{line}"),
-        Err(error) => println!("{{\"error\":\"{error}\"}}"),
+/// Executa `turns` chamadas sobre o mesmo provider (prova *keep-alive*) e imprime cada medição.
+fn report<P: Provider>(provider: &P, model: &str, prompt: &str, max_tokens: u32, turns: u32) {
+    for _turn in 0..turns {
+        match measure(provider, model, prompt, max_tokens) {
+            Ok(line) => println!("{line}"),
+            Err(error) => println!("{{\"error\":\"{error}\"}}"),
+        }
     }
 }
 

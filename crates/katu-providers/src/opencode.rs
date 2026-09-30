@@ -6,44 +6,23 @@
 //! - **Go** (subscrição): `https://opencode.ai/zen/go/v1/*` — exige `x-opencode-session`
 //!   (afinidade de sessão/prefix-cache).
 //!
-//! O dialeto implementado é `chat/completions` (OpenAI-compatible); os dialetos
-//! `responses`/`messages`/`google` ficam explicitamente `Unsupported` até E12-T06 os cobrir.
+//! O dialeto por omissão é `chat/completions`; o [`Catalog`] embutido (definição declarativa)
+//! pode encaminhar um modelo para `responses`/`messages`. `google` fica explicitamente
+//! `Unsupported`.
 
 use katu_core::diag::{Level, events};
 use katu_core::provider::{
     Provider, ProviderError, ProviderOutcome, ProviderRequest, ProviderSink,
 };
 
-use super::openai::{self, Endpoint};
+use super::catalog::{Catalog, ModelEntry};
+use super::declarative::ProviderSpec;
+use super::engine::{self, Dispatch, WireConfig};
+use super::openai::Endpoint;
 use super::retry::RetryPolicy;
 use super::transport::Transport;
 
-/// Dialeto do gateway (normalizado no trait [`Provider`]).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum Dialect {
-    /// `chat/completions` (OpenAI-compatible) — implementado.
-    ChatCompletions,
-    /// `responses` (`OpenAI` Responses `API`) — por implementar.
-    Responses,
-    /// `messages` (Anthropic) — por implementar.
-    Messages,
-    /// `models/<id>` (Google) — por implementar.
-    Google,
-}
-
-impl Dialect {
-    /// Nome estável.
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::ChatCompletions => "chat/completions",
-            Self::Responses => "responses",
-            Self::Messages => "messages",
-            Self::Google => "google",
-        }
-    }
-}
+pub use crate::catalog::Dialect;
 
 /// Configuração do built-in `opencode`.
 #[derive(Debug, Clone)]
@@ -54,25 +33,29 @@ pub struct OpenCodeConfig {
     pub api_key: String,
     /// Header `x-opencode-session` (afinidade; obrigatório no Go).
     pub session: Option<String>,
-    /// Dialeto.
+    /// Dialeto por omissão (o catálogo pode sobrepô-lo por modelo).
     pub dialect: Dialect,
     /// Teto de tokens por omissão.
     pub max_tokens: Option<u32>,
     /// Temperatura por omissão.
     pub temperature: Option<f32>,
+    /// Nome do cabeçalho de afinidade.
+    pub session_header: Option<String>,
+    /// Catálogo `model → dialeto` da definição declarativa.
+    pub catalog: Catalog,
 }
 
 impl OpenCodeConfig {
     /// Zen (pay-as-you-go).
     #[must_use]
     pub fn zen(api_key: impl Into<String>) -> Self {
-        Self::at("https://opencode.ai/zen/v1", api_key)
+        Self::from_spec(&ProviderSpec::opencode_zen(), api_key)
     }
 
     /// Go (subscrição).
     #[must_use]
     pub fn go(api_key: impl Into<String>) -> Self {
-        Self::at("https://opencode.ai/zen/go/v1", api_key)
+        Self::from_spec(&ProviderSpec::opencode_go(), api_key)
     }
 
     /// Gateway arbitrário (útil em testes/self-hosted).
@@ -85,6 +68,22 @@ impl OpenCodeConfig {
             dialect: Dialect::ChatCompletions,
             max_tokens: None,
             temperature: None,
+            session_header: Some("x-opencode-session".to_string()),
+            catalog: Catalog::new(),
+        }
+    }
+
+    /// Constrói a partir de uma definição declarativa (a chave é injetada).
+    fn from_spec(spec: &ProviderSpec, api_key: impl Into<String>) -> Self {
+        Self {
+            base_url: spec.base_url.clone(),
+            api_key: api_key.into(),
+            session: None,
+            dialect: spec.engine.dialect(),
+            max_tokens: None,
+            temperature: None,
+            session_header: spec.session_id_header.clone(),
+            catalog: spec.catalog(),
         }
     }
 
@@ -95,36 +94,44 @@ impl OpenCodeConfig {
         self
     }
 
-    /// Fixa o dialeto.
+    /// Substitui a base do gateway.
+    #[must_use]
+    pub fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
+        self.base_url = base_url.into();
+        self
+    }
+
+    /// Fixa o dialeto por omissão.
     #[must_use]
     pub fn with_dialect(mut self, dialect: Dialect) -> Self {
         self.dialect = dialect;
         self
     }
 
-    /// Endpoint + cabeçalhos do dialeto.
+    /// Substitui o catálogo.
+    #[must_use]
+    pub fn with_catalog(mut self, catalog: Catalog) -> Self {
+        self.catalog = catalog;
+        self
+    }
+
+    /// Endpoint + cabeçalhos do dialeto por omissão.
     #[must_use]
     pub fn endpoint(&self) -> Endpoint {
-        let mut headers = vec![
-            (
-                "authorization".to_string(),
-                format!("Bearer {}", self.api_key),
-            ),
-            ("content-type".to_string(), "application/json".to_string()),
-            ("accept".to_string(), "text/event-stream".to_string()),
-            // Latência primeiro: sem compressão de transporte.
-            ("accept-encoding".to_string(), "identity".to_string()),
-            (
-                "user-agent".to_string(),
-                format!("katu/{}", env!("CARGO_PKG_VERSION")),
-            ),
-        ];
-        if let Some(session) = &self.session {
-            headers.push(("x-opencode-session".to_string(), session.clone()));
-        }
-        Endpoint {
-            url: format!("{}/chat/completions", self.base_url.trim_end_matches('/')),
-            headers,
+        engine::endpoint(&self.wire(None), Dialect::ChatCompletions)
+    }
+
+    /// Vista de wire (para o despacho).
+    fn wire<'a>(&'a self, entry: Option<&'a ModelEntry>) -> WireConfig<'a> {
+        WireConfig {
+            base_url: &self.base_url,
+            api_key: Some(self.api_key.as_str()),
+            session: self.session.as_deref(),
+            session_header: self.session_header.as_deref(),
+            entry,
+            reasoning_format: None,
+            max_tokens: self.max_tokens,
+            temperature: self.temperature,
         }
     }
 }
@@ -154,10 +161,25 @@ impl<T: Transport> OpenCode<T> {
         self
     }
 
+    /// Fixa a sessão de afinidade (atalho).
+    #[must_use]
+    pub fn with_session(mut self, session: impl Into<String>) -> Self {
+        self.config = self.config.with_session(session);
+        self
+    }
+
     /// Configuração em uso.
     #[must_use]
     pub fn config(&self) -> &OpenCodeConfig {
         &self.config
+    }
+
+    /// Pré-aquece a ligação (TCP/TLS) ao gateway; ignora erros.
+    ///
+    /// É uma otimização de latência: a ligação quente no *pool* evita o *handshake* no 1.º turno.
+    pub fn warm(&self) {
+        self.transport
+            .warm(&engine::models_request(&self.config.wire(None)));
     }
 }
 
@@ -178,22 +200,14 @@ impl<T: Transport> Provider for OpenCode<T> {
             "model" => request.model.model.as_str(),
             "dialect" => self.config.dialect.as_str(),
         );
-        let mut request = request.clone();
-        if request.max_tokens.is_none() {
-            request.max_tokens = self.config.max_tokens;
-        }
-        if request.temperature.is_none() {
-            request.temperature = self.config.temperature;
-        }
-        match self.config.dialect {
-            Dialect::ChatCompletions => openai::stream_chat(
-                &self.transport,
-                &self.config.endpoint(),
-                &request,
-                &self.retry,
-                sink,
-            ),
-            other => Err(ProviderError::Unsupported(other.as_str().to_string())),
-        }
+        let entry = self.config.catalog.lookup(&request.model.model);
+        let dialect = entry.map_or(self.config.dialect, |entry| entry.dialect);
+        let dispatch = Dispatch {
+            wire: self.config.wire(entry),
+            dialect,
+            request,
+            retry: &self.retry,
+        };
+        engine::stream(&self.transport, &dispatch, sink)
     }
 }

@@ -5,11 +5,33 @@ use katu_core::provider::{ProviderError, ProviderRequest, Thinking, ToolDef};
 use katu_policy::{SearchMode, ToolArgs, ToolName, ToolUse};
 use serde_json::{Map, Value, json};
 
+use crate::catalog::MaxTokensField;
+
+/// Parametrização do wire que não vem do pedido (modelo/catálogo/config).
+#[derive(Debug, Clone, Default)]
+pub(crate) struct EncodeOptions {
+    /// Campo do teto de tokens de saída.
+    pub max_tokens_field: MaxTokensField,
+    /// `prompt_cache_key` (cache de prefixo; famílias `OpenAI`).
+    pub prompt_cache_key: Option<String>,
+    /// `prompt_cache_retention` (ex.: `"24h"`).
+    pub prompt_cache_retention: Option<String>,
+    /// `reasoning_format` (`llama.cpp`: `"parsed"`).
+    pub reasoning_format: Option<String>,
+    /// Teto de tokens por omissão do provider (usado se o pedido não trouxer).
+    pub default_max_tokens: Option<u32>,
+    /// Temperatura por omissão do provider (usada se o pedido não trouxer).
+    pub default_temperature: Option<f32>,
+}
+
 /// Serializa o pedido completo (JSON) para o endpoint.
 ///
 /// # Errors
 /// [`ProviderError::Decode`] se a serialização falhar (nunca em prática).
-pub(crate) fn encode_request(request: &ProviderRequest) -> Result<String, ProviderError> {
+pub(crate) fn encode_request(
+    request: &ProviderRequest,
+    options: &EncodeOptions,
+) -> Result<String, ProviderError> {
     let mut messages = Vec::new();
     if let Some(system) = request.system.as_deref().filter(|s| !s.is_empty()) {
         messages.push(json!({"role": "system", "content": system}));
@@ -29,11 +51,23 @@ pub(crate) fn encode_request(request: &ProviderRequest) -> Result<String, Provid
         let tools = request.tools.iter().map(encode_tool).collect();
         body.insert("tools".to_string(), Value::Array(tools));
     }
-    if let Some(max_tokens) = request.max_tokens {
-        body.insert("max_tokens".to_string(), json!(max_tokens));
+    if let Some(max_tokens) = request.max_tokens.or(options.default_max_tokens) {
+        body.insert(
+            options.max_tokens_field.as_str().to_string(),
+            json!(max_tokens),
+        );
     }
-    if let Some(temperature) = request.temperature {
+    if let Some(temperature) = request.temperature.or(options.default_temperature) {
         body.insert("temperature".to_string(), json!(f64::from(temperature)));
+    }
+    if let Some(key) = options.prompt_cache_key.as_deref() {
+        body.insert("prompt_cache_key".to_string(), json!(key));
+    }
+    if let Some(retention) = options.prompt_cache_retention.as_deref() {
+        body.insert("prompt_cache_retention".to_string(), json!(retention));
+    }
+    if let Some(format) = options.reasoning_format.as_deref() {
+        body.insert("reasoning_format".to_string(), json!(format));
     }
     if let Some(effort) = thinking_effort(request.model.thinking) {
         body.insert("reasoning_effort".to_string(), json!(effort));
@@ -122,7 +156,7 @@ pub(crate) fn tool_arguments(tool: &ToolUse) -> Value {
 }
 
 /// Mapeia o grau de pensamento para `reasoning_effort` (dialeto `OpenAI`).
-fn thinking_effort(thinking: Thinking) -> Option<&'static str> {
+pub(crate) fn thinking_effort(thinking: Thinking) -> Option<&'static str> {
     match thinking {
         Thinking::Low => Some("low"),
         Thinking::Medium => Some("medium"),

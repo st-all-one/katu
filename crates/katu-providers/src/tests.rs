@@ -120,7 +120,7 @@ fn opencode_go_sets_session_header() {
 fn unimplemented_dialects_are_explicit() {
     let transport = MockTransport::ok("", 4);
     let config =
-        OpenCodeConfig::at("https://example.invalid/v1", "k").with_dialect(Dialect::Messages);
+        OpenCodeConfig::at("https://example.invalid/v1", "k").with_dialect(Dialect::Google);
     let provider = OpenCode::new(transport, config);
     let mut sink = CollectSink::default();
     let result = provider.stream(&request("m"), &mut sink);

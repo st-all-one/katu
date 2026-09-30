@@ -9,6 +9,8 @@
 
 use katu_core::provider::{Flow, ProviderError};
 
+use crate::error::sanitize;
+
 /// Método HTTP (só o que o endpoint de modelo precisa).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Method {
@@ -77,14 +79,17 @@ impl From<TransportError> for ProviderError {
     fn from(error: TransportError) -> Self {
         match error {
             TransportError::Timeout { millis } => Self::Timeout { millis },
-            TransportError::Io(source) => Self::Transport(source.to_string()),
-            TransportError::Protocol(message) => Self::Transport(message),
+            TransportError::Io(source) => Self::Transport(sanitize(&source.to_string())),
+            TransportError::Protocol(message) => Self::Transport(sanitize(&message)),
         }
     }
 }
 
 /// Consumidor de bytes do corpo (deltas). Devolve [`Flow::Break`] para cancelar já.
 pub type ChunkSink<'a> = dyn FnMut(&[u8]) -> Flow + 'a;
+
+/// Teto de drenagem do [`Transport::warm`] (devolve a ligação ao *pool* sem ler tudo).
+const WARM_DRAIN_LIMIT: usize = 16 * 1024;
 
 /// Transporte substituível para um endpoint de modelo.
 pub trait Transport: Send + Sync {
@@ -115,6 +120,22 @@ pub trait Transport: Send + Sync {
             Flow::Continue
         })?;
         Ok((meta.status, body))
+    }
+
+    /// Pré-aquece a ligação (TCP/TLS) ao endpoint, drenando o corpo até um teto.
+    ///
+    /// É uma **otimização**, não um contrato: erros são ignorados e o objetivo é deixar a
+    /// ligação quente no *pool* antes do primeiro turno. O provider **não** toca o relógio.
+    fn warm(&self, request: &HttpRequest) {
+        let mut total = 0_usize;
+        let _sent = self.send(request, &mut |chunk| {
+            total = total.saturating_add(chunk.len());
+            if total >= WARM_DRAIN_LIMIT {
+                Flow::Break
+            } else {
+                Flow::Continue
+            }
+        });
     }
 }
 

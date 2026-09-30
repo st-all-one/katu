@@ -31,6 +31,7 @@
 | [0009](0009-auditoria-densa.md) | Auditoria densa e pesquisável (`.katu/audit`, completa sob compactação) | aceite |
 | [0010](0010-porta-memory-e-substituibilidade.md) | Memória de primeira classe e substituível (porta `Memory` + adaptador knudge) | aceite |
 | [0011](0011-porta-provider-e-builtin-opencode.md) | Porta `Provider` e built-in `opencode go/zen` sobre transporte bloqueante | aceite |
+| [0012](0012-catalogo-dialetos-e-providers-declarativos.md) | Catálogo de dialetos e providers declarativos | aceite |
 
 ## Template
 

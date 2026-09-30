@@ -74,10 +74,10 @@ Ambos tratam o opencode como **gateway OpenAI-compatible** com o mesmo truque de
   `Retry-After`; o `http_status.rs` normaliza erros e extrai `retry_after_seconds` do corpo.
 
 **Adotado no katu:** o mesmo seam (`engine: openai` + `x-opencode-session`), o retry classificado
-com `x-should-retry`/`Retry-After` e os limites do opencode como permanentes, e o `usage` robusto
-(`prompt_tokens_details.cached_tokens` ?? `prompt_cache_hit_tokens`). **Por adotar:** catálogo de
-modelos com dialeto por modelo (E12-T06/T10), `prompt_cache_key` para famílias OpenAI e a via
-declarativa GDK (E12-T02).
+com `x-should-retry`/`Retry-After` (segundos, ms ou data `HTTP`) e os limites do opencode como
+permanentes, o `usage` robusto de cache, o **catálogo `model → dialeto`** e a via **declarativa**
+(`ProviderSpec` + JSON; ADR 0012). Os dialetos `responses`/`messages` estão implementados;
+**por adotar:** `google`/WebSocket, `dynamic_models` e `Control::SetModel` (E12-T10).
 
 ---
 
@@ -112,22 +112,24 @@ declarativa GDK (E12-T02).
 
 ## Tarefas
 
-### E12-T01 ◐ Port `Provider` e adaptador built-in
+### E12-T01 ☑ Port `Provider` e adaptador built-in
 - **Entregáveis:** trait `Provider` (streaming normalizado, tool calling, contagem de custo/tokens);
   adaptador **built-in `opencode go/zen`** como provider por omissão do MVP — o hot path de E12-T06;
   o `llama.cpp` local é o segundo built-in (E12-T08/T09); os demais providers ficam para E12-T02
   (GDK).
 - **Estado:** porta em `katu_core::provider` (núcleo sem dependência de provider) e adaptadores em
-  `katu-providers`; built-in `opencode` e `llama` pelo dialeto `chat/completions`. O fake cobre o
-  loop sem rede. Os dialetos extra são E12-T06.
+  `katu-providers`; built-in `opencode` e `llama` pelo dialeto `chat/completions`, com catálogo
+  `model → dialeto` (ADR 0012). O fake cobre o loop sem rede.
 - **Aceite:** o núcleo compila com a feature do provider desligada; `xtask check-layers` falha se
   um crate de provider entrar em `core`/`policy`/`tools`.
 
-### E12-T02 ☐ Integração com GDK/declarativo (demais providers)
-- **Entregáveis:** uso de `goose-provider-types`/`goose-providers` (declarativo: um JSON por
-  provider OpenAI/Anthropic/Ollama-compatível) para os **demais** providers, isolados atrás do
-  trait próprio; `goose-context-management` só como fonte de compaction **off-path**; versão
-  pinada (`0.1.0-alpha.11`, R1).
+### E12-T02 ◐ Providers declarativos (commodity)
+- **Entregáveis:** formato declarativo (`engine`/`base_url`/catálogo) para os **demais** providers,
+  isolado atrás do trait próprio; `goose-context-management` só como fonte de compaction **off-path**.
+- **Estado:** `ProviderSpec` + `providers/*.json` (opencode zen/go, openai) e `Declarative<T>`,
+  reusando os adaptadores de dialeto (ADR 0012). A integração direta com o GDK `goose` foi
+  **rejeitada** (risco R1, `tokio`/`reqwest`/tipos externos). Falta ler o catálogo do endpoint
+  (`dynamic_models`) e cobrir mais dialetos.
 - **Aceite:** trocar a fonte de commodity muda só o adaptador; nenhum tipo externo na API do katu;
   o caminho built-in (`opencode go/zen`) **não** passa pelo GDK.
 
@@ -165,9 +167,10 @@ declarativa GDK (E12-T02).
   `chunkTimeout` próprio; header `x-opencode-session` para afinidade; streaming incremental por
   delta (texto parcial) e tool calls **completas** (paridade com `MessageStream` do GDK);
   cancelamento imediato; zero re-encode; reconexão explícita.
-- **Estado:** `chat/completions` ponta-a-ponta (SSE incremental, tool calls completas,
-  `x-opencode-session`, keep-alive/`TCP_NODELAY`, sem compressão); `responses`/`messages`/`google`
-  e WebSocket explícitos `Unsupported`.
+- **Estado:** `chat/completions`, `responses` e `messages` normalizados pelo mesmo `wire`,
+  com retry/erro partilhados; `x-opencode-session`, keep-alive/`TCP_NODELAY`, sem compressão;
+  catálogo `model → dialeto` (ADR 0012). `google` e WebSocket/HTTP2 explícitos `Unsupported`;
+  `responses`/`messages` ainda sem validação ao vivo.
 - **Aceite:** TTFT dentro do orçamento (E12-T07); nenhum buffer integral da resposta; cancelar
   interrompe o stream e não vaza conexão/tarefa; a sessão mantém afinidade via
   `x-opencode-session`.
@@ -199,7 +202,7 @@ declarativa GDK (E12-T02).
 - **Aceite:** TTFT in-process ≤ ao caminho HTTP/WebSocket (E12-T07) na mesma máquina; desligar a
   feature remove o crate do grafo; Miri/geiger verdes (E13-T04).
 
-### E12-T10 ☐ Controlo de modelo e grau de pensamento
+### E12-T10 ◐ Controlo de modelo e grau de pensamento
 - **Objetivos:** cumprir o core §1.1 #11 — alterar **modelo** e **grau de pensamento**
   (reasoning/thinking) em runtime, sem reiniciar a sessão.
 - **Entregáveis:** `Control::{SetModel, SetThinking}` no kernel; mapeamento por dialeto
@@ -207,6 +210,9 @@ declarativa GDK (E12-T02).
   no Google, equivalente no `llama.cpp`); só os built-in (`opencode go/zen`, `llama.cpp`) expõem a
   capacidade — os demais via GDK quando suportarem; **o utilizador** aciona; o agente **não** se
   auto-escala (custo/qualidade) e, se pedir, vira `NeedsHuman`.
+- **Estado:** o `Catalog` já expõe `model → {dialect, context_limit, reasoning}` e o wire aceita
+  `reasoning_effort`/`reasoning_format` por modelo; falta o `Control::{SetModel, SetThinking}` no
+  kernel e a recusa que ensina para grau inválido.
 - **Aceite:** trocar de modelo a meio da sessão preserva log/estado (só muda o provider do próximo
   turno); grau de pensamento inválido para o modelo é recusado com erro que ensina; nenhum caminho
   deixa o agente escolher um modelo mais caro sem aprovação.

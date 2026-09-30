@@ -20,6 +20,8 @@
     reason = "módulos internos usam pub(crate); a API pública é a reexportação em `lib.rs`"
 )]
 
+pub mod catalog;
+pub mod declarative;
 pub mod fake;
 pub mod http;
 pub mod llama;
@@ -30,11 +32,19 @@ pub mod sse;
 pub mod transport;
 pub mod usage;
 
+mod anthropic;
+mod engine;
+mod error;
+mod responses;
+mod wire;
+
+pub use catalog::{Catalog, Dialect, MaxTokensField, ModelEntry};
+pub use declarative::{Declarative, Engine, ProviderSpec, SpecError};
 pub use fake::{FakeProvider, Turn};
 pub use http::UreqTransport;
 pub use llama::{Llama, LlamaConfig};
 pub use openai::Endpoint;
-pub use opencode::{Dialect, OpenCode, OpenCodeConfig};
+pub use opencode::{OpenCode, OpenCodeConfig};
 pub use retry::RetryPolicy;
 pub use transport::{
     ChunkSink, HttpMeta, HttpRequest, Method, MockTransport, Transport, TransportError,

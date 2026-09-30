@@ -7,7 +7,7 @@
 ## 0. Snapshot
 
 - **6 crates + `xtask`**: `katu-policy`, `katu-core`, `katu-tools`, `katu` (bin), `katu-providers`, `katu-tui`*.
-- **435 testes** · catálogo de instrumentação **73 ids** · **11 tools** · **8 regras** (5 memória + 3 contenção) · **11 ADRs**.
+- **451 testes** · catálogo de instrumentação **73 ids** · **11 tools** · **8 regras** (5 memória + 3 contenção) · **12 ADRs**.
 - `make check` verde (fmt + clippy `-D warnings` + testes + `check-layers` + `check-diag` + `check-schemas` + `check-docs` + `check-memory-swap` + `policy:audit` + `gate:bench` + file-length ≤300) · `make instrument` verde.
 - **O MVK passou** ([ADR 0001](docs/adr/0001-mvk-gate-aprovado.md)); o kernel (E04) e a política (E02) estão completos.
 
@@ -25,7 +25,7 @@
 - **Saída ao modelo colunar v3** (ADR 0006/0007): **sem headers** no *stream* (o prime v3 é o registo de esquema, re-emitido no início e após compactação), blocos literais (`\x1d`) para código, escalares explícitos em `k`, domínios no registo e **aliases de sessão** `#N`/`@N` (lazy, limiar 3). Projeções model-facing canónicas de `ToolOutcome`/`Error`/`VerificationReport`; digest de compactação em tabela `m` (sem `Debug`); catálogo de tools no prime (`prime_with_catalog`, anti-drift). JSON de máquina inalterado.
 - **Sessões e auditoria** (ADR 0008/0009): sessões vinculadas ao projeto em `.katu/sessions/<id>` (id `s_<16hex>` determinístico, índice temporal `(created_ms, id)`, **snapshot de estado com offset** por fase — inclui o histórico temporal `rolling`/`velocity` que o log não reproduz —, retomada que lê só a cauda, `Session::create`/`resume`/`list`); auditoria permanente e pesquisável em `.katu/audit` (**segmentos colunares imutáveis** + **índice invertido binário `KAI1`** com posições e **Bloom** por segmento — termos, frases, filtros), local e em `.git/info/exclude`.
 - **Memória de primeira classe** (ADR 0010): porta `Memory` com tipos do katu + adaptador in-process sobre `knudge-core` isolado no binário (`src/memory/`); `Runtime::open` (`src/runtime.rs`) monta a sessão com o adaptador e **recusa arrancar** sem memória saudável (fail-closed, E03-T03/T07); `katu remember`/`katu recall` exercitam o caminho §42; gate `check-memory-swap` (E03-T06).
-- **Providers** (ADR 0011): porta `Provider` em `katu_core::provider` (o núcleo **não** depende de provider) e adaptadores em `katu-providers` — built-in `opencode go/zen` e `llama-server` no dialeto `chat/completions` (SSE incremental, tool calls completas, `x-opencode-session`, `TCP_NODELAY`, sem compressão de transporte); `FakeProvider`/`MockTransport` cobrem o loop sem rede; e2e com chave **auto-*skip***; `xtask provider-smoke` mede TTFT/usage; retry classificado (transitórios vs conta/quota, só antes do 1.º delta, honrando `Retry-After`) e `usage` robusto de cache.
+- **Providers** (ADR 0011/0012): porta `Provider` em `katu_core::provider` (o núcleo **não** depende de provider) e adaptadores em `katu-providers` — built-in `opencode go/zen` e `llama-server`; **catálogo `model → dialeto`** e **providers declarativos** (`ProviderSpec` + JSON), com `chat/completions`, `responses` e `messages` (SSE incremental, tool calls completas, `x-opencode-session`, `TCP_NODELAY`, sem compressão); `FakeProvider`/`MockTransport` cobrem o loop sem rede; e2e com chave **auto-*skip***; `xtask provider-smoke` mede TTFT/usage; retry classificado (transitórios vs conta/quota, só antes do 1.º delta, `Retry-After` em segundos/ms/data) e `usage` robusto de cache.
 
 ---
 
@@ -55,13 +55,15 @@
 | **E09-T05** | ◐ | `Metric`/portão de publicação — fecho. |
 | **E09-T07** | ◐ | Comando do utilizador para compactar (CLI/TUI); gatilho do kernel feito. |
 | **E10-T01…T07** | ☐ | **CLI/TUI inteira** (ratatui/crossterm, keymap, render, superfície de política, checkpoint). |
-| **E12-T01** | ◐ | Porta no núcleo + adaptadores `opencode`/`llama` (dialeto `chat/completions`); falta o binário ligar o loop. |
+| **E12-T01** | ☑ | Porta no núcleo + adaptadores `opencode`/`llama` com catálogo `model → dialeto`; falta o binário ligar o loop. |
+| **E12-T02** | ◐ | Formato declarativo próprio (`ProviderSpec`+JSON) e `Declarative<T>`; GDK `goose` rejeitado (ADR 0012); falta `dynamic_models`. |
 | **E12-T03** | ◐ | `TokenUsage`/`PriceTable` (base `provider_reported`, `unpriced`); falta `Metric`/tier. |
 | **E12-T04** | ☑ | Retry classificado (transitório vs conta/quota) só antes do 1.º delta, honrando `Retry-After`; timeout + cancelamento. |
 | **E12-T05** | ◐ | `FakeProvider`+`MockTransport`; falta ligar ao loop de turnos com tool execution (E10). |
-| **E12-T06** | ◐ | `chat/completions` ponta-a-ponta; faltam `responses`/`messages`/`google`/WebSocket. |
+| **E12-T06** | ◐ | `chat/completions`+`responses`+`messages` pelo mesmo `wire`; faltam `google`/WebSocket e validação ao vivo. |
 | **E12-T07** | ◐ | `xtask provider-smoke` mede TTFT/total/usage; falta artefacto commitado e gate. |
 | **E12-T08** | ☑ | `llama-server` (L1) pelo mesmo trait; smoke real com Qwen2.5-Coder-1.5B Q4_K_M. |
+| **E12-T10** | ◐ | `Catalog` com dialeto/contexto/reasoning e `reasoning_effort`/`reasoning_format` por modelo; falta `Control::SetModel`. |
 | **E13-T01…T07** | ☐ | Camadas de teste, teste real por regra, regressão invertida, Miri/geiger/machete, goldens, matriz de aceitação. |
 | **E14-T02…T07** | ☐ | Postmortems, "um facto um lar", `policy/` versionado, teto de superfície, catálogos gerados, slices. |
 | **E15-T01** | ◐ | `criterion` + gate de performance no CI. |

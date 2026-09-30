@@ -1,19 +1,24 @@
 //! Política de retry do provider (E12-T04): só antes do primeiro evento ao modelo.
 //!
 //! Repõe, no modelo bloqueante, a política dos SDKs: estados transitórios (`408`/`409`/`429`/`5xx`)
-//! e falhas de transporte; respeita `x-should-retry` e `Retry-After`. Erros de conta/quota
-//! (opencode `GoUsageLimitError`/`FreeTierError`, `insufficient_quota`, …) são **permanentes** —
-//! repetir nunca ajudaria e só gastaria tempo. Um retry após qualquer delta emitido duplicaria
-//! texto, por isso nunca acontece.
+//! e falhas de transporte; respeita `x-should-retry` e `Retry-After` (segundos, milissegundos ou
+//! data `HTTP`, interpretada face ao `Date` da resposta — o provider não toca relógio). Erros de
+//! conta/quota (opencode `GoUsageLimitError`/`FreeTierError`, `insufficient_quota`, …) são
+//! **permanentes**: repetir só gastaria tempo. Um retry após qualquer delta duplicaria texto, por
+//! isso nunca acontece.
 
 use std::time::Duration;
+
+/// Teto absoluto de um atraso pedido pelo servidor (1 h): um `1e30` malformado degrada para
+/// "sem dica", nunca congela o agente.
+const MAX_DELAY: Duration = Duration::from_secs(3600);
 
 /// Política de retry (bounded; sem jitter — um cliente, não uma manada).
 #[derive(Debug, Clone, Copy)]
 pub struct RetryPolicy {
     /// Tentativas extra (0 = sem retry). A primeira chamada não conta.
     pub max_retries: u32,
-    /// Atraso base; o atraso do `attempt` é `base * 2^attempt`, limitado a [`RetryPolicy::max_delay`].
+    /// Atraso base; o do `attempt` é `base * 2^attempt`, limitado a [`RetryPolicy::max_delay`].
     pub base_delay: Duration,
     /// Teto de qualquer atraso (inclui `Retry-After` do servidor).
     pub max_delay: Duration,
@@ -70,14 +75,35 @@ pub(crate) fn is_retryable(status: u16, headers: &[(String, String)], body: &str
     matches!(status, 408 | 409 | 425 | 429) || status >= 500
 }
 
-/// Extrai um atraso pedido pelo servidor (`Retry-After`/`Retry-After-Ms`), já limitado.
+/// Extrai um atraso pedido pelo servidor em cabeçalhos, já limitado a [`MAX_DELAY`].
+///
+/// Ordem: `Retry-After-Ms` → `Retry-After` (segundos) → `Retry-After` (data `HTTP`, descontando o
+/// cabeçalho `Date` da mesma resposta). Datas sem `Date` são ignoradas (o provider é puro).
 #[must_use]
 pub(crate) fn retry_after(headers: &[(String, String)]) -> Option<Duration> {
-    let millis = header(headers, "retry-after-ms").and_then(parse_secs);
-    let seconds = header(headers, "retry-after").and_then(parse_secs);
-    millis
-        .map(|ms| Duration::from_secs_f64(ms / 1000.0))
-        .or_else(|| seconds.map(Duration::from_secs_f64))
+    if let Some(millis) = header(headers, "retry-after-ms").and_then(parse_secs) {
+        return secs_to_duration(millis / 1000.0);
+    }
+    let raw = header(headers, "retry-after")?;
+    if let Some(seconds) = parse_secs(raw) {
+        return secs_to_duration(seconds);
+    }
+    let date = header(headers, "date").and_then(parse_http_date)?;
+    let target = parse_http_date(raw)?;
+    let seconds = u64::try_from(target.saturating_sub(date)).unwrap_or(0);
+    Some(Duration::from_secs(seconds).min(MAX_DELAY))
+}
+
+/// Extrai um atraso do **corpo** (`error.metadata.retry_after_seconds`, forma `OpenRouter`).
+#[must_use]
+pub(crate) fn body_retry_after(body: &str) -> Option<Duration> {
+    let value: serde_json::Value = serde_json::from_str(body).ok()?;
+    let seconds = value
+        .get("error")?
+        .get("metadata")?
+        .get("retry_after_seconds")?
+        .as_f64()?;
+    secs_to_duration(seconds)
 }
 
 /// Atraso do `attempt` (o pedido do servidor vence a exponencial), limitado ao teto.
@@ -91,6 +117,79 @@ pub(crate) fn delay(policy: &RetryPolicy, attempt: u32, requested: Option<Durati
         .base_delay
         .saturating_mul(factor)
         .min(policy.max_delay)
+}
+
+/// Converte segundos (finitos, não-negativos e limitados) num [`Duration`].
+fn secs_to_duration(seconds: f64) -> Option<Duration> {
+    if !seconds.is_finite() || seconds < 0.0 {
+        return None;
+    }
+    Some(Duration::from_secs_f64(
+        seconds.min(MAX_DELAY.as_secs_f64()),
+    ))
+}
+
+/// Interpreta uma data `IMF-fixdate` (`Sun, 06 Nov 1994 08:49:37 GMT`) em segundos `epoch`.
+fn parse_http_date(value: &str) -> Option<i64> {
+    let rest = value.split_once(", ").map_or(value, |(_, rest)| rest);
+    let mut parts = rest.split_whitespace();
+    let day = parts.next()?.parse::<i64>().ok()?;
+    let month = month_index(parts.next()?)?;
+    let year = parts.next()?.parse::<i64>().ok()?;
+    let mut clock = parts.next()?.split(':');
+    let hour = clock.next()?.parse::<i64>().ok()?;
+    let minute = clock.next()?.parse::<i64>().ok()?;
+    let second = clock.next()?.trim_end_matches(" GMT").parse::<i64>().ok()?;
+    let days = days_from_civil(year, month, day);
+    Some(
+        days.wrapping_mul(86_400)
+            .wrapping_add(hour.wrapping_mul(3_600))
+            .wrapping_add(minute.wrapping_mul(60))
+            .wrapping_add(second),
+    )
+}
+
+/// Índice do mês (1–12) a partir do nome abreviado em inglês.
+fn month_index(name: &str) -> Option<i64> {
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    MONTHS
+        .iter()
+        .position(|month| month.eq_ignore_ascii_case(name))
+        .map(|index| i64::try_from(index).unwrap_or(0).wrapping_add(1))
+}
+
+/// Dias desde `1970-01-01` (algoritmo de Howard Hinnant; `wrapping_*` porque as entradas são
+/// datas válidas e nunca chegam perto dos limites de `i64`).
+fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
+    let year = if month <= 2 {
+        year.wrapping_sub(1)
+    } else {
+        year
+    };
+    let era = (if year >= 0 {
+        year
+    } else {
+        year.wrapping_sub(399)
+    })
+    .wrapping_div(400);
+    let yoe = year.wrapping_sub(era.wrapping_mul(400));
+    let mp = month.wrapping_add(9).wrapping_rem(12);
+    let doy = 153_i64
+        .wrapping_mul(mp)
+        .wrapping_add(2)
+        .wrapping_div(5)
+        .wrapping_add(day)
+        .wrapping_sub(1);
+    let doe = yoe
+        .wrapping_mul(365)
+        .wrapping_add(yoe.wrapping_div(4))
+        .wrapping_sub(yoe.wrapping_div(100))
+        .wrapping_add(doy);
+    era.wrapping_mul(146_097)
+        .wrapping_add(doe)
+        .wrapping_sub(719_468)
 }
 
 /// Lê um cabeçalho (case-insensitive).
@@ -108,68 +207,4 @@ fn parse_secs(value: &str) -> Option<f64> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{RetryPolicy, delay, is_retryable, retry_after};
-    use std::time::Duration;
-
-    fn headers(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
-        pairs
-            .iter()
-            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-            .collect()
-    }
-
-    #[test]
-    fn transient_statuses_retry_but_account_limits_do_not() {
-        assert!(is_retryable(429, &[], "rate limited"));
-        assert!(is_retryable(503, &[], "overloaded"));
-        assert!(!is_retryable(
-            429,
-            &[],
-            r#"{"error":{"type":"FreeTierError"}}"#
-        ));
-        assert!(!is_retryable(400, &[], "bad request"));
-        assert!(!is_retryable(
-            500,
-            &headers(&[("x-should-retry", "false")]),
-            ""
-        ));
-        assert!(is_retryable(
-            418,
-            &headers(&[("x-should-retry", "true")]),
-            ""
-        ));
-    }
-
-    #[test]
-    fn retry_after_prefers_millis_and_caps_at_the_policy_ceiling() {
-        assert_eq!(
-            retry_after(&headers(&[("Retry-After", "2")])),
-            Some(Duration::from_secs(2))
-        );
-        assert_eq!(
-            retry_after(&headers(&[("retry-after-ms", "1500")])),
-            Some(Duration::from_millis(1500))
-        );
-        let policy = RetryPolicy {
-            max_delay: Duration::from_secs(5),
-            ..RetryPolicy::default()
-        };
-        assert_eq!(
-            delay(&policy, 0, Some(Duration::from_secs(60))),
-            Duration::from_secs(5)
-        );
-    }
-
-    #[test]
-    fn exponential_backoff_is_bounded() {
-        let policy = RetryPolicy {
-            max_retries: 5,
-            base_delay: Duration::from_millis(100),
-            max_delay: Duration::from_millis(250),
-        };
-        assert_eq!(delay(&policy, 0, None), Duration::from_millis(100));
-        assert_eq!(delay(&policy, 1, None), Duration::from_millis(200));
-        assert_eq!(delay(&policy, 2, None), Duration::from_millis(250));
-    }
-}
+mod tests;
