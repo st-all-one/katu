@@ -11,6 +11,9 @@
 
 mod cli;
 
+#[cfg(feature = "memory-in-process")]
+mod agent;
+
 #[cfg(feature = "profile")]
 mod diag;
 

@@ -45,6 +45,8 @@ A camada de **providers**: o caminho built-in first-party é nosso; o resto é c
 - **Instrumentação** (DF9): span `provider.request`, eventos `provider.ttft`, `provider.chunk`,
   `provider.retry`, `provider.error`. O TTFT real é medido pelo consumidor (o provider não toca
   relógio).
+- **Latência** (E12-T07): `xtask provider-smoke`/`bench-provider` medem TTFT/overhead; artefacto
+  cru em `bench/providers/latency.json` e gate de orçamento `xtask gate:provider` (ADR 0014).
 
 ## Seam
 

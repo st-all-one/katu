@@ -33,6 +33,8 @@
 | [0011](0011-porta-provider-e-builtin-opencode.md) | Porta `Provider` e built-in `opencode go/zen` sobre transporte bloqueante | aceite |
 | [0012](0012-catalogo-dialetos-e-providers-declarativos.md) | Catálogo de dialetos e providers declarativos | aceite |
 | [0013](0013-cache-de-prefixo-e-compressao-de-pedido.md) | Cache de prefixo por modelo e compressão de pedido (medida) | aceite |
+| [0014](0014-orcamento-de-latencia-do-provider.md) | Orçamento de latência do provider: gate offline determinístico | aceite |
+| [0015](0015-loop-de-turnos-e-roteador.md) | Loop de turnos e roteador de tool calls | aceite |
 
 ## Template
 

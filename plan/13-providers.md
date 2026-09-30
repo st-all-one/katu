@@ -157,12 +157,15 @@ bloqueado pelo `ureq` (HTTP/1.1). Os dialetos `responses`/`messages` estão impl
   texto); limites de conta/quota do opencode são permanentes.
 - **Aceite:** provider que trava é cancelado sem vazar tarefa; retry não duplica efeito.
 
-### E12-T05 ◐ Testes com provider fake e snapshot
+### E12-T05 ☑ Testes com provider fake e snapshot
 - **Entregáveis:** provider fake determinístico para o loop (E04/E05); replay de sessão gravada
   sem chave; política explícita "inference is cheap here — não racionar" nos e2e com chave.
 - **Estado:** `FakeProvider` (turnos guionados) e `MockTransport` (SSE canónico) cobrem o caminho
-  sem rede; e2e com chave **auto-*skip*** (`KATU_OPENCODE_KEY`/`KATU_LLAMA_URL`). Falta ligar o
-  fake ao loop de turnos com tool execution (E10).
+  sem rede; e2e com chave **auto-*skip*** (`KATU_OPENCODE_KEY`/`KATU_LLAMA_URL`). O **loop de
+  turnos** liga o provider ao kernel com tool execution pela ordem §42 (`katu run`; roteador
+  fail-closed em `crates/katu/src/agent/`; ADR 0015): o histórico é a projeção do log, as tool
+  calls são logadas antes de executar e o resultado volta ao modelo. Testes de loop correm sem
+  rede (fake + `MemFs`); e2e real verificado contra o `llama-server` e o built-in `opencode-go`.
 - **Aceite:** todo teste de loop corre sem rede; o e2e com chave auto-*skip* sem credencial.
 
 ### E12-T06 ◐ Adaptador built-in `opencode go/zen` (hot path)
@@ -186,7 +189,9 @@ bloqueado pelo `ureq` (HTTP/1.1). Os dialetos `responses`/`messages` estão impl
   e bytes de rede; `Metric` com base tipada (DF5) — tokens `provider_reported` quando vierem do
   provider, `inferred` quando estimados.
 - **Estado:** instrumento dev-only `xtask provider-smoke` mede TTFT/total/usage contra o built-in
-  e o `llama-server`; falta o artefacto commitado e o gate de regressão.
+  e o `llama-server`; **artefacto commitado** (`bench/providers/latency.json`, offline +
+  live) e **gate de orçamento** (`xtask gate:provider` no `make check`; dado em
+  `bench/providers/budget.toml`). Protocolo/relatório em `bench/providers/` (ADR 0014).
 - **Aceite:** artefacto commitado por número; regressão > X% falha o gate (E15); a linha em que a
   compressão teria poupado bytes mas foi preterida pela latência fica **visível** (negativo/
   `unpriced`), conforme DF5.

@@ -1,0 +1,10 @@
+# Orçamento de latência do provider (E12-T07 / F4-E18-T04).
+#
+# Dados **versionados** (a política de latência é um dado, não uma constante de código): o gate
+# `xtask gate:provider` compara a medição offline contra estes limites e falha acima deles.
+# Percentis variam por máquina; o orçamento tem folga para não ser um portão de hardware — trava
+# **regressões grosseiras** (ex.: um clone/buffer que reintroduza custo O(história) por turno).
+
+[provider]
+# p95 do overhead de cliente por turno (encode + decode + eventos), offline, em nanossegundos.
+client_overhead_p95_nanos = 5_000_000

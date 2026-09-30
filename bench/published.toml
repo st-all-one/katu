@@ -48,3 +48,37 @@ name = "mvk.cross_tool.gain_ratio"
 value = 0.0
 unit = "ratio"
 basis = "unpriced"
+
+# --- Latência do provider (E12-T07 / F4-E18-T04) ---
+# Protocolo em `bench/providers/PROTOCOL.md`; artefacto cru em `bench/providers/latency.json`.
+# O overhead de cliente é offline (MockTransport, determinístico); o TTFT é live contra o
+# `llama-server` local (CPU) — percentis variam por máquina, a razão de cache é `provider_reported`.
+
+[[metrics]]
+name = "provider.client_overhead.p95_nanos"
+value = 2181985.0
+unit = "nanos"
+basis = "measured"
+artifact = { path = "bench/providers/latency.json", note = "p95 do turno offline (encode+decode+eventos), 30 reps" }
+
+[[metrics]]
+name = "provider.ttft.llama.p50_ms"
+value = 48.0
+unit = "millis"
+basis = "measured"
+artifact = { path = "bench/providers/latency.json", note = "TTFT p50 contra `llama-server` local (Qwen2.5-Coder-1.5B, CPU)" }
+
+[[metrics]]
+name = "provider.cache_hit_ratio.llama"
+value = 0.9523809523809523
+unit = "ratio"
+basis = "provider_reported"
+artifact = { path = "bench/providers/latency.json", note = "`cached_tokens`/`prompt_tokens` reportados pelo endpoint" }
+
+# Negativo (ADR 0013): a compressão do pedido pouparia bytes, mas os endpoints rejeitam-na
+# (opencode 401, llama 415) e foi preterida pela latência. O negativo fica visível, não escondido.
+[[metrics]]
+name = "provider.request_compression.saved_ratio"
+value = 0.0
+unit = "ratio"
+basis = "unpriced"

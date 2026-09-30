@@ -26,6 +26,7 @@ mod docs;
 mod ledger;
 mod memory_swap;
 mod policy;
+mod provider_bench;
 mod provider_smoke;
 mod schemas;
 mod session_bench;
@@ -80,11 +81,16 @@ fn main() -> ExitCode {
             provider_smoke::run(&rest);
             Ok(())
         }
+        Some("bench-provider") => {
+            provider_bench::run(&rest);
+            Ok(())
+        }
+        Some("gate:provider") => provider_bench::gate(&rest),
         #[cfg(feature = "tokenizer")]
         Some("bench-toon") => toon_bench::run(),
         Some(other) => Err(format!("tarefa desconhecida: {other}")),
         None => Err(
-            "uso: xtask <check-layers|check-crate-coverage|check-diag|check-schemas|check-docs|check-memory-swap|gate:bench|policy:audit|ledger:validate|bench-audit|bench-resume|provider-smoke>"
+            "uso: xtask <check-layers|check-crate-coverage|check-diag|check-schemas|check-docs|check-memory-swap|gate:bench|gate:provider|policy:audit|ledger:validate|bench-audit|bench-resume|bench-provider|provider-smoke>"
                 .to_string(),
         ),
     };

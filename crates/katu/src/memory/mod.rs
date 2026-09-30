@@ -5,6 +5,7 @@
 //! cache e são invalidados por cada escrita. O core do knudge é síncrono — o caminho async
 //! envolve-o com `spawn_blocking` + timeout (E03-T04).
 
+pub(crate) mod commands;
 mod translate;
 
 use std::path::{Path, PathBuf};

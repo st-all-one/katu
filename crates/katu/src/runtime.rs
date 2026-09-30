@@ -8,8 +8,8 @@ use std::path::Path;
 
 use katu_core::error::Error;
 use katu_core::kernel::{
-    CallContext, CallId, Dispatch, Event, MemoryWriteRequest, Session, SessionError, discover_root,
-    memory_recall_use,
+    CallContext, CallId, Dispatch, Event, MemoryWriteRequest, Message, Session, SessionError,
+    SessionId, discover_root, memory_recall_use,
 };
 use katu_core::memory::{Anchor, Memory, MemoryError, NoteType, PreWriteReq, RecallReq};
 use katu_core::ports::{Clock, Fs};
@@ -48,12 +48,12 @@ impl From<RuntimeError> for Error {
 
 /// Runtime de uma sessão com memória real (in-process) e regras do protocolo.
 pub(crate) struct Runtime<'a> {
-    clock: &'a dyn Clock,
-    session: Session<'a>,
-    memory: KnudgeMemory,
-    rules: RuleSet,
-    cwd: ResolvedPath,
-    calls: u64,
+    pub(crate) clock: &'a dyn Clock,
+    pub(crate) session: Session<'a>,
+    pub(crate) memory: KnudgeMemory,
+    pub(crate) rules: RuleSet,
+    pub(crate) cwd: ResolvedPath,
+    pub(crate) calls: u64,
 }
 
 impl<'a> Runtime<'a> {
@@ -88,6 +88,53 @@ impl<'a> Runtime<'a> {
     /// Raiz do projeto vinculada (delegada ao log/sessão).
     pub(crate) fn root(&self) -> &Path {
         self.session.root()
+    }
+
+    /// Histórico visível ao modelo (projeção do log, §42).
+    ///
+    /// # Errors
+    /// [`SessionError`] se o log estiver corrompido.
+    pub(crate) fn messages(&self) -> Result<Vec<Message>, SessionError> {
+        self.session.messages()
+    }
+
+    /// Turno corrente (o turno é aberto por [`Runtime::open`]).
+    pub(crate) fn turn(&self) -> u32 {
+        self.session.state().turn
+    }
+
+    /// Identificador estável da sessão (afinidade do provider).
+    #[must_use]
+    pub(crate) fn session_id(&self) -> Option<&str> {
+        self.session.id().map(SessionId::as_str)
+    }
+
+    /// Loga a mensagem do utilizador.
+    ///
+    /// # Errors
+    /// [`SessionError`] se o evento não puder ser logado.
+    pub(crate) fn record_user(&mut self, text: &str) -> Result<(), SessionError> {
+        self.session.apply(&Event::UserMessage {
+            text: text.to_string(),
+        })
+    }
+
+    /// Loga a mensagem do assistente (resposta do modelo).
+    ///
+    /// # Errors
+    /// [`SessionError`] se o evento não puder ser logado.
+    pub(crate) fn record_assistant(&mut self, text: &str) -> Result<(), SessionError> {
+        self.session.apply(&Event::AssistantMessage {
+            text: text.to_string(),
+        })
+    }
+
+    /// Fecha o turno (o `state` fica consistente para `verify`).
+    ///
+    /// # Errors
+    /// [`SessionError`] se o turno não corresponder ao aberto.
+    pub(crate) fn record_turn_end(&mut self, turn: u32) -> Result<(), SessionError> {
+        self.session.apply(&Event::TurnEnd { turn })
     }
 
     /// Sessão (log e estado) do runtime — usada pelos testes e pelo loop real (E12).

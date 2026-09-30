@@ -8,13 +8,12 @@ use clap::{Parser, Subcommand};
 use serde_json::{Value, json};
 
 use katu_core::diag;
+use katu_policy::POLICY_VOCAB_VERSION;
 
 #[cfg(feature = "memory-in-process")]
-use crate::runtime::{Runtime, RuntimeError};
+use crate::agent::{RunArgs, run};
 #[cfg(feature = "memory-in-process")]
-use katu_core::error::Error;
-#[cfg(feature = "memory-in-process")]
-use katu_core::kernel::Dispatch;
+use crate::memory::commands::{memory_command, memory_recall, memory_remember, memory_status};
 
 use crate::report::Report;
 
@@ -55,6 +54,27 @@ pub(crate) enum Command {
         #[arg(long)]
         anchor: Option<String>,
     },
+    /// Executa um turno do agente (provider ↔ kernel ↔ tools).
+    #[cfg(feature = "memory-in-process")]
+    Run {
+        /// Objetivo/mensagem do utilizador.
+        goal: String,
+        /// Provider (`llama`, `opencode-go`, `opencode-zen`).
+        #[arg(long, default_value = "llama")]
+        provider: String,
+        /// Modelo (por omissão depende do provider).
+        #[arg(long)]
+        model: Option<String>,
+        /// Base URL do endpoint (por omissão depende do provider).
+        #[arg(long)]
+        base: Option<String>,
+        /// Teto de tokens de saída.
+        #[arg(long, default_value_t = 512)]
+        max_tokens: u32,
+        /// Máximo de passos (tool calls) por turno.
+        #[arg(long, default_value_t = 8)]
+        max_steps: u32,
+    },
 }
 
 impl Command {
@@ -66,6 +86,8 @@ impl Command {
             Self::Memory => "memory",
             Self::Recall { .. } => "recall",
             Self::Remember { .. } => "remember",
+            #[cfg(feature = "memory-in-process")]
+            Self::Run { .. } => "run",
         }
     }
 }
@@ -77,13 +99,29 @@ pub(crate) fn execute(cli: &Cli) -> Report {
             Command::Version.name(),
             Some(json!({
                 "katu": env!("CARGO_PKG_VERSION"),
-                "policy_vocab": katu_policy::POLICY_VOCAB_VERSION,
+                "policy_vocab": POLICY_VOCAB_VERSION,
             })),
         ),
         Command::Doctor => doctor(),
         Command::Memory => memory_command(),
         Command::Recall { query, limit } => memory_recall(query, *limit),
         Command::Remember { statement, anchor } => memory_remember(statement, anchor.as_deref()),
+        #[cfg(feature = "memory-in-process")]
+        Command::Run {
+            goal,
+            provider,
+            model,
+            base,
+            max_tokens,
+            max_steps,
+        } => run(&RunArgs {
+            goal,
+            provider,
+            model: model.as_deref(),
+            base: base.as_deref(),
+            max_tokens: *max_tokens,
+            max_steps: *max_steps,
+        }),
     }
 }
 
@@ -102,114 +140,6 @@ fn doctor() -> Report {
         object.insert("memory".to_string(), memory_status());
     }
     Report::ok(Command::Doctor.name(), Some(data))
-}
-
-/// Estado do backend de memória (adaptador in-process do knudge, E03-T07).
-#[cfg(feature = "memory-in-process")]
-fn memory_status() -> Value {
-    use crate::memory::KnudgeMemory;
-    use katu_core::memory::Memory;
-
-    let root = std::env::current_dir().unwrap_or_default();
-    match KnudgeMemory::open(&root) {
-        Ok(memory) => match memory.status() {
-            Ok(status) => json!({
-                "backend": status.backend,
-                "health": format!("{:?}", status.health),
-                "warnings": status.warnings,
-                "knowledge_dir": memory.knowledge_dir().display().to_string(),
-            }),
-            Err(error) => json!({ "error": error.to_string() }),
-        },
-        Err(error) => json!({ "error": error.to_string() }),
-    }
-}
-
-/// Comando de memória de primeira classe (E03-T07): falha fechada sem adaptador.
-#[cfg(feature = "memory-in-process")]
-fn memory_command() -> Report {
-    use crate::memory::KnudgeMemory;
-    use katu_core::memory::Memory;
-
-    let root = std::env::current_dir().unwrap_or_default();
-    match KnudgeMemory::open(&root) {
-        Ok(memory) => match memory.status() {
-            Ok(status) => Report::ok(
-                Command::Memory.name(),
-                Some(json!({
-                    "backend": status.backend,
-                    "health": format!("{:?}", status.health),
-                    "warnings": status.warnings,
-                    "knowledge_dir": memory.knowledge_dir().display().to_string(),
-                })),
-            ),
-            Err(error) => runtime_failure(Command::Memory.name(), RuntimeError::Memory(error)),
-        },
-        Err(error) => runtime_failure(Command::Memory.name(), RuntimeError::Memory(error)),
-    }
-}
-
-/// Comando `recall`: monta o runtime e consulta a memória pelo caminho §42.
-#[cfg(feature = "memory-in-process")]
-fn memory_recall(query: &str, limit: usize) -> Report {
-    use crate::ports::{StdFs, SystemClock};
-
-    let fs = StdFs;
-    let clock = SystemClock;
-    let start = std::env::current_dir().unwrap_or_default();
-    let mut runtime = match Runtime::open(&fs, &clock, &start, "cli: recall") {
-        Ok(runtime) => runtime,
-        Err(error) => return runtime_failure("recall", error),
-    };
-    let project = runtime.root().display().to_string();
-    match runtime.recall(query, limit) {
-        Ok(dispatch) => Report::ok("recall", Some(dispatch_value(&project, &dispatch))),
-        Err(error) => runtime_failure("recall", error),
-    }
-}
-
-/// Comando `remember`: recall prévio + escrita pelo gate de E05.
-#[cfg(feature = "memory-in-process")]
-fn memory_remember(statement: &str, anchor: Option<&str>) -> Report {
-    use crate::ports::{StdFs, SystemClock};
-    use katu_core::memory::NoteType;
-
-    let fs = StdFs;
-    let clock = SystemClock;
-    let start = std::env::current_dir().unwrap_or_default();
-    let mut runtime = match Runtime::open(&fs, &clock, &start, "cli: remember") {
-        Ok(runtime) => runtime,
-        Err(error) => return runtime_failure("remember", error),
-    };
-    let project = runtime.root().display().to_string();
-    let req = Runtime::note(statement, NoteType::Fact, anchor);
-    match runtime.remember(&req) {
-        Ok(dispatch) => Report::ok("remember", Some(dispatch_value(&project, &dispatch))),
-        Err(error) => runtime_failure("remember", error),
-    }
-}
-
-/// Converte a falha do runtime na taxonomia estável de erro do katu.
-#[cfg(feature = "memory-in-process")]
-fn runtime_failure(command: &'static str, error: RuntimeError) -> Report {
-    let core: Error = error.into();
-    Report::failed(command, &core)
-}
-
-/// Envelope de dados de um `Dispatch` (resultado + relatório TOON projetado para JSON).
-#[cfg(feature = "memory-in-process")]
-fn dispatch_value(project: &str, dispatch: &Dispatch) -> Value {
-    let report = dispatch
-        .report()
-        .and_then(|report| report.to_json().ok())
-        .and_then(|text| serde_json::from_str::<Value>(&text).ok())
-        .unwrap_or(Value::Null);
-    json!({
-        "project": project,
-        "ran": dispatch.ran(),
-        "outcome": format!("{:?}", dispatch.outcome()),
-        "report": report,
-    })
 }
 
 /// Sem o adaptador compilado, a memória é invariante: os comandos **recusam** (DF4, fail-closed).
