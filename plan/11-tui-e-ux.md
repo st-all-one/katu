@@ -47,14 +47,20 @@ fecha o ponto em aberto **OA3** com um desenho testado. Padrões a herdar:
 
 ## Tarefas
 
-### E10-T01 ☐ Esqueleto TUI (`crossterm` cru)
+### E10-T01 ☑ Esqueleto TUI (`crossterm` cru)
 - **Entregáveis:** loop de eventos, alt-screen, panic hook, restauro do terminal.
 - **Aceite:** matar o processo durante o render deixa o terminal utilizável; teste de panic hook.
+- **Estado:** `katu-tui/src/run.rs` usa `try_init` (modo cru + ecrã alternativo + panic hook que
+  restaura) e uma guarda RAII (`Drop` → `restore`) em qualquer saída; loop com `poll(50 ms)`. O
+  hook é o do `ratatui` (restaura antes de chamar o hook anterior).
 
-### E10-T02 ☐ Keymap puro e modos
+### E10-T02 ☑ Keymap puro e modos
 - **Entregáveis:** `Action`, `AppMode`, `map_key`, `apply_action`.
 - **Aceite:** o keymap é uma função pura testada por modo; nenhuma lógica de UI no handler de
   eventos.
+- **Estado:** `katu-tui/src/action.rs` (`Mode`, `Action`, `map_key`) + `App::apply_action` em
+  `app.rs` (devolve `Command` só quando há efeito). Testado por modo (Normal/Insert/Confirm) e para
+  `Ctrl-C`/caracteres de controlo; o loop de eventos só traduz a tecla em `Action`.
 
 ### E10-T03 ☐ Render diferencial e orçamento de render
 - **Entregáveis:** diff de frames; throttle; teto de trabalho por frame.
@@ -67,13 +73,21 @@ fecha o ponto em aberto **OA3** com um desenho testado. Padrões a herdar:
 - **Aceite:** um `Deny` mostra a regra e a evidência; um override exige resposta a perguntas
   positivas e regista `override_reason` + `overridden_by`.
 
-### E10-T05 ☐ Split live/durable
+### E10-T05 ◐ Split live/durable
 - **Entregáveis:** painel de observação efémero; transcrições em ficheiro; viewer read-only.
 - **Aceite:** o live não entra no transcript do modelo; o durable é reconstruível do log.
+- **Estado:** painel de atividade efémero feito (`App::live`/`streaming`/`thinking`, `Update::Live`,
+  `Painter` em `katu-tui/src/run.rs`): o stream do modelo e as tools em curso aparecem ao vivo,
+  com o evento estruturado `tui.live`, **fora** do log e do transcript (testado: deltas ao vivo não
+  entram no contexto do modelo). O durável é o próprio log de sessão (`Session`), reconstruível.
+  **Falta:** transcrição em ficheiro dedicada e viewer read-only.
 
-### E10-T06 ☐ Checkpoint e estado visíveis
+### E10-T06 ◐ Checkpoint e estado visíveis
 - **Entregáveis:** indicador de fase, checkpoint atual, pendências, próxima ação.
 - **Aceite:** o estado mostrado deriva do `State` (fonte única), nunca de variável de UI paralela.
+- **Estado:** o cabeçalho mostra a fase (via `Runtime::phase()` → `Update::Phase`) e a pendência
+  (derivada do `Status`); a barra mostra o estado. **Falta:** checkpoint atual/próxima ação quando
+  o checkpoint tipado (E09-T02) for ligado à UI.
 
 ### E10-T07 ☐ Controlos do core na TUI
 - **Entregáveis:** selector de **modelo** e de **grau de pensamento** (`set_model`/`set_thinking`,

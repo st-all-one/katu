@@ -111,7 +111,9 @@ método de verificação imposto e nomeado; negativos visíveis.
   mínimo, rede = `AND`. Se ambos os `allowed` são não vazios e disjuntos, o merge **falha**
   (`MergeError::EmptyAllowedScope`, fail-closed) em vez de conceder "tudo". Emite o span
   `scope.merge`. O `≤ 1 in_progress` é imposto por `Plan::validate` (E06-T06).
-- **Falta:** carregar `scope_contract.json`/`feature_list.json` no arranque (CLI/E10).
+- **Falta:** nada — o carregamento de `scope_contract.json`/`feature_list.json` no arranque vive
+  em `katu/src/scope.rs` (E09-T04): valida o plano com `Plan::validate` **antes** do turno
+  (fail-closed) e liga a tool `plan` ao kernel (`PlanRecorded` §42, `katu/src/agent/plan.rs`).
 - **Aceite:** contrato sem `forbidden_files` ou sem rollback **não** é aprovado; merge testado
   (narrowing, união, mínimo, `AND`, conflito disjunto, contrato resultante válido).
 

@@ -28,6 +28,12 @@ mod report;
 #[cfg(feature = "memory-in-process")]
 mod runtime;
 
+#[cfg(feature = "memory-in-process")]
+mod scope;
+
+#[cfg(feature = "memory-in-process")]
+mod tui;
+
 use std::process::ExitCode;
 
 use clap::Parser;

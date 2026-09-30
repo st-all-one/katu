@@ -16,6 +16,7 @@ use std::path::{Path, PathBuf};
 
 use katu_core::kernel::Tool;
 use katu_core::memory::{Anchor, NoteType, PreWriteReq, RecallReq};
+use katu_core::plan::Plan;
 use katu_core::ports::{Clock, Env, Fs, Process};
 use katu_policy::{ResolvedArgv, ResolvedPath, SearchMode, ToolArgs, ToolName, ToolUse};
 use katu_tools::read::LineRange;
@@ -58,6 +59,13 @@ pub(super) enum Routed<'a> {
         /// Nota pré-validada.
         req: PreWriteReq,
     },
+    /// Validação/registo de plano (E09-T04): plano do artefacto do projeto.
+    Plan {
+        /// Uso resolvido.
+        use_: ToolUse,
+        /// Plano carregado no arranque.
+        plan: Plan,
+    },
 }
 
 /// Erro de roteamento (fail-closed: nada executa).
@@ -83,6 +91,7 @@ pub(super) fn route<'a>(
     cwd: &ResolvedPath,
     name: &str,
     args: &Value,
+    loaded: Option<&Plan>,
 ) -> Result<Routed<'a>, RouteError> {
     match name {
         "read" => read(ports, cwd, args),
@@ -94,7 +103,7 @@ pub(super) fn route<'a>(
         "grep" => search(ports, cwd, args, SearchMode::Grep),
         "find" => search(ports, cwd, args, SearchMode::Find),
         "ls" => search(ports, cwd, args, SearchMode::Ls),
-        "plan" => Ok(plan(cwd)),
+        "plan" => Ok(plan(cwd, loaded)),
         "memory" => memory(args),
         other => Err(RouteError::UnknownTool(other.to_string())),
     }

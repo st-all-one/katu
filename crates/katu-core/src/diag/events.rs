@@ -85,6 +85,7 @@ catalog! {
     (CONTEXT_COMPACT, "context.compact", "Compactação determinística do histórico antigo (E09-T07)."),
     (CONTEXT_CHECKPOINT, "context.checkpoint", "Checkpoint de evidência."),
     (VERIFY_REPORT, "verify.report", "Relatório do gate de verificação determinístico (E09)."),
+    (SCOPE_LOAD, "scope.load", "Carregamento do contrato de escopo/feature list no arranque (E09-T04)."),
     (SCOPE_MERGE, "scope.merge", "Merge de contratos de escopo por menor privilégio (E09-T04)."),
 
     // -- Sessões (ADR 0008) --------------------------------------------------
@@ -124,6 +125,7 @@ catalog! {
     // -- TUI -----------------------------------------------------------------
     (TUI_RENDER, "tui.render", "Desenho de um quadro."),
     (TUI_INPUT, "tui.input", "Entrada do utilizador."),
+    (TUI_LIVE, "tui.live", "Observação efémera do turno (painel de atividade)."),
 }
 
 #[cfg(test)]

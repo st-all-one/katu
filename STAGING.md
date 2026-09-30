@@ -7,11 +7,11 @@
 ## 0. Snapshot
 
 - **6 crates + `xtask`**: `katu-policy`, `katu-core`, `katu-tools`, `katu` (bin), `katu-providers`, `katu-tui`*.
-- **468 testes** · catálogo de instrumentação **73 ids** · **11 tools** · **8 regras** (5 memória + 3 contenção) · **15 ADRs**.
+- **492 testes** · catálogo de instrumentação **75 ids** · **11 tools** · **8 regras** (5 memória + 3 contenção) · **15 ADRs**.
 - `make check` verde (fmt + clippy `-D warnings` + testes + `check-layers` + `check-diag` + `check-schemas` + `check-docs` + `check-memory-swap` + `policy:audit` + `gate:bench` + `gate:provider` + file-length ≤300) · `make instrument` verde.
 - **O MVK passou** ([ADR 0001](docs/adr/0001-mvk-gate-aprovado.md)); o kernel (E04) e a política (E02) estão completos.
 
-\* `katu-tui` é ainda um **stub vazio**; `katu-providers` já implementa a porta `Provider` e os built-in `opencode go/zen` + `llama.cpp` (ADR 0011).
+\* `katu-tui` traz a base E10 (T01/T02/T05◐/T06◐): esqueleto panic-safe, keymap puro, render e painel de atividade efémero; `katu-providers` implementa a porta `Provider` e os built-in `opencode go/zen` + `llama.cpp` (ADR 0011).
 
 ## 1. O que já funciona
 
@@ -26,7 +26,8 @@
 - **Sessões e auditoria** (ADR 0008/0009): sessões vinculadas ao projeto em `.katu/sessions/<id>` (id `s_<16hex>` determinístico, índice temporal `(created_ms, id)`, **snapshot de estado com offset** por fase — inclui o histórico temporal `rolling`/`velocity` que o log não reproduz —, retomada que lê só a cauda, `Session::create`/`resume`/`list`); auditoria permanente e pesquisável em `.katu/audit` (**segmentos colunares imutáveis** + **índice invertido binário `KAI1`** com posições e **Bloom** por segmento — termos, frases, filtros), local e em `.git/info/exclude`.
 - **Memória de primeira classe** (ADR 0010): porta `Memory` com tipos do katu + adaptador in-process sobre `knudge-core` isolado no binário (`src/memory/`); `Runtime::open` (`src/runtime.rs`) monta a sessão com o adaptador e **recusa arrancar** sem memória saudável (fail-closed, E03-T03/T07); `katu remember`/`katu recall` exercitam o caminho §42; gate `check-memory-swap` (E03-T06).
 - **Providers** (ADR 0011/0012): porta `Provider` em `katu_core::provider` (o núcleo **não** depende de provider) e adaptadores em `katu-providers` — built-in `opencode go/zen` e `llama-server`; **catálogo `model → dialeto`** e **providers declarativos** (`ProviderSpec` + JSON), com `chat/completions`, `responses` e `messages` (SSE incremental, tool calls completas, `x-opencode-session`, `TCP_NODELAY`, sem compressão); `FakeProvider`/`MockTransport` cobrem o loop sem rede; e2e com chave **auto-*skip***; `xtask provider-smoke` mede TTFT/usage; retry classificado (transitórios vs conta/quota, só antes do 1.º delta, `Retry-After` em segundos/ms/data) e `usage` robusto de cache; **cache de prefixo por modelo medido** (`deepseek-v4.1-flash`, 2.º turno `cached=896/1004`) com afinidade (`x-client-request-id`/`x-session-affinity`); compressão do pedido **rejeitada** pelos endpoints (opencode `401`/llama `415`) e desligada (ADR 0013). **Latência publicada** com artefacto cru (`bench/providers/latency.json`) e **gate de orçamento** (`xtask gate:provider`, ADR 0014).
-- **Loop de turnos** (ADR 0015): `katu run` liga o provider ao kernel — pedido montado do log, tool calls logadas antes de executar (§42), resultado de volta ao modelo; roteador **fail-closed** dos argumentos JSON (caminhos canonicalizados antes do veredicto). Verificado e2e contra `llama-server` e `opencode-go` (um tool call real criou o ficheiro).
+- **Loop de turnos** (ADR 0015): `katu run` liga o provider ao kernel — pedido montado do log, tool calls logadas antes de executar (§42), resultado de volta ao modelo; roteador **fail-closed** dos argumentos JSON (caminhos canonicalizados antes do veredicto). Verificado e2e contra `llama-server` e `opencode-go` (um tool call real criou o ficheiro). **Contrato de escopo** (E09-T04): `scope_contract.json` + `feature_list.json` da raiz são carregados e validados no arranque (`katu/src/scope.rs`); com o artefacto, a tool `plan` executa e registra o plano (`PlanRecorded` §42), destrancando a fase `Planned`.
+- **UI de terminal (E10, base)**: `katu tui` liga a crate `katu-tui` ao loop — estado central, keymap **puro** (`map_key`/`apply_action`) e render puro (E10-T01/T02/T06◐); a borda implementa o `Handler` que corre o turno e injeta `Update`s. `Runtime::begin_turn` suporta multi-turno. O **streaming é visível** num painel de atividade efémero (`run_turn_with` + `ActivitySink`, evento `tui.live`), fora do log e do transcript (E10-T05◐).
 
 ---
 
@@ -52,10 +53,10 @@
 | **E07-T03** | ☑ | Gate do épico: autorização ausente fora do workspace recusada; symlink para fora negado na política. |
 | **E07-T05** | ◐ | **Autorização interativa** (`override_reason`+`granted_by`) — CLI/TUI (E10). |
 | **E09-T03** | ◐ | Override interativo (CLI/TUI); kernel `→ Verified` feito. |
-| **E09-T04** | ◐ | Carregar `scope_contract.json`/`feature_list.json` no arranque (CLI) — **destranca a tool `plan`** (hoje `Unavailable`, ADR 0015). |
+| **E09-T04** | ☑ | Carregar `scope_contract.json`/`feature_list.json` no arranque (`katu/src/scope.rs`): valida o `Plan` (schema + ≤ 1 `in_progress`) antes do turno e liga a tool `plan` ao kernel (`PlanRecorded` §42, `katu/src/agent/plan.rs`) — **destranca a fase `Planned`**; sem artefacto, `plan` mantém `Unavailable{scope-contract}`. |
 | **E09-T05** | ◐ | `Metric`/portão de publicação — fecho. |
 | **E09-T07** | ◐ | Comando do utilizador para compactar (CLI/TUI); gatilho do kernel feito. |
-| **E10-T01…T07** | ☐ | **CLI/TUI inteira** (ratatui/crossterm, keymap, render, superfície de política, checkpoint). |
+| **E10-T01…T07** | ◐ | **CLI/TUI**: T01 (esqueleto panic-safe + restauro), T02 (keymap puro testado por modo), T05◐ (painel de atividade efémero + streaming visível, fora do log; falta transcrição/viewer) e T06◐ (fase/pendência no ecrã) feitos em `katu-tui` + `katu tui`; faltam T03 (orçamento de render/sem alocações), T04 (superfície de política/override) e T07 (controlos de modelo/compactação/lixeira). O executor em background fica por fazer. |
 | **E12-T01** | ☑ | Porta no núcleo + adaptadores `opencode`/`llama` com catálogo `model → dialeto`; o binário **liga o loop** (`katu run`, E12-T05). |
 | **E12-T02** | ◐ | Formato declarativo próprio (`ProviderSpec`+JSON) e `Declarative<T>`; GDK `goose` rejeitado (ADR 0012); falta `dynamic_models`. |
 | **E12-T03** | ◐ | `TokenUsage`/`PriceTable` (base `provider_reported`, `unpriced`); falta `Metric`/tier. |
@@ -82,25 +83,21 @@
 
 ### 3.1 Bloqueadores (impedem a experiência completa)
 
-1. **Sem TUI (E10).** O binário já corre **um** turno com tool execution (`katu run`, E12-T05);
-   falta a TUI (ratatui/crossterm): loop de eventos, keymap puro, render diferencial e multi-turno
-   interativo.
-2. **`plan` indisponível (E09-T04).** O roteador expõe `plan` mas devolve
-   `Unavailable { scope-contract }` (ADR 0015): falta carregar `scope_contract.json`/
-   `feature_list.json` no arranque para o executor validar um plano real. Sem isto, a fase
-   `Planned` é inalcançável pelo modelo.
-3. **Autorização interativa e compactação por comando (E07-T05/E09-T03/E09-T07).** A lógica do core
+1. **TUI (E10) — base feita; faltam interação, evidência e evidência de política.** `katu tui` já
+   abre uma UI panic-safe com keymap puro, multi-turno síncrono e **streaming visível** (`katu-tui`,
+   T01/T02/T05◐/T06◐). Falta o executor em background, a superfície de política com override (T04)
+   e os controlos do core (T07).
+2. **Autorização interativa e compactação por comando (E07-T05/E09-T03/E09-T07).** A lógica do core
    está feita; falta a superfície de CLI/TUI (E10).
-4. **`spawn_blocking`+timeout (E03-T04).** O adaptador in-process está ligado e o loop usa a tool
+3. **`spawn_blocking`+timeout (E03-T04).** O adaptador in-process está ligado e o loop usa a tool
    `memory` (§42); o timeout do worker bloqueante continua gated (E12/E01-T09).
 
 ### 3.2 Integração CLI/TUI (lógica já feita no core)
 
 - Autorização interativa de E07-T05 / override de E09-T03.
 - Comando de compactação de E09-T07.
-- Carregamento de `scope_contract`/`feature_list` de E09-T04 — **destranca a tool `plan`**.
 - `read view=diff` precisa que o chamador forneça o `base` (checkpoint/leitura anterior).
-- Visualização do stream do provider (deltas) e das tool calls em curso (E10).
+- Transcrição em ficheiro + viewer read-only do split live/durable (T05, parcial).
 
 ### 3.3 From-zero ainda não iniciado (E18)
 
@@ -122,32 +119,34 @@ buffer adaptativo (E18-T04).
 
 ### 3.5 Dívida do loop de turnos (ADR 0015)
 
-- **10 de 11 tools executáveis** pelo modelo: `plan` fica `Unavailable` até E09-T04.
+- **11 de 11 tools executáveis** pelo modelo: a tool `plan` exige `scope_contract.json`/
+  `feature_list.json` na raiz (E09-T04); sem artefacto recusa com `Unavailable{scope-contract}`.
 - **Argumentos crus do modelo não são logados**: o log guarda o `ToolUse` **resolvido**, não o JSON
   original — replay fiel e auditoria dos argumentos exatos ficam por resolver (dívida E04/§42).
 - **`katu run` é um turno único** (sem REPL/TUI multi-turno): o turno abre e fecha na mesma
   invocação.
-- **Sem streaming visível ao utilizador**: os deltas do provider são acumulados, não mostrados em
-  tempo real (E10).
+- **Streaming visível na TUI, não na CLI one-shot**: a TUI (`katu tui`) mostra os deltas do provider
+  e as tools em curso ao vivo no painel de atividade (E10-T05◐); o `katu run` continua a acumular
+  (turno único sem UI).
 
 ---
 
 ## 4. Ordem recomendada (próximos passos)
 
-1. **E10 (CLI/TUI)** — a superfície sobre o loop já acionável: loop de eventos, keymap puro, render
-   diferencial, painel de evidência (regra + evidência), autorização interativa (E07-T05/E09-T03),
-   compactação por comando (E09-T07) e controlo de modelo/pensamento (E12-T10).
-2. **E09-T04 (contrato de escopo)** — carregar `scope_contract.json`/`feature_list.json`; **destranca
-   a tool `plan`** e a fase `Planned`.
-3. **E03-T04** — `spawn_blocking` + timeout do adaptador (gated no worker bloqueante; E12/E01-T09).
-4. **E15-T01 + E18-T10** — `criterion`/`hyperfine`/`dhat` + gate de regressão no CI; generaliza o
+1. **E10 (CLI/TUI)** — a superfície sobre o loop já acionável. **Feito:** loop de eventos,
+   keymap puro, render, multi-turno síncrono e streaming visível (T01/T02/T05◐/T06◐). **Falta:**
+   painel de evidência e autorização interativa (T04/E07-T05/E09-T03), orçamento de render/sem
+   alocações (T03), compactação por comando (E09-T07) e controlo de modelo/pensamento
+   (T07/E12-T10).
+2. **E03-T04** — `spawn_blocking` + timeout do adaptador (gated no worker bloqueante; E12/E01-T09).
+3. **E15-T01 + E18-T10** — `criterion`/`hyperfine`/`dhat` + gate de regressão no CI; generaliza o
    que a E12-T07 já faz para o provider (harness de medição antes de otimizar).
-5. **E12-T06/T10** — dialeto `google` + WebSocket/HTTP2 e validação ao vivo de `responses`/`messages`;
+4. **E12-T06/T10** — dialeto `google` + WebSocket/HTTP2 e validação ao vivo de `responses`/`messages`;
    `Control::{SetModel, SetThinking}` no kernel.
-6. Fechos core/policy/tools: **E06-T02/T03/T12**, **E07-T02/T03**, **E01-T07**, **E19-T04/T06** — ✅;
+5. Fechos core/policy/tools: **E06-T02/T03/T12**, **E07-T02/T03**, **E01-T07**, **E19-T04/T06** — ✅;
    faltam **E06-T07** (rotação gated), a iteração de densidade colunar (§3.4) e a integração de
    `read.diff`/CLI.
-7. **E18 (T02/T03/T05/T06/T09)** — frentes from-zero, cada uma com **fórmula + artefacto + teste**
+6. **E18 (T02/T03/T05/T06/T09)** — frentes from-zero, cada uma com **fórmula + artefacto + teste**
    (plan/19 §0.3); corta-primeiro **T07/T08** `✂`.
 
 ## 5. Regras que não se quebram

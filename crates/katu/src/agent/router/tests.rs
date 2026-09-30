@@ -63,6 +63,7 @@ fn read_resolves_a_relative_path() -> Result<(), Box<dyn std::error::Error>> {
         &cwd()?,
         "read",
         &json!({"path": "src/lib.rs"}),
+        None,
     )?;
     let Routed::Plain { use_, .. } = routed else {
         return Err("esperava uma tool genérica".into());
@@ -80,7 +81,7 @@ fn read_resolves_a_relative_path() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn ls_uses_the_cwd_without_a_query() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::new()?;
-    let routed = route(&fixture.ports(), &cwd()?, "ls", &json!({"path": "."}))?;
+    let routed = route(&fixture.ports(), &cwd()?, "ls", &json!({"path": "."}), None)?;
     let Routed::Plain { use_, .. } = routed else {
         return Err("esperava uma tool genérica".into());
     };
@@ -94,25 +95,55 @@ fn ls_uses_the_cwd_without_a_query() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn plan_is_recognized_but_not_executable() -> Result<(), Box<dyn std::error::Error>> {
+fn plan_without_a_contract_is_unavailable() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::new()?;
     let routed = route(
         &fixture.ports(),
         &cwd()?,
         "plan",
         &json!({"goal": "x", "next_action": "y"}),
+        None,
     )?;
     let Routed::Plain { use_, .. } = routed else {
-        return Err("esperava uma tool genérica".into());
+        return Err("esperava a tool indisponível".into());
     };
     assert_eq!(use_.name, ToolName::Plan);
     Ok(())
 }
 
 #[test]
+fn plan_with_a_loaded_contract_is_routed() -> Result<(), Box<dyn std::error::Error>> {
+    use katu_core::plan::{Feature, FeatureStatus, Plan, ScopeContract};
+
+    let fixture = Fixture::new()?;
+    let plan = Plan::new(
+        ScopeContract::new(
+            Vec::new(),
+            vec!["**/secrets/**".into()],
+            Vec::new(),
+            "reverter",
+        ),
+        vec![Feature::new("F1", "fazer", FeatureStatus::Pending)],
+    );
+    let routed = route(
+        &fixture.ports(),
+        &cwd()?,
+        "plan",
+        &json!({"goal": "x", "next_action": "y"}),
+        Some(&plan),
+    )?;
+    let Routed::Plan { use_, plan } = routed else {
+        return Err("esperava o registo de plano".into());
+    };
+    assert_eq!(use_.name, ToolName::Plan);
+    assert_eq!(plan.feature_list.len(), 1);
+    Ok(())
+}
+
+#[test]
 fn unknown_tool_is_fail_closed() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::new()?;
-    let result = route(&fixture.ports(), &cwd()?, "rm", &json!({}));
+    let result = route(&fixture.ports(), &cwd()?, "rm", &json!({}), None);
     assert!(matches!(result, Err(RouteError::UnknownTool(_))));
     Ok(())
 }
@@ -120,7 +151,7 @@ fn unknown_tool_is_fail_closed() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn missing_argument_does_not_execute() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::new()?;
-    let result = route(&fixture.ports(), &cwd()?, "read", &json!({}));
+    let result = route(&fixture.ports(), &cwd()?, "read", &json!({}), None);
     assert!(matches!(result, Err(RouteError::MissingArg("path"))));
     Ok(())
 }

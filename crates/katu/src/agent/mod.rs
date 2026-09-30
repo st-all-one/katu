@@ -7,25 +7,27 @@
 //!
 //! Fail-closed: uma tool fora do catálogo, um argumento em falta ou um caminho que não resolve
 //! **não** executam nada; o turno para com erro e o log fica consistente.
+//!
+//! O **observador efémero** (`ActivitySink`, E10-T05) recebe deltas e tools em curso para o painel
+//! da UI: nada disso entra no log nem no contexto do modelo.
 
 mod catalog;
 mod command;
+mod plan;
 mod router;
+mod turn;
 
 #[cfg(test)]
 mod tests;
 
-pub(crate) use command::{RunArgs, run};
+pub(crate) use command::{RunArgs, SYSTEM, build_provider, default_base, default_model, run};
+pub(crate) use turn::{Activity, ActivitySink, run_turn, run_turn_with};
 
-use katu_core::diag::{Level, events};
 use katu_core::error::Error;
 use katu_core::kernel::{CallContext, CallId, MemoryWriteRequest, SessionError, memory_recall_use};
 use katu_core::memory::Memory;
 use katu_core::ports::{Env, Fs, Process};
-use katu_core::provider::{
-    Flow, ModelSpec, Provider, ProviderError, ProviderEvent, ProviderRequest, ProviderSink,
-    TokenUsage,
-};
+use katu_core::provider::{ModelSpec, Provider, ProviderError, TokenUsage};
 use katu_tools::recall::RecallTool;
 use katu_tools::write::WriteNoteTool;
 use serde_json::Value;
@@ -55,6 +57,19 @@ pub(crate) struct TurnOptions {
     pub temperature: f32,
     /// Máximo de passos (chamadas de tool) por turno.
     pub max_steps: u32,
+}
+
+/// Pedido de execução de um turno (o que o loop precisa além do runtime).
+#[derive(Clone, Copy)]
+pub(crate) struct TurnRequest<'a> {
+    /// Provider do endpoint de modelo.
+    pub provider: &'a dyn Provider,
+    /// Portas de I/O para as tools.
+    pub ports: Ports<'a>,
+    /// Objetivo do utilizador.
+    pub goal: &'a str,
+    /// Parâmetros do turno.
+    pub options: &'a TurnOptions,
 }
 
 /// Resultado observável de um turno.
@@ -105,83 +120,6 @@ impl From<AgentError> for Error {
     }
 }
 
-/// Sink que acumula o texto e as tool calls do turno.
-#[derive(Default)]
-struct TurnSink {
-    text: String,
-    calls: Vec<(CallId, String, Value)>,
-}
-
-impl ProviderSink for TurnSink {
-    fn on_event(&mut self, event: ProviderEvent) -> Flow {
-        match event {
-            ProviderEvent::Text(delta) => self.text.push_str(&delta),
-            ProviderEvent::ToolCall {
-                call,
-                name,
-                arguments,
-            } => self.calls.push((call, name, arguments)),
-            _ => {}
-        }
-        Flow::Continue
-    }
-}
-
-/// Executa um turno completo: mensagem do utilizador → (modelo → tools)* → paragem.
-///
-/// # Errors
-/// [`AgentError`] em falha do provider, da sessão ou do roteamento (fail-closed).
-pub(crate) fn run_turn(
-    runtime: &mut Runtime<'_>,
-    provider: &dyn Provider,
-    ports: &Ports<'_>,
-    goal: &str,
-    options: &TurnOptions,
-) -> Result<TurnReport, AgentError> {
-    let _span = katu_core::span!(Level::Info, events::KERNEL_TURN);
-    runtime.record_user(goal)?;
-    let tools = catalog::tool_defs();
-    let mut text = String::new();
-    let mut calls = 0_usize;
-    let mut usage = None;
-    let mut steps = 0_u32;
-    loop {
-        steps = steps.saturating_add(1);
-        let request = ProviderRequest {
-            model: options.model.clone(),
-            system: options.system.clone(),
-            messages: runtime.messages()?,
-            tools: tools.clone(),
-            max_tokens: Some(options.max_tokens),
-            temperature: Some(options.temperature),
-        };
-        let mut sink = TurnSink::default();
-        let outcome = provider.stream(&request, &mut sink)?;
-        usage = outcome.usage.or(usage);
-        if !sink.text.is_empty() {
-            runtime.record_assistant(&sink.text)?;
-            text.push_str(&sink.text);
-        }
-        calls = calls.saturating_add(sink.calls.len());
-        if sink.calls.is_empty() {
-            let turn = runtime.turn();
-            runtime.record_turn_end(turn)?;
-            return Ok(TurnReport {
-                steps,
-                text,
-                calls,
-                usage,
-            });
-        }
-        for (call, name, arguments) in sink.calls {
-            execute_call(runtime, ports, call, &name, &arguments)?;
-        }
-        if steps >= options.max_steps {
-            return Err(AgentError::TooManySteps { steps });
-        }
-    }
-}
-
 /// Roteia e executa uma tool call, mantendo a ordem §42 (logar → política → efeito).
 fn execute_call(
     runtime: &mut Runtime<'_>,
@@ -194,35 +132,34 @@ fn execute_call(
         return execute_memory(runtime, call, args);
     }
     let root = runtime.root().to_path_buf();
-    let Runtime {
-        session,
-        rules,
-        cwd,
-        clock,
-        ..
-    } = runtime;
-    let now = clock.now().as_millis();
+    let loaded = runtime.plan().cloned();
+    let now = runtime.clock.now().as_millis();
     let route_ports = router::Ports {
         fs: ports.fs,
         process: ports.process,
         env: ports.env,
-        clock: *clock,
+        clock: runtime.clock,
         root: &root,
     };
-    let router::Routed::Plain { use_, tool } = router::route(&route_ports, cwd, name, args)? else {
-        return Err(AgentError::Route(router::RouteError::UnknownTool(
-            name.to_string(),
-        )));
-    };
-    session.tool_call(
-        call,
-        &use_,
-        CallContext {
-            rules,
-            now_millis: now,
-            tool: tool.as_ref(),
-        },
-    )?;
+    match router::route(&route_ports, &runtime.cwd, name, args, loaded.as_ref())? {
+        router::Routed::Plan { use_, plan } => plan::execute(runtime, call, &use_, &plan)?,
+        router::Routed::Plain { use_, tool } => {
+            runtime.session.tool_call(
+                call,
+                &use_,
+                CallContext {
+                    rules: &runtime.rules,
+                    now_millis: now,
+                    tool: tool.as_ref(),
+                },
+            )?;
+        }
+        _ => {
+            return Err(AgentError::Route(router::RouteError::UnknownTool(
+                name.to_string(),
+            )));
+        }
+    }
     Ok(())
 }
 
@@ -268,7 +205,7 @@ fn execute_memory(runtime: &mut Runtime<'_>, call: CallId, args: &Value) -> Resu
                 },
             )?;
         }
-        router::Routed::Plain { .. } => {
+        router::Routed::Plain { .. } | router::Routed::Plan { .. } => {
             return Err(AgentError::Route(router::RouteError::UnknownTool(
                 "memory".to_string(),
             )));

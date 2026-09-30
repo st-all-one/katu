@@ -9,6 +9,8 @@ publish.workspace = true
 
 [dependencies]
 katu-core.workspace = true
+# UI de terminal (E10): estado central + render puro; `crossterm` vem re-exportado.
+ratatui.workspace = true
 
 [lints]
 workspace = true

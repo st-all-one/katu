@@ -7,13 +7,13 @@ use katu_core::error::Error;
 use katu_core::provider::{ModelSpec, Provider};
 use serde_json::{Value, json};
 
-use super::{Ports, TurnOptions, run_turn};
+use super::{Ports, TurnOptions, TurnRequest, run_turn};
 use crate::ports::{StdEnv, StdFs, StdProcess, SystemClock};
 use crate::report::Report;
 use crate::runtime::{Runtime, RuntimeError};
 
 /// Instrução de sistema (prime) enviada ao modelo no turno.
-const SYSTEM: &str =
+pub(crate) const SYSTEM: &str =
     "És o katu, um agente de código. Usa as tools quando precisares e responde de forma concisa.";
 
 /// Argumentos do comando `run` (um por flag).
@@ -65,7 +65,15 @@ pub(crate) fn run(args: &RunArgs<'_>) -> Report {
         process: &process,
         env: &env,
     };
-    match run_turn(&mut runtime, provider.as_ref(), &ports, args.goal, &options) {
+    match run_turn(
+        &mut runtime,
+        TurnRequest {
+            provider: provider.as_ref(),
+            ports,
+            goal: args.goal,
+            options: &options,
+        },
+    ) {
         Ok(turn) => Report::ok("run", Some(turn_value(&model, &turn))),
         Err(error) => Report::failed("run", &error.into()),
     }
@@ -78,7 +86,7 @@ fn runtime_failure(error: RuntimeError) -> Report {
 }
 
 /// Constrói o provider a partir das flags da CLI.
-fn build_provider(
+pub(crate) fn build_provider(
     name: &str,
     base: &str,
     env: &StdEnv,
@@ -145,7 +153,7 @@ fn turn_value(model: &str, turn: &super::TurnReport) -> Value {
 }
 
 /// Base URL por omissão de cada provider.
-fn default_base(provider: &str) -> &'static str {
+pub(crate) fn default_base(provider: &str) -> &'static str {
     match provider {
         "opencode-go" => "https://opencode.ai/zen/go/v1",
         "opencode-zen" => "https://opencode.ai/zen/v1",
@@ -154,7 +162,7 @@ fn default_base(provider: &str) -> &'static str {
 }
 
 /// Modelo por omissão de cada provider.
-fn default_model(provider: &str) -> &'static str {
+pub(crate) fn default_model(provider: &str) -> &'static str {
     match provider {
         "opencode-go" | "opencode-zen" => "longcat-2.5-preview-free",
         _ => "qwen",

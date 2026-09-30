@@ -5,6 +5,7 @@
 
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::{Tool, ToolOutput};
+use katu_core::plan::Plan;
 use katu_policy::{ControlId, ResolvedPath, SearchMode, ToolArgs, ToolName, ToolUse};
 use katu_tools::edit::EditFileTool;
 use katu_tools::exec::{DEFAULT_TIMEOUT_MS, ExecTool};
@@ -219,15 +220,22 @@ pub(super) fn search<'a>(
     })
 }
 
-/// Tool `plan`: reconhecida mas **não executável** até o contrato de escopo (E09-T04) existir.
-pub(super) fn plan<'a>(cwd: &ResolvedPath) -> Routed<'a> {
+/// Tool `plan`: valida o plano do artefacto carregado no arranque (E09-T04). Sem artefacto fica
+/// **não executável** (controlo `scope-contract` em falta), fail-closed recuperável.
+pub(super) fn plan<'a>(cwd: &ResolvedPath, loaded: Option<&Plan>) -> Routed<'a> {
     let use_ = use_of(ToolName::Plan, ToolArgs::Plan, Vec::new(), None, cwd);
-    Routed::Plain {
-        use_,
-        tool: Box::new(Unavailable {
-            tool_name: ToolName::Plan,
-            control: "scope-contract",
-        }),
+    match loaded {
+        Some(plan) => Routed::Plan {
+            use_,
+            plan: plan.clone(),
+        },
+        None => Routed::Plain {
+            use_,
+            tool: Box::new(Unavailable {
+                tool_name: ToolName::Plan,
+                control: "scope-contract",
+            }),
+        },
     }
 }
 

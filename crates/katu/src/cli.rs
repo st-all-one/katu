@@ -14,6 +14,8 @@ use katu_policy::POLICY_VOCAB_VERSION;
 use crate::agent::{RunArgs, run};
 #[cfg(feature = "memory-in-process")]
 use crate::memory::commands::{memory_command, memory_recall, memory_remember, memory_status};
+#[cfg(feature = "memory-in-process")]
+use crate::tui::run_tui;
 
 use crate::report::Report;
 
@@ -75,6 +77,25 @@ pub(crate) enum Command {
         #[arg(long, default_value_t = 8)]
         max_steps: u32,
     },
+    /// Abre a UI de terminal sobre o loop de turnos (E10).
+    #[cfg(feature = "memory-in-process")]
+    Tui {
+        /// Provider (`llama`, `opencode-go`, `opencode-zen`).
+        #[arg(long, default_value = "llama")]
+        provider: String,
+        /// Modelo (por omissão depende do provider).
+        #[arg(long)]
+        model: Option<String>,
+        /// Base URL do endpoint (por omissão depende do provider).
+        #[arg(long)]
+        base: Option<String>,
+        /// Teto de tokens de saída.
+        #[arg(long, default_value_t = 512)]
+        max_tokens: u32,
+        /// Máximo de passos (tool calls) por turno.
+        #[arg(long, default_value_t = 8)]
+        max_steps: u32,
+    },
 }
 
 impl Command {
@@ -88,6 +109,8 @@ impl Command {
             Self::Remember { .. } => "remember",
             #[cfg(feature = "memory-in-process")]
             Self::Run { .. } => "run",
+            #[cfg(feature = "memory-in-process")]
+            Self::Tui { .. } => "tui",
         }
     }
 }
@@ -116,6 +139,21 @@ pub(crate) fn execute(cli: &Cli) -> Report {
             max_steps,
         } => run(&RunArgs {
             goal,
+            provider,
+            model: model.as_deref(),
+            base: base.as_deref(),
+            max_tokens: *max_tokens,
+            max_steps: *max_steps,
+        }),
+        #[cfg(feature = "memory-in-process")]
+        Command::Tui {
+            provider,
+            model,
+            base,
+            max_tokens,
+            max_steps,
+        } => run_tui(&RunArgs {
+            goal: "tui",
             provider,
             model: model.as_deref(),
             base: base.as_deref(),

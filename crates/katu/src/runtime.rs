@@ -12,12 +12,14 @@ use katu_core::kernel::{
     SessionId, discover_root, memory_recall_use,
 };
 use katu_core::memory::{Anchor, Memory, MemoryError, NoteType, PreWriteReq, RecallReq};
+use katu_core::plan::Plan;
 use katu_core::ports::{Clock, Fs};
 use katu_policy::{PolicyError, ResolvedPath, RuleSet};
 use katu_tools::recall::RecallTool;
 use katu_tools::write::WriteNoteTool;
 
 use crate::memory::KnudgeMemory;
+use crate::scope::{self, ScopeError};
 
 /// Regras do protocolo de memória, versionadas no repositório (dado, não código).
 const MEMORY_POLICY: &str = include_str!("../../../policy/memory.toml");
@@ -34,6 +36,9 @@ pub(crate) enum RuntimeError {
     /// Vocabulário de política inválido.
     #[error("política: {0}")]
     Policy(#[from] PolicyError),
+    /// Artefacto de plano (`scope_contract`/`feature_list`) inválido (E09-T04).
+    #[error("escopo: {0}")]
+    Scope(#[from] ScopeError),
 }
 
 impl From<RuntimeError> for Error {
@@ -41,6 +46,7 @@ impl From<RuntimeError> for Error {
         match error {
             RuntimeError::Memory(source) => Self::unavailable(source.to_string()),
             RuntimeError::Policy(source) => Self::invalid_input(source.to_string()),
+            RuntimeError::Scope(source) => Self::invalid_input(source.to_string()),
             RuntimeError::Session(source) => Self::internal(source.to_string()),
         }
     }
@@ -54,6 +60,7 @@ pub(crate) struct Runtime<'a> {
     pub(crate) rules: RuleSet,
     pub(crate) cwd: ResolvedPath,
     pub(crate) calls: u64,
+    pub(crate) plan: Option<Plan>,
 }
 
 impl<'a> Runtime<'a> {
@@ -68,6 +75,7 @@ impl<'a> Runtime<'a> {
         goal: &str,
     ) -> Result<Self, RuntimeError> {
         let root = discover_root(fs, start);
+        let plan = scope::load(fs, &root)?;
         let memory = KnudgeMemory::open(&root)?;
         memory.status()?;
         let mut session = Session::create(fs, &root, clock.now().as_millis(), goal)?;
@@ -82,12 +90,34 @@ impl<'a> Runtime<'a> {
             rules,
             cwd,
             calls: 0,
+            plan,
         })
+    }
+
+    /// Abre o próximo turno (multi-turno, E10): o turno anterior tem de estar fechado.
+    ///
+    /// # Errors
+    /// [`SessionError`] se já houver um turno aberto ou a transição for recusada.
+    pub(crate) fn begin_turn(&mut self) -> Result<(), SessionError> {
+        let next = self.session.state().turn.saturating_add(1);
+        self.session.apply(&Event::TurnStart { turn: next })
     }
 
     /// Raiz do projeto vinculada (delegada ao log/sessão).
     pub(crate) fn root(&self) -> &Path {
         self.session.root()
+    }
+
+    /// Fase corrente do kernel (E10-T06).
+    #[must_use]
+    pub(crate) fn phase(&self) -> katu_policy::Phase {
+        self.session.state().phase
+    }
+
+    /// Plano carregado no arranque (E09-T04); `None` mantém a tool `plan` indisponível.
+    #[must_use]
+    pub(crate) fn plan(&self) -> Option<&Plan> {
+        self.plan.as_ref()
     }
 
     /// Histórico visível ao modelo (projeção do log, §42).
