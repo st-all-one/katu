@@ -31,7 +31,7 @@
 | `mem-recall-before-write` | enforced | Memória: não gravar nota sem ter consultado o conhecimento (recall) na mesma fase |
 | `mem-single-claim` | enforced | Memória: uma afirmação por nota |
 
-## Eventos de diag (84)
+## Eventos de diag (85)
 
 - `katu.run`
 - `katu.setup`
@@ -115,6 +115,7 @@
 - `tui.input`
 - `tui.live`
 - `tui.cancel`
+- `tui.steer`
 - `tui.approval`
 - `tui.trash_empty`
 

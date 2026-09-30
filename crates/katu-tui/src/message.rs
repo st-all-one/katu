@@ -49,6 +49,8 @@ pub enum Update {
     Live(Live),
     /// Modelos disponíveis no provider (E10-T07); o primeiro é o default.
     Models(Vec<String>),
+    /// Graus de pensamento suportados pelo modelo ativo (E20-T10); o menu só oferece estes.
+    ThinkingOptions(Vec<Thinking>),
     /// Próxima ação declarada no checkpoint de fase (E10-T06).
     NextAction(String),
     /// Uso/custo do último turno (E12-T03/T10), já formatado pela borda.

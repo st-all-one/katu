@@ -5,8 +5,6 @@
 //! feita com `std::fs` e a ativação via a porta `Process` (injetável nos testes). **Fail-closed**:
 //! se o `systemctl` faltar ou falhar, o comando recusa com `unavailable` (exit 10).
 
-use std::fs;
-use std::io::ErrorKind;
 use std::iter::once;
 use std::path::{Path, PathBuf};
 
@@ -14,32 +12,21 @@ use katu_core::error::Error;
 use katu_core::ports::{Env, ExecRequest, ExecResult, Process};
 use serde_json::{Value, json};
 
+use crate::ports::{StdEnv, StdProcess};
 use crate::report::Report;
 
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
+use store::{
+    SCRIPT_NAME, SERVICE_NAME, TIMER_NAME, TIMER_UNIT, WATCHED_NAME, read_watched, remove_file,
+    service_unit, write_file, write_script, write_watched,
+};
 
-/// Script do worker, embutido no binário (sem rede por omissão).
-const SCRIPT_BODY: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../../scripts/katu-idle.sh"
-));
+mod store;
 
-/// Nome do script materializado.
-const SCRIPT_NAME: &str = "katu-idle.sh";
-/// Ficheiro com a lista de projetos subscritos.
-const WATCHED_NAME: &str = "watched";
-/// Unidade systemd do worker.
-const SERVICE_NAME: &str = "katu-drain.service";
-/// Timer systemd do worker.
-const TIMER_NAME: &str = "katu-drain.timer";
+#[cfg(test)]
+mod tests;
+
 /// Timeout de cada chamada ao `systemctl`.
 const SYSTEMCTL_TIMEOUT_MS: u64 = 15_000;
-
-/// Timer systemd do worker (corre a cada 30 min; sobrevive a reinícios).
-const TIMER_UNIT: &str = "[Unit]\nDescription=katu — timer de auto-drain (worker ocioso)\n\n\
-[Timer]\nOnBootSec=5min\nOnUnitActiveSec=30min\nPersistent=true\n\n\
-[Install]\nWantedBy=timers.target\n";
 
 /// Ação pedida a `--watch-service` (default: `status`, read-only).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -109,8 +96,8 @@ struct Context<'a> {
 
 /// Executa a ação pedida (borda real: `StdProcess`/`StdEnv`).
 pub(crate) fn run(action: Action) -> Report {
-    let process = crate::ports::StdProcess;
-    let env = crate::ports::StdEnv;
+    let process = StdProcess;
+    let env = StdEnv;
     let paths = Paths::from_env(&env);
     let project = std::env::current_dir().unwrap_or_default();
     let context = Context {
@@ -152,7 +139,10 @@ fn status(context: &Context<'_>) -> Result<Value, Error> {
 /// `--install`: materializa o script + unidades e ativa o timer.
 fn install(context: &Context<'_>) -> Result<Value, Error> {
     write_script(&context.paths.script())?;
-    write_file(&context.paths.service(), &service_unit(&context.paths.script()))?;
+    write_file(
+        &context.paths.service(),
+        &service_unit(&context.paths.script()),
+    )?;
     write_file(&context.paths.timer(), TIMER_UNIT)?;
     systemctl(context, &["daemon-reload"])?;
     systemctl(context, &["enable", "--now", TIMER_NAME])?;
@@ -242,76 +232,13 @@ fn systemctl_request(context: &Context<'_>, args: &[&str]) -> ExecRequest {
 
 /// Ambiente mínimo para o `systemctl --user` (sem segredos).
 fn systemctl_env(env: &dyn Env) -> Vec<(String, String)> {
-    const KEYS: &[&str] = &["HOME", "PATH", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"];
+    const KEYS: &[&str] = &[
+        "HOME",
+        "PATH",
+        "XDG_RUNTIME_DIR",
+        "DBUS_SESSION_BUS_ADDRESS",
+    ];
     KEYS.iter()
         .filter_map(|key| env.var(key).map(|value| ((*key).to_string(), value)))
         .collect()
 }
-
-/// Materializa o script do worker com permissão de execução.
-fn write_script(path: &Path) -> Result<(), Error> {
-    write_file(path, SCRIPT_BODY)?;
-    #[cfg(unix)]
-    {
-        let mut permissions = fs::metadata(path)
-            .map_err(|err| Error::io(path.display().to_string(), err))?
-            .permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(path, permissions)
-            .map_err(|err| Error::io(path.display().to_string(), err))?;
-    }
-    Ok(())
-}
-
-/// Escreve `body` em `path`, criando o diretório pai.
-fn write_file(path: &Path, body: &str) -> Result<(), Error> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|err| Error::io(parent.display().to_string(), err))?;
-    }
-    fs::write(path, body).map_err(|err| Error::io(path.display().to_string(), err))
-}
-
-/// Remove um ficheiro, ignorando a ausência.
-fn remove_file(path: &Path) -> Result<(), Error> {
-    match fs::remove_file(path) {
-        Ok(()) => Ok(()),
-        Err(err) if err.kind() == ErrorKind::NotFound => Ok(()),
-        Err(err) => Err(Error::io(path.display().to_string(), err)),
-    }
-}
-
-/// Lê a lista de projetos subscritos (ordem preservada, sem linhas vazias).
-fn read_watched(paths: &Paths) -> Result<Vec<String>, Error> {
-    let path = paths.watched();
-    match fs::read_to_string(&path) {
-        Ok(text) => Ok(text
-            .lines()
-            .map(str::trim)
-            .filter(|line| !line.is_empty())
-            .map(str::to_string)
-            .collect()),
-        Err(err) if err.kind() == ErrorKind::NotFound => Ok(Vec::new()),
-        Err(err) => Err(Error::io(path.display().to_string(), err)),
-    }
-}
-
-/// Grava a lista de projetos subscritos (uma por linha).
-fn write_watched(paths: &Paths, watched: &[String]) -> Result<(), Error> {
-    let mut body = watched.join("\n");
-    if !body.is_empty() {
-        body.push('\n');
-    }
-    write_file(&paths.watched(), &body)
-}
-
-/// Unidade systemd do worker, com o caminho real do script.
-fn service_unit(script: &Path) -> String {
-    format!(
-        "[Unit]\nDescription=katu — auto-drain de embeddings (worker ocioso)\n\n\
-         [Service]\nType=oneshot\nExecStart={}\n",
-        script.display()
-    )
-}
-
-#[cfg(test)]
-mod tests;

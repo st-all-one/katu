@@ -17,6 +17,7 @@ use crate::runtime::Runtime;
 
 mod context;
 mod live;
+mod steering;
 mod verify;
 
 /// Pedido de turno a partir dos componentes (o `ports` é `Copy`).

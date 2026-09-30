@@ -149,7 +149,8 @@ catalog! {
     (TUI_RENDER, "tui.render", "Desenho de um quadro."),
     (TUI_INPUT, "tui.input", "Entrada do utilizador."),
     (TUI_LIVE, "tui.live", "Observação efémera do turno (painel de atividade)."),
-    (TUI_CANCEL, "tui.cancel", "Turno cancelado pelo utilizador (Esc/Ctrl-C durante o stream)."),
+    (TUI_CANCEL, "tui.cancel", "Turno cancelado pelo utilizador (Esc durante o stream)."),
+    (TUI_STEER, "tui.steer", "Prompt de steering aplicado no passo seguinte do turno."),
     (TUI_APPROVAL, "tui.approval", "Challenge-and-response de aprovação humana respondido."),
     (
         TUI_TRASH_EMPTY,

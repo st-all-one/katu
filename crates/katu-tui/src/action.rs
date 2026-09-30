@@ -1,17 +1,20 @@
-//! Keymap **puro** (E10-T02): `map_key(KeyEvent, Mode) -> Option<Action>`.
+//! Keymap **puro** (E10-T02/E20-T10): `map_key(KeyEvent, Mode) -> Option<Action>`.
 //!
 //! Nenhuma lógica de UI no handler de eventos: o handler só traduz a tecla numa [`Action`] e
 //! delega em [`App::apply_action`](crate::App::apply_action). Testável por modo, sem terminal.
+//!
+//! Na TUI v2 os comandos vivem na linha de mensagem (`/model`, `/thinking`, …) e a ajuda é uma
+//! sobreposição (`?`); os antigos atalhos de um toque foram **removidos**.
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// Modo de entrada da UI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Mode {
-    /// Navegação: atalhos de um toque (`q`, `i`, setas).
+    /// Navegação: `q` sai, `i`/Enter escreve, `/` inicia um comando, `?` abre a ajuda.
     #[default]
     Normal,
-    /// Edição da linha de mensagem.
+    /// Edição da linha de mensagem (mensagem ou comando `/`).
     Insert,
     /// Confirmação de uma ação destrutiva (`y`/`n`).
     Confirm,
@@ -19,6 +22,10 @@ pub enum Mode {
     Trash,
     /// Leitura da transcrição durável (E10-T05).
     Transcript,
+    /// Sobreposição de ajuda (`?`, E20-T10).
+    Help,
+    /// Mini-menu de seleção (`/model`, `/thinking`, E20-T10).
+    Menu,
 }
 
 /// Ação pura produzida pelo teclado.
@@ -26,15 +33,17 @@ pub enum Mode {
 pub enum Action {
     /// Entra no modo de edição.
     EnterInsert,
+    /// Inicia um comando (`/`): entra em edição com o prefixo.
+    StartCommand,
     /// Volta ao modo de navegação.
     LeaveInsert,
     /// Insere um caractere na mensagem.
     Insert(char),
     /// Apaga o último caractere da mensagem.
     Backspace,
-    /// Submete a mensagem (efeito na borda).
+    /// Submete a mensagem/comando (efeito na borda).
     Submit,
-    /// Cancela a edição/confirmação.
+    /// Cancela a edição/confirmação/sobreposição.
     Cancel,
     /// Confirma a ação pendente.
     Confirm,
@@ -42,15 +51,19 @@ pub enum Action {
     ScrollUp,
     /// Rola a conversa para baixo (mais recente).
     ScrollDown,
-    /// Avança para o próximo modelo (E10-T07).
-    CycleModel,
-    /// Avança o grau de pensamento (E10-T07).
-    CycleThinking,
+    /// Abre a sobreposição de ajuda (`?`, E20-T10).
+    OpenHelp,
+    /// Seleciona a escolha anterior do menu.
+    MenuUp,
+    /// Seleciona a escolha seguinte do menu.
+    MenuDown,
+    /// Confirma a escolha do menu.
+    MenuConfirm,
     /// Abre a vista da lixeira (E10-T07).
     OpenTrash,
     /// Abre a vista read-only da transcrição durável (E10-T05).
     OpenTranscript,
-    /// Fecha a sobreposição corrente (lixeira/transcrição).
+    /// Fecha a sobreposição corrente (lixeira/transcrição/ajuda/menu).
     CloseOverlay,
     /// Seleciona a entrada anterior da lixeira.
     TrashUp,
@@ -83,12 +96,8 @@ pub fn map_key(key: KeyEvent, mode: Mode) -> Option<Action> {
         Mode::Normal => match key.code {
             KeyCode::Char('q') => Some(Action::Quit),
             KeyCode::Enter | KeyCode::Char('i') => Some(Action::EnterInsert),
-            KeyCode::Char('m') => Some(Action::CycleModel),
-            KeyCode::Char('t') => Some(Action::CycleThinking),
-            KeyCode::Char('l') => Some(Action::OpenTrash),
-            KeyCode::Char('T') => Some(Action::OpenTranscript),
-            KeyCode::Char('c') => Some(Action::Compact),
-            KeyCode::Char('v') => Some(Action::Verify),
+            KeyCode::Char('/') => Some(Action::StartCommand),
+            KeyCode::Char('?') => Some(Action::OpenHelp),
             KeyCode::Up => Some(Action::ScrollUp),
             KeyCode::Down => Some(Action::ScrollDown),
             _ => None,
@@ -104,6 +113,17 @@ pub fn map_key(key: KeyEvent, mode: Mode) -> Option<Action> {
         Mode::Confirm => match key.code {
             KeyCode::Char('y' | 'Y') => Some(Action::Confirm),
             KeyCode::Char('n' | 'N') | KeyCode::Esc => Some(Action::Cancel),
+            _ => None,
+        },
+        Mode::Help => match key.code {
+            KeyCode::Esc | KeyCode::Char('q' | '?') => Some(Action::CloseOverlay),
+            _ => None,
+        },
+        Mode::Menu => match key.code {
+            KeyCode::Up => Some(Action::MenuUp),
+            KeyCode::Down => Some(Action::MenuDown),
+            KeyCode::Enter => Some(Action::MenuConfirm),
+            KeyCode::Esc | KeyCode::Char('q') => Some(Action::CloseOverlay),
             _ => None,
         },
         Mode::Trash => match key.code {
@@ -124,165 +144,4 @@ pub fn map_key(key: KeyEvent, mode: Mode) -> Option<Action> {
 }
 
 #[cfg(test)]
-mod tests {
-    use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-
-    use super::{Action, Mode, map_key};
-
-    fn key(code: KeyCode) -> KeyEvent {
-        KeyEvent::new(code, KeyModifiers::NONE)
-    }
-
-    fn ctrl(character: char) -> KeyEvent {
-        KeyEvent::new(KeyCode::Char(character), KeyModifiers::CONTROL)
-    }
-
-    #[test]
-    fn normal_mode_has_one_touch_shortcuts() {
-        assert_eq!(
-            map_key(key(KeyCode::Char('q')), Mode::Normal),
-            Some(Action::Quit)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Char('i')), Mode::Normal),
-            Some(Action::EnterInsert)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Char('m')), Mode::Normal),
-            Some(Action::CycleModel)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Char('t')), Mode::Normal),
-            Some(Action::CycleThinking)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Char('l')), Mode::Normal),
-            Some(Action::OpenTrash)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Char('T')), Mode::Normal),
-            Some(Action::OpenTranscript)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Char('c')), Mode::Normal),
-            Some(Action::Compact)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Char('v')), Mode::Normal),
-            Some(Action::Verify)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Up), Mode::Normal),
-            Some(Action::ScrollUp)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Down), Mode::Normal),
-            Some(Action::ScrollDown)
-        );
-        assert_eq!(map_key(key(KeyCode::Char('x')), Mode::Normal), None);
-    }
-
-    #[test]
-    fn insert_mode_edits_and_submits() {
-        assert_eq!(
-            map_key(key(KeyCode::Char('a')), Mode::Insert),
-            Some(Action::Insert('a'))
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Enter), Mode::Insert),
-            Some(Action::Submit)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Esc), Mode::Insert),
-            Some(Action::LeaveInsert)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Backspace), Mode::Insert),
-            Some(Action::Backspace)
-        );
-    }
-
-    #[test]
-    fn confirm_mode_answers_yes_no() {
-        assert_eq!(
-            map_key(key(KeyCode::Char('y')), Mode::Confirm),
-            Some(Action::Confirm)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Char('n')), Mode::Confirm),
-            Some(Action::Cancel)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Esc), Mode::Confirm),
-            Some(Action::Cancel)
-        );
-    }
-
-    #[test]
-    fn trash_mode_navigates_and_restores() {
-        assert_eq!(
-            map_key(key(KeyCode::Char('r')), Mode::Trash),
-            Some(Action::Restore)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Char('x')), Mode::Trash),
-            Some(Action::EmptyTrash)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Up), Mode::Trash),
-            Some(Action::TrashUp)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Down), Mode::Trash),
-            Some(Action::TrashDown)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Esc), Mode::Trash),
-            Some(Action::CloseOverlay)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Char('q')), Mode::Trash),
-            Some(Action::CloseOverlay),
-            "q fecha a sobreposição, não a UI"
-        );
-    }
-
-    #[test]
-    fn transcript_mode_scrolls_and_closes() {
-        assert_eq!(
-            map_key(key(KeyCode::Up), Mode::Transcript),
-            Some(Action::TranscriptUp)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Down), Mode::Transcript),
-            Some(Action::TranscriptDown)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Esc), Mode::Transcript),
-            Some(Action::CloseOverlay)
-        );
-        assert_eq!(
-            map_key(key(KeyCode::Char('q')), Mode::Transcript),
-            Some(Action::CloseOverlay),
-            "q fecha a vista, não a UI"
-        );
-    }
-
-    #[test]
-    fn control_c_quits_in_every_mode() {
-        for mode in [
-            Mode::Normal,
-            Mode::Insert,
-            Mode::Confirm,
-            Mode::Trash,
-            Mode::Transcript,
-        ] {
-            assert_eq!(map_key(ctrl('c'), mode), Some(Action::Quit), "{mode:?}");
-        }
-    }
-
-    #[test]
-    fn control_char_is_not_inserted() {
-        assert_eq!(map_key(ctrl('a'), Mode::Insert), None);
-    }
-}
+mod tests;

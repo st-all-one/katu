@@ -178,18 +178,20 @@ S4  Contexto e IA                T13 · T17
   `<projeto>/.katu/katu.toml` (segredos ficam no global).
 - **Aceite:** cópia byte-a-byte do que não é segredo; sem global, escreve o default.
 
-### E20-T20 ◐ `memo drain` e worker de embeddings
+### E20-T20 ☑ `memo drain` e worker de embeddings
 - **Feito:** `memo drain --status` (read-only, não toca no índice) e **`--digest [--force]`** —
   dreno real pelo pipeline do `knudge-core` (`http`/`lightweight`/`none`, da config do knudge; o
   bridge para as chaves `embeddings.*` do `katu.toml` fica na E20-T17); `--force` apaga `.idx/`
   (derivado) e redigeri; fail-closed sem provedor (não inventa endpoint); o conhecimento vive em
-  `.katu/knowledge` (E20-T19). Falta: `--watch-service` (worker de auto-drain) — contrato presente,
-  ainda fail-closed.
+  `.katu/knowledge` (E20-T19). **`--watch-service`** instala/remove um **timer systemd `--user`**
+  (`crates/katu/src/watch_service.rs` + script embutido `scripts/katu-idle.sh`);
+  `--subscribe`/`--unsubscribe` mantêm a lista de projetos por utilizador; fail-closed sem
+  `systemctl`.
 - **Entregáveis:** `memo drain` (`--status`/`--digest [--force]`) e `memo drain --watch-service
   --install|--subscribe|--un-subscribe|--uninstall` (provedor de embedding, reutilizando o worker
   `knudge-idle.sh` e o provedor HTTP do knudge).
 - **Aceite:** `--status` não toca no índice; `--digest` esvazia/estagna; `--force` reconstrói;
-  `--watch-service` instala e remove o worker (**pendente**); fail-closed sem provider.
+  `--watch-service` instala e remove o worker; fail-closed sem provider.
 
 ### E20-T03 ◐ `katu` sozinho abre a TUI e inicializa o projeto
 - **Feito:** default TUI com `ensure` (bootstrap) e falha fechada sem TTY. Falta: a TUI v2 (S3).
@@ -211,7 +213,12 @@ S4  Contexto e IA                T13 · T17
 - **Aceite:** o id devolvido é aceito por `--resume` na execução seguinte (e2e); id desconhecido
   recusa (exit 2); o texto mostra o id em destaque.
 
-### E20-T10 ☐ TUI por comandos `/`
+### E20-T10 ☑ TUI por comandos `/`
+- **Feito:** entrada por `/` com mini-menus (`crates/katu-tui/src/{menu,overlay}.rs` +
+  `src/app/menu.rs`): `/model`, `/thinking` (submenu **adaptado às capacidades**, aberto ao mudar de
+  modelo), `/help`, `/compact`, `/verify`, `/trash`, `/transcript`, `/quit`; `?` abre a sobreposição
+  de ajuda com comandos, padrões e teclas; atalhos antigos removidos do keymap. `!`/`@` são
+  reconhecidos e recusam (E20-T12).
 - **Entregáveis:** entrada por `/` com mini-menus; `/model` (substituir modelo) e `/thinking`
   (submenu **adaptado às capacidades** do modelo, aberto automaticamente ao mudar de modelo);
   `/help`, `/compact`, `/verify`, `/trash`, `/transcript`, `/quit`. **`?` abre uma sobreposição de
@@ -228,25 +235,38 @@ S4  Contexto e IA                T13 · T17
 - **Aceite:** no modo plano, uma tool de escrita fora de `.katu/` é **negada** com evidência
   (teste pelo caminho real); a regra aparece no log; o nome do ficheiro segue o formato UTC.
 
-### E20-T12 ☐ `!` shell e `@` citação
+### E20-T12 ◐ `!` shell e `@` citação
+- **Feito (`@`):** `App::cite`/`take_goal` (`katu-tui/src/app/menu.rs`) enfileira `@<path>` e
+  prefixa o próximo objetivo **só com os caminhos** (sem anexar conteúdo); teste
+  `citation_prefixes_the_next_submission`. `!<cmd>` continua fail-closed até ao modo `/plan` (T11).
 - **Entregáveis:** `!<cmd>` executa shell a partir da raiz de inicialização **pela
   política/contenção** (como a tool `bash`) e é **bloqueado no modo `/plan`**; `@<path>` cita
   ficheiro/diretório e passa **só o caminho exato** ao modelo (sem anexar conteúdo).
 - **Aceite:** `!` passa pela política (negação com evidência) e é recusado no `/plan`; `@` injeta
   o caminho citado no contexto do próximo turno e nada mais.
 
-### E20-T14 ☐ Cópia por seleção de rato
+### E20-T14 ☑ Cópia por seleção de rato
+- **Feito:** `crates/katu-tui/src/copy.rs` (seleção + extração do buffer renderizado + OSC 52 +
+  base64 próprio, sem dependência) e captura de rato no loop (`src/run.rs`, `EnableMouseCapture` no
+  arranque / `DisableMouseCapture` no restauro); testes de base64, extração e OSC 52.
 - **Entregáveis:** selecionar texto na TUI copia-o automaticamente para o clipboard via **OSC 52**
   (sem dependência nova; mantém o firewall `katu-tui`).
 - **Aceite:** teste do caminho de cópia (escrita OSC 52 abstrata); terminal sem suporte degrada
   sem erro.
 
-### E20-T15 ☐ `Esc` para a rodada sem fechar a sessão
+### E20-T15 ☑ `Esc` para a rodada sem fechar a sessão
+- **Feito:** `is_cancel_key` só aceita `Esc` (`crates/katu-tui/src/run.rs`); `Ctrl-C`/`q` saem pelo
+  loop principal, sem cancelar a rodada. Teste `only_esc_cancels_the_round`.
 - **Entregáveis:** `Esc` é o **único** comando que interrompe a rodada corrente mantendo a sessão
   de conversa aberta; `Ctrl-C`/`q` continuam a sair da UI.
 - **Aceite:** após `Esc`, o próximo turno continua a mesma sessão; `q` sai; testes.
 
-### E20-T16 ☐ *Steering* linear/síncrono
+### E20-T16 ☑ *Steering* linear/síncrono
+- **Feito:** `ActivitySink::steer` é consultado **entre passos** (`agent/turn/run.rs`) e o prompt
+  entra no log como mensagem de utilizador no passo seguinte; o `Painter` (`katu-tui/src/run.rs`)
+  sonda o teclado de forma não bloqueante durante o turno, mostra o buffer na linha de entrada e
+  enfileira em **FIFO** no `Enter` (diag `tui.steer`). Teste com provider falso:
+  `steering_injects_a_user_message_between_steps`.
 - **Entregáveis:** uma **thread leitora de input** só durante o turno alimenta uma fila **FIFO**;
   ela é consultada **durante o HTTP** (entre chunks/passos) e o prompt empilhado é enviado no passo
   seguinte, com prioridade. É **linear/síncrono** do ponto de vista do humano; sem executor
@@ -324,10 +344,14 @@ S4  Contexto e IA                T13 · T17
     registada no log.
 14. **`!` shell** — passa pela **política/contenção** (como a tool `bash`) e é **bloqueado no
     modo `/plan`**.
-15. **Steering** — **thread leitora de input** só durante o turno → fila **FIFO** consultada entre
-    chunks/passos; linear do ponto de vista do humano.
+15. **Steering** — fila **FIFO** consultada entre chunks/passos; linear do ponto de vista do
+    humano. O pintor já sonda o teclado de forma **não bloqueante** durante o stream, pelo que a
+    thread leitora dedicada é desnecessária (mantém a UI numa só thread).
 16. **Cópia por rato** — **OSC 52** (sem dependência nova).
 17. **`@`** — **só o caminho** (sem anexar conteúdo).
+18. **Worker de auto-drain** — **timer systemd `--user`** + script embutido (`katu-idle.sh`); a
+    lista de projetos subscritos é por utilizador (`--subscribe`/`--unsubscribe`); **fail-closed**
+    sem `systemctl` (não finge sucesso).
 
 ### 5.1 `memo` espelha o `kd` (versão CLI)
 

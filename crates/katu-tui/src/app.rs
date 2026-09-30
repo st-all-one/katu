@@ -11,11 +11,13 @@ use katu_core::provider::Thinking;
 
 use crate::action::{Action, Mode};
 use crate::controls::Controls;
-use crate::entry::{Entry, Role, Status};
+use crate::entry::{Entry, Status};
+use crate::menu::{Menu, MenuKind};
 use crate::message::Command;
 use crate::transcript::TranscriptView;
 use crate::trash::{Trash, TrashEntry};
 
+mod menu;
 mod panel;
 mod update;
 mod viewer;
@@ -24,6 +26,10 @@ mod viewer;
 #[derive(Debug)]
 pub struct App {
     input: String,
+    /// Caminhos citados com `@<path>` à espera do próximo turno (E20-T12).
+    citations: Vec<String>,
+    /// Buffer de *steering* em curso durante um turno (E20-T16; efémero).
+    steering: String,
     transcript: Vec<Entry>,
     mode: Mode,
     status: Status,
@@ -36,6 +42,12 @@ pub struct App {
     live: Vec<String>,
     /// Controlos do core: modelo e grau de pensamento (E10-T07/E12-T10).
     controls: Controls,
+    /// Mini-menu de seleção aberto (`/model`, `/thinking`, E20-T10).
+    menu: Option<Menu>,
+    /// Menu a abrir quando a borda publicar as capacidades do novo modelo (E20-T10).
+    pending_menu: Option<MenuKind>,
+    /// Graus de pensamento suportados pelo modelo ativo (E20-T10).
+    thinking_options: Vec<Thinking>,
     /// Vista da lixeira (E10-T07/E06-T09).
     trash: Trash,
     /// Vista da transcrição durável (E10-T05).
@@ -61,6 +73,8 @@ impl App {
     pub fn new() -> Self {
         Self {
             input: String::new(),
+            citations: Vec::new(),
+            steering: String::new(),
             transcript: Vec::new(),
             mode: Mode::default(),
             status: Status::default(),
@@ -69,6 +83,9 @@ impl App {
             thinking: String::new(),
             live: Vec::new(),
             controls: Controls::new(),
+            menu: None,
+            pending_menu: None,
+            thinking_options: Vec::new(),
             trash: Trash::new(),
             viewer: TranscriptView::new(),
             next_action: None,
@@ -118,6 +135,18 @@ impl App {
     #[must_use]
     pub fn input(&self) -> &str {
         &self.input
+    }
+
+    /// Buffer de *steering* em curso durante um turno (E20-T16).
+    #[must_use]
+    pub fn steering(&self) -> &str {
+        &self.steering
+    }
+
+    /// Substitui o buffer de *steering* (chamado pelo pintor durante o turno).
+    pub fn set_steering(&mut self, text: &str) {
+        self.steering.clear();
+        self.steering.push_str(text);
     }
 
     /// Conversa mostrada.
@@ -190,6 +219,11 @@ impl App {
     pub fn apply_action(&mut self, action: Action) -> Option<Command> {
         match action {
             Action::EnterInsert => self.mode = Mode::Insert,
+            Action::StartCommand => {
+                self.mode = Mode::Insert;
+                self.input.clear();
+                self.input.push('/');
+            }
             Action::LeaveInsert => self.mode = Mode::Normal,
             Action::Insert(character) => {
                 if self.mode == Mode::Insert {
@@ -203,27 +237,18 @@ impl App {
             Action::Cancel => {
                 self.mode = Mode::Normal;
                 self.input.clear();
+                self.menu = None;
             }
             Action::Confirm => self.status = Status::Message("nada a confirmar".to_string()),
             Action::ScrollUp => self.scroll = self.scroll.saturating_add(1),
             Action::ScrollDown => self.scroll = self.scroll.saturating_sub(1),
-            Action::CycleModel => return self.controls.cycle_model(),
-            Action::CycleThinking => return Some(self.controls.cycle_thinking()),
-            Action::OpenTrash => {
-                self.trash.open();
-                self.mode = Mode::Trash;
-                return Some(Command::Trash);
-            }
-            Action::OpenTranscript => {
-                self.viewer.open();
-                self.mode = Mode::Transcript;
-                return Some(Command::Transcript);
-            }
-            Action::CloseOverlay => {
-                self.trash.close();
-                self.viewer.close();
-                self.mode = Mode::Normal;
-            }
+            Action::OpenHelp
+            | Action::MenuUp
+            | Action::MenuDown
+            | Action::MenuConfirm
+            | Action::OpenTrash
+            | Action::OpenTranscript
+            | Action::CloseOverlay => return self.overlay_action(action),
             Action::TrashUp => self.trash.up(),
             Action::TrashDown => self.trash.down(),
             Action::TranscriptUp => self.viewer.up(),
@@ -243,23 +268,5 @@ impl App {
             }
         }
         None
-    }
-
-    /// Toma a mensagem escrita e devolve o pedido de submissão (se não estiver vazia).
-    fn submit(&mut self) -> Option<Command> {
-        let text = self.input.trim().to_string();
-        self.input.clear();
-        self.mode = Mode::Normal;
-        if text.is_empty() {
-            return None;
-        }
-        self.transcript.push(Entry {
-            role: Role::User,
-            text: text.clone(),
-        });
-        self.scroll = 0;
-        self.status = Status::Working;
-        self.clear_live();
-        Some(Command::Submit(text))
     }
 }

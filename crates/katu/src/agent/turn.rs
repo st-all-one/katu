@@ -68,6 +68,13 @@ pub(crate) trait ActivitySink {
     fn cancelled(&self) -> bool {
         false
     }
+
+    /// Prompt de *steering* empilhado durante o turno (E20-T16); `None` se não há.
+    ///
+    /// O loop consulta-o **entre passos** e injeta-o como mensagem de utilizador no passo seguinte.
+    fn steer(&mut self) -> Option<String> {
+        None
+    }
 }
 
 /// Pedido de aprovação apresentado ao humano (E07-T05, §33).

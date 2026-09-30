@@ -1,5 +1,6 @@
 //! Testes de render da UI (E10) num backend de teste (sem terminal real).
 
+use katu_core::provider::Thinking;
 use katu_tui::{Action, App, Live, TrashEntry, Update, render};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -36,10 +37,46 @@ fn renders_header_and_transcript() -> Result<(), Box<dyn std::error::Error>> {
 fn renders_model_and_thinking_in_the_header() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = App::new();
     app.apply_update(Update::Models(vec!["qwen".to_string()]));
-    app.apply_action(Action::CycleThinking);
+    app.apply_update(Update::ThinkingOptions(vec![Thinking::Off, Thinking::Low]));
+    app.apply_action(Action::StartCommand);
+    for character in "thinking".chars() {
+        app.apply_action(Action::Insert(character));
+    }
+    app.apply_action(Action::Submit);
+    app.apply_action(Action::MenuDown);
+    app.apply_action(Action::MenuConfirm);
     let text = draw(&app)?;
     assert!(text.contains("qwen"), "{text}");
     assert!(text.contains("pensamento low"), "{text}");
+    Ok(())
+}
+
+#[test]
+fn renders_the_help_overlay() -> Result<(), Box<dyn std::error::Error>> {
+    let mut app = App::new();
+    app.apply_action(Action::OpenHelp);
+    let text = draw_sized(&app, 80, 32)?;
+    assert!(text.contains("ajuda"), "{text}");
+    assert!(text.contains("/model"), "{text}");
+    assert!(text.contains("!<cmd>"), "{text}");
+    Ok(())
+}
+
+#[test]
+fn renders_the_model_menu() -> Result<(), Box<dyn std::error::Error>> {
+    let mut app = App::new();
+    app.apply_update(Update::Models(vec![
+        "qwen".to_string(),
+        "outro".to_string(),
+    ]));
+    app.apply_action(Action::StartCommand);
+    for character in "model".chars() {
+        app.apply_action(Action::Insert(character));
+    }
+    app.apply_action(Action::Submit);
+    let text = draw_sized(&app, 80, 30)?;
+    assert!(text.contains("modelo"), "{text}");
+    assert!(text.contains("outro"), "{text}");
     Ok(())
 }
 

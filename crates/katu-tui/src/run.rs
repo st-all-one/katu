@@ -10,12 +10,17 @@ use std::time::Duration;
 
 use katu_core::diag::{Level, events};
 use katu_core::ports::Clock;
-use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use ratatui::crossterm::event::{
+    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind,
+    KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
+use ratatui::crossterm::execute;
 use ratatui::{DefaultTerminal, restore, try_init};
 
 use crate::action::map_key;
 use crate::app::App;
 use crate::approval::{self, Challenge, ChallengePrompt, ChallengeSignature, Step};
+use crate::copy::{self, Selection};
 use crate::live::Live;
 use crate::throttle::{FRAME_INTERVAL_MS, Throttle};
 use crate::ui::render;
@@ -41,27 +46,41 @@ pub struct Painter<'a> {
     throttle: &'a Throttle<'a>,
     error: Option<io::Error>,
     cancel: bool,
+    /// Prompts de *steering* enfileirados, por ordem (FIFO; E20-T16).
+    steer: Vec<String>,
+    /// Buffer de *steering* em edição durante o turno.
+    steer_buffer: String,
 }
 
 impl Painter<'_> {
     /// Regista um evento efémero e redesenha.
     pub fn live(&mut self, live: Live) {
-        self.poll_cancel();
+        self.poll_input();
         self.app.apply_update(Update::Live(live));
         self.redraw();
     }
 
-    /// `true` se o utilizador pediu para **cancelar** o turno (Esc/Ctrl-C durante o stream).
+    /// `true` se o utilizador pediu para **cancelar** o turno (Esc durante o stream).
     #[must_use]
     pub fn cancelled(&self) -> bool {
         self.cancel
     }
 
-    /// Sonda o teclado (não bloqueante) durante o turno: Esc/Ctrl-C pedem cancelamento.
+    /// Retira o próximo prompt de *steering* enfileirado, se houver (E20-T16).
+    #[must_use]
+    pub fn take_steer(&mut self) -> Option<String> {
+        if self.steer.is_empty() {
+            return None;
+        }
+        Some(self.steer.remove(0))
+    }
+
+    /// Sonda o teclado (não bloqueante) durante o turno.
     ///
-    /// A borda corre o turno na thread da UI, pelo que este é o único ponto que lê o teclado
-    /// enquanto o modelo responde. Teclas que não sejam de cancelamento são descartadas.
-    fn poll_cancel(&mut self) {
+    /// **Esc** pede cancelamento (E20-T15); as restantes teclas alimentam o buffer de *steering*
+    /// (E20-T16), que `Enter` enfileira e a borda aplica no passo seguinte. `Ctrl-C`/`q` saem da UI
+    /// no loop principal (não aqui).
+    fn poll_input(&mut self) {
         loop {
             match event::poll(Duration::ZERO) {
                 Ok(true) => {}
@@ -72,18 +91,45 @@ impl Painter<'_> {
                 }
             }
             match event::read() {
-                Ok(Event::Key(key)) if key.kind == KeyEventKind::Press => {
-                    if is_cancel_key(key) && !self.cancel {
-                        self.cancel = true;
-                        katu_core::event!(Level::Info, events::TUI_CANCEL);
-                    }
-                }
+                Ok(Event::Key(key)) if key.kind == KeyEventKind::Press => self.on_key(key),
                 Ok(_) => {}
                 Err(error) => {
                     self.error = Some(error);
                     return;
                 }
             }
+        }
+    }
+
+    /// Trata uma tecla durante o turno (cancelamento ou *steering*).
+    fn on_key(&mut self, key: KeyEvent) {
+        if is_cancel_key(key) {
+            if !self.cancel {
+                self.cancel = true;
+                katu_core::event!(Level::Info, events::TUI_CANCEL);
+            }
+            return;
+        }
+        match key.code {
+            KeyCode::Enter => {
+                let prompt = self.steer_buffer.trim().to_string();
+                if !prompt.is_empty() {
+                    self.steer.push(prompt);
+                    self.steer_buffer.clear();
+                    self.app.set_steering("");
+                }
+            }
+            KeyCode::Backspace => {
+                self.steer_buffer.pop();
+                let buffer = self.steer_buffer.clone();
+                self.app.set_steering(&buffer);
+            }
+            KeyCode::Char(character) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.steer_buffer.push(character);
+                let buffer = self.steer_buffer.clone();
+                self.app.set_steering(&buffer);
+            }
+            _ => {}
         }
     }
 
@@ -145,10 +191,9 @@ impl Painter<'_> {
     }
 }
 
-/// `true` se a tecla pede o cancelamento do turno (Esc ou Ctrl-C).
+/// `true` se a tecla pede o cancelamento do turno: **só `Esc`** (E20-T15).
 fn is_cancel_key(key: KeyEvent) -> bool {
     matches!(key.code, KeyCode::Esc)
-        || (key.modifiers.contains(KeyModifiers::CONTROL) && matches!(key.code, KeyCode::Char('c')))
 }
 
 /// Guarda RAII do terminal: restaura em qualquer saída (o `panic` já é coberto pelo hook).
@@ -158,14 +203,15 @@ struct TerminalGuard {
 
 impl TerminalGuard {
     fn enter() -> io::Result<Self> {
-        Ok(Self {
-            terminal: try_init()?,
-        })
+        let terminal = try_init()?;
+        execute!(io::stdout(), EnableMouseCapture)?;
+        Ok(Self { terminal })
     }
 }
 
 impl Drop for TerminalGuard {
     fn drop(&mut self) {
+        drop(execute!(io::stdout(), DisableMouseCapture));
         restore();
     }
 }
@@ -180,33 +226,40 @@ impl Drop for TerminalGuard {
 pub fn run<H: Handler>(mut app: App, handler: &mut H, clock: &dyn Clock) -> io::Result<()> {
     let mut guard = TerminalGuard::enter()?;
     let throttle = Throttle::new(clock, FRAME_INTERVAL_MS);
+    let mut selection = Selection::default();
     loop {
         if throttle.due() {
             guard.terminal.draw(|frame| render(frame, &app))?;
         }
-        if event::poll(Duration::from_millis(POLL_MILLIS))?
-            && let Event::Key(key) = event::read()?
-            && key.kind == KeyEventKind::Press
-            && let Some(action) = map_key(key, app.mode())
-        {
-            katu_core::event!(Level::Trace, events::TUI_INPUT);
-            let command = app.apply_action(action);
-            throttle.request();
-            if let Some(command) = command {
-                let mut painter = Painter {
-                    app: &mut app,
-                    terminal: &mut guard.terminal,
-                    throttle: &throttle,
-                    error: None,
-                    cancel: false,
-                };
-                let updates = handler.handle(command, &mut painter);
-                if let Some(error) = painter.take_error() {
-                    return Err(error);
+        if event::poll(Duration::from_millis(POLL_MILLIS))? {
+            match event::read()? {
+                Event::Key(key) if key.kind == KeyEventKind::Press => {
+                    if let Some(action) = map_key(key, app.mode()) {
+                        katu_core::event!(Level::Trace, events::TUI_INPUT);
+                        let command = app.apply_action(action);
+                        throttle.request();
+                        if let Some(command) = command {
+                            let mut painter = Painter {
+                                app: &mut app,
+                                terminal: &mut guard.terminal,
+                                throttle: &throttle,
+                                error: None,
+                                cancel: false,
+                                steer: Vec::new(),
+                                steer_buffer: String::new(),
+                            };
+                            let updates = handler.handle(command, &mut painter);
+                            if let Some(error) = painter.take_error() {
+                                return Err(error);
+                            }
+                            for update in updates {
+                                app.apply_update(update);
+                            }
+                        }
+                    }
                 }
-                for update in updates {
-                    app.apply_update(update);
-                }
+                Event::Mouse(mouse) => handle_mouse(mouse, &mut selection, &mut guard.terminal)?,
+                _ => {}
             }
         }
         if app.should_quit() {
@@ -215,3 +268,26 @@ pub fn run<H: Handler>(mut app: App, handler: &mut H, clock: &dyn Clock) -> io::
     }
     Ok(())
 }
+
+/// Trata um evento de rato: seleção e cópia por OSC 52 (E20-T14).
+fn handle_mouse(
+    mouse: MouseEvent,
+    selection: &mut Selection,
+    terminal: &mut DefaultTerminal,
+) -> io::Result<()> {
+    match mouse.kind {
+        MouseEventKind::Down(MouseButton::Left) => selection.start((mouse.column, mouse.row)),
+        MouseEventKind::Drag(MouseButton::Left) => selection.drag((mouse.column, mouse.row)),
+        MouseEventKind::Up(MouseButton::Left) => {
+            if let Some((start, end)) = selection.take() {
+                let text = copy::extract(terminal.current_buffer_mut(), start, end);
+                copy::osc52(&text)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests;

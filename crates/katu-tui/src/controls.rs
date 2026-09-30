@@ -1,11 +1,10 @@
 //! Controlos do core na UI (E10-T07/E12-T10): **modelo** e **grau de pensamento**.
 //!
 //! Só o **utilizador** os muda (o agente nunca se auto-escala); a borda aplica a escolha ao
-//! **próximo** turno. O log/estado do kernel não muda por trocar de modelo.
+//! **próximo** turno. O log/estado do kernel não muda por trocar de modelo. Na TUI v2 a escolha
+//! faz-se pelos mini-menus de `/model` e `/thinking` (E20-T10).
 
 use katu_core::provider::Thinking;
-
-use crate::message::Command;
 
 /// Seleção de modelo e grau de pensamento para os próximos turnos.
 #[derive(Debug, Default)]
@@ -34,36 +33,27 @@ impl Controls {
         self.models.get(self.index).map(String::as_str)
     }
 
+    /// Lista de modelos publicada pela borda (E12-T02/T10).
+    #[must_use]
+    pub(crate) fn models(&self) -> &[String] {
+        &self.models
+    }
+
     /// Publica a lista de modelos (o **primeiro** é o default).
     pub(crate) fn set_models(&mut self, models: Vec<String>) {
         self.models = models;
         self.index = 0;
     }
 
-    /// Avança para o próximo modelo; `None` se ainda não há lista (a tecla não faz nada).
-    pub(crate) fn cycle_model(&mut self) -> Option<Command> {
-        if self.models.is_empty() {
-            return None;
+    /// Seleciona um modelo da lista publicada (se existir).
+    pub(crate) fn set_model(&mut self, model: &str) {
+        if let Some(index) = self.models.iter().position(|name| name == model) {
+            self.index = index;
         }
-        let next = self.index.checked_add(1).unwrap_or(0);
-        self.index = if next >= self.models.len() { 0 } else { next };
-        let model = self.models.get(self.index)?.clone();
-        Some(Command::SetModel(model))
     }
 
-    /// Avança o grau de pensamento no ciclo (o utilizador aciona; E12-T10).
-    pub(crate) fn cycle_thinking(&mut self) -> Command {
-        self.reasoning = next_thinking(self.reasoning);
-        Command::SetThinking(self.reasoning)
-    }
-}
-
-/// Próximo grau de pensamento no ciclo (E10-T07/E12-T10).
-const fn next_thinking(thinking: Thinking) -> Thinking {
-    match thinking {
-        Thinking::Off => Thinking::Low,
-        Thinking::Low => Thinking::Medium,
-        Thinking::Medium => Thinking::High,
-        _ => Thinking::Off,
+    /// Define o grau de pensamento escolhido no menu.
+    pub(crate) fn set_thinking(&mut self, thinking: Thinking) {
+        self.reasoning = thinking;
     }
 }

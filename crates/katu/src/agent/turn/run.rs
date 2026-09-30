@@ -129,6 +129,14 @@ fn drive(
             accum.cancelled = true;
             return Ok(accum);
         }
+        if let Some(prompt) = activity.steer() {
+            runtime.record_user(&prompt)?;
+            katu_core::event!(
+                Level::Info,
+                events::TUI_STEER,
+                "chars" => prompt.chars().count()
+            );
+        }
         if accum.steps >= options.max_steps {
             return Err(AgentError::TooManySteps { steps: accum.steps });
         }

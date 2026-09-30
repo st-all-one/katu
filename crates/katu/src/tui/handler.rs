@@ -190,6 +190,10 @@ impl ActivitySink for LivePainter<'_, '_> {
         self.painter.cancelled()
     }
 
+    fn steer(&mut self) -> Option<String> {
+        self.painter.take_steer()
+    }
+
     fn approve(&mut self, prompt: &ApprovalPrompt<'_>) -> Option<Approval> {
         let request = ChallengePrompt {
             tool: prompt.tool.to_string(),

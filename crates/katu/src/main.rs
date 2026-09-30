@@ -29,6 +29,9 @@ mod memory;
 #[cfg(feature = "memory-in-process")]
 mod pricing;
 
+#[cfg(feature = "memory-in-process")]
+mod watch_service;
+
 #[allow(dead_code, reason = "adaptadores ligados ao kernel em E04")]
 mod ports;
 

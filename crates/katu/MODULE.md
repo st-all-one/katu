@@ -33,9 +33,10 @@ todo o código impuro confinado.
   *dry-run* fiel ao `update`; `memo doctor` expõe `memory.status()` e a suíte de
   conformidade corre contra o adaptador (E03-T02/T05/T06/T07). O conhecimento vive em
   `.katu/knowledge` (E20-T19) e `memo drain --digest [--force]` drena a fila de embeddings pelo
-  pipeline do `knudge-core` (`src/memory/drain.rs`, E20-T20), fail-closed sem provedor. Sem o
-  adaptador, `katu memory` **falha fechado** (`unavailable`, exit 10) — a memória é invariante de
-  produção (G4).
+  pipeline do `knudge-core` (`src/memory/drain.rs`, E20-T20), fail-closed sem provedor; o worker de
+  auto-drain (`--watch-service`) vive em `src/watch_service.rs` (+ script `scripts/katu-idle.sh`).
+  Sem o adaptador, `katu memory` **falha fechado** (`unavailable`, exit 10) — a memória é invariante
+  de produção (G4).
 - **Runtime** (`src/runtime.rs`, feature `memory-in-process`): ponto de composição do loop
   (E03-T03/T07) — descobre a raiz, abre o adaptador, **recusa arrancar** sem memória saudável
   (fail-closed) e expõe `recall`/`remember` pelo caminho §42 (`src/runtime/memory.rs`). O comando
@@ -62,7 +63,8 @@ todo o código impuro confinado.
   `Handler` que corre o turno e injeta `Update`s; `Runtime::begin_turn` abre o próximo turno
   (multi-turno) e `Runtime::phase` alimenta o indicador de fase (E10-T06). O streaming do modelo e
   as tools em curso vão **ao vivo** para o painel de atividade via `run_turn_with` + `ActivitySink`
-  (`LivePainter`/`Painter`), sem entrarem no log. A **transcrição durável** é projetada do log
+  (`LivePainter`/`Painter`), sem entrarem no log. O **steering** (E20-T16) é consultado **entre
+  passos** (`ActivitySink::steer`) e injetado como mensagem de utilizador no passo seguinte. A **transcrição durável** é projetada do log
   (`Runtime::transcript`, `src/runtime/transcript.rs`) e escrita atomicamente em
   `<root>/.katu/transcript.md` após cada turno (`src/tui/transcript.rs`); a TUI serve-a numa vista
   read-only (`T`, E10-T05). As **recusas de política**

@@ -207,7 +207,7 @@ fn fix_report() -> Report {
 #[cfg(feature = "memory-in-process")]
 fn drain(args: &DrainArgs) -> Report {
     if args.watch_service {
-        return drain_watch_unavailable();
+        return watch_action(args);
     }
     if args.status {
         return Report::ok("memo.drain", Some(json!({ "status": memory_status() })));
@@ -216,6 +216,24 @@ fn drain(args: &DrainArgs) -> Report {
         return memory_drain(args.force);
     }
     drain_unavailable()
+}
+
+/// `--watch-service`: instala/remove o worker de auto-drain (E20-T20).
+#[cfg(feature = "memory-in-process")]
+fn watch_action(args: &DrainArgs) -> Report {
+    use crate::watch_service::{self, Action};
+    let action = if args.install {
+        Action::Install
+    } else if args.subscribe {
+        Action::Subscribe
+    } else if args.unsubscribe {
+        Action::Unsubscribe
+    } else if args.uninstall {
+        Action::Uninstall
+    } else {
+        Action::Status
+    };
+    watch_service::run(action)
 }
 
 /// Sem adaptador, `drain` recusa (fail-closed).
@@ -230,20 +248,10 @@ fn drain(args: &DrainArgs) -> Report {
     drain_unavailable()
 }
 
-/// `--watch-service` ainda não implementado (E20-T20); `drain` sem modo é help.
+/// `drain` sem modo é help.
 fn drain_unavailable() -> Report {
     Report::failed(
         "memo.drain",
-        &Error::unavailable(
-            "memo drain exige --status ou --digest (--watch-service ainda não implementado — E20-T20)",
-        ),
-    )
-}
-
-/// Worker de auto-drain (`--watch-service`): contrato presente, ainda fail-closed (E20-T20).
-fn drain_watch_unavailable() -> Report {
-    Report::failed(
-        "memo.drain",
-        &Error::unavailable("memo drain --watch-service ainda não implementado (E20-T20)"),
+        &Error::unavailable("memo drain exige --status, --digest ou --watch-service"),
     )
 }

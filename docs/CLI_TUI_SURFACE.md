@@ -59,8 +59,9 @@ existir** no topo → `invalid_input` (exit 2), sem retrocompatibilidade.
   - `memo doctor [--fix]` — diagnóstico do backend; `--fix` garante o layout do projeto (**E20-T07**).
   - `memo sessions` — lista as sessões do projeto (para `--resume`).
   - `memo drain [--status\|--digest [--force]]` — `--status` é read-only (não toca no índice);
-    `--digest` drena a fila de embeddings (`--force` apaga `.idx/` e redigeri; **E20-T20**);
-    `--watch-service` recusa (contrato presente, fail-closed).
+    `--digest` drena a fila de embeddings (`--force` apaga `.idx/` e redigeri; **E20-T20**).
+  - `memo drain --watch-service [--install\|--subscribe\|--unsubscribe\|--uninstall]` — instala/remove
+    um **timer systemd `--user`** que corre `--digest` nos projetos subscritos (**E20-T20**).
   - `memo prime [--long]` — prime do grupo.
   A **escrita** de memória é do **agente** (tools no loop) e do `kd`; o `memo` nunca cria notas.
 - **`run`** — monta o runtime, escolhe o modelo (explícito ou por **tier**), corre **uma** rodada;
@@ -133,10 +134,15 @@ Abre com `katu tui [flags de §2]` ou `katu` (sem verbo). A UI é **pura** (esta
 em `katu-tui`); a borda (`crates/katu/src/tui/handler.rs`) é quem fala com o modelo e executa os
 efeitos.
 
-> **Nota (E20-T10…T16, onda S3):** a entrada por `/` (mini-menus), `/plan`, `!`/`@`, cópia por
-> rato (OSC 52), *steering* e a ajuda por `?` ainda **não** estão implementados; as teclas abaixo
-> são as atuais. Quando entrar, **`?`** abre uma sobreposição com todos os comandos `/` e padrões
-> (`!<cmd>`, `@<path>`, `/<comando>`) — E20-T10.
+> **Nota (E20-T10…T16, onda S3):** `/` + mini-menus + ajuda `?` (**E20-T10**), `Esc` como único
+> cancelamento (**E20-T15**), cópia por seleção de rato via OSC 52 (**E20-T14**) e *steering* FIFO
+> (**E20-T16**) já estão implementados; `/plan` (T11) e `!` (T12) ainda **não**; `@<path>` já cita.
+> `?` abre a sobreposição com todos os comandos `/`, os padrões (`!<cmd>`, `@<path>`, `/<comando>`) e
+> as teclas.
+>
+> **Steering:** durante o turno, escrever e premir `Enter` enfileira um prompt que é aplicado no
+> **passo seguinte** (FIFO), sem reiniciar a rodada; o buffer aparece na linha de entrada. `Esc`
+> continua a ser o único cancelamento.
 
 ### 4.1 Layout
 
@@ -154,24 +160,25 @@ Render governado por orçamento (`Throttle`, ~60 fps, forçado em cada tecla/fim
 
 ### 4.2 Modos e teclas
 
-Modos: `Normal` (navegação), `Insert` (edição), `Trash` (lixeira), `Transcript` (transcrição),
+Modos: `Normal` (navegação), `Insert` (edição/mensagem ou comando `/`), `Menu` (mini-menu de
+`/model`/`/thinking`), `Help` (ajuda `?`), `Trash` (lixeira), `Transcript` (transcrição),
 `Confirm` (**reservado** — ver §6) e o challenge de aprovação (sobreposição, §4.3).
 
 | Modo | Tecla | Ação |
 | --- | --- | --- |
 | Normal | `q` | Sai da UI |
 | Normal | `Enter` / `i` | Entra em `Insert` |
-| Normal | `m` | Cicla o **modelo** (próximo turno) |
-| Normal | `t` | Cicla o **grau de pensamento** (Off→Low→Medium→High→Off) |
-| Normal | `l` | Abre a **lixeira** |
-| Normal | `T` | Abre a **transcrição** durável (read-only) |
-| Normal | `c` | Liga/desliga a **compactação** (com pré-visualização) |
-| Normal | `v` | Corre o **gate de verificação** (override por challenge se bloquear) |
+| Normal | `/` | Inicia um comando (`/model`, `/thinking`, …) |
+| Normal | `?` | Abre a **ajuda** (comandos, padrões e teclas) |
 | Normal | `↑` / `↓` | Rola a conversa |
-| Insert | `Enter` | Submete a mensagem (inicia o turno) |
+| Insert | `Enter` | Submete a mensagem/comando (inicia o turno) |
 | Insert | `Esc` | Volta a `Normal` (sem submeter) |
 | Insert | `Backspace` | Apaga o último caractere |
 | Insert | caracteres | Escrevem na mensagem (teclas `Ctrl` ignoradas) |
+| Menu | `↑` / `↓` | Escolhe a opção |
+| Menu | `Enter` | Confirma (aplica ao próximo turno) |
+| Menu | `Esc` / `q` | Fecha o menu |
+| Help | `Esc` / `q` / `?` | Fecha a ajuda |
 | Trash | `↑` / `↓` | Escolhe a entrada |
 | Trash | `r` | **Restaura** a entrada selecionada |
 | Trash | `x` | **Esvazia** a lixeira (destrutivo; challenge) |
@@ -180,9 +187,19 @@ Modos: `Normal` (navegação), `Insert` (edição), `Trash` (lixeira), `Transcri
 | Transcript | `Esc` / `q` | Fecha a vista |
 | qualquer | `Ctrl-C` | Sai da UI (em todos os modos) |
 
-**Durante um turno** (estado `a trabalhar…`), `Esc` ou `Ctrl-C` pedem **cancelamento cooperativo**:
-o texto parcial é registado, o turno fecha limpo e a UI mostra `turno cancelado` (evento
-`tui.cancel`).
+**Comandos `/`** (na linha de mensagem): `/model` (menu de modelos), `/thinking` (menu dos graus
+**suportados pelo modelo**), `/compact`, `/verify`, `/trash`, `/transcript`, `/help`, `/quit`.
+Comando desconhecido → erro na barra de estado (não é enviado ao modelo). `@<path>` **cita** um
+caminho: fica pendente e é prefixado (só o caminho, sem conteúdo) ao próximo turno (E20-T12).
+`!<cmd>` é reconhecido mas recusa até ao modo `/plan` (E20-T11/T12).
+
+**Rato:** arrastar com o botão esquerdo seleciona texto e copia-o automaticamente para o clipboard
+via **OSC 52** (E20-T14); terminais sem suporte ignoram a sequência. A captura de rato é ligada no
+arranque e desligada no restauro.
+
+**Durante um turno** (estado `a trabalhar…`), **`Esc`** pede **cancelamento cooperativo**: o texto
+parcial é registado, o turno fecha limpo e a UI mostra `turno cancelado` (evento `tui.cancel`).
+`Ctrl-C`/`q` saem da UI (no loop principal), **não** cancelam a rodada (E20-T15).
 
 ### 4.3 Challenge de aprovação / override
 
@@ -205,8 +222,8 @@ Quem assina é `USER`/`USERNAME` (default `local`); o agente **nunca** assina.
 
 A UI emite `Command`s (efeitos) e a borda devolve `Update`s. **Comandos**: `Submit`, `SetModel`,
 `SetThinking`, `Trash`, `Transcript`, `Restore`, `EmptyTrash`, `Compact`, `Verify`, `Quit`.
-**Atualizações**: `Assistant`, `Tool`, `Info`, `Error`, `Phase`, `Live`, `Models`, `NextAction`,
-`Usage`, `Trash`, `Transcript`, `Cancelled`, `Done`.
+**Atualizações**: `Assistant`, `Tool`, `Info`, `Error`, `Phase`, `Live`, `Models`,
+`ThinkingOptions`, `NextAction`, `Usage`, `Trash`, `Transcript`, `Cancelled`, `Done`.
 
 Efeitos na borda: o turno usa o **tier** da fase salvo modelo explícito; no fim escreve o
 **checkpoint** de fase (`<root>/.katu/…`) e a **transcrição** durável (`<root>/.katu/transcript.md`);
@@ -227,8 +244,8 @@ o `verify` grava o relatório e, se bloqueado, regista `overrides.jsonl` por cha
 
 ## 6. Lacunas conhecidas (superfície reservada)
 
-- **Verbos em esqueleto:** `upgrade`, `memo knowledge`, `memo drain --watch-service` — existem no
-  contrato mas **recusam** (exit 10) até às tarefas E20-T02/T06/T20.
+- **Verbos em esqueleto:** `upgrade`, `memo knowledge` — existem no contrato mas **recusam**
+  (exit 10) até às tarefas E20-T02/T06.
 - **`--params`/`--batch`** existem em `prime`/`run`/`tui`/`memo ask`; `config` (subcomandos) e os
   verbos em esqueleto ficam para quando tiverem dados.
 - **Modo `Confirm`** existe no keymap (`y`/`n`) mas **nenhum fluxo o ativa** hoje: `Action::Confirm`

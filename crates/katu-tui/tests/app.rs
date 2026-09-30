@@ -124,43 +124,100 @@ fn refusal_is_shown_and_kept_in_the_transcript() {
     assert_eq!(app.transcript().len(), 1, "o transcript mantém a recusa");
 }
 
+/// Escreve e submete um comando `/` na linha de mensagem.
+fn slash(app: &mut App, command: &str) {
+    app.apply_action(Action::StartCommand);
+    for character in command.chars() {
+        app.apply_action(Action::Insert(character));
+    }
+    app.apply_action(Action::Submit);
+}
+
 #[test]
-fn cycling_the_model_emits_a_set_model_command() {
+fn model_menu_selects_a_model() {
     let mut app = App::new();
     app.apply_update(Update::Models(vec!["a".to_string(), "b".to_string()]));
     assert_eq!(app.model(), Some("a"));
+    slash(&mut app, "model");
+    assert_eq!(app.mode(), Mode::Menu);
+    assert!(app.menu().is_some());
+    app.apply_action(Action::MenuDown);
     assert_eq!(
-        app.apply_action(Action::CycleModel),
+        app.apply_action(Action::MenuConfirm),
         Some(Command::SetModel("b".to_string()))
     );
     assert_eq!(app.model(), Some("b"));
-    assert_eq!(
-        app.apply_action(Action::CycleModel),
-        Some(Command::SetModel("a".to_string())),
-        "cicla de volta ao primeiro"
-    );
+    assert_eq!(app.mode(), Mode::Normal);
 }
 
 #[test]
-fn cycling_the_model_without_a_list_is_a_noop() {
+fn model_menu_without_a_list_is_reported() {
     let mut app = App::new();
-    assert_eq!(app.apply_action(Action::CycleModel), None);
-    assert_eq!(app.model(), None);
+    slash(&mut app, "model");
+    assert_eq!(app.mode(), Mode::Normal, "sem modelos não abre menu");
+    assert!(matches!(app.status(), Status::Message(_)));
 }
 
 #[test]
-fn cycling_thinking_advances_and_wraps() {
+fn thinking_menu_offers_only_supported_grades() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = App::new();
-    assert_eq!(app.reasoning(), Thinking::Off);
+    app.apply_update(Update::ThinkingOptions(vec![Thinking::Off]));
+    slash(&mut app, "thinking");
+    assert_eq!(app.mode(), Mode::Menu);
+    let Some(menu) = app.menu() else {
+        return Err("menu devia estar aberto".into());
+    };
+    assert_eq!(menu.items().len(), 1, "só `off` é suportado");
     assert_eq!(
-        app.apply_action(Action::CycleThinking),
-        Some(Command::SetThinking(Thinking::Low))
+        app.apply_action(Action::MenuConfirm),
+        Some(Command::SetThinking(Thinking::Off))
     );
-    assert_eq!(app.reasoning(), Thinking::Low);
-    for _ in 0..3 {
-        app.apply_action(Action::CycleThinking);
-    }
-    assert_eq!(app.reasoning(), Thinking::Off, "o ciclo fecha");
+    Ok(())
+}
+
+#[test]
+fn changing_model_auto_opens_the_thinking_menu() {
+    let mut app = App::new();
+    app.apply_update(Update::Models(vec!["a".to_string(), "b".to_string()]));
+    app.apply_update(Update::ThinkingOptions(vec![Thinking::Off]));
+    slash(&mut app, "model");
+    app.apply_action(Action::MenuDown);
+    assert_eq!(
+        app.apply_action(Action::MenuConfirm),
+        Some(Command::SetModel("b".to_string()))
+    );
+    app.apply_update(Update::ThinkingOptions(vec![Thinking::Off, Thinking::Low]));
+    assert_eq!(app.mode(), Mode::Menu, "o submenu de thinking abre sozinho");
+    assert!(app.menu().is_some());
+}
+
+#[test]
+fn help_overlay_opens_and_closes() {
+    let mut app = App::new();
+    assert_eq!(app.apply_action(Action::OpenHelp), None);
+    assert!(app.help_open());
+    app.apply_action(Action::CloseOverlay);
+    assert!(!app.help_open());
+}
+
+#[test]
+fn unknown_slash_command_is_reported_not_submitted() {
+    let mut app = App::new();
+    slash(&mut app, "naoexiste");
+    assert_eq!(app.mode(), Mode::Normal);
+    assert!(matches!(app.status(), Status::Failure(_)));
+    assert!(app.transcript().is_empty(), "não vira mensagem");
+}
+
+#[test]
+fn shell_prefix_fails_closed() {
+    let mut app = App::new();
+    app.apply_action(Action::EnterInsert);
+    app.apply_action(Action::Insert('!'));
+    app.apply_action(Action::Insert('x'));
+    assert_eq!(app.apply_action(Action::Submit), None, "!");
+    assert!(matches!(app.status(), Status::Failure(_)), "!");
+    assert!(app.transcript().is_empty(), "! não vira mensagem");
 }
 
 #[test]
@@ -252,4 +309,28 @@ fn opening_the_transcript_emits_a_command_and_fills_the_viewer() {
     app.apply_action(Action::CloseOverlay);
     assert!(!app.viewer_open());
     assert_eq!(app.mode(), Mode::Normal);
+}
+
+#[test]
+fn citation_prefixes_the_next_submission() {
+    let mut app = App::new();
+    app.apply_action(Action::EnterInsert);
+    for character in "@src/main.rs".chars() {
+        app.apply_action(Action::Insert(character));
+    }
+    assert_eq!(app.apply_action(Action::Submit), None, "citar não submete");
+    assert_eq!(
+        app.citations().first().map(String::as_str),
+        Some("@src/main.rs")
+    );
+    app.apply_action(Action::EnterInsert);
+    for character in "vê isto".chars() {
+        app.apply_action(Action::Insert(character));
+    }
+    let command = app.apply_action(Action::Submit);
+    assert_eq!(
+        command,
+        Some(Command::Submit("@src/main.rs\n\nvê isto".to_string()))
+    );
+    assert!(app.citations().is_empty(), "as citações são consumidas");
 }

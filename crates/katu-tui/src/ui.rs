@@ -13,6 +13,7 @@ use ratatui::widgets::{Block, Paragraph, Wrap};
 use crate::action::Mode;
 use crate::app::App;
 use crate::entry::{Role, Status};
+use crate::overlay;
 use crate::transcript;
 use crate::trash;
 
@@ -56,9 +57,17 @@ pub fn render(frame: &mut Frame<'_>, app: &App) {
         activity,
     );
 
+    let (input_text, input_title) = if app.steering().is_empty() {
+        (app.input().to_string(), input_title(app))
+    } else {
+        (
+            app.steering().to_string(),
+            "steering (Enter enfileira, Esc cancela)",
+        )
+    };
     frame.render_widget(
-        Paragraph::new(app.input().to_string())
-            .block(Block::bordered().title(input_title(app)))
+        Paragraph::new(input_text)
+            .block(Block::bordered().title(input_title))
             .wrap(Wrap { trim: false }),
         input,
     );
@@ -70,6 +79,12 @@ pub fn render(frame: &mut Frame<'_>, app: &App) {
     }
     if app.viewer_open() {
         transcript::render(frame, app);
+    }
+    if app.help_open() {
+        overlay::help(frame);
+    }
+    if app.menu().is_some() {
+        overlay::menu(frame, app);
     }
 }
 
@@ -129,8 +144,7 @@ fn input_title(app: &App) -> &'static str {
 fn status_line(app: &App) -> Line<'static> {
     match app.status() {
         Status::Idle => Line::from(Span::styled(
-            "q sai  ·  ↑/↓ rola  ·  i escreve  ·  m modelo  ·  t pensamento  ·  l lixeira  ·  c compactar  ·  v verifica"
-                .to_string(),
+            "q sai  ·  ↑/↓ rola  ·  i escreve  ·  / comandos  ·  ? ajuda".to_string(),
             Style::default().fg(Color::DarkGray),
         )),
         Status::Working => Line::from(Span::styled(

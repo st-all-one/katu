@@ -280,6 +280,15 @@ fn memo_drain_force_requires_digest() -> Result<(), io::Error> {
     Ok(())
 }
 
+/// As ações do worker exigem `--watch-service` (exit 2).
+#[test]
+fn memo_drain_watch_actions_require_flag() -> Result<(), io::Error> {
+    let dir = temp_dir("drain-watch")?;
+    let output = run_in(&dir, &["memo", "drain", "--install"])?;
+    assert_eq!(output.status.code(), Some(2));
+    Ok(())
+}
+
 /// `prime --params` e flags explícitas são exclusivos (T08).
 #[test]
 fn prime_params_and_flag_are_exclusive() -> Result<(), io::Error> {

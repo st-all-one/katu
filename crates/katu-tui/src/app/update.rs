@@ -22,6 +22,7 @@ impl App {
             Update::Phase(phase) => self.phase = phase,
             Update::Live(live) => self.apply_live(live),
             Update::Models(models) => self.controls.set_models(models),
+            Update::ThinkingOptions(options) => self.apply_thinking_options(options),
             Update::NextAction(action) => self.next_action = Some(action),
             Update::Usage(text) => self.usage = Some(text),
             Update::Trash(items) => self.trash.set_items(items),

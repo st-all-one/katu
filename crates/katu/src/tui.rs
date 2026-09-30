@@ -66,8 +66,10 @@ pub(crate) fn run_tui(args: &RunArgs<'_>) -> Report {
         str::to_string,
     );
     let models = models_for(provider.as_ref(), &model);
+    let thinking = control::thinking_options(provider.as_ref(), &model);
     let mut app = App::new();
     app.apply_update(Update::Models(models));
+    app.apply_update(Update::ThinkingOptions(thinking));
     apply_initial(&mut app, &runtime);
     let mut handler = AgentHandler {
         runtime,
