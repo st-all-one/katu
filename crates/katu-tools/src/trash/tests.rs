@@ -1,4 +1,4 @@
-use super::{TrashError, TrashTool, list, restore};
+use super::{TrashError, TrashTool, empty, list, restore};
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::{Tool, ToolOutput};
 use katu_core::ports::{FixedClock, Fs, MemFs, Timestamp};
@@ -11,7 +11,11 @@ const PATH: &str = "/work/src/a.rs";
 const STORED: &str = "/work/.katu/trash/src/a.rs";
 
 fn use_() -> Result<ToolUse, katu_policy::PolicyError> {
-    let path = ResolvedPath::from_canonical(PATH)?;
+    use_path(PATH)
+}
+
+fn use_path(path: &str) -> Result<ToolUse, katu_policy::PolicyError> {
+    let path = ResolvedPath::from_canonical(path)?;
     let cwd = ResolvedPath::from_canonical(ROOT)?;
     Ok(ToolUse {
         name: ToolName::Trash,
@@ -134,4 +138,32 @@ fn list_is_most_recent_first() -> Result<(), Box<dyn std::error::Error>> {
 fn list_without_index_is_empty() {
     let fs = MemFs::new();
     assert!(list(&fs, Path::new(ROOT)).is_empty());
+}
+
+#[test]
+fn empty_removes_files_and_clears_the_list() -> Result<(), Box<dyn std::error::Error>> {
+    let fs = MemFs::new();
+    fs.write_atomic(Path::new(PATH), b"body")?;
+    fs.write_atomic(Path::new("/work/src/b.rs"), b"two")?;
+    let clock = FixedClock::new(Timestamp::from_millis(1_000));
+    let trash = tool(&fs, &clock);
+    trash.execute(&use_()?);
+    trash.execute(&use_path("/work/src/b.rs")?);
+    assert_eq!(list(&fs, Path::new(ROOT)).len(), 2);
+    let removed = empty(&fs, Path::new(ROOT))?;
+    assert_eq!(removed, 2);
+    assert!(!fs.exists(Path::new(STORED)));
+    assert!(list(&fs, Path::new(ROOT)).is_empty());
+    assert!(
+        fs.exists(Path::new("/work/.katu/trash/index.tsv")),
+        "o índice fica como rasto de auditoria"
+    );
+    Ok(())
+}
+
+#[test]
+fn empty_without_index_is_zero() -> Result<(), Box<dyn std::error::Error>> {
+    let fs = MemFs::new();
+    assert_eq!(empty(&fs, Path::new(ROOT))?, 0);
+    Ok(())
 }

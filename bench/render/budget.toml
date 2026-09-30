@@ -1,0 +1,8 @@
+# Orçamento de render por quadro (E15-T01 / E10-T03).
+#
+# `xtask gate:render` re-mede 400 quadros num `TestBackend` de 120×40 com a conversa no teto
+# (200 entradas) e **falha** se o p95 exceder este valor. Dado versionado, não constante de código.
+# Referência local: p95 ≈ 0.74 ms; o orçamento tem folga para o CI (máquinas mais lentas).
+
+[render]
+frame_p95_nanos = 3000000

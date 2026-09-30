@@ -80,6 +80,8 @@ pub enum Unit {
     Nanos,
     /// Milissegundos.
     Millis,
+    /// Micro-USD.
+    Micros,
     /// Contagem inteira.
     Count,
     /// Fração `0..=1`.

@@ -1,0 +1,40 @@
+//! Painel de atividade **efémero** (E10-T05): só estado de UI; nunca toca no log nem no transcript.
+
+use crate::entry::Role;
+use crate::live::{Live, trim_tail};
+
+use super::App;
+
+/// Teto do buffer efémero de streaming (bytes); o painel mostra só a cauda (E10-T03).
+const STREAM_TAIL_BYTES: usize = 8 * 1024;
+
+impl App {
+    /// Aplica um evento efémero ao painel de atividade (não toca no transcript).
+    pub(super) fn apply_live(&mut self, live: Live) {
+        match live {
+            Live::Text(delta) => {
+                self.streaming.push_str(&delta);
+                trim_tail(&mut self.streaming, STREAM_TAIL_BYTES);
+            }
+            Live::Thinking(delta) => self.thinking.push_str(&delta),
+            Live::Tool(name) => self.live.push(format!("→ {name}")),
+            Live::ToolDone(name) => self.live.push(format!("✓ {name}")),
+            Live::Refused { rule, evidence } => {
+                let text = format!("⛔ {rule}: {evidence}");
+                self.live.push(text.clone());
+                self.push(Role::Error, text);
+            }
+            Live::Unavailable { control } => {
+                self.live.push(format!("⚠ falta {control}"));
+            }
+            Live::Clear => self.clear_live(),
+        }
+    }
+
+    /// Limpa o painel de atividade.
+    pub(super) fn clear_live(&mut self) {
+        self.streaming.clear();
+        self.thinking.clear();
+        self.live.clear();
+    }
+}

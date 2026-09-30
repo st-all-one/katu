@@ -22,3 +22,4 @@ jobs:
       - run: cargo run -q -p xtask -- check-diag
       - run: cargo run -q -p xtask -- check-docs
       - run: cargo run -q -p xtask -- gate:bench
+      - run: cargo run -q -p xtask -- gate:render

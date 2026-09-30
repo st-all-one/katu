@@ -82,3 +82,13 @@ name = "provider.request_compression.saved_ratio"
 value = 0.0
 unit = "ratio"
 basis = "unpriced"
+
+# --- Render por quadro da TUI (E15-T01 / E10-T03) ---
+# Protocolo em `bench/render/PROTOCOL.md`; artefacto cru em `bench/render/frame.json`.
+# CPU-local (sem rede): o p95 varia com a máquina; o orçamento versionado é `bench/render/budget.toml`.
+[[metrics]]
+name = "render.frame.p95_nanos"
+value = 743122.0
+unit = "nanos"
+basis = "measured"
+artifact = { path = "bench/render/frame.json", note = "p95 de 400 quadros, TestBackend 120×40, 200 entradas" }

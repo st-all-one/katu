@@ -15,6 +15,8 @@ katu-core.workspace = true
 katu-policy.workspace = true
 katu-tools.workspace = true
 katu-providers.workspace = true
+katu-tui.workspace = true
+ratatui.workspace = true
 tiktoken-rs = { version = "0.12", optional = true }
 
 [features]

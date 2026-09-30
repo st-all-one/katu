@@ -24,8 +24,10 @@ use katu_tools::write::WriteNoteTool;
 use crate::memory::KnudgeMemory;
 use crate::scope::{self, ScopeError};
 
+mod checkpoint;
 mod context;
 mod control;
+mod transcript;
 mod verify;
 
 /// Regras do protocolo de memória, versionadas no repositório (dado, não código).
@@ -103,6 +105,7 @@ pub(crate) struct Runtime<'a> {
     pub(crate) cwd: ResolvedPath,
     pub(crate) calls: u64,
     pub(crate) plan: Option<Plan>,
+    goal: String,
     budget: ContextBudget,
     compaction: CompactionMode,
 }
@@ -137,6 +140,7 @@ impl<'a> Runtime<'a> {
             cwd,
             calls: 0,
             plan,
+            goal: goal.to_string(),
             budget: DEFAULT_CONTEXT_BUDGET,
             compaction: CompactionMode::Disabled,
         })

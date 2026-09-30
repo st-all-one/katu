@@ -9,7 +9,7 @@ use serde::Deserialize;
 
 use katu_policy::{RuleCategory, RuleSet};
 
-use crate::walk::collect_by_extension;
+use crate::walk::collect_rule_files;
 
 /// Ledger de cobertura versionado.
 #[derive(Debug, Deserialize)]
@@ -83,7 +83,7 @@ pub(crate) fn ledger_validate(args: &[String]) -> Result<(), String> {
 /// Regras `Enforced` presentes nos `*.toml` de `policy/`.
 fn enforced_rule_ids() -> Result<BTreeSet<String>, String> {
     let mut files: Vec<PathBuf> = Vec::new();
-    collect_by_extension(Path::new(POLICY_DIR), "toml", &mut files)?;
+    collect_rule_files(Path::new(POLICY_DIR), &mut files)?;
     let mut ids = BTreeSet::new();
     for file in &files {
         let text =

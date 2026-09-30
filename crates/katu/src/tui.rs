@@ -8,9 +8,9 @@
 use katu_core::context::CompactionMode;
 use katu_core::diag::{Level, events};
 use katu_core::error::Error;
+use katu_core::kernel::next_phase;
 use katu_core::provider::{ModelSpec, Provider};
-use katu_tools::trash;
-use katu_tui::{App, ChallengePrompt, Command, Handler, Live, Painter, TrashEntry, Update, run};
+use katu_tui::{App, ChallengePrompt, Command, Handler, Live, Painter, Update, run};
 
 use crate::agent::{
     Activity, ActivitySink, Approval, ApprovalPrompt, Ports, RunArgs, SYSTEM, TurnOptions,
@@ -19,8 +19,11 @@ use crate::agent::{
 use crate::ports::{StdEnv, StdFs, StdProcess, SystemClock};
 use crate::report::Report;
 use crate::runtime::Runtime;
+use crate::tier::TierPolicy;
 
 mod control;
+mod transcript;
+mod trash;
 mod verify;
 
 /// Corre a UI de terminal ligada ao loop de turnos.
@@ -37,9 +40,6 @@ pub(crate) fn run_tui(args: &RunArgs<'_>) -> Report {
     if args.compact {
         runtime.set_compaction(CompactionMode::Enabled);
     }
-    let model = args
-        .model
-        .map_or_else(|| default_model(args.provider).to_string(), str::to_string);
     let base = args
         .base
         .map_or_else(|| default_base(args.provider).to_string(), str::to_string);
@@ -47,7 +47,26 @@ pub(crate) fn run_tui(args: &RunArgs<'_>) -> Report {
         Ok(provider) => provider,
         Err(message) => return Report::failed("tui", &Error::invalid_input(message)),
     };
+    let tiers = match TierPolicy::load() {
+        Ok(tiers) => tiers,
+        Err(message) => return Report::failed("tui", &Error::invalid_input(message)),
+    };
+    let model = args.model.map_or_else(
+        || {
+            tiers.model_for(
+                provider.as_ref(),
+                runtime.phase(),
+                default_model(args.provider),
+            )
+        },
+        str::to_string,
+    );
     let models = models_for(provider.as_ref(), &model);
+    let initial = match runtime.checkpoint() {
+        Ok(Some(checkpoint)) => Some(Update::NextAction(checkpoint.next_action)),
+        Ok(None) => None,
+        Err(error) => Some(Update::Error(error.to_string())),
+    };
     let mut handler = AgentHandler {
         runtime,
         provider,
@@ -55,23 +74,39 @@ pub(crate) fn run_tui(args: &RunArgs<'_>) -> Report {
         process,
         env,
         model: ModelSpec::new(model),
+        tiers,
         max_tokens: args.max_tokens,
         max_steps: args.max_steps,
     };
     let mut app = App::new();
     app.apply_update(Update::Models(models));
+    if let Some(update) = initial {
+        app.apply_update(update);
+    }
     match run(app, &mut handler, &clock) {
         Ok(()) => Report::ok("tui", None),
         Err(error) => Report::failed("tui", &Error::io("<tui>", error)),
     }
 }
 
-/// Modelos oferecidos no seletor da TUI (E12-T02/T10): do **catálogo** do provider.
+/// Modelos oferecidos no seletor da TUI (E12-T02/T10): do **endpoint**, com queda no catálogo.
 ///
+/// Tenta a descoberta ao vivo (`dynamic_models`); se falhar ou vier vazia, usa o catálogo estático.
 /// O default vem primeiro para o índice zero coincidir com o modelo do arranque.
 fn models_for(provider: &dyn Provider, default: &str) -> Vec<String> {
-    let mut models: Vec<String> = provider
-        .models()
+    let discovered = provider.dynamic_models().unwrap_or_default();
+    katu_core::event!(
+        Level::Debug,
+        events::PROVIDER_MODELS,
+        "source" => if discovered.is_empty() { "catalog" } else { "endpoint" },
+        "count" => discovered.len(),
+    );
+    let listed = if discovered.is_empty() {
+        provider.models()
+    } else {
+        discovered
+    };
+    let mut models: Vec<String> = listed
         .into_iter()
         .filter(|model| model.as_str() != default)
         .collect();
@@ -87,6 +122,7 @@ struct AgentHandler<'a> {
     process: StdProcess,
     env: StdEnv,
     model: ModelSpec,
+    tiers: TierPolicy,
     max_tokens: u32,
     max_steps: u32,
 }
@@ -99,7 +135,9 @@ impl Handler for AgentHandler<'_> {
             Command::SetModel(model) => self.set_model(model),
             Command::SetThinking(thinking) => self.set_thinking(thinking),
             Command::Trash => self.trash_list(),
+            Command::Transcript => self.transcript_view(),
             Command::Restore(token) => self.restore(&token),
+            Command::EmptyTrash => self.empty_trash(painter),
             Command::Compact => self.toggle_compaction(),
             Command::Verify => self.verify(painter),
         }
@@ -131,30 +169,6 @@ impl AgentHandler<'_> {
         }
     }
 
-    /// Lista a lixeira do projeto para a UI (E10-T07/E06-T09).
-    fn trash_list(&self) -> Vec<Update> {
-        let items = trash::list(self.fs, self.runtime.root())
-            .into_iter()
-            .map(|item| TrashEntry {
-                original: item.original,
-                stored: item.stored,
-            })
-            .collect();
-        vec![Update::Trash(items)]
-    }
-
-    /// Restaura um item da lixeira e devolve a lista atualizada (E06-T09).
-    fn restore(&self, token: &str) -> Vec<Update> {
-        match trash::restore(self.fs, self.runtime.root(), token) {
-            Ok(path) => {
-                let mut updates = vec![Update::Info(format!("restaurado: {}", path.display()))];
-                updates.extend(self.trash_list());
-                updates
-            }
-            Err(error) => vec![Update::Error(error.to_string())],
-        }
-    }
-
     /// Submete um turno e traduz o resultado em atualizações da UI.
     fn submit(&mut self, goal: &str, painter: &mut Painter<'_>) -> Vec<Update> {
         let granted_by = self.granted_by();
@@ -165,10 +179,13 @@ impl AgentHandler<'_> {
         };
         let control = self.runtime.control();
         let model = ModelSpec {
-            model: control
-                .model
-                .clone()
-                .unwrap_or_else(|| self.model.model.clone()),
+            model: control.model.clone().unwrap_or_else(|| {
+                self.tiers.model_for(
+                    self.provider.as_ref(),
+                    self.runtime.phase(),
+                    &self.model.model,
+                )
+            }),
             thinking: control.thinking,
         };
         let options = TurnOptions {
@@ -198,6 +215,17 @@ impl AgentHandler<'_> {
                     updates.push(Update::Info(format!("{} tool call(s)", turn.calls)));
                 }
                 updates.push(Update::Phase(self.runtime.phase().as_str().to_string()));
+                let next = next_phase(self.runtime.phase()).map_or_else(
+                    || "concluído".to_string(),
+                    |phase| phase.as_str().to_string(),
+                );
+                if let Err(error) = self.runtime.write_checkpoint(&next) {
+                    updates.push(Update::Error(error.to_string()));
+                }
+                updates.push(Update::NextAction(next));
+                if let Some(error) = self.write_transcript() {
+                    updates.push(error);
+                }
                 updates.push(Update::Done);
                 updates
             }

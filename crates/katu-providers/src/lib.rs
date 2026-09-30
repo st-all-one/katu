@@ -36,6 +36,7 @@ mod anthropic;
 mod engine;
 mod error;
 mod google;
+mod models;
 mod responses;
 mod wire;
 

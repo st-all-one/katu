@@ -19,5 +19,8 @@ ureq = { version = "3", default-features = false, features = ["rustls"] }
 # gzip opcional do corpo do pedido (só acima de um limiar; ver `UreqTransport`)
 flate2.workspace = true
 
+[dev-dependencies]
+proptest.workspace = true
+
 [lints]
 workspace = true

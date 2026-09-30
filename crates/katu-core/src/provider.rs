@@ -12,12 +12,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::error::Error;
-use crate::evidence::EvidenceBasis;
 use crate::kernel::{CallId, Message};
 
 mod collect;
+mod tier;
+mod usage;
 
 pub use collect::CollectSink;
+pub use tier::Tier;
+pub use usage::TokenUsage;
 
 /// Grau de pensamento (reasoning) pedido ao modelo num turno (E12-T10).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -111,35 +114,6 @@ pub struct ProviderRequest {
     pub temperature: Option<f32>,
 }
 
-/// Contabilização de tokens de uma chamada, com a sua base (DF5).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TokenUsage {
-    /// Tokens de entrada.
-    pub input: Option<u64>,
-    /// Tokens de saída.
-    pub output: Option<u64>,
-    /// Tokens de entrada servidos por prefix-cache (E18/F4), quando reportado.
-    pub cached_input: Option<u64>,
-    /// Tokens de raciocínio (thinking), quando reportado.
-    pub reasoning: Option<u64>,
-    /// Base de evidência dos números.
-    pub basis: EvidenceBasis,
-}
-
-impl TokenUsage {
-    /// Nova contabilização com a base indicada.
-    #[must_use]
-    pub const fn new(basis: EvidenceBasis) -> Self {
-        Self {
-            input: None,
-            output: None,
-            cached_input: None,
-            reasoning: None,
-            basis,
-        }
-    }
-}
-
 /// Por que razão o modelo parou de gerar.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -214,6 +188,17 @@ pub trait Provider: Send + Sync {
         Vec::new()
     }
 
+    /// Lê o catálogo **do endpoint** (E12-T02), ao vivo.
+    ///
+    /// Por omissão devolve o catálogo estático ([`Provider::models`]): um provider que não descobre
+    /// modelos não faz I/O. A borda usa isto quando disponível e cai no catálogo em erro/vazio.
+    ///
+    /// # Errors
+    /// [`ProviderError`] em falha de transporte/HTTP/decode.
+    fn dynamic_models(&self) -> Result<Vec<String>, ProviderError> {
+        Ok(self.models())
+    }
+
     /// Capacidades do modelo (E12-T10), para o controlo validar.
     ///
     /// Conservador por omissão: um modelo desconhecido **não** anuncia raciocínio.
@@ -222,6 +207,14 @@ pub trait Provider: Send + Sync {
             model: model.to_string(),
             reasoning: false,
         }
+    }
+
+    /// Primeiro modelo de um `tier` (E12-T03), em ordem determinística.
+    ///
+    /// Por omissão `None`: um provider sem catálogo de tiers não escolhe; a borda cai no modelo
+    /// configurado. Implementado pelos providers com [`crate::provider::Tier`] no catálogo.
+    fn model_for_tier(&self, _tier: Tier) -> Option<String> {
+        None
     }
 
     /// Consome o stream do modelo, emitindo eventos no `sink`.

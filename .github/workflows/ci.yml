@@ -18,5 +18,34 @@ jobs:
       - run: cargo clippy -p katu-core --features instrument --all-targets -- -D warnings
       - run: cargo clippy -p katu --features profile --all-targets -- -D warnings
       - run: cargo run -q -p xtask -- gate:bench
+      - run: cargo run -q -p xtask -- gate:render
+      - run: cargo run -q -p xtask -- gate:provider
       - run: cargo test -p katu-core --features instrument
       - run: cargo test -p katu --features profile
+
+  hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo run -q -p xtask -- check-unsafe
+      - run: cargo install cargo-machete --locked
+      - run: cargo machete
+      - run: cargo install cargo-geiger --locked
+      - run: cargo geiger --output-format Json > geiger.json
+
+  miri:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: miri
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo +nightly miri setup
+      - run: cargo +nightly miri test -p katu-core -p katu-policy

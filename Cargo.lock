@@ -628,6 +628,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+ "toml",
 ]
 
 [[package]]
@@ -659,6 +660,7 @@ dependencies = [
  "flate2",
  "katu-core",
  "katu-policy",
+ "proptest",
  "serde",
  "serde_json",
  "thiserror",
@@ -1761,6 +1763,8 @@ dependencies = [
  "katu-policy",
  "katu-providers",
  "katu-tools",
+ "katu-tui",
+ "ratatui",
  "serde",
  "serde_json",
  "tiktoken-rs",

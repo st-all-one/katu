@@ -25,6 +25,23 @@ enum Verdict {
     Other,
 }
 
+/// Artefacto golden (veredictos por caso), regenerável com `KATU_GEN_TEST_DATA=1`.
+const GOLDEN_FILE: &str = "tests/golden/verdicts.tsv";
+
+/// Caso do golden: `(nome, factos, veredicto esperado)`.
+type GoldenCase = (&'static str, Facts, Verdict);
+
+/// Nome estável de um veredicto (para o artefacto golden).
+fn verdict_name(verdict: Verdict) -> &'static str {
+    match verdict {
+        Verdict::Allow => "allow",
+        Verdict::Deny => "deny",
+        Verdict::RequireApproval => "require_approval",
+        Verdict::NeedsHuman => "needs_human",
+        Verdict::Other => "other",
+    }
+}
+
 fn classify(decision: &Decision) -> Verdict {
     match decision {
         Decision::Allow => Verdict::Allow,
@@ -125,10 +142,33 @@ fn rules() -> Result<RuleSet, PolicyError> {
     })
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "regeneração explícita por env var (`KATU_GEN_TEST_DATA`), dev-only"
+)]
 #[test]
-fn golden_matrix() -> Result<(), PolicyError> {
+fn golden_matrix() -> Result<(), Box<dyn std::error::Error>> {
     let rules = rules()?;
-    let cases: Vec<(&str, Facts, Verdict)> = vec![
+    let mut rendered = String::new();
+    for (name, facts, expected) in cases()? {
+        let decision = evaluate(&facts, &rules)?;
+        assert_eq!(
+            classify(&decision),
+            expected,
+            "caso: {name} -> {decision:?}"
+        );
+        rendered.push_str(name);
+        rendered.push('\t');
+        rendered.push_str(verdict_name(classify(&decision)));
+        rendered.push('\n');
+    }
+    golden_artifact(&rendered)?;
+    Ok(())
+}
+
+/// Casos do golden: `(nome, factos, veredicto esperado)`.
+fn cases() -> Result<Vec<GoldenCase>, PolicyError> {
+    Ok(vec![
         (
             "escrita em segredo",
             write_facts("/work/secrets/token")?,
@@ -175,15 +215,24 @@ fn golden_matrix() -> Result<(), PolicyError> {
             Verdict::Deny,
         ),
         ("exec ls", exec_facts("ls", &["-la"])?, Verdict::Deny),
-    ];
-    for (name, facts, expected) in cases {
-        let decision = evaluate(&facts, &rules)?;
-        assert_eq!(
-            classify(&decision),
-            expected,
-            "caso: {name} -> {decision:?}"
-        );
+    ])
+}
+
+/// Compara (ou regenera, com `KATU_GEN_TEST_DATA=1`) o artefacto golden.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "regeneração explícita por env var (`KATU_GEN_TEST_DATA`), dev-only"
+)]
+fn golden_artifact(rendered: &str) -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::var("KATU_GEN_TEST_DATA").as_deref() == Ok("1") {
+        std::fs::write(GOLDEN_FILE, rendered)?;
+        return Ok(());
     }
+    let committed = std::fs::read_to_string(GOLDEN_FILE)?;
+    assert_eq!(
+        committed, rendered,
+        "golden divergente; regenere com `KATU_GEN_TEST_DATA=1 cargo test -p katu-policy --test golden`"
+    );
     Ok(())
 }
 

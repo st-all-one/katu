@@ -85,3 +85,16 @@ fn declarative_provider_streams_chat_completions() -> Result<(), Box<dyn std::er
     assert_eq!(sink.text, "oi");
     Ok(())
 }
+
+#[test]
+fn dynamic_models_read_the_endpoint_and_fall_back() -> Result<(), Box<dyn std::error::Error>> {
+    let live = Declarative::new(
+        MockTransport::ok(r#"{"data":[{"id":"z"},{"id":"y"}]}"#, 8),
+        ProviderSpec::opencode_zen(),
+    );
+    assert_eq!(live.dynamic_models()?, vec!["y", "z"]);
+
+    let empty = Declarative::new(MockTransport::ok("{}", 8), ProviderSpec::opencode_zen());
+    assert_eq!(empty.dynamic_models()?, empty.models());
+    Ok(())
+}

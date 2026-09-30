@@ -24,6 +24,7 @@ mod live;
 mod message;
 mod run;
 mod throttle;
+mod transcript;
 mod trash;
 mod ui;
 

@@ -193,3 +193,30 @@ fn thinking_deltas_are_separate_from_text() -> Result<(), Box<dyn std::error::Er
     assert_eq!(probe.thinking, "penso");
     Ok(())
 }
+
+#[test]
+fn dynamic_models_reads_the_endpoint_listing() -> Result<(), Box<dyn std::error::Error>> {
+    let transport = MockTransport::ok(r#"{"data":[{"id":"b"},{"id":"a"}]}"#, 8);
+    let provider = OpenCode::new(
+        transport,
+        OpenCodeConfig::at("https://example.invalid/v1", "k"),
+    );
+    assert_eq!(provider.dynamic_models()?, vec!["a", "b"]);
+    Ok(())
+}
+
+#[test]
+fn dynamic_models_falls_back_to_the_catalog_when_empty() -> Result<(), Box<dyn std::error::Error>> {
+    let provider = OpenCode::new(MockTransport::ok("{}", 8), OpenCodeConfig::zen("k"));
+    assert!(!provider.models().is_empty());
+    assert_eq!(provider.dynamic_models()?, provider.models());
+    Ok(())
+}
+
+#[test]
+fn llama_dynamic_models_reads_the_local_server() -> Result<(), Box<dyn std::error::Error>> {
+    let transport = MockTransport::ok(r#"{"object":"list","data":[{"id":"qwen"}]}"#, 8);
+    let provider = Llama::new(transport, LlamaConfig::local(8080));
+    assert_eq!(provider.dynamic_models()?, vec!["qwen"]);
+    Ok(())
+}

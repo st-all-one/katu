@@ -93,6 +93,14 @@ pub trait Fs: Send + Sync {
 
     /// Lista as entradas diretas de um diretório, em ordem canônica.
     fn list_dir(&self, path: &Path) -> Result<Vec<PathBuf>, FsError>;
+
+    /// Remove um ficheiro (ou *symlink*) **permanentemente**. Diretórios são recusados
+    /// (fail-closed): a remoção é sempre explícita e nunca recursiva.
+    ///
+    /// # Errors
+    /// [`FsError::NotFound`] se o caminho não existir; [`FsError::Io`] se for um diretório ou a
+    /// remoção falhar.
+    fn remove(&self, path: &Path) -> Result<(), FsError>;
 }
 
 #[cfg(test)]

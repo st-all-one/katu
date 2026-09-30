@@ -69,8 +69,8 @@ fecha o ponto em aberto **OA3** com um desenho testado. Padrões a herdar:
   com relógio determinístico) e coalesce os quadros a ~60 fps, forçando um quadro em cada tecla e
   fim de turno. O **teto de trabalho** limita entradas da conversa (200), linhas do painel (100) e
   a cauda do buffer de streaming (8 KiB, em fronteira de caractere).
-- **Falta:** o **benchmark** por frame e a verificação de **zero alocações** no hot path
-  (E15-T01/E18-T10).
+- **Falta:** a verificação de **zero alocações** no hot path de render (E18-T10); o **benchmark**
+  por quadro está feito (`xtask bench-render`/`gate:render`, `bench/render/`, E15-T01).
 - **Aceite:** benchmark de render por frame dentro do orçamento (E15); sem alocações no hot path
   de render (verificado por lint/bench).
 
@@ -87,23 +87,28 @@ fecha o ponto em aberto **OA3** com um desenho testado. Padrões a herdar:
   `Esc`/`Ctrl-C` cancelam) e, com a assinatura, o kernel regista `ApprovalGranted` e re-executa a
   chamada (E07-T05). Um `Deny` critical e um `NeedsHuman` **não** são sobreponíveis (muro).
 
-### E10-T05 ◐ Split live/durable
+### E10-T05 ☑ Split live/durable
 - **Entregáveis:** painel de observação efémero; transcrições em ficheiro; viewer read-only.
 - **Aceite:** o live não entra no transcript do modelo; o durable é reconstruível do log.
 - **Estado:** painel de atividade efémero feito (`App::live`/`streaming`/`thinking`, `Update::Live`,
   `Painter` em `katu-tui/src/run.rs`): o stream do modelo e as tools em curso aparecem ao vivo,
   com o evento estruturado `tui.live`, **fora** do log e do transcript (testado: deltas ao vivo não
-  entram no contexto do modelo). O durável é o próprio log de sessão (`Session`), reconstruível.
-  **Falta:** transcrição em ficheiro dedicada e viewer read-only.
+  entram no contexto do modelo). O durável é o próprio log de sessão (`Session`), reconstruível; a
+  **transcrição em ficheiro** é `<root>/.katu/transcript.md` (`Runtime::transcript` projeta o log;
+  a borda escreve-a atomicamente após cada turno) e o **viewer read-only** (`T` →
+  `Command::Transcript`, `katu-tui::TranscriptView`) lê o ficheiro com scroll e **sem** edição — o
+  live nunca entra na transcrição (§50.3).
 
-### E10-T06 ◐ Checkpoint e estado visíveis
+### E10-T06 ☑ Checkpoint e estado visíveis
 - **Entregáveis:** indicador de fase, checkpoint atual, pendências, próxima ação.
 - **Aceite:** o estado mostrado deriva do `State` (fonte única), nunca de variável de UI paralela.
-- **Estado:** o cabeçalho mostra a fase (via `Runtime::phase()` → `Update::Phase`) e a pendência
-  (derivada do `Status`); a barra mostra o estado. **Falta:** checkpoint atual/próxima ação quando
-  o checkpoint tipado (E09-T02) for ligado à UI.
+- **Estado:** o cabeçalho mostra a fase (via `Runtime::phase()` → `Update::Phase`), a pendência
+  (derivada do `Status`) e a **próxima ação** declarada no checkpoint (`Update::NextAction`); a
+  barra mostra o estado. O checkpoint tipado (E09-T02) está **ligado à UI**: a borda escreve-o no
+  fim do turno (`Runtime::write_checkpoint`, com a próxima ação derivada de `next_phase` — o `State`
+  é a fonte única) e lê-o no arranque (`Runtime::checkpoint`).
 
-### E10-T07 ◐ Controlos do core na TUI
+### E10-T07 ☑ Controlos do core na TUI
 - **Entregáveis:** selector de **modelo** e de **grau de pensamento** (`set_model`/`set_thinking`,
   E12-T10); comando de **compactar conversa** (E09-T07) com pré-visualização antes/depois; vista
   da **lixeira** (`.katu/trash`) com `restore` (E06-T09); confirmação explícita em toda a ação
@@ -112,12 +117,14 @@ fecha o ponto em aberto **OA3** com um desenho testado. Padrões a herdar:
   `Action`s puras (`CycleModel`/`CycleThinking`) + `Command::{SetModel, SetThinking}`, com o estado
   em `katu-tui/src/controls.rs` (`Controls`) e o modelo/pensamento no cabeçalho. A **vista da
   lixeira** (`l`) lista `.katu/trash` (`trash::list`) e restaura com `r` (`trash::restore`; E06-T09,
-  recuperável). A **compactação** (`c`) liga/desliga o contexto efetivo (`Runtime::set_compaction`,
-  E09-T07) e o **gate de verificação** (`v` → `Runtime::verify`; se bloquear, pede override humano
-  por challenge, E09-T03). A escolha de modelo/pensamento passa por `Runtime::set_control` (validado
-  contra o catálogo com erro que ensina, E12-T10), a lista de modelos vem de `Provider::models()`
-  (E12-T02) e o turno seguinte usa o estado de controlo (o agente **nunca** se auto-escala).
-  **Falta:** o **esvaziamento** da lixeira com challenge-and-response.
+  recuperável); **esvaziar** (`x`) exige challenge-and-response (§33) e remove os ficheiros
+  permanentemente (`trash::empty` + `Fs::remove`; o índice append-only fica como rasto de auditoria
+  e `list` filtra por existência). A **compactação** (`c`) liga/desliga o contexto efetivo
+  (`Runtime::set_compaction`, E09-T07) e o **gate de verificação** (`v` → `Runtime::verify`; se
+  bloquear, pede override humano por challenge, E09-T03). A escolha de modelo/pensamento passa por
+  `Runtime::set_control` (validado contra o catálogo com erro que ensina, E12-T10), a lista de
+  modelos vem de `Provider::models()` (E12-T02) e o turno seguinte usa o estado de controlo (o
+  agente **nunca** se auto-escala).
 - **Aceite:** cada controlo mapeia para uma `Action` pura (E10-T02) e é testável por modo; o
   agente **não** altera modelo/pensamento sem o utilizador; esvaziar a lixeira exige
   challenge-and-response.

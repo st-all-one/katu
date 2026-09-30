@@ -123,10 +123,14 @@ pub struct TrashItem {
 }
 
 /// Lista a lixeira, do mais recente para o mais antigo (vazia sem índice).
+///
+/// Itens já removidos (lixeira esvaziada) deixam de aparecer: filtra pela **existência** do
+/// ficheiro guardado, preservando o índice append-only como rasto de auditoria.
 #[must_use]
 pub fn list(fs: &dyn Fs, root: &Path) -> Vec<TrashItem> {
     let mut items: Vec<TrashItem> = index::read(fs, root)
         .into_iter()
+        .filter(|record| fs.exists(Path::new(&record.stored)))
         .map(|record| TrashItem {
             stored: record.stored,
             original: record.original,
@@ -158,6 +162,27 @@ pub fn restore(fs: &dyn Fs, root: &Path, token: &str) -> Result<PathBuf, TrashEr
     fs.rename(Path::new(token), &original)
         .map_err(|_| TrashError::Io)?;
     Ok(original)
+}
+
+/// Esvazia a lixeira: remove **permanentemente** os ficheiros guardados e devolve quantos removeu.
+///
+/// Ação **destrutiva** (exige challenge-and-response na UI, E10-T07); o índice append-only é
+/// preservado como rasto de auditoria e [`list`] deixa de mostrar os itens removidos.
+///
+/// # Errors
+/// [`TrashError::Io`] se uma remoção falhar.
+pub fn empty(fs: &dyn Fs, root: &Path) -> Result<usize, TrashError> {
+    let records = index::read(fs, root);
+    let mut removed = 0usize;
+    for record in &records {
+        let stored = Path::new(&record.stored);
+        if !fs.exists(stored) {
+            continue;
+        }
+        fs.remove(stored).map_err(|_| TrashError::Io)?;
+        removed = removed.saturating_add(1);
+    }
+    Ok(removed)
 }
 
 /// Erro de restauro.

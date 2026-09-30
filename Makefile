@@ -2,11 +2,13 @@
 
 CARGO ?= cargo
 
-.PHONY: check fmt clippy test build file-length layers diag docs policy bench provider measure clean \
+.PHONY: check fmt clippy test build file-length layers diag docs policy bench provider render measure \
+        measure-render clean \
         deny audit machete typos miri instrument ci memory-swap
 
-## Portão completo local: formatação, lints, testes, camadas, diag, docs, política e tamanho.
-check: fmt clippy test layers diag schemas docs policy memory-swap bench provider file-length
+## Portão completo local: um único ponto de entrada (`cargo xtask check`), igual ao CI.
+check:
+	$(CARGO) run -q -p xtask -- check
 
 ## Verifica formatação sem alterar.
 fmt:
@@ -58,6 +60,10 @@ bench:
 provider:
 	$(CARGO) run -q -p xtask -- gate:provider
 
+## Render por quadro: re-mede e trava contra o orçamento versionado (E15-T01/E10-T03).
+render:
+	$(CARGO) run -q -p xtask -- gate:render
+
 ## Substituibilidade da memória (E03-T06): o knudge só acopla no adaptador; o binário também
 ## compila sem o adaptador (memória é invariante em produção, G4/E03-T07).
 memory-swap:
@@ -67,6 +73,11 @@ memory-swap:
 ## Medição do MVK (E05-T06): gera o artefacto cru e valida o manifesto.
 measure:
 	$(CARGO) run -q -p katu --features profile --example measure_mvk
+	$(CARGO) run -q -p xtask -- gate:bench
+
+## Regenera o artefacto cru do render (máquina declarada) e revalida os números.
+measure-render:
+	$(CARGO) run -q -p xtask -- bench-render
 	$(CARGO) run -q -p xtask -- gate:bench
 
 clean:

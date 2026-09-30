@@ -116,7 +116,7 @@ pub(crate) fn render(frame: &mut Frame<'_>, app: &App) {
         ]));
     }
     lines.push(Line::from(Span::styled(
-        "↑/↓ escolhe · r restaura · Esc fecha",
+        "↑/↓ escolhe · r restaura · x esvazia · Esc fecha",
         Style::default().fg(Color::DarkGray),
     )));
     frame.render_widget(

@@ -6,7 +6,12 @@ use ratatui::backend::TestBackend;
 
 /// Renderiza num backend de teste e devolve o texto do buffer.
 fn draw(app: &App) -> Result<String, Box<dyn std::error::Error>> {
-    let backend = TestBackend::new(60, 16);
+    draw_sized(app, 60, 16)
+}
+
+/// Renderiza num backend de teste com um tamanho explícito.
+fn draw_sized(app: &App, width: u16, height: u16) -> Result<String, Box<dyn std::error::Error>> {
+    let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend)?;
     terminal.draw(|frame| render(frame, app))?;
     let buffer = terminal.backend().buffer();
@@ -49,6 +54,29 @@ fn renders_the_trash_overlay() -> Result<(), Box<dyn std::error::Error>> {
     let text = draw(&app)?;
     assert!(text.contains("lixeira"), "{text}");
     assert!(text.contains("src/a.rs"), "{text}");
+    Ok(())
+}
+
+#[test]
+fn renders_the_transcript_viewer() -> Result<(), Box<dyn std::error::Error>> {
+    let mut app = App::new();
+    app.apply_action(Action::OpenTranscript);
+    app.apply_update(Update::Transcript(vec![
+        "# katu — transcrição".to_string(),
+        "**utilizador**".to_string(),
+    ]));
+    let text = draw(&app)?;
+    assert!(text.contains("transcrição"), "{text}");
+    assert!(text.contains("utilizador"), "{text}");
+    Ok(())
+}
+
+#[test]
+fn renders_the_declared_next_action() -> Result<(), Box<dyn std::error::Error>> {
+    let mut app = App::new();
+    app.apply_update(Update::NextAction("verificar".to_string()));
+    let text = draw_sized(&app, 120, 16)?;
+    assert!(text.contains("próximo verificar"), "{text}");
     Ok(())
 }
 

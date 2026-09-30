@@ -35,6 +35,8 @@
 | [0013](0013-cache-de-prefixo-e-compressao-de-pedido.md) | Cache de prefixo por modelo e compressão de pedido (medida) | aceite |
 | [0014](0014-orcamento-de-latencia-do-provider.md) | Orçamento de latência do provider: gate offline determinístico | aceite |
 | [0015](0015-loop-de-turnos-e-roteador.md) | Loop de turnos e roteador de tool calls | aceite |
+| [0016](0016-politica-de-memoria-e-unsafe.md) | Política de memória e `unsafe` | aceite |
+| [0017](0017-recursos-e-runtime-minimo.md) | Política de recursos e runtime mínimo | aceite |
 
 ## Template
 

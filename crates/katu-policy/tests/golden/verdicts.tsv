@@ -1,0 +1,10 @@
+escrita em segredo	deny
+raiz exata do segredo	deny
+traversal normaliza para fora	allow
+fronteira secrets2 (não é prefixo)	allow
+escrita fora	allow
+exec bash -c	deny
+exec find -delete	deny
+exec docker run	deny
+exec python -c	deny
+exec ls	deny

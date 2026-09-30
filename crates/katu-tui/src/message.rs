@@ -18,8 +18,12 @@ pub enum Command {
     SetThinking(Thinking),
     /// Pede a lista da lixeira (E10-T07/E06-T09).
     Trash,
+    /// Pede a transcrição durável para a vista read-only (E10-T05).
+    Transcript,
     /// Restaura um item da lixeira pelo token guardado.
     Restore(String),
+    /// Esvazia a lixeira (destrutivo; a borda pede challenge, E10-T07).
+    EmptyTrash,
     /// Pré-visualiza a compactação do histórico (E09-T07/E10-T07).
     Compact,
     /// Corre o gate de verificação e pede override se bloquear (E09-T03).
@@ -45,8 +49,12 @@ pub enum Update {
     Live(Live),
     /// Modelos disponíveis no provider (E10-T07); o primeiro é o default.
     Models(Vec<String>),
+    /// Próxima ação declarada no checkpoint de fase (E10-T06).
+    NextAction(String),
     /// Lista da lixeira publicada pela borda (E10-T07/E06-T09).
     Trash(Vec<TrashEntry>),
+    /// Linhas da transcrição durável, lidas do ficheiro pela borda (E10-T05).
+    Transcript(Vec<String>),
     /// Turno concluído (limpa a pendência).
     Done,
 }

@@ -136,14 +136,16 @@ pub enum MemoryErrorKind { Unavailable, Timeout, Invalid, Internal }
 - **Aceite:** um teste de kernel usa `FakeMemory` e **não** puxa `knudge-core`; o binário de
   produção usa o adaptador in-process.
 
-### E03-T04 ☐ `spawn_blocking` + timeout no caminho async
+### E03-T04 ☑ `spawn_blocking` + timeout no caminho async
 - **Entregáveis:** wrapper que executa o adaptador fora do hot path, com timeout e cancelamento
   (o núcleo do knudge é bloqueante, embedding HTTP inclusive).
-- **Estado:** **gated** em E12/E01-T09 — não existe runtime assíncrono (decisão: *worker
-  bloqueante por padrão*; `tokio` mínimo só se necessário). O `Runtime` atual chama o adaptador
-  de forma síncrona, que é o caminho de produção até haver caminho async.
+- **Estado:** **resolvido como não aplicável** por
+  [ADR 0017](../docs/adr/0017-recursos-e-runtime-minimo.md) (E01-T09): não existe runtime
+  assíncrono (decisão: *worker bloqueante por padrão*; `tokio` mínimo só se necessário). O
+  `Runtime` chama o adaptador de forma síncrona, que é o caminho de produção. Quando o executor em
+  background (E10) existir, o wrapper `spawn_blocking`+timeout entra aí.
 - **Aceite:** um adaptador artificialmente bloqueante **não** congela o loop; o timeout é
-  observável e não vaza tarefas.
+  observável e não vaza tarefas — critério retomado no executor em background.
 
 ### E03-T05 ☑ `FakeMemory` e suíte de conformidade
 - **Entregáveis:** `FakeMemory` com cenários (`Create`/`Merge`/`Reject`) e scores fixos; suíte de

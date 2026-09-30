@@ -119,6 +119,16 @@ impl Fs for StdFs {
         entries.sort();
         Ok(entries)
     }
+
+    fn remove(&self, path: &Path) -> Result<(), FsError> {
+        let _span = katu_core::span!(Level::Trace, events::FS_REMOVE);
+        // Recusa diretórios: a remoção é sempre de um ficheiro concreto (fail-closed).
+        let meta = fs::symlink_metadata(path).map_err(|err| FsError::from_io(&err))?;
+        if meta.is_dir() {
+            return Err(FsError::Io("recusado remover um diretório".to_string()));
+        }
+        fs::remove_file(path).map_err(|err| FsError::from_io(&err))
+    }
 }
 
 /// Caminho temporário **imprevisível**, no **mesmo diretório** do alvo (rename no mesmo FS).

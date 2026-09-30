@@ -7,11 +7,11 @@
 ## 0. Snapshot
 
 - **6 crates + `xtask`**: `katu-policy`, `katu-core`, `katu-tools`, `katu` (bin), `katu-providers`, `katu-tui`*.
-- **546 testes** · catálogo de instrumentação **78 ids** · **11 tools** · **8 regras** (5 memória + 3 contenção) · **15 ADRs**.
-- `make check` verde (fmt + clippy `-D warnings` + testes + `check-layers` + `check-diag` + `check-schemas` + `check-docs` + `check-memory-swap` + `policy:audit` + `gate:bench` + `gate:provider` + file-length ≤300) · `make instrument` verde.
+- **592 testes** · catálogo de instrumentação **82 ids** · **11 tools** · **8 regras** (5 memória + 3 contenção) · **17 ADRs**.
+- `cargo xtask check` (= `make check`) verde: fmt + clippy `-D warnings` + testes + `check-layers` + `check-diag` + `check-schemas` + `check-docs` + `check-surface` + `check-policy` + `check-unsafe` + `check-catalog` + `check-rule-coverage` + `check-slices` + `check-memory-swap` + `policy:audit` + `gate:bench` + `gate:provider` + `gate:render` + file-length ≤300 · `make instrument` verde.
 - **O MVK passou** ([ADR 0001](docs/adr/0001-mvk-gate-aprovado.md)); o kernel (E04) e a política (E02) estão completos.
 
-\* `katu-tui` traz a base E10 (T01/T02/T03◐/T04/T05◐/T06◐/T07◐): esqueleto panic-safe, keymap puro,
+\* `katu-tui` traz a base E10 (T01/T02/T03◐/T04/T05/T06/T07): esqueleto panic-safe, keymap puro,
 render com throttle/teto de trabalho, painel de atividade efémero, recusas com regra + evidência,
 seletor de modelo/pensamento (`m`/`t`), vista da lixeira (`l`), compactação efetiva (`c`) e gate de
 verificação (`v`, com override por challenge);
@@ -31,7 +31,7 @@ verificação (`v`, com override por challenge);
 - **Memória de primeira classe** (ADR 0010): porta `Memory` com tipos do katu + adaptador in-process sobre `knudge-core` isolado no binário (`src/memory/`); `Runtime::open` (`src/runtime.rs`) monta a sessão com o adaptador e **recusa arrancar** sem memória saudável (fail-closed, E03-T03/T07); `katu remember`/`katu recall` exercitam o caminho §42; gate `check-memory-swap` (E03-T06).
 - **Providers** (ADR 0011/0012): porta `Provider` em `katu_core::provider` (o núcleo **não** depende de provider) e adaptadores em `katu-providers` — built-in `opencode go/zen` e `llama-server`; **catálogo `model → dialeto`** e **providers declarativos** (`ProviderSpec` + JSON), com `chat/completions`, `responses` e `messages` (SSE incremental, tool calls completas, `x-opencode-session`, `TCP_NODELAY`, sem compressão); `FakeProvider`/`MockTransport` cobrem o loop sem rede; e2e com chave **auto-*skip***; `xtask provider-smoke` mede TTFT/usage; retry classificado (transitórios vs conta/quota, só antes do 1.º delta, `Retry-After` em segundos/ms/data) e `usage` robusto de cache; **cache de prefixo por modelo medido** (`deepseek-v4.1-flash`, 2.º turno `cached=896/1004`) com afinidade (`x-client-request-id`/`x-session-affinity`); compressão do pedido **rejeitada** pelos endpoints (opencode `401`/llama `415`) e desligada (ADR 0013). **Latência publicada** com artefacto cru (`bench/providers/latency.json`) e **gate de orçamento** (`xtask gate:provider`, ADR 0014).
 - **Loop de turnos** (ADR 0015): `katu run` liga o provider ao kernel — pedido montado do log, tool calls logadas antes de executar (§42), resultado de volta ao modelo; roteador **fail-closed** dos argumentos JSON (caminhos canonicalizados antes do veredicto). Verificado e2e contra `llama-server` e `opencode-go` (um tool call real criou o ficheiro). **Contrato de escopo** (E09-T04): `scope_contract.json` + `feature_list.json` da raiz são carregados e validados no arranque (`katu/src/scope.rs`); com o artefacto, a tool `plan` executa e registra o plano (`PlanRecorded` §42), destrancando a fase `Planned`.
-- **UI de terminal (E10, base)**: `katu tui` liga a crate `katu-tui` ao loop — estado central, keymap **puro** (`map_key`/`apply_action`) e render puro (E10-T01/T02/T06◐); a borda implementa o `Handler` que corre o turno e injeta `Update`s. `Runtime::begin_turn` suporta multi-turno. O **streaming é visível** num painel de atividade efémero (`run_turn_with` + `ActivitySink`, evento `tui.live`), fora do log e do transcript (E10-T05◐). Controlos: `m`/`t` (modelo/pensamento), `l`/`r` (lixeira), `c` (compactação) e `v` (gate de verificação com override, E09-T01/T03/T07).
+- **UI de terminal (E10, base)**: `katu tui` liga a crate `katu-tui` ao loop — estado central, keymap **puro** (`map_key`/`apply_action`) e render puro (E10-T01/T02/T06 ☑); a borda implementa o `Handler` que corre o turno e injeta `Update`s. `Runtime::begin_turn` suporta multi-turno. O **streaming é visível** num painel de atividade efémero (`run_turn_with` + `ActivitySink`, evento `tui.live`), fora do log e do transcript (E10-T05 ☑; a transcrição durável é `<root>/.katu/transcript.md`, vista read-only com `T`). Controlos: `m`/`t` (modelo/pensamento), `l`/`r`/`x` (lixeira: listar/restaurar/esvaziar com challenge), `c` (compactação), `v` (gate de verificação com override, E09-T01/T03/T07) e `T` (transcrição). O cabeçalho mostra a **próxima ação** do checkpoint (`Update::NextAction`, E10-T06) e o render por quadro tem gate próprio (`gate:render`, E15-T01).
 
 ---
 
@@ -40,12 +40,12 @@ verificação (`v`, com override por challenge);
 | Tarefa | Estado | Pendência |
 |---|---|---|
 | **E01-T07** | ☑ | Redação por allowlist no sink (E01-T07); rotação de ficheiro fica deliberadamente gated (nunca apaga automaticamente). |
-| **E01-T08** | ☐ | Política de memória e `unsafe` (documento/decisão). |
-| **E01-T09** | ☐ | Política de recursos e runtime mínimo. |
-| **E01-T10** | ◐ | `xtask` e CI em camadas (fecho). |
+| **E01-T08** | ☑ | Política de memória e `unsafe` (ADR 0016): `#![forbid(unsafe_code)]` em todos os crates puros; `disallowed_types`/pânico/indexação/`as` negados; `reason` em todo `#[allow]`. Miri fica em E13. |
+| **E01-T09** | ☑ | Política de recursos e runtime mínimo (ADR 0017): worker bloqueante por padrão, sem `tokio`; teto de corpo (`GET_BODY_CAP`), timeouts tipados, canais bounded. `spawn_blocking`/async só quando houver executor em background. |
+| **E01-T10** | ☑ | `cargo xtask check` (`xtask/src/check.rs`) é o ponto de entrada único: fmt + clippy + testes + file-length + camadas + diag + schemas + docs + memória + política + `gate:bench`/`gate:provider`/`gate:render`; `make check` delega nele. Workflows `pr-fast`/`pr-msrv`/`ci` em camadas. |
 | **E03-T02** | ☑ | **Adaptador in-process do `knudge-core`** (primário, no binário; feature default). |
 | **E03-T03** | ☑ | `Runtime::open` monta sessão + adaptador + regras; `recall`/`remember` pelo §42 (E10/E12). |
-| **E03-T04** | ☐ | `spawn_blocking` + timeout; **gated** em E12/E01-T09 (worker bloqueante por desenho). |
+| **E03-T04** | ☑ | `spawn_blocking` + timeout; **resolvido por ADR 0017** como não aplicável até existir caminho async (worker bloqueante por desenho). |
 | **E03-T05** | ☑ | Suíte de conformidade corre contra o fake **e** o adaptador in-process. |
 | **E03-T06** | ☑ | Gate de substituibilidade (`xtask check-memory-swap` + `make memory-swap`). |
 | **E03-T07** | ☑ | `Runtime::open` recusa sem memória saudável (fail-closed); comandos falham com exit 10 sem adaptador. |
@@ -60,19 +60,19 @@ verificação (`v`, com override por challenge);
 | **E09-T04** | ☑ | Carregar `scope_contract.json`/`feature_list.json` no arranque (`katu/src/scope.rs`): valida o `Plan` (schema + ≤ 1 `in_progress`) antes do turno e liga a tool `plan` ao kernel (`PlanRecorded` §42, `katu/src/agent/plan.rs`) — **destranca a fase `Planned`**; sem artefacto, `plan` mantém `Unavailable{scope-contract}`. |
 | **E09-T05** | ◐ | `Metric`/portão de publicação — fecho. |
 | **E09-T07** | ☑ | Compactação determinística e opt-in; o **contexto efetivo** do turno vem de `Session::context` (`assemble` puro ou com digest), com o resumo no `system` e o original recuperável no log; TUI `c` liga/desliga e CLI `--compact`. |
-| **E10-T01…T07** | ◐ | **CLI/TUI**: T01 (esqueleto panic-safe + restauro), T02 (keymap puro testado por modo), T03◐ (render diferencial + throttle por `Clock` + teto de trabalho; falta benchmark/zero alocações), T04 (recusas com regra + evidência **e** override por challenge-and-response — `katu-tui::Challenge`), T05◐ (painel de atividade efémero + streaming visível; falta transcrição/viewer), T06◐ (fase/pendência no ecrã) e T07◐ (`m`/`t` modelo/pensamento, `l` lixeira com `trash::list`+`restore`, `c` compactação efetiva, `v` gate de verificação; falta o esvaziamento da lixeira) feitos em `katu-tui` + `katu tui`; falta o benchmark de render. O executor em background fica por fazer. |
+| **E10-T01…T07** | ◐ | **CLI/TUI**: T01 (esqueleto panic-safe + restauro), T02 (keymap puro testado por modo), T03◐ (render diferencial + throttle por `Clock` + teto de trabalho; benchmark por quadro feito — `gate:render`; falta zero alocações, E18-T10), T04 (recusas com regra + evidência **e** override por challenge-and-response — `katu-tui::Challenge`), T05☑ (painel de atividade efémero + streaming visível; transcrição durável `.katu/transcript.md` + viewer read-only `T`), T06☑ (fase/pendência + próxima ação do checkpoint no ecrã) e T07☑ (`m`/`t` modelo/pensamento, `l` lixeira com `trash::list`+`restore`, `x` esvaziar com challenge, `c` compactação efetiva, `v` gate de verificação) feitos em `katu-tui` + `katu tui`. O executor em background fica por fazer. |
 | **E12-T01** | ☑ | Porta no núcleo + adaptadores `opencode`/`llama` com catálogo `model → dialeto`; o binário **liga o loop** (`katu run`, E12-T05). |
-| **E12-T02** | ◐ | Formato declarativo próprio (`ProviderSpec`+JSON) e `Declarative<T>`; GDK `goose` rejeitado (ADR 0012); `Provider::models()`/`Catalog::models()` expõem o catálogo (a lista da TUI vem dele); falta `dynamic_models` **do endpoint** (descoberta ao vivo). |
-| **E12-T03** | ◐ | `TokenUsage`/`PriceTable` (base `provider_reported`, `unpriced`); falta `Metric`/tier. |
+| **E12-T02** | ☑ | Formato declarativo próprio (`ProviderSpec`+JSON) e `Declarative<T>`; GDK `goose` rejeitado (ADR 0012); `Provider::models()` (catálogo) e `Provider::dynamic_models()` (descoberta **ao vivo** do endpoint, leitura defensiva em `models.rs`), com queda no catálogo; a lista da TUI vem daí. **E12-T03 ☑** tier pela política (`Tier`, `ModelEntry.tier`, `Catalog::select_tier`, `Provider::model_for_tier`, `policy/tiers.toml`, diag `provider.tier`). |
+| **E12-T03** | ◐ | `TokenUsage`/`PriceTable` (base `provider_reported`, `unpriced`) e ligação ao **`Metric`** (`Cost::metric`/`usage_metrics`, com `Unit::Micros`/`Tokens`); falta a seleção de **tier** pela política. |
 | **E12-T04** | ☑ | Retry classificado (transitório vs conta/quota) só antes do 1.º delta, honrando `Retry-After`; timeout + cancelamento. |
 | **E12-T05** | ☑ | **Loop de turnos** ligado ao kernel com tool execution §42 (`katu run`; roteador fail-closed em `src/agent/`; ADR 0015); testes de loop sem rede e e2e real verificado. |
-| **E12-T06** | ◐ | `chat/completions`+`responses`+`messages`+`google` (`models/<id>:streamGenerateContent`) pelo mesmo `wire`; faltam WebSocket/HTTP2 e validação ao vivo. |
+| **E12-T06** | ◐ | `chat/completions`+`responses`+`messages`+`google` (`models/<id>:streamGenerateContent`) pelo mesmo `wire`; smoke **ao vivo** por dialeto e `dynamic_models` (auto-*skip*); faltam WebSocket/HTTP2. |
 | **E12-T07** | ◐ | Artefacto cru (`bench/providers/latency.json`, offline+live) e **gate de orçamento** (`xtask gate:provider` em `make check`, ADR 0014); falta `criterion`/`dhat` e a matriz por dialeto/transporte (E18-T10). |
 | **E12-T08** | ☑ | `llama-server` (L1) pelo mesmo trait; smoke real com Qwen2.5-Coder-1.5B Q4_K_M. |
 | **E12-T10** | ☑ | `Control::{SetModel, SetThinking}` no kernel (`kernel::control`): `Event::Control` no log (audit `kind=control`), `ControlState` no `State` (sobrevive a *resume*) e validação pura com erro que **ensina** (`ControlError::ReasoningUnsupported`), usando `ModelCapabilities` do catálogo (`Provider::capabilities`); a borda (TUI `m`/`t`) valida e regista via `Runtime::set_control`; o agente nunca emite `Control`. |
-| **E13-T01…T07** | ☐ | Camadas de teste, teste real por regra, regressão invertida, Miri/geiger/machete, goldens, matriz de aceitação. |
-| **E14-T02…T07** | ☐ | Postmortems, "um facto um lar", `policy/` versionado, teto de superfície, catálogos gerados, slices. |
-| **E15-T01** | ◐ | `criterion` + gate de performance no CI. |
+| **E13-T01…T07** | ◐ | **E13-T01 ◐**: alvos `cargo xtask test:{unit,integration,e2e,all}`; property (`proptest` em TOON e `parse_models`); falta fuzz. **E13-T02 ☑**: `coverage.toml` + `check-rule-coverage` (matriz regra↔teste total). **E13-T04 ☑**: CI `miri` + `hygiene`. **E13-T05 ☑**: golden regenerável (`KATU_GEN_TEST_DATA=1`). **E13-T07 ☑**: invariantes em `session/tests/invariants.rs`. Falta E13-T03 (regressão invertida) e E13-T06 (matriz de aceitação). |
+| **E14-T02…T07** | ◐ | **E14-T02 ☑** (postmortems + `check-docs` exige guardrail), **E14-T03 ☑** (router `AGENTS.md`), **E14-T04 ☑** (`check-policy`), **E14-T05 ☑** (`check-surface` + `surface.toml`), **E14-T06 ☑** (`check-catalog` gera `docs/catalog.md`), **E14-T07 ☑** (`check-slices`). |
+| **E15-T01** | ◐ | `criterion` + gate de performance no CI. Feito: harnesses **zero-dep** + gates de **render** (`gate:render`, E10-T03) e **provider** (`gate:provider`, E12-T07), em `make check` e no CI; `criterion` preterido (consistente com E19-T02). Falta o micro-bench de seleção de regras e heap/escala (§44). |
 | **E15-T03…T06** | ☐ | Tabela de recuo, determinismo de prefixo, instrumentação do prefixo (`✂`), negativos. |
 | **E18-T01…T10** | ◐ | F1 (determinismo) é contrato transversal; **F4 parcial via E12-T07** (TTFT/cache/gate); F2/F3/F5–F10 por iniciar (fórmula + artefacto + teste, plan/19 §0.3). |
 | **E19-T03** | ◐ | Instrumentar o caminho crítico por épico (cresce com o código). |
@@ -92,15 +92,15 @@ verificação (`v`, com override por challenge);
    challenge-and-response**, **orçamento de render** (throttle por `Clock` + teto de trabalho),
    **seletor de modelo/pensamento** (`m`/`t`), **vista da lixeira** (`l`, `trash::list`+`restore`),
    **compactação efetiva** (`c`) e **gate de verificação** (`v`; override por challenge)
-   (`katu-tui`, T01/T02/T03◐/T04/T05◐/T06◐/T07◐). Faltam o executor em background, o benchmark de
-   render e o esvaziamento da lixeira.
+   (`katu-tui`, T01/T02/T03◐/T04/T05/T06/T07). Faltam o executor em background e a verificação de
+   zero alocações no render (E18-T10).
 2. **`spawn_blocking`+timeout (E03-T04).** O adaptador in-process está ligado e o loop usa a tool
-   `memory` (§42); o timeout do worker bloqueante continua gated (E12/E01-T09).
+   `memory` (§42); o timeout do worker bloqueante fica para quando existir caminho async (ADR 0017;
+   E03-T04 não aplicável).
 
 ### 3.2 Integração CLI/TUI (lógica já feita no core)
 
 - `read view=diff` precisa que o chamador forneça o `base` (checkpoint/leitura anterior).
-- Transcrição em ficheiro + viewer read-only do split live/durable (T05, parcial).
 
 ### 3.3 From-zero ainda não iniciado (E18)
 
@@ -129,7 +129,7 @@ buffer adaptativo (E18-T04).
 - **`katu run` é um turno único** (sem REPL/TUI multi-turno): o turno abre e fecha na mesma
   invocação.
 - **Streaming visível na TUI, não na CLI one-shot**: a TUI (`katu tui`) mostra os deltas do provider
-  e as tools em curso ao vivo no painel de atividade (E10-T05◐); o `katu run` continua a acumular
+  e as tools em curso ao vivo no painel de atividade (E10-T05 ☑); o `katu run` continua a acumular
   (turno único sem UI).
 
 ---
@@ -139,13 +139,13 @@ buffer adaptativo (E18-T04).
 1. **E10 (CLI/TUI)** — a superfície sobre o loop já acionável. **Feito:** loop de eventos,
    keymap puro, render com throttle/teto de trabalho, multi-turno síncrono, streaming visível,
    recusas com regra + evidência e **aprovação por challenge-and-response**
-   (T01/T02/T03◐/T04/T05◐/T06◐/T07◐; E07-T05 ☑). **Falta:** o benchmark de render (T03) e o
-   esvaziamento da lixeira (T07).
-2. **E03-T04** — `spawn_blocking` + timeout do adaptador (gated no worker bloqueante; E12/E01-T09).
-3. **E15-T01 + E18-T10** — `criterion`/`hyperfine`/`dhat` + gate de regressão no CI; generaliza o
-   que a E12-T07 já faz para o provider (harness de medição antes de otimizar).
-4. **E12-T06/T10** — WebSocket/HTTP2 e validação ao vivo de `responses`/`messages`/`google`;
-   `Control::{SetModel, SetThinking}` no kernel.
+   (T01/T02/T03◐/T04/T05/T06/T07; E07-T05 ☑). **Falta:** zero alocações no render (E18-T10).
+2. **E03-T04** — `spawn_blocking` + timeout do adaptador: **resolvido por ADR 0017** (não aplicável
+   até existir caminho async; worker bloqueante por desenho). E01-T08/T09 fechados (ADRs 0016/0017).
+3. **E15-T01 + E18-T10** — `hyperfine`/`dhat` + gate de regressão no CI (o render e o provider já
+   têm gates zero-dep); falta o micro-bench de seleção de regras e os orçamentos de heap/escala (§44).
+4. **E12-T06/T10** — validação ao vivo de `responses`/`messages`/`google` e `dynamic_models`
+   (auto-*skip*; E12-T02 ☑); faltam WebSocket/HTTP2; `Control::{SetModel, SetThinking}` no kernel.
 5. Fechos core/policy/tools: **E06-T02/T03/T12**, **E07-T02/T03**, **E01-T07**, **E19-T04/T06** — ✅;
    faltam **E06-T07** (rotação gated), a iteração de densidade colunar (§3.4) e a integração de
    `read.diff`/CLI.

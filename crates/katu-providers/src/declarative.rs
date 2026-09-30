@@ -9,6 +9,7 @@
 use serde::Deserialize;
 
 use crate::catalog::{Catalog, Dialect, MaxTokensField, ModelEntry};
+use katu_core::provider::Tier;
 
 mod provider;
 pub use provider::Declarative;
@@ -72,6 +73,9 @@ pub struct ModelEntrySpec {
     /// `reasoning_format` específico do gateway.
     #[serde(default)]
     pub reasoning_format: Option<String>,
+    /// Classe de custo/capacidade (E12-T03); por omissão, o do modelo sem tier.
+    #[serde(default)]
+    pub tier: Option<Tier>,
 }
 
 /// Definição declarativa de um provider.
@@ -149,6 +153,7 @@ impl ProviderSpec {
             entry.prompt_cache |= entry.prompt_cache_retention.is_some();
             entry.reasoning = model.reasoning.unwrap_or(self.default_reasoning);
             entry.reasoning_format.clone_from(&model.reasoning_format);
+            entry.tier = model.tier.unwrap_or_default();
             catalog.insert(entry);
         }
         catalog

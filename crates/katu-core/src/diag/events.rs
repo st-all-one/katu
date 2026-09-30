@@ -36,7 +36,11 @@ catalog! {
     (FS_MKDIR, "fs.mkdir", "Criação de diretórios (idempotente)."),
     (FS_LIST, "fs.list", "Listagem de um diretório (ordem canónica)."),
     (FS_STAT, "fs.stat", "Metadados de um ficheiro (mtime)."),
-
+    (
+        FS_REMOVE,
+        "fs.remove",
+        "Remoção permanente de um ficheiro (nunca de diretórios)."
+    ),
     // -- Kernel ------------------------------------------------------------------
     (KERNEL_STEP, "kernel.step", "Um passo da máquina de estados."),
     (KERNEL_TURN, "kernel.turn", "Um turno completo (entrada → paragem)."),
@@ -123,12 +127,27 @@ catalog! {
     (PROVIDER_CHUNK, "provider.chunk", "Fragmento recebido em streaming."),
     (PROVIDER_RETRY, "provider.retry", "Nova tentativa (backoff/hedging)."),
     (PROVIDER_ERROR, "provider.error", "Erro do provider."),
+    (
+        PROVIDER_MODELS,
+        "provider.models",
+        "Catálogo de modelos descoberto no endpoint (E12-T02)."
+    ),
+    (
+        PROVIDER_TIER,
+        "provider.tier",
+        "Seleção de tier pela política (E12-T03)."
+    ),
 
     // -- TUI -----------------------------------------------------------------
     (TUI_RENDER, "tui.render", "Desenho de um quadro."),
     (TUI_INPUT, "tui.input", "Entrada do utilizador."),
     (TUI_LIVE, "tui.live", "Observação efémera do turno (painel de atividade)."),
     (TUI_APPROVAL, "tui.approval", "Challenge-and-response de aprovação humana respondido."),
+    (
+        TUI_TRASH_EMPTY,
+        "tui.trash_empty",
+        "Lixeira esvaziada permanentemente após challenge humano."
+    ),
 }
 
 #[cfg(test)]

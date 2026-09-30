@@ -17,6 +17,8 @@ pub enum Mode {
     Confirm,
     /// Navegação na vista da lixeira (E10-T07).
     Trash,
+    /// Leitura da transcrição durável (E10-T05).
+    Transcript,
 }
 
 /// Ação pura produzida pelo teclado.
@@ -46,14 +48,22 @@ pub enum Action {
     CycleThinking,
     /// Abre a vista da lixeira (E10-T07).
     OpenTrash,
-    /// Fecha a sobreposição corrente (lixeira).
+    /// Abre a vista read-only da transcrição durável (E10-T05).
+    OpenTranscript,
+    /// Fecha a sobreposição corrente (lixeira/transcrição).
     CloseOverlay,
     /// Seleciona a entrada anterior da lixeira.
     TrashUp,
     /// Seleciona a entrada seguinte da lixeira.
     TrashDown,
+    /// Rola a transcrição para cima (E10-T05).
+    TranscriptUp,
+    /// Rola a transcrição para baixo (E10-T05).
+    TranscriptDown,
     /// Restaura a entrada selecionada da lixeira.
     Restore,
+    /// Esvazia a lixeira (destrutivo; exige challenge, E10-T07).
+    EmptyTrash,
     /// Pré-visualiza a compactação do histórico (E10-T07).
     Compact,
     /// Corre o gate de verificação e pede override se bloquear (E09-T03).
@@ -76,6 +86,7 @@ pub fn map_key(key: KeyEvent, mode: Mode) -> Option<Action> {
             KeyCode::Char('m') => Some(Action::CycleModel),
             KeyCode::Char('t') => Some(Action::CycleThinking),
             KeyCode::Char('l') => Some(Action::OpenTrash),
+            KeyCode::Char('T') => Some(Action::OpenTranscript),
             KeyCode::Char('c') => Some(Action::Compact),
             KeyCode::Char('v') => Some(Action::Verify),
             KeyCode::Up => Some(Action::ScrollUp),
@@ -97,9 +108,16 @@ pub fn map_key(key: KeyEvent, mode: Mode) -> Option<Action> {
         },
         Mode::Trash => match key.code {
             KeyCode::Char('r') => Some(Action::Restore),
+            KeyCode::Char('x') => Some(Action::EmptyTrash),
             KeyCode::Esc | KeyCode::Char('q') => Some(Action::CloseOverlay),
             KeyCode::Up => Some(Action::TrashUp),
             KeyCode::Down => Some(Action::TrashDown),
+            _ => None,
+        },
+        Mode::Transcript => match key.code {
+            KeyCode::Esc | KeyCode::Char('q') => Some(Action::CloseOverlay),
+            KeyCode::Up => Some(Action::TranscriptUp),
+            KeyCode::Down => Some(Action::TranscriptDown),
             _ => None,
         },
     }
@@ -140,6 +158,10 @@ mod tests {
         assert_eq!(
             map_key(key(KeyCode::Char('l')), Mode::Normal),
             Some(Action::OpenTrash)
+        );
+        assert_eq!(
+            map_key(key(KeyCode::Char('T')), Mode::Normal),
+            Some(Action::OpenTranscript)
         );
         assert_eq!(
             map_key(key(KeyCode::Char('c')), Mode::Normal),
@@ -203,6 +225,10 @@ mod tests {
             Some(Action::Restore)
         );
         assert_eq!(
+            map_key(key(KeyCode::Char('x')), Mode::Trash),
+            Some(Action::EmptyTrash)
+        );
+        assert_eq!(
             map_key(key(KeyCode::Up), Mode::Trash),
             Some(Action::TrashUp)
         );
@@ -222,8 +248,35 @@ mod tests {
     }
 
     #[test]
+    fn transcript_mode_scrolls_and_closes() {
+        assert_eq!(
+            map_key(key(KeyCode::Up), Mode::Transcript),
+            Some(Action::TranscriptUp)
+        );
+        assert_eq!(
+            map_key(key(KeyCode::Down), Mode::Transcript),
+            Some(Action::TranscriptDown)
+        );
+        assert_eq!(
+            map_key(key(KeyCode::Esc), Mode::Transcript),
+            Some(Action::CloseOverlay)
+        );
+        assert_eq!(
+            map_key(key(KeyCode::Char('q')), Mode::Transcript),
+            Some(Action::CloseOverlay),
+            "q fecha a vista, não a UI"
+        );
+    }
+
+    #[test]
     fn control_c_quits_in_every_mode() {
-        for mode in [Mode::Normal, Mode::Insert, Mode::Confirm, Mode::Trash] {
+        for mode in [
+            Mode::Normal,
+            Mode::Insert,
+            Mode::Confirm,
+            Mode::Trash,
+            Mode::Transcript,
+        ] {
             assert_eq!(map_key(ctrl('c'), mode), Some(Action::Quit), "{mode:?}");
         }
     }

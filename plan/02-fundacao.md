@@ -113,8 +113,13 @@ Todos os entregáveis abaixo assumem e verificam:
 - **Aceite:** `katu … --json 2>/dev/null` é JSON válido; segredo plantado nunca aparece no log;
   teste de redação.
 
-### E01-T08 ☐ Política de memória e `unsafe`
+### E01-T08 ☑ Política de memória e `unsafe`
 - **Objetivo:** manter a segurança de memória por construção.
+- **Estado:** política publicada em
+  [ADR 0016](../docs/adr/0016-politica-de-memoria-e-unsafe.md). `#![forbid(unsafe_code)]` já está na
+  raiz de todos os crates puros (`katu-core`/`katu-policy`/`katu-tools`/`katu-providers`/
+  `katu-tui`/`katu`); `clippy.toml` tem os `disallowed_types`, pânico/indexação/`as` negados e
+  `reason` obrigatório em todo `#[allow]`. Falta apenas a verificação **Miri** (E13).
 - **Entregáveis:** `#![forbid(unsafe_code)]` nos crates puros; `unsafe` só no sandbox/FFI com
   `#[allow(unsafe_code)]` + `// SAFETY:`; `clippy.toml` com `disallowed_types` para
   `Rc`/`Weak`/`RefCell`/`Cell`/`LinkedList` **e `HashMap`/`HashSet`** (determinismo — G8), e
@@ -127,9 +132,13 @@ Todos os entregáveis abaixo assumem e verificam:
 - **Aceite:** compila com `forbid(unsafe_code)`; `clippy` verde com os `disallowed_types`; Miri
   verde (E13); zero `unsafe` fora do sandbox; symlink rejeitado.
 
-### E01-T09 ☐ Política de recursos e runtime mínimo
+### E01-T09 ☑ Política de recursos e runtime mínimo
 - **Objetivo:** teto de memória/disco/tempo, sem runtime pesado.
-- **Estado:** adiado até haver I/O real (E04+); nenhum runtime assíncrono ainda.
+- **Estado:** decisão publicada em
+  [ADR 0017](../docs/adr/0017-recursos-e-runtime-minimo.md). **Worker bloqueante por padrão, sem
+  `tokio`**; teto de corpo no transporte (`GET_BODY_CAP`), timeouts tipados e canais *bounded*.
+  `spawn_blocking`/async só quando existir o executor em background; resolve **E03-T04** (não
+  aplicável até lá).
 - **Entregáveis:** canal bounded + backpressure; pool limitado a `available_parallelism()`;
   timeouts tipados e retry/backoff só em operação idempotente; cap de corpo e de cache; decisão de
   runtime (**worker bloqueante por padrão**; `tokio` mínimo só se necessário); `spawn_blocking`
@@ -138,10 +147,12 @@ Todos os entregáveis abaixo assumem e verificam:
 - **Aceite:** `cargo tree` sem `tokio full`; rajada acima do teto não estoura memória; I/O lento
   não trava o comando.
 
-### E01-T10 ◐ `xtask` e CI em camadas
-- **Estado:** `xtask` com `check-layers`/`check-crate-coverage`/`check-diag`/`check-docs`; workflows
-  `pr-fast`, `pr-msrv` (Rust 1.97.0 exato), `ci`. **Falta** um único `cargo xtask check` que corra
-  tudo (hoje é `make check`).
+### E01-T10 ☑ `xtask` e CI em camadas
+- **Estado:** `xtask` com `check` (ponto de entrada único: fmt+clippy+test+file-length+camadas+diag+
+  schemas+docs+memória+política+gates de número, em `xtask/src/check.rs`), `check-layers`,
+  `check-crate-coverage`, `check-diag`, `check-docs`, `gate:bench`/`gate:provider`/`gate:render`;
+  `make check` delega em `cargo xtask check`. Workflows `pr-fast`, `pr-msrv` (Rust 1.97.0 exato),
+  `ci`.
 - **Objetivo:** um único ponto de entrada para os gates, local e em CI (o `extension_cli` do zed,
   §57.2).
 - **Entregáveis:** `cargo xtask` com `check` (fmt+clippy+test+linhas+layers), `check-layers`,

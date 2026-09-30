@@ -22,3 +22,6 @@ target
 
 # Research only — not part of the project (consultation/reference, no build dependency).
 _REF/
+
+# Runtime state — never committed (E14-T04).
+.katu/

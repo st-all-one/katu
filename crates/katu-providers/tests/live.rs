@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use katu_core::kernel::Message;
 use katu_core::provider::{CollectSink, ModelSpec, Provider, ProviderRequest};
-use katu_providers::{Llama, LlamaConfig, OpenCode, OpenCodeConfig, UreqTransport};
+use katu_providers::{Dialect, Llama, LlamaConfig, OpenCode, OpenCodeConfig, UreqTransport};
 
 /// Pedido mínimo com uma mensagem do utilizador.
 fn request(model: &str, prompt: &str) -> ProviderRequest {
@@ -80,5 +80,65 @@ fn opencode_smoke() -> Result<(), Box<dyn std::error::Error>> {
         !sink.text.is_empty() || !sink.thinking.is_empty() || !sink.calls.is_empty(),
         "resposta vazia; outcome={outcome:?}"
     );
+    let models = provider.dynamic_models()?;
+    assert!(!models.is_empty(), "catálogo do endpoint vazio (E12-T02)");
     Ok(())
+}
+
+/// Smoke de um dialeto do built-in (auto-*skip* sem chave).
+fn opencode_dialect_smoke(
+    dialect: Dialect,
+    env_model: &str,
+    default_model: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let Some(key) = std::env::var_os("KATU_OPENCODE_KEY") else {
+        return Ok(());
+    };
+    let key = key.to_string_lossy().to_string();
+    let base = std::env::var_os("KATU_OPENCODE_BASE").map_or_else(
+        || "https://opencode.ai/zen/go/v1".to_string(),
+        |b| b.to_string_lossy().to_string(),
+    );
+    let model = std::env::var_os(env_model).map_or_else(
+        || default_model.to_string(),
+        |m| m.to_string_lossy().to_string(),
+    );
+    let config = OpenCodeConfig::at(base, key)
+        .with_session("katu-live-smoke")
+        .with_dialect(dialect);
+    let provider = OpenCode::new(transport(), config);
+    let mut sink = CollectSink::default();
+    let outcome = provider.stream(&request(&model, "Diga apenas: ola"), &mut sink)?;
+    assert!(
+        !sink.text.is_empty() || !sink.thinking.is_empty() || !sink.calls.is_empty(),
+        "resposta vazia no dialeto {dialect:?}; outcome={outcome:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn opencode_responses_smoke() -> Result<(), Box<dyn std::error::Error>> {
+    opencode_dialect_smoke(
+        Dialect::Responses,
+        "KATU_OPENCODE_MODEL_RESPONSES",
+        "gpt-5.5",
+    )
+}
+
+#[test]
+fn opencode_messages_smoke() -> Result<(), Box<dyn std::error::Error>> {
+    opencode_dialect_smoke(
+        Dialect::Messages,
+        "KATU_OPENCODE_MODEL_MESSAGES",
+        "claude-sonnet-4",
+    )
+}
+
+#[test]
+fn opencode_google_smoke() -> Result<(), Box<dyn std::error::Error>> {
+    opencode_dialect_smoke(
+        Dialect::Google,
+        "KATU_OPENCODE_MODEL_GOOGLE",
+        "gemini-2.5-pro",
+    )
 }

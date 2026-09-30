@@ -98,6 +98,9 @@ pub type ChunkSink<'a> = dyn FnMut(&[u8]) -> Flow + 'a;
 /// Teto de drenagem do [`Transport::warm`] (devolve a ligação ao *pool* sem ler tudo).
 const WARM_DRAIN_LIMIT: usize = 16 * 1024;
 
+/// Teto de corpo de um `GET` textual (E01-T09): uma listagem de modelos não passa disto.
+pub const GET_BODY_CAP: usize = 1 << 20;
+
 /// Transporte substituível para um endpoint de modelo.
 pub trait Transport: Send + Sync {
     /// Envia o pedido e alimenta `sink` com os bytes do corpo à medida que chegam.
@@ -110,7 +113,23 @@ pub trait Transport: Send + Sync {
         sink: &mut ChunkSink<'_>,
     ) -> Result<HttpMeta, TransportError>;
 
-    /// `GET` textual (health/models); conveniência sobre [`Transport::send`].
+    /// `GET` textual com os cabeçalhos do pedido (health/models), limitado a [`GET_BODY_CAP`].
+    ///
+    /// # Errors
+    /// [`TransportError`] em falha de I/O, protocolo ou timeout.
+    fn get(&self, request: &HttpRequest) -> Result<(u16, String), TransportError> {
+        let mut body = String::new();
+        let meta = self.send(request, &mut |chunk| {
+            if body.len() >= GET_BODY_CAP {
+                return Flow::Break;
+            }
+            body.push_str(&String::from_utf8_lossy(chunk));
+            Flow::Continue
+        })?;
+        Ok((meta.status, body))
+    }
+
+    /// `GET` textual sem cabeçalhos (health/models); conveniência sobre [`Transport::get`].
     ///
     /// # Errors
     /// [`TransportError`] em falha de I/O, protocolo ou timeout.
@@ -121,12 +140,7 @@ pub trait Transport: Send + Sync {
             headers: Vec::new(),
             body: None,
         };
-        let mut body = String::new();
-        let meta = self.send(&request, &mut |chunk| {
-            body.push_str(&String::from_utf8_lossy(chunk));
-            Flow::Continue
-        })?;
-        Ok((meta.status, body))
+        self.get(&request)
     }
 
     /// Pré-aquece a ligação (TCP/TLS) ao endpoint, drenando o corpo até um teto.

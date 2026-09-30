@@ -198,7 +198,10 @@ verificação recusa `SUCCESS` com erros (§38).
   timestamp); devolve `refs` (id) + `undo_token`. `restore` (função pública, **sempre permitido**,
   sem política) repõe o original. Portas: `Fs::create_dir_all` (`fs.mkdir`) + `Fs::rename`
   (`fs.rename`). `Capability::Delete` é imposta pela política (E02/E07). Nada é apagado
-  automaticamente; a lixeira fica sob `.katu`, que a varredura (`search`) ignora por omissão.
+  automaticamente; a lixeira fica sob `.katu`, que a varredura (`search`) ignora por omissão. O
+  **esvaziamento** é uma ação do **utilizador** (`trash::empty` + `Fs::remove`, E10-T07) guardada por
+  **challenge-and-response** (§33); o índice append-only é preservado como rasto de auditoria e
+  `list` deixa de mostrar itens removidos. O modelo **não** tem tool para esvaziar.
 - **Aceite:** `trash` de ficheiro sob escopo funciona e é reversível; `trash` fora do escopo é
   negado; nada em `.katu/trash` é servido ao modelo por omissão; nenhum processo apaga a lixeira
   sem aprovação humana; a política **não** trata `bash rm` como equivalente a `trash`, mas prefere

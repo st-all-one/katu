@@ -40,8 +40,12 @@ Cada meta tem um **artefacto** (saída crua commitada) e a base de evidência ti
 - **Entregáveis:** benchmarks do hot path; gate obrigatório de PR em Linux com entradas sintéticas
   e orçamentos de tempo/heap/escala (§44).
 - **Estado:** existe um harness **zero-dep** (`crates/katu/examples/measure_mvk.rs`) com o sink
-  agregador (E19-T02) e o portão `xtask gate:bench`; falta o `criterion` do hot path e o job de
-  regressão de tempo no CI.
+  agregador (E19-T02) e o portão `xtask gate:bench`; juntam-se agora os gates de **render por
+  quadro** (`xtask bench-render`/`gate:render`, `bench/render/` — E10-T03) e de **overhead do
+  provider** (`bench-provider`/`gate:provider`, E12-T07), ambos em `make check` e no CI
+  (`pr-fast.yml`/`ci.yml`). O `criterion` foi **preterido** em favor dos harnesses zero-dep
+  (consistente com E19-T02): o gate re-mede e falha acima do orçamento versionado. Falta o
+  micro-bench de **seleção de regras** e os orçamentos de heap/escala (§44).
 - **Aceite:** uma regressão > X% falha o job de benchmark; os números do CI e do README vêm do
   mesmo artefacto.
 

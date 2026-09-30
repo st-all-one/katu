@@ -128,23 +128,30 @@ bloqueado pelo `ureq` (HTTP/1.1). Os dialetos `responses`/`messages`/`google` es
 - **Aceite:** o núcleo compila com a feature do provider desligada; `xtask check-layers` falha se
   um crate de provider entrar em `core`/`policy`/`tools`.
 
-### E12-T02 ◐ Providers declarativos (commodity)
+### E12-T02 ☑ Providers declarativos (commodity)
 - **Entregáveis:** formato declarativo (`engine`/`base_url`/catálogo) para os **demais** providers,
   isolado atrás do trait próprio; `goose-context-management` só como fonte de compaction **off-path**.
 - **Estado:** `ProviderSpec` + `providers/*.json` (opencode zen/go, openai) e `Declarative<T>`,
   reusando os adaptadores de dialeto (ADR 0012). A integração direta com o GDK `goose` foi
   **rejeitada** (risco R1, `tokio`/`reqwest`/tipos externos). O catálogo é exposto por
   `Provider::models()`/`Catalog::models()` (ordem determinística) e `Provider::capabilities()`
-  (E12-T10), pelo que a lista de modelos da TUI vem do catálogo. Falta ler o catálogo **do endpoint**
-  (`dynamic_models` ao vivo) e cobrir mais dialetos.
+  (E12-T10), pelo que a lista de modelos da TUI vem do catálogo. O catálogo **do endpoint** é lido
+  ao vivo por `Provider::dynamic_models()` (`models.rs`, leitura defensiva de `data[]`/`models[]`,
+  determinística), com **queda no catálogo** em erro/vazio; a TUI regista a fonte (`provider.models`).
 - **Aceite:** trocar a fonte de commodity muda só o adaptador; nenhum tipo externo na API do katu;
   o caminho built-in (`opencode go/zen`) **não** passa pelo GDK.
 
-### E12-T03 ◐ Custo/tokens e tiers
+### E12-T03 ☑ Custo/tokens e tiers
 - **Entregáveis:** contabilização por chamada; seleção de tier pela política; `Metric` com base de
   evidência (`provider_reported` quando vier do provider, `inferred` quando estimado).
 - **Estado:** `TokenUsage` (input/output/cached/reasoning) com base `provider_reported`; `PriceTable`
-  em micro-USD com `unpriced` quando não há preço (DF5). Falta ligar ao `Metric`/seleção de tier.
+  em micro-USD com `unpriced` quando não há preço (DF5). Ligado ao **`Metric`**: `Cost::metric` e
+  `usage_metrics` produzem métricas com `Unit::Micros`/`Unit::Tokens` e a base de evidência
+  (artefacto obrigatório quando a base o exige). **Seleção de tier pela política**: `Tier`
+  (`katu-core::provider`), `ModelEntry.tier` + `Catalog::select_tier` (`katu-providers`),
+  `Provider::model_for_tier`, `policy/tiers.toml` (fase → tier, dado versionado) e `TierPolicy`
+  na borda (`crates/katu/src/tier.rs`, diag `provider.tier`); um modelo explícito do utilizador
+  (E12-T10) vence sempre.
 - **Aceite:** custo reportado usa a base correta; `unpriced` para modelo sem preço público; nunca
   inventar preço (DF5).
 
@@ -181,7 +188,8 @@ bloqueado pelo `ureq` (HTTP/1.1). Os dialetos `responses`/`messages`/`google` es
   (`models/<id>:streamGenerateContent?alt=sse`; `thought: true` vira thinking, `functionCall`
   completo) normalizados pelo mesmo `wire`, com retry/erro partilhados; `x-opencode-session`,
   keep-alive/`TCP_NODELAY`, sem compressão; catálogo `model → dialeto` (ADR 0012). WebSocket/HTTP2
-  são explícitos `Unsupported`; `responses`/`messages`/`google` ainda sem validação ao vivo.
+  são explícitos `Unsupported`; `responses`/`messages`/`google` têm **smoke ao vivo** por dialeto
+  (`tests/live.rs`, auto-*skip*) e `dynamic_models` ao vivo.
 - **Aceite:** TTFT dentro do orçamento (E12-T07); nenhum buffer integral da resposta; cancelar
   interrompe o stream e não vaza conexão/tarefa; a sessão mantém afinidade via
   `x-opencode-session`.

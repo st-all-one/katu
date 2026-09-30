@@ -13,11 +13,14 @@
 use katu_core::diag::{Level, events};
 use katu_core::provider::{
     ModelCapabilities, Provider, ProviderError, ProviderOutcome, ProviderRequest, ProviderSink,
+    Tier,
 };
 
 use super::catalog::{Catalog, ModelEntry};
 use super::declarative::ProviderSpec;
 use super::engine::{self, Dispatch, WireConfig};
+use super::error::sanitize;
+use super::models::parse_models;
 use super::openai::Endpoint;
 use super::retry::RetryPolicy;
 use super::transport::Transport;
@@ -202,6 +205,19 @@ impl<T: Transport> Provider for OpenCode<T> {
             .collect()
     }
 
+    fn dynamic_models(&self) -> Result<Vec<String>, ProviderError> {
+        let request = engine::models_request(&self.config.wire(None));
+        let (status, body) = self.transport.get(&request).map_err(ProviderError::from)?;
+        if !(200..300).contains(&status) {
+            return Err(ProviderError::Http {
+                status,
+                body: sanitize(&body),
+            });
+        }
+        let live = parse_models(&body);
+        Ok(if live.is_empty() { self.models() } else { live })
+    }
+
     fn capabilities(&self, model: &str) -> ModelCapabilities {
         ModelCapabilities {
             model: model.to_string(),
@@ -211,6 +227,10 @@ impl<T: Transport> Provider for OpenCode<T> {
                 .lookup(model)
                 .is_some_and(|entry| entry.reasoning),
         }
+    }
+
+    fn model_for_tier(&self, tier: Tier) -> Option<String> {
+        self.config.catalog.select_tier(tier).map(str::to_string)
     }
 
     fn stream(

@@ -1,0 +1,38 @@
+# E12-T03 — seleção de tier pela política: fase do caminho único → classe de modelo.
+#
+# Dado versionado (DF3): a borda resolve a fase corrente para um `tier` e escolhe o primeiro modelo
+# dessa classe no catálogo do provider (E12-T02), em ordem determinística. Um modelo explícito do
+# utilizador (E12-T10) **vence sempre**; sem tier disponível, cai no modelo configurado.
+#
+# Vocabulário fechado: `phase` ∈ {task, knowledge_consulted, planned, implemented, verified,
+# persisted, closed}; `tier` ∈ {fast, balanced, deep}. A primeira rota que casa vence.
+
+vocab = 1
+default = "balanced"
+
+# Planeamento é o passo mais caro: raciocínio longo.
+[[routes]]
+phase = "planned"
+tier = "deep"
+
+# Consulta de conhecimento e verificação são perguntas curtas: barato.
+[[routes]]
+phase = "knowledge_consulted"
+tier = "fast"
+
+[[routes]]
+phase = "verified"
+tier = "fast"
+
+[[routes]]
+phase = "persisted"
+tier = "fast"
+
+[[routes]]
+phase = "closed"
+tier = "fast"
+
+# Implementação fica equilibrada (rota explícita, para o default não ser o único sítio).
+[[routes]]
+phase = "implemented"
+tier = "balanced"

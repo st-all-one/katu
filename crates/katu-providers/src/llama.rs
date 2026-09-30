@@ -12,6 +12,8 @@ use katu_core::provider::{
 
 use super::catalog::Dialect;
 use super::engine::{self, Dispatch, WireConfig};
+use super::error::sanitize;
+use super::models::parse_models;
 use super::retry::RetryPolicy;
 use super::transport::Transport;
 
@@ -97,6 +99,18 @@ impl<T: Transport> Llama<T> {
 impl<T: Transport> Provider for Llama<T> {
     fn id(&self) -> &'static str {
         "llama"
+    }
+
+    fn dynamic_models(&self) -> Result<Vec<String>, ProviderError> {
+        let url = format!("{}/models", self.config.base_url.trim_end_matches('/'));
+        let (status, body) = self.transport.get_text(&url).map_err(ProviderError::from)?;
+        if !(200..300).contains(&status) {
+            return Err(ProviderError::Http {
+                status,
+                body: sanitize(&body),
+            });
+        }
+        Ok(parse_models(&body))
     }
 
     fn capabilities(&self, model: &str) -> ModelCapabilities {

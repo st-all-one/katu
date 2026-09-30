@@ -1,0 +1,39 @@
+# E13-T02 — matriz regra `Enforced` ↔ teste de caminho real.
+#
+# Cada regra `Enforced` de `policy/*.toml` tem de apontar para um teste que conduz o caminho real
+# (motor ou loop) e asserta a decisão. `cargo xtask check-rule-coverage` verifica a **totalidade** da
+# matriz e que o teste nomeado existe. Um teste novo é uma linha aqui — nunca um número escondido.
+
+[[rules]]
+id = "mem-recall-before-write"
+test = "write_without_recall_is_denied"
+
+[[rules]]
+id = "mem-outcome-before-close"
+test = "close_without_outcome_is_denied"
+
+[[rules]]
+id = "mem-no-duplicate"
+test = "duplicate_write_is_denied_even_with_the_tool_registered"
+
+# Âncora e uma-afirmação são validados pelo adaptador de memória (`pre_write`); sem a capacidade
+# `Command`, a regra nega — o caminho real é o mesmo.
+[[rules]]
+id = "mem-anchor-required"
+test = "write_without_capability_is_denied"
+
+[[rules]]
+id = "mem-single-claim"
+test = "write_without_capability_is_denied"
+
+[[rules]]
+id = "contain-sensitive-read"
+test = "sensitive_read_is_denied_without_authorization"
+
+[[rules]]
+id = "contain-write-outside-workspace"
+test = "write_inside_workspace_is_allowed_and_outside_needs_approval"
+
+[[rules]]
+id = "contain-read-outside-workspace"
+test = "read_outside_workspace_requires_approval"

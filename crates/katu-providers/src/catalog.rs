@@ -7,6 +7,7 @@
 
 use std::collections::BTreeMap;
 
+use katu_core::provider::Tier;
 use serde::Deserialize;
 
 /// Dialeto de wire normalizado pelo trait `Provider`.
@@ -86,6 +87,8 @@ pub struct ModelEntry {
     pub reasoning: bool,
     /// `reasoning_format` específico do gateway (ex.: `"parsed"`).
     pub reasoning_format: Option<String>,
+    /// Classe de custo/capacidade (E12-T03); por omissão [`Tier::Balanced`].
+    pub tier: Tier,
 }
 
 impl ModelEntry {
@@ -101,6 +104,7 @@ impl ModelEntry {
             prompt_cache_retention: None,
             reasoning: false,
             reasoning_format: None,
+            tier: Tier::Balanced,
         }
     }
 
@@ -146,6 +150,13 @@ impl ModelEntry {
         self.reasoning_format = Some(format.into());
         self
     }
+
+    /// Fixa a classe de custo/capacidade (E12-T03).
+    #[must_use]
+    pub const fn with_tier(mut self, tier: Tier) -> Self {
+        self.tier = tier;
+        self
+    }
 }
 
 /// Mapa de `model` para `ModelEntry`.
@@ -184,6 +195,15 @@ impl Catalog {
         self.entries.keys().map(String::as_str).collect()
     }
 
+    /// Primeiro modelo de um `tier` (E12-T03), em ordem determinística (`BTreeMap`).
+    #[must_use]
+    pub fn select_tier(&self, tier: Tier) -> Option<&str> {
+        self.entries
+            .values()
+            .find(|entry| entry.tier == tier)
+            .map(|entry| entry.id.as_str())
+    }
+
     /// `true` se vazio.
     #[must_use]
     pub fn is_empty(&self) -> bool {
@@ -194,6 +214,7 @@ impl Catalog {
 #[cfg(test)]
 mod tests {
     use super::{Catalog, Dialect, MaxTokensField, ModelEntry};
+    use katu_core::provider::Tier;
 
     #[test]
     fn lookup_and_insert_replace_by_id() {
@@ -228,5 +249,16 @@ mod tests {
         catalog.insert(ModelEntry::new("b", Dialect::ChatCompletions));
         catalog.insert(ModelEntry::new("a", Dialect::Responses));
         assert_eq!(catalog.models(), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn select_tier_is_deterministic_and_defaults_to_balanced() {
+        let mut catalog = Catalog::new();
+        catalog.insert(ModelEntry::new("deep-2", Dialect::Responses).with_tier(Tier::Deep));
+        catalog.insert(ModelEntry::new("deep-1", Dialect::Responses).with_tier(Tier::Deep));
+        catalog.insert(ModelEntry::new("plain", Dialect::Responses));
+        assert_eq!(catalog.select_tier(Tier::Deep), Some("deep-1"));
+        assert_eq!(catalog.select_tier(Tier::Balanced), Some("plain"));
+        assert_eq!(catalog.select_tier(Tier::Fast), None);
     }
 }

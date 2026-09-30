@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use katu_policy::{RuleSet, audit};
 
-use crate::walk::collect_by_extension;
+use crate::walk::collect_rule_files;
 
 /// Pasta default dos artefactos de política.
 const POLICY_DIR: &str = "policy";
@@ -50,7 +50,7 @@ fn policy_files(args: &[String]) -> Result<Vec<PathBuf>, String> {
         return Ok(args.iter().map(PathBuf::from).collect());
     }
     let mut files = Vec::new();
-    collect_by_extension(Path::new(POLICY_DIR), "toml", &mut files)?;
+    collect_rule_files(Path::new(POLICY_DIR), &mut files)?;
     files.sort();
     Ok(files)
 }

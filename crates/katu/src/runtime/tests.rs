@@ -115,3 +115,38 @@ fn set_control_is_validated_and_logged() -> Result<(), Box<dyn std::error::Error
     std::fs::remove_dir_all(&root)?;
     Ok(())
 }
+
+#[test]
+fn transcript_projects_the_durable_log() -> Result<(), Box<dyn std::error::Error>> {
+    let root = root("transcript")?;
+    let fs = StdFs;
+    let clock = FixedClock::new(Timestamp::from_millis(1_000));
+    let mut runtime = Runtime::open(&fs, &clock, &root, "teste")?;
+    runtime.record_user("olá")?;
+    runtime.record_assistant("feito")?;
+    let lines = runtime.transcript()?;
+    assert!(lines.iter().any(|line| line.contains("utilizador")));
+    assert!(lines.iter().any(|line| line == "olá"), "{lines:?}");
+    assert!(lines.iter().any(|line| line == "feito"), "{lines:?}");
+    drop(runtime);
+    std::fs::remove_dir_all(&root)?;
+    Ok(())
+}
+
+#[test]
+fn checkpoint_records_the_declared_next_action() -> Result<(), Box<dyn std::error::Error>> {
+    let root = root("checkpoint")?;
+    let fs = StdFs;
+    let clock = FixedClock::new(Timestamp::from_millis(1_000));
+    let runtime = Runtime::open(&fs, &clock, &root, "objetivo")?;
+    let written = runtime.write_checkpoint("verificar")?;
+    assert_eq!(written.next_action, "verificar");
+    assert_eq!(written.goal, "objetivo");
+    let read = runtime
+        .checkpoint()?
+        .ok_or("checkpoint devia existir depois de escrito")?;
+    assert_eq!(read.next_action, "verificar");
+    drop(runtime);
+    std::fs::remove_dir_all(&root)?;
+    Ok(())
+}

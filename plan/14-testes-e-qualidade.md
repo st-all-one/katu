@@ -24,15 +24,25 @@
 
 ## Tarefas
 
-### E13-T01 ☐ Camadas de teste
+### E13-T01 ◐ Camadas de teste
 - **Entregáveis:** unit (por crate), integração (loop real), e2e (binário, subprocesso), golden,
   property (`proptest`), fuzz (`cargo-fuzz` para parsers de bytes).
+- **Estado:** alvos `cargo xtask test:{unit,integration,e2e,all}` (`xtask/src/test_runner.rs`); a
+  integração descobre `crates/*/tests/*.rs` e o e2e do binário corre como subprocesso (`-p katu
+  --test cli`); golden já existe (`crates/katu-policy/tests/golden.rs`). **Property:** `proptest`
+  na emissão TOON (`katu-core`) e na leitura defensiva de modelos (`parse_models`, `katu-providers`,
+  totalidade + determinismo). O CI separa rápido (PR) de pesado (merge). **Falta:** fuzz
+  (`cargo-fuzz`) para parsers de bytes.
 - **Aceite:** cada camada tem um alvo `cargo xtask test:<level>`; o CI corre rápido (unit+lint) no
   PR e pesado (e2e+bench) no merge.
 
-### E13-T02 ☐ Regra "testar o caminho real por regra de política"
+### E13-T02 ☑ Regra "testar o caminho real por regra de política"
 - **Entregáveis:** para cada regra `Enforced`, um teste de integração que conduz o loop e asserta a
   negação com evidência.
+- **Estado:** `coverage.toml` (versionado) mapeia cada regra `Enforced` ao teste que a cobre;
+  `xtask check-rule-coverage` (`xtask/src/coverage.rs`) verifica a **totalidade** (nenhuma regra sem
+  teste, nenhuma entrada órfã) e que o teste nomeado existe nas fontes. Integrado em
+  `cargo xtask check`.
 - **Aceite:** a matriz regra ↔ teste é **total** (nenhuma regra sem teste de caminho real); o
   ledger de cobertura (E02-T06) é consultado.
 
@@ -42,23 +52,33 @@
 - **Aceite:** todos os guards passam o teste invertido; qualquer guard que não fique vermelho é
   reportado como falso guard.
 
-### E13-T04 ☐ Miri, geiger e Machete no CI
+### E13-T04 ☑ Miri, geiger e Machete no CI
 - **Entregáveis:** `cargo miri test` nos crates puros; `cargo geiger` (unsafe confinado);
   `cargo machete`/`udeps` (deps mortas — a lição do `open-keyboard`, §26.4).
+- **Estado:** CI com o job `miri` (`cargo +nightly miri test -p katu-core -p katu-policy`) e o job
+  `hygiene` (`check-unsafe` + `cargo machete` + `cargo geiger`). `xtask check-unsafe`
+  (`xtask/src/unsafe_check.rs`) confirma `#![forbid(unsafe_code)]` na raiz de cada crate puro e
+  recusa `allow(unsafe_code)`; `cargo machete` limpo.
 - **Aceite:** Miri verde; zero `unsafe` fora do sandbox; zero dependência declarada e não usada.
 
-### E13-T05 ☐ Goldens e fixtures regeneráveis
+### E13-T05 ☑ Goldens e fixtures regeneráveis
 - **Entregáveis:** dados de referência com regeneração explícita (`KATU_GEN_TEST_DATA=1`); PR que
   toca dados de referência exige **dupla revisão** (§36).
+- **Estado:** `crates/katu-policy/tests/golden/verdicts.tsv` (artefacto golden) comparado pelo teste
+  `golden_matrix`; `KATU_GEN_TEST_DATA=1 cargo test -p katu-policy --test golden` regenera. Os
+  veredictos inline continuam a assertar (o artefacto é secundário).
 - **Aceite:** um snapshot refresh **nunca** é tratado como revisão de correção (postmortem 0002).
 
 ### E13-T06 ☐ Matriz de aceitação por tool/verbo
 - **Entregáveis:** matriz que liga cada tool/subcomando a `stdout`/`--json`/erro/exit/estado.
 - **Aceite:** a matriz é total; um novo verbo sem entrada falha o `xtask`.
 
-### E13-T07 ☐ Invariantes de runtime testadas
+### E13-T07 ☑ Invariantes de runtime testadas
 - **Entregáveis:** `Model-visible ⟺ logged`; "nunca `Ok` com erros"; "sem passthrough silencioso";
   "escrita atómica".
+- **Estado:** `crates/katu-core/src/kernel/session/tests/invariants.rs` — `model_visible_is_exactly_
+  the_logged_messages` (histórico = projeção do log; `Session::verify`) e `refused_event_leaves_
+  state_and_log_intact` (escrita atómica). Já existiam testes de passthrough (budget/deny).
 - **Aceite:** cada invariante tem teste que a viola por um caminho alternativo e falha.
 
 ---

@@ -32,6 +32,9 @@ mod runtime;
 mod scope;
 
 #[cfg(feature = "memory-in-process")]
+mod tier;
+
+#[cfg(feature = "memory-in-process")]
 mod tui;
 
 use std::process::ExitCode;

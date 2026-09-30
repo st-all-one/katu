@@ -13,6 +13,7 @@ use ratatui::widgets::{Block, Paragraph, Wrap};
 use crate::action::Mode;
 use crate::app::App;
 use crate::entry::{Role, Status};
+use crate::transcript;
 use crate::trash;
 
 /// Teto de entradas da conversa projetadas por quadro (E10-T03).
@@ -67,6 +68,9 @@ pub fn render(frame: &mut Frame<'_>, app: &App) {
     if app.trash_open() {
         trash::render(frame, app);
     }
+    if app.viewer_open() {
+        transcript::render(frame, app);
+    }
 }
 
 /// Deslocamento que mostra o **fundo** de um painel (mensagem mais recente).
@@ -82,7 +86,7 @@ fn activity_len(app: &App) -> usize {
     live.saturating_add(app.streaming().lines().count())
 }
 
-/// Cabeçalho: identidade, modelo, pensamento, fase e pendência.
+/// Cabeçalho: identidade, modelo, pensamento, fase, pendência e próxima ação.
 fn header_line(app: &App) -> Line<'static> {
     let state = if app.pending() {
         "a pensar…"
@@ -91,7 +95,7 @@ fn header_line(app: &App) -> Line<'static> {
     };
     let model = app.model().unwrap_or("—");
     let reasoning = format!("{:?}", app.reasoning()).to_lowercase();
-    Line::from(vec![
+    let mut spans = vec![
         Span::styled(
             "katu",
             Style::default()
@@ -102,7 +106,11 @@ fn header_line(app: &App) -> Line<'static> {
             "  {model} · pensamento {reasoning} · fase {}  ·  {state}",
             app.phase()
         )),
-    ])
+    ];
+    if let Some(next) = app.next_action() {
+        spans.push(Span::raw(format!("  ·  próximo {next}")));
+    }
+    Line::from(spans)
 }
 
 /// Título do painel de entrada, dependente do modo.

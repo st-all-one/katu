@@ -1,0 +1,16 @@
+# Teto de superfície do katu (E14-T05) — versionado.
+#
+# `xtask check-surface` conta a superfície real e compara com estes tetos: **avisa** quando uma
+# dimensão atinge o teto e **falha** quando o excede. Subir um teto é uma decisão em PR (a lição do
+# `arag` §20 / `maxima` §51.13): a superfície cresce de forma deliberada, nunca por acidente.
+#
+# Dimensões: crates do workspace, tools, regras de `policy/`, ADRs, eventos de diagnóstico,
+# subcomandos do `xtask` (proxy dos gates) e artefactos crus de benchmark.
+
+crates = 6
+tools = 11
+rules = 8
+adrs = 17
+diag_events = 82
+xtask_commands = 28
+bench_artifacts = 3

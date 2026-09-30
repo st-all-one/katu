@@ -41,17 +41,26 @@ todo o código impuro confinado.
   `Handler` que corre o turno e injeta `Update`s; `Runtime::begin_turn` abre o próximo turno
   (multi-turno) e `Runtime::phase` alimenta o indicador de fase (E10-T06). O streaming do modelo e
   as tools em curso vão **ao vivo** para o painel de atividade via `run_turn_with` + `ActivitySink`
-  (`LivePainter`/`Painter`), sem entrarem no log (E10-T05). As **recusas de política**
+  (`LivePainter`/`Painter`), sem entrarem no log. A **transcrição durável** é projetada do log
+  (`Runtime::transcript`, `src/runtime/transcript.rs`) e escrita atomicamente em
+  `<root>/.katu/transcript.md` após cada turno (`src/tui/transcript.rs`); a TUI serve-a numa vista
+  read-only (`T`, E10-T05). As **recusas de política**
   (`Denied`/`Unavailable`) chegam ao painel/transcript com regra + evidência, e uma
   `RequireApproval` abre um **challenge-and-response** na TUI: o humano assina
   (`reason`+`granted_by`), o kernel regista `ApprovalGranted` e concede a capacidade mínima
   (`katu-policy::capability_for`), re-executando a chamada (E10-T04/E07-T05, §33). O runtime
   carrega as regras de **memória + contenção** e define o **workspace** no arranque (`Runtime::open`),
   pelo que a contenção é aplicada no loop. A TUI liga/desliga a compactação (`c`), lista/restaura a
-  lixeira (`l`/`r`) e corre o **gate de verificação** (`v`; se bloquear, pede override humano por
-  challenge, E09-T03). O **modelo/pensamento** (`m`/`t`) passa por `Runtime::set_control` (validado
-  contra o catálogo com erro que ensina, E12-T10) e a lista de modelos vem de `Provider::models()`
-  (E12-T02); o turno seguinte usa o estado de controlo (o agente nunca se auto-escala). O turno é
+  lixeira (`l`/`r`) e **esvazia-a** (`x`, com challenge; `trash::empty` + `Fs::remove`, E10-T07), e
+  corre o **gate de verificação** (`v`; se bloquear, pede override humano por challenge, E09-T03).
+  O **modelo/pensamento** (`m`/`t`) passa por `Runtime::set_control` (validado contra o catálogo com
+  erro que ensina, E12-T10) e a lista de modelos vem de `Provider::dynamic_models()` com queda em
+  `Provider::models()` (E12-T02); sem controlo explícito, o turno usa o **tier** da fase
+  (`src/tier.rs`: `policy/tiers.toml` → `TierPolicy`, resolvido por `Provider::model_for_tier`,
+  E12-T03). O turno
+  seguinte usa o estado de controlo (o agente nunca se auto-escala). O **checkpoint** de fase é
+  escrito no fim de cada turno (`Runtime::write_checkpoint`, próxima ação de `next_phase`) e lido no
+  arranque (`Runtime::checkpoint`); o cabeçalho mostra a próxima ação (E10-T06). O turno é
   **síncrono** nesta fatia (executor em background é trabalho futuro).
 - Exit codes na borda (a lógica propaga `Result`).
 - Harness de medição do MVK (`examples/measure_mvk.rs`, feature `profile`, E05-T06): corre o

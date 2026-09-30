@@ -12,12 +12,12 @@ use katu_core::provider::Thinking;
 use crate::action::{Action, Mode};
 use crate::controls::Controls;
 use crate::entry::{Entry, Role, Status};
-use crate::live::{Live, trim_tail};
 use crate::message::{Command, Update};
+use crate::transcript::TranscriptView;
 use crate::trash::{Trash, TrashEntry};
 
-/// Teto do buffer efémero de streaming (bytes); o painel mostra só a cauda (E10-T03).
-const STREAM_TAIL_BYTES: usize = 8 * 1024;
+mod panel;
+mod viewer;
 
 /// Estado central da UI.
 #[derive(Debug)]
@@ -37,6 +37,10 @@ pub struct App {
     controls: Controls,
     /// Vista da lixeira (E10-T07/E06-T09).
     trash: Trash,
+    /// Vista da transcrição durável (E10-T05).
+    viewer: TranscriptView,
+    /// Próxima ação declarada no checkpoint (E10-T06).
+    next_action: Option<String>,
     /// Deslocamento a partir do fundo (0 = mensagem mais recente).
     scroll: u16,
     quit: bool,
@@ -63,6 +67,8 @@ impl App {
             live: Vec::new(),
             controls: Controls::new(),
             trash: Trash::new(),
+            viewer: TranscriptView::new(),
+            next_action: None,
             scroll: 0,
             quit: false,
         }
@@ -152,6 +158,12 @@ impl App {
         matches!(self.status, Status::Working)
     }
 
+    /// Próxima ação declarada no checkpoint (E10-T06); `None` antes do primeiro turno.
+    #[must_use]
+    pub fn next_action(&self) -> Option<&str> {
+        self.next_action.as_deref()
+    }
+
     /// Deslocamento a partir do fundo (para o render).
     #[must_use]
     pub const fn scroll(&self) -> u16 {
@@ -192,18 +204,27 @@ impl App {
                 self.mode = Mode::Trash;
                 return Some(Command::Trash);
             }
+            Action::OpenTranscript => {
+                self.viewer.open();
+                self.mode = Mode::Transcript;
+                return Some(Command::Transcript);
+            }
             Action::CloseOverlay => {
                 self.trash.close();
+                self.viewer.close();
                 self.mode = Mode::Normal;
             }
             Action::TrashUp => self.trash.up(),
             Action::TrashDown => self.trash.down(),
+            Action::TranscriptUp => self.viewer.up(),
+            Action::TranscriptDown => self.viewer.down(),
             Action::Restore => {
                 return self
                     .trash
                     .selected()
                     .map(|entry| Command::Restore(entry.stored.clone()));
             }
+            Action::EmptyTrash => return Some(Command::EmptyTrash),
             Action::Compact => return Some(Command::Compact),
             Action::Verify => return Some(Command::Verify),
             Action::Quit => {
@@ -245,41 +266,14 @@ impl App {
             Update::Phase(phase) => self.phase = phase,
             Update::Live(live) => self.apply_live(live),
             Update::Models(models) => self.controls.set_models(models),
+            Update::NextAction(action) => self.next_action = Some(action),
             Update::Trash(items) => self.trash.set_items(items),
+            Update::Transcript(lines) => self.viewer.set_lines(lines),
             Update::Done => {
                 self.clear_live();
                 self.status = Status::Idle;
             }
         }
-    }
-
-    /// Aplica um evento efémero ao painel de atividade (não toca no transcript).
-    fn apply_live(&mut self, live: Live) {
-        match live {
-            Live::Text(delta) => {
-                self.streaming.push_str(&delta);
-                trim_tail(&mut self.streaming, STREAM_TAIL_BYTES);
-            }
-            Live::Thinking(delta) => self.thinking.push_str(&delta),
-            Live::Tool(name) => self.live.push(format!("→ {name}")),
-            Live::ToolDone(name) => self.live.push(format!("✓ {name}")),
-            Live::Refused { rule, evidence } => {
-                let text = format!("⛔ {rule}: {evidence}");
-                self.live.push(text.clone());
-                self.push(Role::Error, text);
-            }
-            Live::Unavailable { control } => {
-                self.live.push(format!("⚠ falta {control}"));
-            }
-            Live::Clear => self.clear_live(),
-        }
-    }
-
-    /// Limpa o painel de atividade.
-    fn clear_live(&mut self) {
-        self.streaming.clear();
-        self.thinking.clear();
-        self.live.clear();
     }
 
     /// Acrescenta uma entrada (ignora texto vazio) e volta ao fundo.

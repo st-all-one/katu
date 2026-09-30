@@ -48,7 +48,8 @@ função, o log é a fonte da verdade.
   - `memory::conformance` — `assert_contract` (E03-T05): suíte partilhada por backend.
 - Modelo de erro [`error`](src/error.rs) (E01-T06) e ports determinísticos
   [`ports`](src/ports/mod.rs) (`Clock`/`Rng`/`Fs`/`Env`/`Process` + fakes; `Fs::write_atomic_if` =
-  CAS para `edit`, OA16; `Process` = execução com timeout, E06-T04).
+  CAS para `edit`, OA16; `Fs::remove` = remoção permanente de ficheiro, nunca de diretórios,
+  E10-T07; `Process` = execução com timeout, E06-T04).
 - Diagnóstico transversal [`diag`](src/diag/mod.rs) (DF9/E19): log estruturado + métrica de tempo,
   custo zero por defeito; catálogo de eventos em [`diag::events`](src/diag/events.rs); sink
   agregador de percentis em `diag::aggregate` (E19-T02).
@@ -85,6 +86,13 @@ função, o log é a fonte da verdade.
   saída das tools ao modelo — sem `null`, vazios omitidos, ordem canónica; JSON é a alternativa.
 - Envelope [`report`](src/report.rs) (DF12/E06-T12): `ToolReport`/`Page`/`Cost`, ids
   content-addressed e hash; renderiza em TOON ou JSON. Transportado por `ToolOutput`.
+- Porta `Provider` [`provider`](src/provider.rs) (E12-T01/T02/T03/T10): `Provider::{models, dynamic_models,
+  capabilities, model_for_tier}` (`dynamic_models` descobre o catálogo do endpoint, com default =
+  catálogo estático; `model_for_tier` escolhe a classe do catálogo, E12-T03),
+  `Thinking`/`Tier`/`ModelSpec`/`ModelCapabilities`, `TokenUsage`
+  ([`provider/usage`](src/provider/usage.rs)) e `CollectSink`
+  ([`provider/collect`](src/provider/collect.rs)). O núcleo compila com ou sem provider ligado
+  (firewall LLM-free).
 
 ## Fronteira
 

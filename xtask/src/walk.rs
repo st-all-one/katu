@@ -36,6 +36,21 @@ pub(crate) fn collect_by_extension(
     Ok(())
 }
 
+/// Recolhe `*.toml` que declaram regras (`[[rules]]`), ignorando dados de política (ex.:
+/// `policy/tiers.toml`, E12-T03).
+pub(crate) fn collect_rule_files(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), String> {
+    let mut files: Vec<PathBuf> = Vec::new();
+    collect_by_extension(dir, "toml", &mut files)?;
+    for file in files {
+        let text =
+            fs::read_to_string(&file).map_err(|err| format!("lendo {}: {err}", file.display()))?;
+        if text.contains("[[rules]]") {
+            out.push(file);
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{collect_by_extension, is_foreign_root};

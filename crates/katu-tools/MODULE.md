@@ -22,7 +22,8 @@ sem veredicto; controlo em falta = recusa.
   ortogonais (`exit`/`signal`/`timed_out`); porta `Process` (fake `MemProcess`).
 - `move_file` (E06-T11): renomeação atómica (`Fs::rename`) sob escopo; recusa destino existente.
 - `trash` (E06-T09): move para `<root>/.katu/trash` (preserva o relativo) com índice append-only;
-  `list` (vista do utilizador) e `restore` (sempre permitido); nada é apagado automaticamente.
+  `list` (vista do utilizador, filtra removidos), `restore` (sempre permitido) e `empty`
+  (destrutivo, exige challenge na UI; E10-T07). Nada é apagado automaticamente.
 - `search` (E06-T05): `grep`/`find`/`ls` determinísticos (`walk` com ignore + teto); hits
   clusterizados por símbolo; `ls` devolve o mapa semântico. `search_use` traz a **raiz resolvida**
   em `resolved_paths` (E07-T05), para a política avaliar leitura fora do workspace/sensíveis.
@@ -36,7 +37,7 @@ sem veredicto; controlo em falta = recusa.
 - `recall::RecallTool` (E06-T10): consulta a porta `Memory` (`search`); devolve o envelope
   `memory.recall` e marca `memory_recall` no log (pré-condição de `memory_write`).
 - Contenção **soft** (E07): caminhos canonicalizados, `argv` resolvido, autorização explícita.
-- `trash` → `.katu/trash` (recuperável; esvaziar exige humano) — E06-T09.
+- `trash` → `.katu/trash` (recuperável; esvaziar exige challenge humano) — E06-T09/E10-T07.
 
 ## Fronteira
 

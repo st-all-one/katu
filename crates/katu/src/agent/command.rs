@@ -12,6 +12,7 @@ use super::{Ports, TurnOptions, TurnRequest, run_turn};
 use crate::ports::{StdEnv, StdFs, StdProcess, SystemClock};
 use crate::report::Report;
 use crate::runtime::{Runtime, RuntimeError};
+use crate::tier::TierPolicy;
 
 /// Instrução de sistema (prime) enviada ao modelo no turno.
 pub(crate) const SYSTEM: &str =
@@ -49,9 +50,6 @@ pub(crate) fn run(args: &RunArgs<'_>) -> Report {
     if args.compact {
         runtime.set_compaction(CompactionMode::Enabled);
     }
-    let model = args
-        .model
-        .map_or_else(|| default_model(args.provider).to_string(), str::to_string);
     let base = args
         .base
         .map_or_else(|| default_base(args.provider).to_string(), str::to_string);
@@ -59,6 +57,20 @@ pub(crate) fn run(args: &RunArgs<'_>) -> Report {
         Ok(provider) => provider,
         Err(message) => return Report::failed("run", &Error::invalid_input(message)),
     };
+    let tiers = match TierPolicy::load() {
+        Ok(tiers) => tiers,
+        Err(message) => return Report::failed("run", &Error::invalid_input(message)),
+    };
+    let model = args.model.map_or_else(
+        || {
+            tiers.model_for(
+                provider.as_ref(),
+                runtime.phase(),
+                default_model(args.provider),
+            )
+        },
+        str::to_string,
+    );
     let options = TurnOptions {
         model: ModelSpec::new(model.clone()),
         system: Some(SYSTEM.to_string()),

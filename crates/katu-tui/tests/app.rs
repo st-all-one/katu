@@ -195,3 +195,43 @@ fn restoring_an_empty_trash_is_a_noop() {
     app.apply_action(Action::OpenTrash);
     assert_eq!(app.apply_action(Action::Restore), None);
 }
+
+#[test]
+fn emptying_the_trash_emits_a_command() {
+    let mut app = App::new();
+    app.apply_action(Action::OpenTrash);
+    assert_eq!(
+        app.apply_action(Action::EmptyTrash),
+        Some(Command::EmptyTrash)
+    );
+}
+
+#[test]
+fn next_action_update_fills_the_header_state() {
+    let mut app = App::new();
+    assert_eq!(app.next_action(), None);
+    app.apply_update(Update::NextAction("verificar".to_string()));
+    assert_eq!(app.next_action(), Some("verificar"));
+}
+
+#[test]
+fn opening_the_transcript_emits_a_command_and_fills_the_viewer() {
+    let mut app = App::new();
+    assert_eq!(
+        app.apply_action(Action::OpenTranscript),
+        Some(Command::Transcript)
+    );
+    assert!(app.viewer_open());
+    assert_eq!(app.mode(), Mode::Transcript);
+    app.apply_update(Update::Transcript(vec![
+        "# katu".to_string(),
+        "olá".to_string(),
+    ]));
+    assert_eq!(app.viewer_lines().len(), 2);
+    assert_eq!(app.viewer_scroll(), 0);
+    app.apply_action(Action::TranscriptDown);
+    assert_eq!(app.viewer_scroll(), 1);
+    app.apply_action(Action::CloseOverlay);
+    assert!(!app.viewer_open());
+    assert_eq!(app.mode(), Mode::Normal);
+}

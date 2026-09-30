@@ -2,10 +2,13 @@
 
 use katu_core::provider::{
     ModelCapabilities, Provider, ProviderError, ProviderOutcome, ProviderRequest, ProviderSink,
+    Tier,
 };
 
 use crate::catalog::{Catalog, ModelEntry};
 use crate::engine::{self, Dispatch, WireConfig};
+use crate::error::sanitize;
+use crate::models::parse_models;
 use crate::retry::RetryPolicy;
 use crate::transport::Transport;
 
@@ -97,6 +100,19 @@ impl<T: Transport> Provider for Declarative<T> {
             .collect()
     }
 
+    fn dynamic_models(&self) -> Result<Vec<String>, ProviderError> {
+        let request = engine::models_request(&self.wire(None));
+        let (status, body) = self.transport.get(&request).map_err(ProviderError::from)?;
+        if !(200..300).contains(&status) {
+            return Err(ProviderError::Http {
+                status,
+                body: sanitize(&body),
+            });
+        }
+        let live = parse_models(&body);
+        Ok(if live.is_empty() { self.models() } else { live })
+    }
+
     fn capabilities(&self, model: &str) -> ModelCapabilities {
         ModelCapabilities {
             model: model.to_string(),
@@ -105,6 +121,10 @@ impl<T: Transport> Provider for Declarative<T> {
                 .lookup(model)
                 .is_some_and(|entry| entry.reasoning),
         }
+    }
+
+    fn model_for_tier(&self, tier: Tier) -> Option<String> {
+        self.catalog.select_tier(tier).map(str::to_string)
     }
 
     fn stream(

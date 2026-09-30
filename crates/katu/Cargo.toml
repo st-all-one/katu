@@ -33,6 +33,7 @@ clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+toml.workspace = true
 knudge-core = { path = "../knudge/crates/knudge-core", optional = true }
 
 [lints]

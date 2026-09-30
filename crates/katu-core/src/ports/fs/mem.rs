@@ -224,4 +224,15 @@ impl Fs for MemFs {
         }
         Ok(entries.into_iter().collect())
     }
+
+    fn remove(&self, path: &Path) -> Result<(), FsError> {
+        let mut inner = lock(&self.inner);
+        if inner.links.remove(path).is_some() {
+            return Ok(());
+        }
+        match inner.files.remove(path) {
+            Some(_) => Ok(()),
+            None => Err(FsError::NotFound),
+        }
+    }
 }

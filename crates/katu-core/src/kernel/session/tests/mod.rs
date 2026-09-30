@@ -180,6 +180,7 @@ mod context;
 mod control;
 mod cost;
 mod facts;
+mod invariants;
 mod replay;
 mod resume;
 mod workspace;
