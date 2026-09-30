@@ -62,10 +62,14 @@ método de verificação imposto e nomeado; negativos visíveis.
   ler a saída; o prime é determinístico e versionado (`PRIME_VERSION`).
 - **Estado:** `katu-core::context` implementa `ContextBudget`, `Context`, `assemble(events, budget)`
   (a assinatura usa os **eventos**, não `State`, porque o invariante é `Model-visible ⟺ logged`) e
-  `prime()` (`PRIME_VERSION = 1`). A montagem é pura: projeta com `derive_messages` e mantém o
+  `prime()` (`PRIME_VERSION = 3`). A montagem é pura: projeta com `derive_messages` e mantém o
   **sufixo mais recente** que cabe em `raw_min`; a contagem de tokens é estimativa determinística
   (`bytes/4`, base `inferred`). Emite o span `context.build`. O `summary` é preenchido pela
   compactação (E09-T07) e o prime tem variante `--long` (`PrimeMode::Long`/`assemble_with_prime`).
+- **Integração (E10):** `Session::context(budget, mode)` monta o contexto **efetivo** do turno (o
+  `assemble` puro, ou o `assemble` com o digest quando a compactação está ligada) e o loop
+  (`agent::turn::request::build_request`) envia o **prime** e o **digest** no `system`. O `Runtime`
+  é o **único dono do teto** (`DEFAULT_CONTEXT_BUDGET`) — não há segundo montador de contexto.
 - **Aceite:** nenhuma mensagem sem origem no log (`Model-visible ⟺ logged`); o orçamento é
   respeitado; teste com limite exato e limite+1; o prime aparece uma única vez e é estável.
 
@@ -81,7 +85,7 @@ método de verificação imposto e nomeado; negativos visíveis.
   mantém a recusa dedicada `SchemaVersion`. `CheckpointError::Invalid` passa a carregar `Issues`.
 - **Aceite:** checkpoint corrompido falha a validação; escrita é atómica sob crash simulado.
 
-### E09-T03 ◐ Gate de verificação determinístico
+### E09-T03 ☑ Gate de verificação determinístico
 - **Entregáveis:** `verification_report.json` = função determinística sobre (regras, escopo,
   feedback, diff); zero LLM; um único caminho de relatório; `block` não sobreponível pelo agente —
   só por humano com `override_reason` + `overridden_by`; *coverage floor*; `--strict` promove
@@ -94,8 +98,15 @@ método de verificação imposto e nomeado; negativos visíveis.
   (append-only); `save` grava o relatório atomicamente. Emite o span `verify.report`.
   O kernel exige agora um relatório **não bloqueado** para `→ Verified` (`State::verification`,
   `Event::VerificationRecorded`, `Session::record_verification`; teste
-  `verified_requires_a_non_blocked_report`). **Falta:** o pedido interativo de override
-  (CLI/TUI, E10).
+  `verified_requires_a_non_blocked_report`).
+- **Integração (E10):** `Session::changed_files` (do *diff*: tools que mudam o disco com
+  `ToolResult` de sucesso, **relativos à raiz**) e `Session::recorded_commands` (feedback, E06-T07)
+  derivam os factos do log; `Runtime::verify` compõe o `VerificationInput` com o contrato de escopo
+  e corre o gate (puro, sem LLM), gravando `verification_report.json` e registando
+  `VerificationRecorded`. Na TUI, `v` corre o gate e, por cada verificação bloqueada, pede um
+  **override humano** por challenge-and-response (§33) e regista-o em `overrides.jsonl`
+  (append-only; evento `verify.override`). O agente **nunca** assina (`Override::new` exige
+  `reason` + `overridden_by`).
 - **Aceite:** o gate nunca chama um LLM; override é assinado e registado (`overrides.jsonl`).
 
 ### E09-T04 ☑ Scope contracts e `feature_list`
@@ -147,7 +158,7 @@ método de verificação imposto e nomeado; negativos visíveis.
 
 ---
 
-### E09-T07 ◐ Compactação da conversa como controlo do core
+### E09-T07 ☑ Compactação da conversa como controlo do core
 - **Objetivos:** tornar "compactar conversa" (core §1.1 #10) operação de primeira classe — via
   comando do utilizador e/ou gatilho do kernel no limite de fase/orçamento excedido — **nunca**
   inline no hot path.
@@ -164,7 +175,10 @@ método de verificação imposto e nomeado; negativos visíveis.
   `Metric` com base `inferred` (E09-T05). Um único dono do teto (`ContextBudget`). Emite
   `context.compact`. Gatilho do kernel: `needs_compaction(events, budget)` e
   `Session::compact_context`.
-- **Falta:** comando do utilizador (CLI/TUI, E10).
+- **Integração (E10):** a TUI liga/desliga a compactação (`c` → `Runtime::set_compaction`, só
+  quando há prefixo a compactar — nada silencioso) e a CLI tem `--compact`. O contexto efetivo do
+  turno vem de `Session::context` (`assemble`, ou `assemble` + digest quando ligada), pelo que o
+  resumo viaja no `system` e o original continua endereçável no log (`recover`).
 - **Aceite:** compactar não perde nenhuma mensagem recuperável; determinístico para o mesmo input;
   desligar mantém o `assemble`; nenhuma compactação silenciosa no caminho built-in (E12).
 

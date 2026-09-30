@@ -3,14 +3,16 @@
 use katu_core::diag::{Level, events};
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::CallId;
-use katu_core::provider::{Flow, ProviderEvent, ProviderRequest, ProviderSink, ToolDef};
+use katu_core::provider::{Flow, ProviderEvent, ProviderSink};
 use katu_policy::ApprovalRequest;
 use serde_json::Value;
 
-use super::{
-    AgentError, CallOutcome, Ports, TurnOptions, TurnReport, TurnRequest, catalog, execute_call,
-};
+use super::{AgentError, CallOutcome, Ports, TurnReport, TurnRequest, catalog, execute_call};
 use crate::runtime::Runtime;
+
+mod request;
+
+use request::build_request;
 
 /// Evento **efémero** do turno (E10-T05): observação ao vivo, fora do log e do contexto.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -111,22 +113,6 @@ impl ProviderSink for TurnSink<'_> {
         }
         Flow::Continue
     }
-}
-
-/// Monta o pedido ao provider para um passo (histórico = projeção do log).
-fn build_request(
-    runtime: &Runtime<'_>,
-    options: &TurnOptions,
-    tools: &[ToolDef],
-) -> Result<ProviderRequest, AgentError> {
-    Ok(ProviderRequest {
-        model: options.model.clone(),
-        system: options.system.clone(),
-        messages: runtime.messages()?,
-        tools: tools.to_vec(),
-        max_tokens: Some(options.max_tokens),
-        temperature: Some(options.temperature),
-    })
 }
 
 /// Executa um turno completo sem observador externo.

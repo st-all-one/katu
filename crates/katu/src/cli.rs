@@ -76,6 +76,9 @@ pub(crate) enum Command {
         /// Máximo de passos (tool calls) por turno.
         #[arg(long, default_value_t = 8)]
         max_steps: u32,
+        /// Liga a compactação do histórico no turno (E09-T07).
+        #[arg(long)]
+        compact: bool,
     },
     /// Abre a UI de terminal sobre o loop de turnos (E10).
     #[cfg(feature = "memory-in-process")]
@@ -95,6 +98,9 @@ pub(crate) enum Command {
         /// Máximo de passos (tool calls) por turno.
         #[arg(long, default_value_t = 8)]
         max_steps: u32,
+        /// Liga a compactação do histórico no turno (E09-T07).
+        #[arg(long)]
+        compact: bool,
     },
 }
 
@@ -137,6 +143,7 @@ pub(crate) fn execute(cli: &Cli) -> Report {
             base,
             max_tokens,
             max_steps,
+            compact,
         } => run(&RunArgs {
             goal,
             provider,
@@ -144,6 +151,7 @@ pub(crate) fn execute(cli: &Cli) -> Report {
             base: base.as_deref(),
             max_tokens: *max_tokens,
             max_steps: *max_steps,
+            compact: *compact,
         }),
         #[cfg(feature = "memory-in-process")]
         Command::Tui {
@@ -152,6 +160,7 @@ pub(crate) fn execute(cli: &Cli) -> Report {
             base,
             max_tokens,
             max_steps,
+            compact,
         } => run_tui(&RunArgs {
             goal: "tui",
             provider,
@@ -159,6 +168,7 @@ pub(crate) fn execute(cli: &Cli) -> Report {
             base: base.as_deref(),
             max_tokens: *max_tokens,
             max_steps: *max_steps,
+            compact: *compact,
         }),
     }
 }

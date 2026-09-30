@@ -14,11 +14,12 @@ use ratatui::crossterm::event::{self, Event, KeyEventKind};
 use ratatui::{DefaultTerminal, restore, try_init};
 
 use crate::action::map_key;
-use crate::app::{App, Command, Update};
+use crate::app::App;
 use crate::approval::{self, Challenge, ChallengePrompt, ChallengeSignature, Step};
 use crate::live::Live;
 use crate::throttle::{FRAME_INTERVAL_MS, Throttle};
 use crate::ui::render;
+use crate::{Command, Update};
 
 /// Executor dos efeitos pedidos pela UI (implementado pela borda do binário).
 pub trait Handler {

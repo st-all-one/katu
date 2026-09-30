@@ -6,10 +6,12 @@
 use std::path::Path;
 
 use super::{Session, SessionError};
-use crate::kernel::Event;
+use crate::context::{Compaction, CompactionMode, Context, ContextBudget, assemble, compact};
+use crate::feedback::CommandRecord;
 use crate::kernel::checkpoint::{self, Checkpoint, CheckpointError};
 use crate::kernel::log::{read_records, session_path};
 use crate::kernel::project::{Message, derive_messages, state_of};
+use crate::kernel::{CallId, Event};
 use crate::ports::FsError;
 
 impl Session<'_> {
@@ -70,6 +72,91 @@ impl Session<'_> {
             Err(other) => return Err(SessionError::Fs(other)),
         }
         Session::open_with_cap(self.fs, dst_dir, self.cost.caps().global)
+    }
+
+    /// Compacta o contexto pelo gatilho do kernel (E09-T07); determinístico e explícito.
+    ///
+    /// # Errors
+    /// [`SessionError::Log`] se o log estiver corrompido.
+    pub fn compact_context(
+        &self,
+        budget: ContextBudget,
+        mode: CompactionMode,
+    ) -> Result<Option<Compaction>, SessionError> {
+        Ok(compact(&self.log_events()?, budget, mode))
+    }
+
+    /// Monta o **contexto efetivo** do turno (E09-T01/T07): `assemble` com o orçamento; com a
+    /// compactação ligada, o prefixo antigo é substituído pelo digest (determinístico, o original
+    /// continua endereçável no log). Sem nada a compactar, o `assemble` puro mantém-se.
+    ///
+    /// # Errors
+    /// [`SessionError::Log`] se o log estiver corrompido.
+    pub fn context(
+        &self,
+        budget: ContextBudget,
+        mode: CompactionMode,
+    ) -> Result<Context, SessionError> {
+        let events = self.log_events()?;
+        Ok(match compact(&events, budget, mode) {
+            Some(compaction) if !compaction.replacements.is_empty() => compaction.context,
+            _ => assemble(&events, budget),
+        })
+    }
+
+    /// Ficheiros alterados (do *diff*) registados no log, **relativos à raiz** do workspace
+    /// (E09-T03). Só contam tools que mudam o disco (`is_file_change`) e cujo `ToolResult` teve
+    /// sucesso — um pedido recusado não alterou nada.
+    ///
+    /// # Errors
+    /// [`SessionError::Log`] se o log estiver corrompido.
+    pub fn changed_files(&self) -> Result<Vec<String>, SessionError> {
+        let mut pending: Vec<(CallId, Vec<String>)> = Vec::new();
+        let mut files = Vec::new();
+        for event in self.log_events()? {
+            match event {
+                Event::ToolCall { call, tool } if tool.name.is_file_change() => {
+                    let paths = tool
+                        .resolved_paths
+                        .iter()
+                        .map(|path| self.relative(path.as_str()))
+                        .collect();
+                    pending.push((call, paths));
+                }
+                Event::ToolResult { call, outcome } => {
+                    if let Some(index) = pending.iter().position(|(id, _)| *id == call) {
+                        let (_, paths) = pending.remove(index);
+                        if outcome.is_success() {
+                            files.extend(paths);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(files)
+    }
+
+    /// Comandos registados no log (E06-T07), na ordem causal (E09-T03).
+    ///
+    /// # Errors
+    /// [`SessionError::Log`] se o log estiver corrompido.
+    pub fn recorded_commands(&self) -> Result<Vec<CommandRecord>, SessionError> {
+        let mut commands = Vec::new();
+        for event in self.log_events()? {
+            if let Event::CommandRecorded { record } = event {
+                commands.push(record);
+            }
+        }
+        Ok(commands)
+    }
+
+    /// Caminho relativo à raiz do projeto (ou o absoluto, se estiver fora dela).
+    fn relative(&self, path: &str) -> String {
+        Path::new(path).strip_prefix(&self.root).map_or_else(
+            |_| path.to_string(),
+            |relative| relative.to_string_lossy().into_owned(),
+        )
     }
 
     /// Lê os eventos do log.

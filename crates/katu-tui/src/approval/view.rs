@@ -2,12 +2,12 @@
 
 use katu_core::diag::{Level, events};
 use ratatui::Frame;
-use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 
 use super::{Challenge, Focus, QUESTIONS};
+use crate::layout::centered;
 
 /// Desenha o challenge centrado na área.
 pub(crate) fn render(frame: &mut Frame<'_>, challenge: &Challenge) {
@@ -68,18 +68,4 @@ pub(crate) fn render(frame: &mut Frame<'_>, challenge: &Challenge) {
             .wrap(Wrap { trim: false }),
         area,
     );
-}
-
-/// Área centrada de tamanho `width`×`height` (limitada à moldura).
-fn centered(area: Rect, width: u16, height: u16) -> Rect {
-    let width = width.min(area.width);
-    let height = height.min(area.height);
-    Rect {
-        x: area.x.saturating_add(area.width.saturating_sub(width) / 2),
-        y: area
-            .y
-            .saturating_add(area.height.saturating_sub(height) / 2),
-        width,
-        height,
-    }
 }

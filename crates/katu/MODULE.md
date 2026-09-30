@@ -21,7 +21,9 @@ todo o código impuro confinado.
 - **Runtime** (`src/runtime.rs`, feature `memory-in-process`): ponto de composição do loop
   (E03-T03/T07) — descobre a raiz, abre o adaptador, **recusa arrancar** sem memória saudável
   (fail-closed) e expõe `recall`/`remember` pelo caminho §42. Os comandos `katu remember` e
-  `katu recall` exercitam-no.
+  `katu recall` exercitam-no. Os submodules `src/runtime/context.rs` (contexto efetivo +
+  compactação, E09-T01/T07) e `src/runtime/verify.rs` (gate de verificação sobre o log, E09-T03)
+  estendem o runtime; o teto de contexto tem **um único dono** (`DEFAULT_CONTEXT_BUDGET`).
 - **Contrato de escopo** (`src/scope.rs`, E09-T04): carrega `scope_contract.json` +
   `feature_list.json` da raiz no arranque e valida o `Plan` (schema + "≤ 1 `in_progress`"),
   **antes de qualquer turno** (fail-closed: artefacto pela metade ou inválido recusa o arranque).
@@ -29,8 +31,8 @@ todo o código impuro confinado.
   (`PlanRecorded`) pela ordem §42 em `src/agent/plan.rs`, tornado a fase `Planned` alcançável;
   sem ele, `plan` mantém `Unavailable{scope-contract}`.
 - **Loop de turnos** (`src/agent/`, feature `memory-in-process`, E12-T05/E10): liga o provider ao
-  kernel — monta `ProviderRequest` a partir da projeção do log (`derive_messages`) + catálogo de
-  tools, e executa cada tool call pela ordem §42 (logar → política → efeito). O `router` mapeia os
+  kernel — monta `ProviderRequest` via `Session::context` (`assemble`/`compact`: prime determinístico
+  + digest, E09-T01/T07) e o catálogo de tools, e executa cada tool call pela ordem §42 (logar → política → efeito). O `router` mapeia os
   argumentos JSON do modelo num `ToolUse` resolvido (caminhos canonicalizados antes do veredicto,
   E07-T02) e no executor; a tool `memory` passa pelos caminhos de recall/escrita do gate de E05.
   O comando `katu run` exercita-o. Envelopes de `Dispatch`/memória vivem em `src/memory/commands.rs`.
@@ -45,8 +47,9 @@ todo o código impuro confinado.
   (`reason`+`granted_by`), o kernel regista `ApprovalGranted` e concede a capacidade mínima
   (`katu-policy::capability_for`), re-executando a chamada (E10-T04/E07-T05, §33). O runtime
   carrega as regras de **memória + contenção** e define o **workspace** no arranque (`Runtime::open`),
-  pelo que a contenção é aplicada no loop. O turno é **síncrono** nesta fatia (executor em
-  background é trabalho futuro).
+  pelo que a contenção é aplicada no loop. A TUI liga/desliga a compactação (`c`), lista/restaura a
+  lixeira (`l`/`r`) e corre o **gate de verificação** (`v`; se bloquear, pede override humano por
+  challenge, E09-T03). O turno é **síncrono** nesta fatia (executor em background é trabalho futuro).
 - Exit codes na borda (a lógica propaga `Result`).
 - Harness de medição do MVK (`examples/measure_mvk.rs`, feature `profile`, E05-T06): corre o
   caminho real e grava `bench/mvk/raw.json` (evidência tipada, DF5).

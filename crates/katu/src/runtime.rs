@@ -6,10 +6,13 @@
 
 use std::path::Path;
 
+use katu_core::context::{CompactionMode, ContextBudget};
 use katu_core::error::Error;
+#[cfg(test)]
+use katu_core::kernel::Message;
 use katu_core::kernel::{
-    CallContext, CallId, Dispatch, Event, MemoryWriteRequest, Message, Session, SessionError,
-    SessionId, discover_root, memory_recall_use,
+    CallContext, CallId, Dispatch, Event, MemoryWriteRequest, Session, SessionError, SessionId,
+    discover_root, memory_recall_use,
 };
 use katu_core::memory::{Anchor, Memory, MemoryError, NoteType, PreWriteReq, RecallReq};
 use katu_core::plan::Plan;
@@ -21,11 +24,29 @@ use katu_tools::write::WriteNoteTool;
 use crate::memory::KnudgeMemory;
 use crate::scope::{self, ScopeError};
 
+mod context;
+mod verify;
+
 /// Regras do protocolo de memória, versionadas no repositório (dado, não código).
 const MEMORY_POLICY: &str = include_str!("../../../policy/memory.toml");
 
 /// Regras de contenção **soft** (E07-T05): sensíveis e fora do workspace.
 const CONTAINMENT_POLICY: &str = include_str!("../../../policy/containment.toml");
+
+/// Orçamento de contexto do turno — o **único dono do teto** (E09-T01/T07).
+pub(crate) const DEFAULT_CONTEXT_BUDGET: ContextBudget = ContextBudget {
+    raw_min: 4096,
+    summary_max: 1024,
+};
+
+/// Parâmetros do gate de verificação (struct evita booleano nu em parâmetros).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct VerifyRequest {
+    /// Cobertura mínima exigida (pontos base).
+    pub coverage_floor_bps: u16,
+    /// `--strict`: promove `Warn` a `Block`.
+    pub strict: bool,
+}
 
 /// Carrega as regras do protocolo de memória **e** as de contenção (DF3: dado versionado).
 fn load_rules() -> Result<RuleSet, PolicyError> {
@@ -51,6 +72,9 @@ pub(crate) enum RuntimeError {
     /// Artefacto de plano (`scope_contract`/`feature_list`) inválido (E09-T04).
     #[error("escopo: {0}")]
     Scope(#[from] ScopeError),
+    /// O gate de verificação (E09-T03) não pôde correr (falta o escopo).
+    #[error("verificação: {0}")]
+    Verification(String),
 }
 
 impl From<RuntimeError> for Error {
@@ -59,6 +83,7 @@ impl From<RuntimeError> for Error {
             RuntimeError::Memory(source) => Self::unavailable(source.to_string()),
             RuntimeError::Policy(source) => Self::invalid_input(source.to_string()),
             RuntimeError::Scope(source) => Self::invalid_input(source.to_string()),
+            RuntimeError::Verification(message) => Self::invalid_input(message),
             RuntimeError::Session(source) => Self::internal(source.to_string()),
         }
     }
@@ -73,6 +98,8 @@ pub(crate) struct Runtime<'a> {
     pub(crate) cwd: ResolvedPath,
     pub(crate) calls: u64,
     pub(crate) plan: Option<Plan>,
+    budget: ContextBudget,
+    compaction: CompactionMode,
 }
 
 impl<'a> Runtime<'a> {
@@ -105,6 +132,8 @@ impl<'a> Runtime<'a> {
             cwd,
             calls: 0,
             plan,
+            budget: DEFAULT_CONTEXT_BUDGET,
+            compaction: CompactionMode::Disabled,
         })
     }
 
@@ -134,10 +163,11 @@ impl<'a> Runtime<'a> {
         self.plan.as_ref()
     }
 
-    /// Histórico visível ao modelo (projeção do log, §42).
+    /// Histórico visível ao modelo (projeção do log, §42) — usado pelos testes do loop.
     ///
     /// # Errors
     /// [`SessionError`] se o log estiver corrompido.
+    #[cfg(test)]
     pub(crate) fn messages(&self) -> Result<Vec<Message>, SessionError> {
         self.session.messages()
     }

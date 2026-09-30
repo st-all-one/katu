@@ -13,43 +13,11 @@ use crate::action::{Action, Mode};
 use crate::controls::Controls;
 use crate::entry::{Entry, Role, Status};
 use crate::live::{Live, trim_tail};
+use crate::message::{Command, Update};
+use crate::trash::{Trash, TrashEntry};
 
 /// Teto do buffer efémero de streaming (bytes); o painel mostra só a cauda (E10-T03).
 const STREAM_TAIL_BYTES: usize = 8 * 1024;
-
-/// Comando emitido pela UI para a borda executar (I/O fora do render).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Command {
-    /// Submeter uma mensagem ao agente.
-    Submit(String),
-    /// Altera o modelo do **próximo** turno (E10-T07/E12-T10); o agente não se auto-escala.
-    SetModel(String),
-    /// Altera o grau de pensamento do **próximo** turno (E10-T07/E12-T10).
-    SetThinking(Thinking),
-    /// Sair.
-    Quit,
-}
-
-/// Atualização injetada pela borda na UI.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Update {
-    /// Resposta (texto final) do modelo.
-    Assistant(String),
-    /// Uma tool correu.
-    Tool(String),
-    /// Nota informativa.
-    Info(String),
-    /// Erro do turno.
-    Error(String),
-    /// Fase corrente do kernel (E10-T06).
-    Phase(String),
-    /// Observação efémera do turno (E10-T05): só o painel de atividade.
-    Live(Live),
-    /// Modelos disponíveis no provider (E10-T07); o primeiro é o default.
-    Models(Vec<String>),
-    /// Turno concluído (limpa a pendência).
-    Done,
-}
 
 /// Estado central da UI.
 #[derive(Debug)]
@@ -67,6 +35,8 @@ pub struct App {
     live: Vec<String>,
     /// Controlos do core: modelo e grau de pensamento (E10-T07/E12-T10).
     controls: Controls,
+    /// Vista da lixeira (E10-T07/E06-T09).
+    trash: Trash,
     /// Deslocamento a partir do fundo (0 = mensagem mais recente).
     scroll: u16,
     quit: bool,
@@ -92,6 +62,7 @@ impl App {
             thinking: String::new(),
             live: Vec::new(),
             controls: Controls::new(),
+            trash: Trash::new(),
             scroll: 0,
             quit: false,
         }
@@ -113,6 +84,24 @@ impl App {
     #[must_use]
     pub const fn reasoning(&self) -> Thinking {
         self.controls.reasoning()
+    }
+
+    /// A vista da lixeira está aberta (E10-T07).
+    #[must_use]
+    pub const fn trash_open(&self) -> bool {
+        self.trash.is_open()
+    }
+
+    /// Entradas da lixeira listadas (mais recentes primeiro).
+    #[must_use]
+    pub fn trash_items(&self) -> &[TrashEntry] {
+        self.trash.items()
+    }
+
+    /// Índice selecionado na lixeira.
+    #[must_use]
+    pub const fn trash_index(&self) -> usize {
+        self.trash.index()
     }
 
     /// Linha de mensagem em edição.
@@ -198,6 +187,25 @@ impl App {
             Action::ScrollDown => self.scroll = self.scroll.saturating_sub(1),
             Action::CycleModel => return self.controls.cycle_model(),
             Action::CycleThinking => return Some(self.controls.cycle_thinking()),
+            Action::OpenTrash => {
+                self.trash.open();
+                self.mode = Mode::Trash;
+                return Some(Command::Trash);
+            }
+            Action::CloseOverlay => {
+                self.trash.close();
+                self.mode = Mode::Normal;
+            }
+            Action::TrashUp => self.trash.up(),
+            Action::TrashDown => self.trash.down(),
+            Action::Restore => {
+                return self
+                    .trash
+                    .selected()
+                    .map(|entry| Command::Restore(entry.stored.clone()));
+            }
+            Action::Compact => return Some(Command::Compact),
+            Action::Verify => return Some(Command::Verify),
             Action::Quit => {
                 self.quit = true;
                 return Some(Command::Quit);
@@ -237,6 +245,7 @@ impl App {
             Update::Phase(phase) => self.phase = phase,
             Update::Live(live) => self.apply_live(live),
             Update::Models(models) => self.controls.set_models(models),
+            Update::Trash(items) => self.trash.set_items(items),
             Update::Done => {
                 self.clear_live();
                 self.status = Status::Idle;

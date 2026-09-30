@@ -5,7 +5,7 @@
 
 use katu_core::provider::Thinking;
 
-use crate::app::Command;
+use crate::message::Command;
 
 /// Seleção de modelo e grau de pensamento para os próximos turnos.
 #[derive(Debug, Default)]

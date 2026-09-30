@@ -86,6 +86,7 @@ catalog! {
     (CONTEXT_COMPACT, "context.compact", "Compactação determinística do histórico antigo (E09-T07)."),
     (CONTEXT_CHECKPOINT, "context.checkpoint", "Checkpoint de evidência."),
     (VERIFY_REPORT, "verify.report", "Relatório do gate de verificação determinístico (E09)."),
+    (VERIFY_OVERRIDE, "verify.override", "Override humano assinado de uma verificação bloqueada (E09-T03)."),
     (SCOPE_LOAD, "scope.load", "Carregamento do contrato de escopo/feature list no arranque (E09-T04)."),
     (SCOPE_MERGE, "scope.merge", "Merge de contratos de escopo por menor privilégio (E09-T04)."),
 

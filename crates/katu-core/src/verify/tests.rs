@@ -5,20 +5,19 @@ use super::{
 use crate::feedback::CommandRecord;
 use crate::plan::ScopeContract;
 use crate::ports::{Fs, MemFs};
-use katu_policy::{PolicyError, ResolvedPath};
 use std::path::Path;
 
 fn scope() -> ScopeContract {
     ScopeContract::new(
-        vec!["/work/src/**".to_string()],
-        vec!["/work/secrets/**".to_string()],
+        vec!["src/**".to_string()],
+        vec!["secrets/**".to_string()],
         vec!["testes passam".to_string()],
         "reverter",
     )
 }
 
-fn paths(values: &[&str]) -> Result<Vec<ResolvedPath>, PolicyError> {
-    values.iter().map(ResolvedPath::from_canonical).collect()
+fn paths(values: &[&str]) -> Vec<String> {
+    values.iter().map(|value| (*value).to_string()).collect()
 }
 
 /// Desfecho de um comando nos testes (sem booleano como parâmetro).
@@ -58,9 +57,9 @@ fn check_status(report: &VerificationReport, id: &str) -> Option<CheckStatus> {
 }
 
 #[test]
-fn same_input_yields_the_same_report() -> Result<(), Box<dyn std::error::Error>> {
+fn same_input_yields_the_same_report() {
     let scope = scope();
-    let files = paths(&["/work/src/main.rs"])?;
+    let files = paths(&["src/main.rs"]);
     let commands = [command(Outcome::Exit(0))];
     let input = VerificationInput {
         changed_files: &files,
@@ -71,13 +70,12 @@ fn same_input_yields_the_same_report() -> Result<(), Box<dyn std::error::Error>>
     };
     assert_eq!(verify(&input), verify(&input));
     assert_eq!(verify(&input).schema_version, VERIFICATION_SCHEMA_VERSION);
-    Ok(())
 }
 
 #[test]
-fn forbidden_file_blocks() -> Result<(), Box<dyn std::error::Error>> {
+fn forbidden_file_blocks() {
     let scope = scope();
-    let files = paths(&["/work/secrets/token"])?;
+    let files = paths(&["secrets/token"]);
     let report = verify(&VerificationInput {
         changed_files: &files,
         scope: &scope,
@@ -90,13 +88,12 @@ fn forbidden_file_blocks() -> Result<(), Box<dyn std::error::Error>> {
         check_status(&report, "scope.forbidden"),
         Some(CheckStatus::Block)
     );
-    Ok(())
 }
 
 #[test]
-fn outside_scope_warns_and_strict_promotes_to_block() -> Result<(), Box<dyn std::error::Error>> {
+fn outside_scope_warns_and_strict_promotes_to_block() {
     let scope = scope();
-    let files = paths(&["/work/docs/readme.md"])?;
+    let files = paths(&["docs/readme.md"]);
     let lax = verify(&VerificationInput {
         changed_files: &files,
         scope: &scope,
@@ -113,13 +110,12 @@ fn outside_scope_warns_and_strict_promotes_to_block() -> Result<(), Box<dyn std:
         strict: true,
     });
     assert!(strict.is_blocked(), "--strict promove o aviso a muro");
-    Ok(())
 }
 
 #[test]
-fn ambiguous_or_timed_out_commands_block() -> Result<(), Box<dyn std::error::Error>> {
+fn ambiguous_or_timed_out_commands_block() {
     let scope = scope();
-    let files = paths(&["/work/src/main.rs"])?;
+    let files = paths(&["src/main.rs"]);
     let ambiguous = [command(Outcome::Ambiguous)];
     let report = verify(&VerificationInput {
         changed_files: &files,
@@ -144,13 +140,12 @@ fn ambiguous_or_timed_out_commands_block() -> Result<(), Box<dyn std::error::Err
         check_status(&report, "feedback.timeout"),
         Some(CheckStatus::Block)
     );
-    Ok(())
 }
 
 #[test]
-fn nonzero_exit_warns() -> Result<(), Box<dyn std::error::Error>> {
+fn nonzero_exit_warns() {
     let scope = scope();
-    let files = paths(&["/work/src/main.rs"])?;
+    let files = paths(&["src/main.rs"]);
     let failed = [command(Outcome::Exit(1))];
     let report = verify(&VerificationInput {
         changed_files: &files,
@@ -163,13 +158,12 @@ fn nonzero_exit_warns() -> Result<(), Box<dyn std::error::Error>> {
         check_status(&report, "feedback.exit"),
         Some(CheckStatus::Warn)
     );
-    Ok(())
 }
 
 #[test]
-fn coverage_floor_is_enforced() -> Result<(), Box<dyn std::error::Error>> {
+fn coverage_floor_is_enforced() {
     let scope = scope();
-    let files = paths(&["/work/src/a.rs", "/work/docs/b.md"])?;
+    let files = paths(&["src/a.rs", "docs/b.md"]);
     let report = verify(&VerificationInput {
         changed_files: &files,
         scope: &scope,
@@ -179,7 +173,6 @@ fn coverage_floor_is_enforced() -> Result<(), Box<dyn std::error::Error>> {
     });
     assert_eq!(report.coverage_bps, 5_000);
     assert_eq!(check_status(&report, "coverage"), Some(CheckStatus::Warn));
-    Ok(())
 }
 
 #[test]
@@ -222,7 +215,7 @@ fn report_is_saved_atomically() -> Result<(), Box<dyn std::error::Error>> {
     let fs = MemFs::new();
     let dir = Path::new("/sessions");
     let scope = scope();
-    let files = paths(&["/work/src/main.rs"])?;
+    let files = paths(&["src/main.rs"]);
     let report = verify(&VerificationInput {
         changed_files: &files,
         scope: &scope,

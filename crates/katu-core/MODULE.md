@@ -31,7 +31,8 @@ função, o log é a fonte da verdade.
     `write_atomic`); erros agregados em `Issue { path, message }` (OA19/E09-T02).
   - `kernel::session` — `Session`/`CallContext` (loop mínimo: valida transição + orçamento antes de
     gravar; `tool_call` e `memory_write` pela ordem §42; `set_workspace`/`record_verification`;
-    `approve` (aprovação humana, E07-T05); `verify`/`messages`/`fork`).
+    `approve` (aprovação humana, E07-T05); `context` (contexto efetivo, E09-T01/T07);
+    `verify`/`changed_files`/`recorded_commands` (factos do gate, E09-T03); `messages`/`fork`).
 - `derive_messages`/`snapshot` — projeções puras.
 - Porta [`memory::Memory`](src/memory.rs) (tipos do katu, DF6), com submódulos:
   - `memory::types` — `NoteType`, `Status`, `Basis`, `NoteRef`, `Anchor`, `Score` (pontos base,
@@ -56,13 +57,16 @@ função, o log é a fonte da verdade.
   `ArtifactRef`; um número sem artefacto não fundamenta decisão; a base não muda numa agregação.
 - Contexto com orçamento [`context`](src/context.rs) (E09-T01/T07): `ContextBudget`/`Context`/
   `assemble` (prime determinístico + sufixo de mensagens do log; `Model-visible ⟺ logged`) e
-  `prime()` (`PRIME_VERSION = 1`); tokens por estimativa determinística (`bytes/4`). A compactação
+  `prime()` (`PRIME_VERSION = 3`); tokens por estimativa determinística (`bytes/4`). A compactação
   [`context/compact`](src/context/compact.rs) (E09-T07) é determinística e opt-in
   (`CompactionMode`, default `Disabled`): digest do prefixo + mapeamento original→substituto,
-  `recover` pelo log, ganho como `Metric` `inferred`.
+  `recover` pelo log, ganho como `Metric` `inferred`. `Session::context(budget, mode)` é o **único**
+  ponto que monta o contexto efetivo do turno (com ou sem digest), consumido pelo loop.
 - Gate de verificação [`verify`](src/verify/mod.rs) (E09-T03): `verify` **puro** (escopo/feedback/
   cobertura, zero LLM), `VerificationReport`/`Check`/`CheckStatus`, `--strict` promove warns a
-  blocks; `Override` **assinado** (`reason`+`overridden_by`) registado em `overrides.jsonl`.
+  blocks; o `diff` são ficheiros **relativos à raiz** derivados do log (`changed_files`, só escritas
+  com sucesso) e o `feedback` são os `CommandRecord`; `Override` **assinado**
+  (`reason`+`overridden_by`) registado em `overrides.jsonl` (evento `verify.override`).
 - Plano tipado [`plan`](src/plan.rs) (E06-T06/E09-T04): `Plan`/`ScopeContract`/`Feature`/
   `FeatureStatus`; `validate` (schema + "≤ 1 `in_progress`" + globs relativos), `allows` (globs;
   proibido vence) e `merge` por menor privilégio ([`plan/merge`](src/plan/merge.rs): `allowed`

@@ -15,7 +15,9 @@ use super::{Ports, TurnOptions, TurnRequest, run_turn};
 use crate::ports::{StdEnv, StdFs, StdProcess};
 use crate::runtime::Runtime;
 
+mod context;
 mod live;
+mod verify;
 
 /// Pedido de turno a partir dos componentes (o `ports` é `Copy`).
 pub(super) fn request<'a>(

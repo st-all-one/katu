@@ -13,6 +13,7 @@ use ratatui::widgets::{Block, Paragraph, Wrap};
 use crate::action::Mode;
 use crate::app::App;
 use crate::entry::{Role, Status};
+use crate::trash;
 
 /// Teto de entradas da conversa projetadas por quadro (E10-T03).
 const MAX_TRANSCRIPT_ENTRIES: usize = 200;
@@ -62,6 +63,10 @@ pub fn render(frame: &mut Frame<'_>, app: &App) {
     );
 
     frame.render_widget(Paragraph::new(status_line(app)), footer);
+
+    if app.trash_open() {
+        trash::render(frame, app);
+    }
 }
 
 /// Deslocamento que mostra o **fundo** de um painel (mensagem mais recente).
@@ -113,7 +118,8 @@ fn input_title(app: &App) -> &'static str {
 fn status_line(app: &App) -> Line<'static> {
     match app.status() {
         Status::Idle => Line::from(Span::styled(
-            "q sai  ·  ↑/↓ rola  ·  i escreve  ·  m modelo  ·  t pensamento".to_string(),
+            "q sai  ·  ↑/↓ rola  ·  i escreve  ·  m modelo  ·  t pensamento  ·  l lixeira  ·  c compactar  ·  v verifica"
+                .to_string(),
             Style::default().fg(Color::DarkGray),
         )),
         Status::Working => Line::from(Span::styled(
@@ -211,83 +217,5 @@ const fn role_prefix(role: Role) -> &'static str {
         Role::Tool => "tool  ",
         Role::Info => "info  ",
         Role::Error => "erro  ",
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use ratatui::Terminal;
-    use ratatui::backend::TestBackend;
-
-    use super::render;
-    use crate::action::Action;
-    use crate::app::{App, Update};
-    use crate::live::Live;
-
-    /// Renderiza num backend de teste e devolve o texto do buffer.
-    fn draw(app: &App) -> Result<String, Box<dyn std::error::Error>> {
-        let backend = TestBackend::new(60, 16);
-        let mut terminal = Terminal::new(backend)?;
-        terminal.draw(|frame| render(frame, app))?;
-        let buffer = terminal.backend().buffer();
-        Ok(buffer
-            .content()
-            .iter()
-            .map(|cell| cell.symbol().to_string())
-            .collect())
-    }
-
-    #[test]
-    fn renders_header_and_transcript() -> Result<(), Box<dyn std::error::Error>> {
-        let mut app = App::new();
-        app.apply_update(Update::Assistant("olá mundo".to_string()));
-        let text = draw(&app)?;
-        assert!(text.contains("katu"), "{text}");
-        assert!(text.contains("olá mundo"), "{text}");
-        Ok(())
-    }
-
-    #[test]
-    fn renders_model_and_thinking_in_the_header() -> Result<(), Box<dyn std::error::Error>> {
-        let mut app = App::new();
-        app.apply_update(Update::Models(vec!["qwen".to_string()]));
-        app.apply_action(Action::CycleThinking);
-        let text = draw(&app)?;
-        assert!(text.contains("qwen"), "{text}");
-        assert!(text.contains("pensamento low"), "{text}");
-        Ok(())
-    }
-
-    #[test]
-    fn renders_phase_from_state() -> Result<(), Box<dyn std::error::Error>> {
-        let mut app = App::new();
-        app.apply_update(Update::Phase("verified".to_string()));
-        let text = draw(&app)?;
-        assert!(text.contains("verified"), "{text}");
-        Ok(())
-    }
-
-    #[test]
-    fn renders_only_the_tail_of_a_large_transcript() -> Result<(), Box<dyn std::error::Error>> {
-        let mut app = App::new();
-        for index in 0..(super::MAX_TRANSCRIPT_ENTRIES + 40) {
-            app.apply_update(Update::Info(format!("linha {index}")));
-        }
-        let text = draw(&app)?;
-        assert!(text.contains("linha 239"), "mostra o fim: {text}");
-        assert!(!text.contains("linha 0 "), "não mostra o início: {text}");
-        Ok(())
-    }
-
-    #[test]
-    fn renders_live_activity_panel() -> Result<(), Box<dyn std::error::Error>> {
-        let mut app = App::new();
-        app.apply_update(Update::Live(Live::Tool("grep".to_string())));
-        app.apply_update(Update::Live(Live::Text("a responder".to_string())));
-        let text = draw(&app)?;
-        assert!(text.contains("atividade"), "{text}");
-        assert!(text.contains("grep"), "{text}");
-        assert!(text.contains("a responder"), "{text}");
-        Ok(())
     }
 }

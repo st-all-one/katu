@@ -14,7 +14,6 @@ use super::memory_gate::{MemoryWriteRequest, enforce_memory_write, memory_write_
 use super::pipeline::{Dispatch, dispatch};
 use super::state::State;
 use super::step::step;
-use crate::context::{Compaction, CompactionMode, ContextBudget, compact};
 use crate::diag::{Level, events};
 use crate::ports::Fs;
 use crate::verify::VerificationReport;
@@ -240,18 +239,6 @@ impl<'a> Session<'a> {
         self.apply(&Event::VerificationRecorded {
             report: report.clone(),
         })
-    }
-
-    /// Compacta o contexto pelo gatilho do kernel (E09-T07); determinístico e explícito.
-    ///
-    /// # Errors
-    /// [`SessionError::Log`] se o log estiver corrompido.
-    pub fn compact_context(
-        &self,
-        budget: ContextBudget,
-        mode: CompactionMode,
-    ) -> Result<Option<Compaction>, SessionError> {
-        Ok(compact(&self.log_events()?, budget, mode))
     }
 
     /// Executa uma **escrita de memória** pela ordem §42, com o gate de E05: loga o pedido, corre

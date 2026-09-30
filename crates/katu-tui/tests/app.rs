@@ -1,7 +1,7 @@
 //! Testes do estado central da UI (E10-T02/T05/T07) pela API pública.
 
 use katu_core::provider::Thinking;
-use katu_tui::{Action, App, Command, Live, Role, Status, Update};
+use katu_tui::{Action, App, Command, Live, Mode, Role, Status, TrashEntry, Update};
 
 #[test]
 fn typing_then_submitting_emits_a_command_and_echoes_the_user() {
@@ -143,4 +143,55 @@ fn cycling_thinking_advances_and_wraps() {
         app.apply_action(Action::CycleThinking);
     }
     assert_eq!(app.reasoning(), Thinking::Off, "o ciclo fecha");
+}
+
+#[test]
+fn opening_the_trash_lists_navigates_and_restores() {
+    let mut app = App::new();
+    assert_eq!(app.apply_action(Action::OpenTrash), Some(Command::Trash));
+    assert!(app.trash_open());
+    assert_eq!(app.mode(), Mode::Trash);
+    app.apply_update(Update::Trash(vec![
+        TrashEntry {
+            original: "a".to_string(),
+            stored: "/t/a".to_string(),
+        },
+        TrashEntry {
+            original: "b".to_string(),
+            stored: "/t/b".to_string(),
+        },
+    ]));
+    assert_eq!(app.trash_index(), 0);
+    app.apply_action(Action::TrashDown);
+    assert_eq!(app.trash_index(), 1);
+    app.apply_action(Action::TrashDown);
+    assert_eq!(app.trash_index(), 1, "satura no fim");
+    app.apply_action(Action::TrashUp);
+    assert_eq!(app.trash_index(), 0);
+    assert_eq!(
+        app.apply_action(Action::Restore),
+        Some(Command::Restore("/t/a".to_string()))
+    );
+    app.apply_action(Action::CloseOverlay);
+    assert!(!app.trash_open());
+    assert_eq!(app.mode(), Mode::Normal);
+}
+
+#[test]
+fn compact_emits_a_command() {
+    let mut app = App::new();
+    assert_eq!(app.apply_action(Action::Compact), Some(Command::Compact));
+}
+
+#[test]
+fn verify_emits_a_command() {
+    let mut app = App::new();
+    assert_eq!(app.apply_action(Action::Verify), Some(Command::Verify));
+}
+
+#[test]
+fn restoring_an_empty_trash_is_a_noop() {
+    let mut app = App::new();
+    app.apply_action(Action::OpenTrash);
+    assert_eq!(app.apply_action(Action::Restore), None);
 }

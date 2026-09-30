@@ -1,4 +1,4 @@
-use super::{TrashError, TrashTool, restore};
+use super::{TrashError, TrashTool, list, restore};
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::{Tool, ToolOutput};
 use katu_core::ports::{FixedClock, Fs, MemFs, Timestamp};
@@ -115,4 +115,23 @@ fn collision_gets_a_suffix() -> Result<(), Box<dyn std::error::Error>> {
     assert!(rendered.contains("a.rs.1000.0"), "{rendered}");
     assert_eq!(fs.read(Path::new(STORED))?, b"old".to_vec());
     Ok(())
+}
+
+#[test]
+fn list_is_most_recent_first() -> Result<(), Box<dyn std::error::Error>> {
+    let fs = MemFs::new();
+    fs.write_atomic(Path::new(PATH), b"body")?;
+    let clock = FixedClock::new(Timestamp::from_millis(1_000));
+    tool(&fs, &clock).execute(&use_()?);
+    let items = list(&fs, Path::new(ROOT));
+    assert_eq!(items.len(), 1);
+    assert_eq!(items.first().map(|item| item.original.as_str()), Some(PATH));
+    assert_eq!(items.first().map(|item| item.at_millis), Some(1_000));
+    Ok(())
+}
+
+#[test]
+fn list_without_index_is_empty() {
+    let fs = MemFs::new();
+    assert!(list(&fs, Path::new(ROOT)).is_empty());
 }

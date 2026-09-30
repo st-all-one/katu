@@ -62,6 +62,12 @@ impl ToolName {
         }
     }
 
+    /// `true` se a tool altera ficheiros no disco (entra no *diff* da verificação, E09-T03).
+    #[must_use]
+    pub const fn is_file_change(self) -> bool {
+        matches!(self, Self::Write | Self::Edit | Self::Move | Self::Trash)
+    }
+
     /// Converte um nome estável de volta para o enum (vocabulário fechado).
     ///
     /// Devolve `None` para um nome desconhecido — o adaptador de provider decide o que fazer
@@ -86,5 +92,20 @@ impl ToolName {
             "thinking" => Self::Thinking,
             _ => return None,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ToolName;
+
+    #[test]
+    fn only_disk_mutating_tools_are_file_changes() {
+        assert!(ToolName::Write.is_file_change());
+        assert!(ToolName::Edit.is_file_change());
+        assert!(ToolName::Move.is_file_change());
+        assert!(ToolName::Trash.is_file_change());
+        assert!(!ToolName::Read.is_file_change());
+        assert!(!ToolName::Exec.is_file_change());
     }
 }

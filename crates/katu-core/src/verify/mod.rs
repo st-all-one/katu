@@ -12,7 +12,6 @@ use crate::diag::{Level, events};
 use crate::feedback::CommandRecord;
 use crate::plan::ScopeContract;
 use crate::ports::{Fs, FsError};
-use katu_policy::ResolvedPath;
 
 mod checks;
 
@@ -83,8 +82,8 @@ impl Check {
 /// Entrada do gate: factos já recolhidos (a função é pura).
 #[derive(Debug, Clone, Copy)]
 pub struct VerificationInput<'a> {
-    /// Ficheiros alterados (do diff).
-    pub changed_files: &'a [ResolvedPath],
+    /// Ficheiros alterados (do diff), **relativos à raiz** do workspace.
+    pub changed_files: &'a [String],
     /// Contrato de escopo do plano.
     pub scope: &'a ScopeContract,
     /// Comandos executados (feedback).

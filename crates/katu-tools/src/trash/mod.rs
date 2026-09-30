@@ -111,6 +111,32 @@ impl TrashTool<'_> {
     }
 }
 
+/// Item da lixeira na visão do utilizador (subset do índice).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TrashItem {
+    /// Caminho guardado (token de restauro).
+    pub stored: String,
+    /// Caminho original.
+    pub original: String,
+    /// Instante (ms) em que foi enviado para a lixeira.
+    pub at_millis: u64,
+}
+
+/// Lista a lixeira, do mais recente para o mais antigo (vazia sem índice).
+#[must_use]
+pub fn list(fs: &dyn Fs, root: &Path) -> Vec<TrashItem> {
+    let mut items: Vec<TrashItem> = index::read(fs, root)
+        .into_iter()
+        .map(|record| TrashItem {
+            stored: record.stored,
+            original: record.original,
+            at_millis: record.at_millis,
+        })
+        .collect();
+    items.reverse();
+    items
+}
+
 /// Restaura um item guardado. **Sempre permitido** (não passa pela política).
 ///
 /// # Errors

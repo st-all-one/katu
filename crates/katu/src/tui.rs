@@ -5,11 +5,12 @@
 //! modelo. Durante o turno, os deltas e as tools em curso são reencaminhados **ao vivo** para o
 //! painel de atividade (E10-T05) através do `Painter`, sem entrarem no log nem no transcript.
 
+use katu_core::context::CompactionMode;
 use katu_core::diag::{Level, events};
 use katu_core::error::Error;
-use katu_core::ports::Env;
 use katu_core::provider::{ModelSpec, Provider};
-use katu_tui::{App, ChallengePrompt, Command, Handler, Live, Painter, Update, run};
+use katu_tools::trash;
+use katu_tui::{App, ChallengePrompt, Command, Handler, Live, Painter, TrashEntry, Update, run};
 
 use crate::agent::{
     Activity, ActivitySink, Approval, ApprovalPrompt, Ports, RunArgs, SYSTEM, TurnOptions,
@@ -19,6 +20,8 @@ use crate::ports::{StdEnv, StdFs, StdProcess, SystemClock};
 use crate::report::Report;
 use crate::runtime::Runtime;
 
+mod verify;
+
 /// Corre a UI de terminal ligada ao loop de turnos.
 pub(crate) fn run_tui(args: &RunArgs<'_>) -> Report {
     let fs = StdFs;
@@ -26,10 +29,13 @@ pub(crate) fn run_tui(args: &RunArgs<'_>) -> Report {
     let env = StdEnv;
     let process = StdProcess;
     let start = std::env::current_dir().unwrap_or_default();
-    let runtime = match Runtime::open(&fs, &clock, &start, "cli: tui") {
+    let mut runtime = match Runtime::open(&fs, &clock, &start, "cli: tui") {
         Ok(runtime) => runtime,
         Err(error) => return Report::failed("tui", &Error::from(error)),
     };
+    if args.compact {
+        runtime.set_compaction(CompactionMode::Enabled);
+    }
     let model = args
         .model
         .map_or_else(|| default_model(args.provider).to_string(), str::to_string);
@@ -95,18 +101,66 @@ impl Handler for AgentHandler<'_> {
                 self.model.thinking = thinking;
                 vec![Update::Info(format!("pensamento: {thinking:?}"))]
             }
+            Command::Trash => self.trash_list(),
+            Command::Restore(token) => self.restore(&token),
+            Command::Compact => self.toggle_compaction(),
+            Command::Verify => self.verify(painter),
         }
     }
 }
 
 impl AgentHandler<'_> {
+    /// Liga/desliga a compactação do histórico (E09-T07/E10-T07) — comando explícito do utilizador.
+    ///
+    /// Liga só quando há algo a compactar; nunca compacta em silêncio (nada muda se não houver
+    /// prefixo fora do orçamento). Desligar volta ao `assemble` puro.
+    fn toggle_compaction(&mut self) -> Vec<Update> {
+        if self.runtime.compaction() == CompactionMode::Enabled {
+            self.runtime.set_compaction(CompactionMode::Disabled);
+            return vec![Update::Info("compactação desligada".to_string())];
+        }
+        match self.runtime.compaction_preview() {
+            Ok(Some(compaction)) if !compaction.replacements.is_empty() => {
+                self.runtime.set_compaction(CompactionMode::Enabled);
+                vec![Update::Info(format!(
+                    "compactação ligada: {} → {} tokens ({} substituições)",
+                    compaction.original_tokens,
+                    compaction.context.tokens,
+                    compaction.replacements.len()
+                ))]
+            }
+            Ok(_) => vec![Update::Info("nada a compactar".to_string())],
+            Err(error) => vec![Update::Error(error.to_string())],
+        }
+    }
+
+    /// Lista a lixeira do projeto para a UI (E10-T07/E06-T09).
+    fn trash_list(&self) -> Vec<Update> {
+        let items = trash::list(self.fs, self.runtime.root())
+            .into_iter()
+            .map(|item| TrashEntry {
+                original: item.original,
+                stored: item.stored,
+            })
+            .collect();
+        vec![Update::Trash(items)]
+    }
+
+    /// Restaura um item da lixeira e devolve a lista atualizada (E06-T09).
+    fn restore(&self, token: &str) -> Vec<Update> {
+        match trash::restore(self.fs, self.runtime.root(), token) {
+            Ok(path) => {
+                let mut updates = vec![Update::Info(format!("restaurado: {}", path.display()))];
+                updates.extend(self.trash_list());
+                updates
+            }
+            Err(error) => vec![Update::Error(error.to_string())],
+        }
+    }
+
     /// Submete um turno e traduz o resultado em atualizações da UI.
     fn submit(&mut self, goal: &str, painter: &mut Painter<'_>) -> Vec<Update> {
-        let granted_by = self
-            .env
-            .var("USER")
-            .or_else(|| self.env.var("USERNAME"))
-            .unwrap_or_else(|| "local".to_string());
+        let granted_by = self.granted_by();
         let ports = Ports {
             fs: self.fs,
             process: &self.process,

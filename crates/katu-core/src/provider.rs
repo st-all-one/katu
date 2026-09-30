@@ -40,6 +40,18 @@ pub struct ModelSpec {
     pub thinking: Thinking,
 }
 
+/// Capacidades de um modelo relevantes ao **controlo** do utilizador (E12-T10).
+///
+/// Derivadas do catálogo pela borda (E12-T02); o kernel valida o controlo (e o erro **ensina**)
+/// contra elas.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModelCapabilities {
+    /// Identificador do modelo (para o erro que ensina).
+    pub model: String,
+    /// O modelo emite raciocínio e aceita grau de pensamento.
+    pub reasoning: bool,
+}
+
 impl ModelSpec {
     /// Constrói a partir do id, com pensamento desligado.
     #[must_use]
@@ -203,6 +215,23 @@ impl ProviderSink for CollectSink {
 pub trait Provider: Send + Sync {
     /// Identificador estável do provider (ex.: `"opencode"`, `"llama"`, `"fake"`).
     fn id(&self) -> &str;
+
+    /// Modelos oferecidos pelo endpoint (E12-T02), em ordem determinística.
+    ///
+    /// Vazio por omissão: `dynamic_models` por descobrir.
+    fn models(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// Capacidades do modelo (E12-T10), para o controlo validar.
+    ///
+    /// Conservador por omissão: um modelo desconhecido **não** anuncia raciocínio.
+    fn capabilities(&self, model: &str) -> ModelCapabilities {
+        ModelCapabilities {
+            model: model.to_string(),
+            reasoning: false,
+        }
+    }
 
     /// Consome o stream do modelo, emitindo eventos no `sink`.
     ///

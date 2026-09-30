@@ -41,3 +41,27 @@ fn runtime_recalls_and_remembers_through_the_gate() -> Result<(), Box<dyn std::e
     std::fs::remove_dir_all(&root)?;
     Ok(())
 }
+
+#[test]
+fn compaction_preview_is_enabled_and_deterministic() -> Result<(), Box<dyn std::error::Error>> {
+    let root = root("compact")?;
+    let fs = StdFs;
+    let clock = FixedClock::new(Timestamp::from_millis(1_000));
+    let mut runtime = Runtime::open(&fs, &clock, &root, "teste")?;
+    runtime.record_user("olá")?;
+    runtime.record_assistant("resposta")?;
+    let Some(first) = runtime.compaction_preview()? else {
+        return Err("compactação devia estar ligada".into());
+    };
+    let Some(second) = runtime.compaction_preview()? else {
+        return Err("compactação devia estar ligada".into());
+    };
+    assert_eq!(
+        first.original_tokens, second.original_tokens,
+        "determinístico"
+    );
+    assert!(first.context.tokens > 0);
+    drop(runtime);
+    std::fs::remove_dir_all(&root)?;
+    Ok(())
+}

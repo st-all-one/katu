@@ -3,6 +3,7 @@
 //! A borda CLI decide; aqui vive a composição (runtime + provider) e a conversão do resultado no
 //! envelope de máquina. Sem o adaptador de memória, o runtime **recusa** (fail-closed, E03-T07).
 
+use katu_core::context::CompactionMode;
 use katu_core::error::Error;
 use katu_core::provider::{ModelSpec, Provider};
 use serde_json::{Value, json};
@@ -30,6 +31,8 @@ pub(crate) struct RunArgs<'a> {
     pub max_tokens: u32,
     /// Máximo de passos (tool calls) por turno.
     pub max_steps: u32,
+    /// Liga a compactação do histórico no turno (E09-T07).
+    pub compact: bool,
 }
 
 /// Executa um turno do agente e devolve o relatório do comando.
@@ -43,6 +46,9 @@ pub(crate) fn run(args: &RunArgs<'_>) -> Report {
         Ok(runtime) => runtime,
         Err(error) => return runtime_failure(error),
     };
+    if args.compact {
+        runtime.set_compaction(CompactionMode::Enabled);
+    }
     let model = args
         .model
         .map_or_else(|| default_model(args.provider).to_string(), str::to_string);

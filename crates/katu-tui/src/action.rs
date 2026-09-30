@@ -15,6 +15,8 @@ pub enum Mode {
     Insert,
     /// Confirmação de uma ação destrutiva (`y`/`n`).
     Confirm,
+    /// Navegação na vista da lixeira (E10-T07).
+    Trash,
 }
 
 /// Ação pura produzida pelo teclado.
@@ -42,6 +44,20 @@ pub enum Action {
     CycleModel,
     /// Avança o grau de pensamento (E10-T07).
     CycleThinking,
+    /// Abre a vista da lixeira (E10-T07).
+    OpenTrash,
+    /// Fecha a sobreposição corrente (lixeira).
+    CloseOverlay,
+    /// Seleciona a entrada anterior da lixeira.
+    TrashUp,
+    /// Seleciona a entrada seguinte da lixeira.
+    TrashDown,
+    /// Restaura a entrada selecionada da lixeira.
+    Restore,
+    /// Pré-visualiza a compactação do histórico (E10-T07).
+    Compact,
+    /// Corre o gate de verificação e pede override se bloquear (E09-T03).
+    Verify,
     /// Sai da UI.
     Quit,
 }
@@ -59,6 +75,9 @@ pub fn map_key(key: KeyEvent, mode: Mode) -> Option<Action> {
             KeyCode::Enter | KeyCode::Char('i') => Some(Action::EnterInsert),
             KeyCode::Char('m') => Some(Action::CycleModel),
             KeyCode::Char('t') => Some(Action::CycleThinking),
+            KeyCode::Char('l') => Some(Action::OpenTrash),
+            KeyCode::Char('c') => Some(Action::Compact),
+            KeyCode::Char('v') => Some(Action::Verify),
             KeyCode::Up => Some(Action::ScrollUp),
             KeyCode::Down => Some(Action::ScrollDown),
             _ => None,
@@ -74,6 +93,13 @@ pub fn map_key(key: KeyEvent, mode: Mode) -> Option<Action> {
         Mode::Confirm => match key.code {
             KeyCode::Char('y' | 'Y') => Some(Action::Confirm),
             KeyCode::Char('n' | 'N') | KeyCode::Esc => Some(Action::Cancel),
+            _ => None,
+        },
+        Mode::Trash => match key.code {
+            KeyCode::Char('r') => Some(Action::Restore),
+            KeyCode::Esc | KeyCode::Char('q') => Some(Action::CloseOverlay),
+            KeyCode::Up => Some(Action::TrashUp),
+            KeyCode::Down => Some(Action::TrashDown),
             _ => None,
         },
     }
@@ -110,6 +136,18 @@ mod tests {
         assert_eq!(
             map_key(key(KeyCode::Char('t')), Mode::Normal),
             Some(Action::CycleThinking)
+        );
+        assert_eq!(
+            map_key(key(KeyCode::Char('l')), Mode::Normal),
+            Some(Action::OpenTrash)
+        );
+        assert_eq!(
+            map_key(key(KeyCode::Char('c')), Mode::Normal),
+            Some(Action::Compact)
+        );
+        assert_eq!(
+            map_key(key(KeyCode::Char('v')), Mode::Normal),
+            Some(Action::Verify)
         );
         assert_eq!(
             map_key(key(KeyCode::Up), Mode::Normal),
@@ -159,8 +197,33 @@ mod tests {
     }
 
     #[test]
+    fn trash_mode_navigates_and_restores() {
+        assert_eq!(
+            map_key(key(KeyCode::Char('r')), Mode::Trash),
+            Some(Action::Restore)
+        );
+        assert_eq!(
+            map_key(key(KeyCode::Up), Mode::Trash),
+            Some(Action::TrashUp)
+        );
+        assert_eq!(
+            map_key(key(KeyCode::Down), Mode::Trash),
+            Some(Action::TrashDown)
+        );
+        assert_eq!(
+            map_key(key(KeyCode::Esc), Mode::Trash),
+            Some(Action::CloseOverlay)
+        );
+        assert_eq!(
+            map_key(key(KeyCode::Char('q')), Mode::Trash),
+            Some(Action::CloseOverlay),
+            "q fecha a sobreposição, não a UI"
+        );
+    }
+
+    #[test]
     fn control_c_quits_in_every_mode() {
-        for mode in [Mode::Normal, Mode::Insert, Mode::Confirm] {
+        for mode in [Mode::Normal, Mode::Insert, Mode::Confirm, Mode::Trash] {
             assert_eq!(map_key(ctrl('c'), mode), Some(Action::Quit), "{mode:?}");
         }
     }
