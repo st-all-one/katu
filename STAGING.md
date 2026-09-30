@@ -7,9 +7,10 @@
 ## 0. Snapshot
 
 - **6 crates + `xtask`**: `katu-policy`, `katu-core`, `katu-tools`, `katu` (bin), `katu-providers`, `katu-tui`*.
-- **603 testes** · catálogo de instrumentação **84 ids** · **11 tools** · **8 regras** (5 memória + 3 contenção) · **17 ADRs**.
+- **603 testes** · catálogo de instrumentação **84 ids** · **11 tools** · **8 regras** (5 memória + 3 contenção) · **18 ADRs**.
 - `cargo xtask check` (= `make check`) verde: fmt + clippy `-D warnings` + testes + `check-layers` + `check-diag` + `check-schemas` + `check-docs` + `check-surface` + `check-policy` + `check-unsafe` + `check-catalog` + `check-rule-coverage` + `check-slices` + `check-memory-swap` + `policy:audit` + `gate:bench` + `gate:provider` + `gate:render` + file-length ≤300 · `make instrument` verde.
 - **O MVK passou** ([ADR 0001](docs/adr/0001-mvk-gate-aprovado.md)); o kernel (E04) e a política (E02) estão completos.
+- **E20 — Superfície v2** (reforma do CLI/TUI inspirada no `kd`) em **planeamento**: épico dedicado em [`SURFACE_IMPLEMENTATION.md`](SURFACE_IMPLEMENTATION.md).
 
 \* `katu-tui` traz a base E10 (T01/T02/T03◐/T04/T05/T06/T07): esqueleto panic-safe, keymap puro,
 render com throttle/teto de trabalho, painel de atividade efémero, recusas com regra + evidência,

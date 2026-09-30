@@ -77,6 +77,7 @@ const DOC_ROOTS: &[&str] = &[
     "ARCHITECTURE.md",
     "IMPLEMENTATION_PLAN.md",
     "AGENTS.md",
+    "SURFACE_IMPLEMENTATION.md",
 ];
 
 #[allow(clippy::print_stderr, reason = "xtask é a borda de linha de comando")]

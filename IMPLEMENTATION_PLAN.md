@@ -219,3 +219,4 @@ Tudo o resto é incremental e **condicional ao gate de E05**.
 | E17 Jail *(futuro)* | [`18-jail-futuro.md`](plan/18-jail-futuro.md) | — |
 | E18 Otimização profunda | [`19-otimizacao-profunda.md`](plan/19-otimizacao-profunda.md) | 0–7 |
 | E19 Instrumentação transversal | [`20-instrumentacao-transversal.md`](plan/20-instrumentacao-transversal.md) | 0,7 |
+| E20 Superfície v2 (CLI + TUI) | [`SURFACE_IMPLEMENTATION.md`](SURFACE_IMPLEMENTATION.md) | 6–7 |

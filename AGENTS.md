@@ -7,6 +7,8 @@ Um link quebrado aqui é uma falha de arranque (`cargo xtask check-docs`).
 
 - **Regras do agente** (≤ 2 saltos até qualquer regra): [`docs/agent-rules.md`](docs/agent-rules.md).
 - **Catálogo gerado**: [`docs/catalog.md`](docs/catalog.md).
+- **Superfície de utilizador** (CLI + TUI): [`docs/CLI_TUI_SURFACE.md`](docs/CLI_TUI_SURFACE.md).
+- **Reforma da superfície (E20)**: [`SURFACE_IMPLEMENTATION.md`](SURFACE_IMPLEMENTATION.md).
 - **Postmortems**: [`docs/postmortems/README.md`](docs/postmortems/README.md).
 - **Estado operacional**: [`STAGING.md`](STAGING.md).
 - **Plano**: [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) · [`plan/README.md`](plan/README.md).

@@ -111,6 +111,10 @@ justifica (§53).
 gate de decisão de E05**. O que não serve o core de [`00b`](00b-objetivos.md) §1.1 fica
 `deferred` com razão registada.
 
+> **E20 — Superfície v2** (reforma do CLI/TUI inspirada no `kd`: `prime`/`help`, verbos
+> `[prime, upgrade, config, memo, run, tui]`, config global/local e TUI por `/`):
+> [`../SURFACE_IMPLEMENTATION.md`](../SURFACE_IMPLEMENTATION.md).
+
 ---
 
 ## 4. Grafo de dependências

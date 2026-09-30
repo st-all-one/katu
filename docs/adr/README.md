@@ -38,6 +38,7 @@
 | [0016](0016-politica-de-memoria-e-unsafe.md) | Política de memória e `unsafe` | aceite |
 | [0017](0017-recursos-e-runtime-minimo.md) | Política de recursos e runtime mínimo | aceite |
 | [0018](0018-kill-do-grupo-com-unsafe-unico.md) | Kill do grupo de processos com um único `unsafe` | aceite |
+| [0019](0019-superficie-cli-tui-v2.md) | Superfície v2 do CLI e da TUI | aceite |
 
 ## Template
 

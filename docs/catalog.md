@@ -118,7 +118,7 @@
 - `tui.approval`
 - `tui.trash_empty`
 
-## ADRs (18)
+## ADRs (19)
 
 - [ADR 0001 — MVK aprovado: o loop possuído (DF1) torna-se compromisso](adr/0001-mvk-gate-aprovado.md)
 - [ADR 0002 — Ferramentas AI-first: envelope + views + TOON (core por medição)](adr/0002-ferramentas-ai-first.md)
@@ -138,3 +138,4 @@
 - [ADR 0016 — Política de memória e `unsafe`](adr/0016-politica-de-memoria-e-unsafe.md)
 - [ADR 0017 — Política de recursos e runtime mínimo](adr/0017-recursos-e-runtime-minimo.md)
 - [ADR 0018 — Kill do grupo de processos com um único `unsafe`](adr/0018-kill-do-grupo-com-unsafe-unico.md)
+- [ADR 0019 — Superfície v2 do CLI e da TUI](adr/0019-superficie-cli-tui-v2.md)
