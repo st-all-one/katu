@@ -77,3 +77,30 @@ fn done_clears_the_live_panel() {
     assert!(app.thinking().is_empty());
     assert_eq!(app.transcript().len(), 1);
 }
+
+#[test]
+fn refusal_is_shown_and_kept_in_the_transcript() {
+    let mut app = App::new();
+    app.apply_update(Update::Live(Live::Refused {
+        rule: "contain-sensitive-read".to_string(),
+        evidence: ".env".to_string(),
+    }));
+    app.apply_update(Update::Live(Live::Unavailable {
+        control: "approval".to_string(),
+    }));
+    assert!(
+        app.live()
+            .iter()
+            .any(|line| line.contains("contain-sensitive-read")),
+        "a recusa aparece no painel"
+    );
+    assert!(
+        app.transcript()
+            .iter()
+            .any(|entry| entry.role == Role::Error && entry.text.contains(".env")),
+        "a recusa fica no transcript como erro"
+    );
+    app.apply_update(Update::Done);
+    assert!(app.live().is_empty(), "o painel limpa no fim do turno");
+    assert_eq!(app.transcript().len(), 1, "o transcript mantém a recusa");
+}

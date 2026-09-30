@@ -120,6 +120,8 @@ pub enum RefusalReason {
         /// Fase destino cuja pré-condição falhou.
         to: Phase,
     },
+    /// Aprovação sem assinatura (`reason` ou `granted_by` vazios): recusada (§33, fail-closed).
+    UnsignedApproval,
 }
 
 /// Recusa de uma transição: o estado **não** muda (§42).

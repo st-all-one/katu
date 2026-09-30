@@ -25,9 +25,14 @@ A **interface de terminal** do katu (uma das duas superfícies, com a CLI — G7
   transcrição em ficheiro com viewer read-only.
 - **E10-T06 ◐** — cabeçalho mostra fase + pendência a partir do `App` (alimentado pelo binário com
   `Runtime::phase`).
-- **E10-T04/T07 ☐** — superfície de política (`blocked`/`needs_human` + override) e controlos do
-  core (modelo/pensamento, compactar, lixeira) por fazer. O turno corre de forma **síncrona** no
-  handler da borda (executor em background é trabalho futuro).
+- **E10-T04 ☑** — **superfície de política**: as recusas do kernel (`Denied`/`Unavailable`) chegam
+  ao painel e ao transcript com **regra + evidência** (`Live::Refused`/`Live::Unavailable`, evento
+  `tui.live` com `kind=refused`) e o **override** por **challenge-and-response** (`approval::Challenge`:
+  perguntas positivas + justificação, `Esc`/`Ctrl-C` cancelam) é apresentado numa sobreposição
+  centrada (`approval::render`); o `Painter::challenge` corre o sub-loop de teclado durante o turno
+  (E07-T05).
+- **E10-T07 ☐** — controlos do core (modelo/pensamento, compactar, lixeira) por fazer. O turno corre
+  de forma **síncrona** no handler da borda (executor em background é trabalho futuro).
 
 ## Fronteira
 

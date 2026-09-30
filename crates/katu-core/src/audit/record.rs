@@ -111,6 +111,15 @@ impl AuditRecord {
                 record.path = root.as_str().to_string();
                 record.text = "workspace set".to_string();
             }
+            Event::ApprovalGranted {
+                rule_id,
+                granted_by,
+                ..
+            } => {
+                record.kind = "approval";
+                record.rule = rule_id.as_str().to_string();
+                record.text = format!("aprovado por {granted_by}");
+            }
             Event::VerificationRecorded { report } => {
                 record.kind = "verify";
                 record.status = report.status.as_str().to_string();

@@ -21,13 +21,14 @@ mod turn;
 mod tests;
 
 pub(crate) use command::{RunArgs, SYSTEM, build_provider, default_base, default_model, run};
-pub(crate) use turn::{Activity, ActivitySink, run_turn, run_turn_with};
+pub(crate) use turn::{Activity, ActivitySink, Approval, ApprovalPrompt, run_turn, run_turn_with};
 
-use katu_core::error::Error;
+use katu_core::error::{Error, ToolOutcome};
 use katu_core::kernel::{CallContext, CallId, MemoryWriteRequest, SessionError, memory_recall_use};
 use katu_core::memory::Memory;
 use katu_core::ports::{Env, Fs, Process};
 use katu_core::provider::{ModelSpec, Provider, ProviderError, TokenUsage};
+use katu_policy::{ApprovalRequest, Decision, ToolUse};
 use katu_tools::recall::RecallTool;
 use katu_tools::write::WriteNoteTool;
 use serde_json::Value;
@@ -120,14 +121,27 @@ impl From<AgentError> for Error {
     }
 }
 
+/// Resultado de uma tool call: o efeito, o uso resolvido e, quando a política pede, o pedido de
+/// aprovação humana (E07-T05, §33).
+pub(crate) struct CallOutcome {
+    /// Efeito a devolver ao modelo.
+    pub outcome: ToolOutcome,
+    /// Uso resolvido (presente quando há caminho pela política, para derivar a capacidade).
+    pub use_: Option<ToolUse>,
+    /// Pedido de aprovação, quando a política o exigiu.
+    pub approval: Option<ApprovalRequest>,
+}
+
 /// Roteia e executa uma tool call, mantendo a ordem §42 (logar → política → efeito).
+///
+/// Devolve o resultado da tool (incluindo recusas) para o observador o poder mostrar (E10-T04).
 fn execute_call(
     runtime: &mut Runtime<'_>,
     ports: &Ports<'_>,
     call: CallId,
     name: &str,
     args: &Value,
-) -> Result<(), AgentError> {
+) -> Result<CallOutcome, AgentError> {
     if name == "memory" {
         return execute_memory(runtime, call, args);
     }
@@ -141,10 +155,18 @@ fn execute_call(
         clock: runtime.clock,
         root: &root,
     };
-    match router::route(&route_ports, &runtime.cwd, name, args, loaded.as_ref())? {
-        router::Routed::Plan { use_, plan } => plan::execute(runtime, call, &use_, &plan)?,
+    let call_outcome = match router::route(&route_ports, &runtime.cwd, name, args, loaded.as_ref())?
+    {
+        router::Routed::Plan { use_, plan } => {
+            let outcome = plan::execute(runtime, call, &use_, &plan)?;
+            CallOutcome {
+                outcome,
+                use_: Some(use_),
+                approval: None,
+            }
+        }
         router::Routed::Plain { use_, tool } => {
-            runtime.session.tool_call(
+            let dispatch = runtime.session.tool_call(
                 call,
                 &use_,
                 CallContext {
@@ -153,18 +175,31 @@ fn execute_call(
                     tool: tool.as_ref(),
                 },
             )?;
+            let approval = match &dispatch.decision {
+                Decision::RequireApproval { request } => Some(request.clone()),
+                _ => None,
+            };
+            CallOutcome {
+                outcome: dispatch.outcome(),
+                use_: Some(use_),
+                approval,
+            }
         }
         _ => {
             return Err(AgentError::Route(router::RouteError::UnknownTool(
                 name.to_string(),
             )));
         }
-    }
-    Ok(())
+    };
+    Ok(call_outcome)
 }
 
 /// Executa a tool `memory` pelos caminhos de recall/escrita do gate de E05.
-fn execute_memory(runtime: &mut Runtime<'_>, call: CallId, args: &Value) -> Result<(), AgentError> {
+fn execute_memory(
+    runtime: &mut Runtime<'_>,
+    call: CallId,
+    args: &Value,
+) -> Result<CallOutcome, AgentError> {
     let Runtime {
         session,
         memory,
@@ -175,10 +210,10 @@ fn execute_memory(runtime: &mut Runtime<'_>, call: CallId, args: &Value) -> Resu
     } = runtime;
     let now = clock.now().as_millis();
     let memory: &dyn Memory = &*memory;
-    match router::memory(args)? {
+    let call_outcome = match router::memory(args)? {
         router::Routed::MemoryRecall { req } => {
             let tool = RecallTool { memory, req };
-            session.tool_call(
+            let dispatch = session.tool_call(
                 call,
                 &memory_recall_use(cwd),
                 CallContext {
@@ -187,13 +222,18 @@ fn execute_memory(runtime: &mut Runtime<'_>, call: CallId, args: &Value) -> Resu
                     tool: &tool,
                 },
             )?;
+            CallOutcome {
+                outcome: dispatch.outcome(),
+                use_: None,
+                approval: None,
+            }
         }
         router::Routed::MemoryRecord { req } => {
             let tool = WriteNoteTool {
                 memory,
                 req: req.clone(),
             };
-            session.memory_write(
+            let dispatch = session.memory_write(
                 call,
                 MemoryWriteRequest {
                     cwd,
@@ -204,12 +244,17 @@ fn execute_memory(runtime: &mut Runtime<'_>, call: CallId, args: &Value) -> Resu
                     tool: &tool,
                 },
             )?;
+            CallOutcome {
+                outcome: dispatch.outcome(),
+                use_: None,
+                approval: None,
+            }
         }
         router::Routed::Plain { .. } | router::Routed::Plan { .. } => {
             return Err(AgentError::Route(router::RouteError::UnknownTool(
                 "memory".to_string(),
             )));
         }
-    }
-    Ok(())
+    };
+    Ok(call_outcome)
 }

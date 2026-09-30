@@ -7,7 +7,7 @@ use crate::error::ToolOutcome;
 use crate::feedback::{CommandRecord, CommandStatus};
 use crate::plan::Plan;
 use crate::verify::VerificationReport;
-use katu_policy::{Phase, ResolvedPath, ToolName, ToolUse};
+use katu_policy::{Capability, Phase, ResolvedPath, ToolName, ToolUse};
 
 /// Aplica um evento ao estado, devolvendo o novo estado ou uma [`Refusal`].
 ///
@@ -30,6 +30,12 @@ pub fn step(state: &State, event: &Event) -> Result<State, Refusal> {
         Event::PlanRecorded { plan } => Ok(plan_recorded(state, plan)),
         Event::CommandRecorded { record } => Ok(command_recorded(state, record)),
         Event::WorkspaceSet { root } => Ok(workspace_set(state, root)),
+        Event::ApprovalGranted {
+            capability,
+            reason,
+            granted_by,
+            ..
+        } => approval_granted(state, capability, reason, granted_by),
         Event::VerificationRecorded { report } => Ok(verification_recorded(state, report)),
         Event::TurnEnd { turn } => turn_end(state, *turn),
     }
@@ -109,6 +115,26 @@ fn workspace_set(state: &State, root: &ResolvedPath) -> State {
     let mut next = state.clone();
     next.workspace = Some(root.clone());
     next
+}
+
+/// Concede uma capacidade aprovada por humano (E07-T05, §33).
+///
+/// Uma aprovação **sem assinatura** (`reason`/`granted_by` vazios) é recusada: o agente não pode
+/// fabricar um override. A capacidade concedida é a mínima derivada da regra.
+fn approval_granted(
+    state: &State,
+    capability: &Capability,
+    reason: &str,
+    granted_by: &str,
+) -> Result<State, Refusal> {
+    if reason.trim().is_empty() || granted_by.trim().is_empty() {
+        return Err(refuse(state, RefusalReason::UnsignedApproval));
+    }
+    let mut next = state.clone();
+    if !next.capabilities.contains(capability) {
+        next.capabilities.push(capability.clone());
+    }
+    Ok(next)
 }
 
 /// Regista o relatório do gate de verificação (E09-T03).

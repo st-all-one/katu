@@ -13,7 +13,7 @@ função, o log é a fonte da verdade.
     (E06-T07), `State::workspace` (raiz do workspace, E07-T05) e `State::verification`
     (relatório do gate, E09-T03); `UnmetPrecondition` (E05-T02/T04).
   - `kernel::event` — `Event`, `CallId`, `Event::kind` (`Waiver`, `PlanRecorded`, `CommandRecorded`,
-    `WorkspaceSet`, `VerificationRecorded`).
+    `WorkspaceSet`, `ApprovalGranted`, `VerificationRecorded`).
   - `kernel::step` — `step(State, Event) -> Result<State, Refusal>` (puro) + pré-condições de fase
     (`Verified` exige relatório não bloqueado, E09-T03).
   - `kernel::log` — `Log`/`LogRecord` append-only JSONL (`session.v1.jsonl`) sobre a porta `Fs`.
@@ -31,7 +31,7 @@ função, o log é a fonte da verdade.
     `write_atomic`); erros agregados em `Issue { path, message }` (OA19/E09-T02).
   - `kernel::session` — `Session`/`CallContext` (loop mínimo: valida transição + orçamento antes de
     gravar; `tool_call` e `memory_write` pela ordem §42; `set_workspace`/`record_verification`;
-    `verify`/`messages`/`fork`).
+    `approve` (aprovação humana, E07-T05); `verify`/`messages`/`fork`).
 - `derive_messages`/`snapshot` — projeções puras.
 - Porta [`memory::Memory`](src/memory.rs) (tipos do katu, DF6), com submódulos:
   - `memory::types` — `NoteType`, `Status`, `Basis`, `NoteRef`, `Anchor`, `Score` (pontos base,

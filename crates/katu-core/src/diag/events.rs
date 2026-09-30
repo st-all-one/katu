@@ -54,6 +54,7 @@ catalog! {
     (POLICY_ALLOW, "policy.allow", "Ação permitida."),
     (POLICY_DENY, "policy.deny", "Ação negada."),
     (POLICY_WAIVER, "policy.waiver", "Exceção explícita aplicada."),
+    (POLICY_APPROVAL, "policy.approval", "Aprovação humana explícita registada."),
 
     // -- Tools & contenção ---------------------------------------------------
     (TOOL_CALL, "tool.call", "Pedido de tool do modelo."),
@@ -126,6 +127,7 @@ catalog! {
     (TUI_RENDER, "tui.render", "Desenho de um quadro."),
     (TUI_INPUT, "tui.input", "Entrada do utilizador."),
     (TUI_LIVE, "tui.live", "Observação efémera do turno (painel de atividade)."),
+    (TUI_APPROVAL, "tui.approval", "Challenge-and-response de aprovação humana respondido."),
 }
 
 #[cfg(test)]

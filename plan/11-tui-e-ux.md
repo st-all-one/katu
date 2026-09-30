@@ -67,11 +67,18 @@ fecha o ponto em aberto **OA3** com um desenho testado. Padrões a herdar:
 - **Aceite:** benchmark de render por frame dentro do orçamento (E15); sem alocações no hot path
   de render (verificado por lint/bench).
 
-### E10-T04 ☐ Superfície de política: `blocked`/`needs_human`
+### E10-T04 ☑ Superfície de política: `blocked`/`needs_human`
 - **Entregáveis:** apresentação do veredicto com `rule_id`, evidência e o caminho de override
   (challenge-and-response, não rubber-stamp, §33).
 - **Aceite:** um `Deny` mostra a regra e a evidência; um override exige resposta a perguntas
   positivas e regista `override_reason` + `overridden_by`.
+- **Estado:** as recusas do kernel chegam à UI com **regra + evidência** (`Activity::Refused`/
+  `Unavailable` → `Live::Refused`/`Unavailable`, evento `tui.live` `kind=refused`); a recusa fica no
+  painel e no transcript (teste e2e: `read .env` → `Denied{contain-sensitive-read}`). O **override**
+  interativo está feito: quando a política devolve `RequireApproval`, o `LivePainter` abre um
+  **challenge-and-response** (`katu-tui::Challenge`, perguntas positivas + justificação obrigatória;
+  `Esc`/`Ctrl-C` cancelam) e, com a assinatura, o kernel regista `ApprovalGranted` e re-executa a
+  chamada (E07-T05). Um `Deny` critical e um `NeedsHuman` **não** são sobreponíveis (muro).
 
 ### E10-T05 ◐ Split live/durable
 - **Entregáveis:** painel de observação efémero; transcrições em ficheiro; viewer read-only.

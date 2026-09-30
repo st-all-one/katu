@@ -8,6 +8,7 @@
 //! e **nunca** entra no transcript durável nem no contexto do modelo.
 
 use crate::action::{Action, Mode};
+use crate::live::Live;
 
 /// Papel de uma entrada da conversa (cor e prefixo no render).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -73,24 +74,6 @@ pub enum Update {
     Live(Live),
     /// Turno concluído (limpa a pendência).
     Done,
-}
-
-/// Evento **efémero** do painel de atividade (E10-T05).
-///
-/// Nunca é escrito no log de sessão nem enviado ao modelo: serve só para o utilizador ver o
-/// progresso enquanto o turno corre.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Live {
-    /// Delta de texto do modelo (acumula no corpo do painel).
-    Text(String),
-    /// Delta de raciocínio (guardado, fora do ecrã por omissão).
-    Thinking(String),
-    /// Tool pedida pelo modelo.
-    Tool(String),
-    /// Tool concluída.
-    ToolDone(String),
-    /// Limpa o painel (fim de turno).
-    Clear,
 }
 
 /// Estado central da UI.
@@ -275,6 +258,14 @@ impl App {
             Live::Thinking(delta) => self.thinking.push_str(&delta),
             Live::Tool(name) => self.live.push(format!("→ {name}")),
             Live::ToolDone(name) => self.live.push(format!("✓ {name}")),
+            Live::Refused { rule, evidence } => {
+                let text = format!("⛔ {rule}: {evidence}");
+                self.live.push(text.clone());
+                self.push(Role::Error, text);
+            }
+            Live::Unavailable { control } => {
+                self.live.push(format!("⚠ falta {control}"));
+            }
             Live::Clear => self.clear_live(),
         }
     }

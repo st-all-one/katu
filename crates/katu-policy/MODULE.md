@@ -44,6 +44,7 @@ similaridade; as pré-condições semânticas (dedup ≥ 0.92, âncora, uma afir
 | `decision` | `Decision`, `Evidence`, `Reason`, `ApprovalRequest`, `ControlId` |
 | `engine` | `impl Rule` (âmbito/casamento/veredicto) + portas de capacidade |
 | `evaluate` | `evaluate` puro + seleção do veredicto de maior `rank` |
+| `approval` | `capability_for`/`capability_for_request` — capacidade **mínima** que satisfaz um `RequireApproval` (E07-T05, §33) |
 | `audit` | auditoria de regras (E02-T04) |
 | `error` | `PolicyError` |
 

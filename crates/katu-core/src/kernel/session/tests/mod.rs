@@ -175,6 +175,7 @@ fn budget_cap_refuses_tool_call_without_effect() -> Result<(), Box<dyn std::erro
     Ok(())
 }
 
+mod approval;
 mod cost;
 mod replay;
 mod resume;

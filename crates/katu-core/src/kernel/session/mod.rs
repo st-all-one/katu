@@ -20,6 +20,7 @@ use crate::ports::Fs;
 use crate::verify::VerificationReport;
 use katu_policy::{ResolvedPath, ToolUse};
 
+mod approval;
 mod context;
 mod error;
 mod identity;

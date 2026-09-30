@@ -6,7 +6,7 @@ use crate::error::ToolOutcome;
 use crate::feedback::CommandRecord;
 use crate::plan::Plan;
 use crate::verify::VerificationReport;
-use katu_policy::{Phase, ResolvedPath, ToolUse};
+use katu_policy::{Capability, Phase, ResolvedPath, RuleId, ToolUse};
 
 /// Identificador de um pedido de tool (correlaciona `ToolCall` ↔ `ToolResult`).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -95,6 +95,18 @@ pub enum Event {
         /// Raiz canonicalizada.
         root: ResolvedPath,
     },
+    /// Aprovação **humana** explícita (E07-T05, §33): concede a capacidade mínima que destranca a
+    /// regra. Evento de controlo, append-only e auditável; o agente **não** o assina.
+    ApprovalGranted {
+        /// Regra que exigiu a aprovação.
+        rule_id: RuleId,
+        /// Capacidade concedida (mínima, derivada da regra).
+        capability: Capability,
+        /// Justificação (`override_reason`).
+        reason: String,
+        /// Quem assinou (`granted_by`).
+        granted_by: String,
+    },
     /// Relatório do gate de verificação registado (E09-T03). Evento de controlo.
     VerificationRecorded {
         /// Relatório determinístico.
@@ -122,6 +134,7 @@ impl Event {
             Self::PlanRecorded { .. } => "plan_recorded",
             Self::CommandRecorded { .. } => "command_recorded",
             Self::WorkspaceSet { .. } => "workspace_set",
+            Self::ApprovalGranted { .. } => "approval_granted",
             Self::VerificationRecorded { .. } => "verification_recorded",
             Self::TurnEnd { .. } => "turn_end",
         }

@@ -45,6 +45,7 @@ pub(super) const AUDIT_KINDS: Domain = &[
     "plan",
     "command",
     "workspace",
+    "approval",
     "verify",
 ];
 

@@ -169,7 +169,7 @@ fn write_plan(root: &Path) -> Result<(), std::io::Error> {
 }
 
 /// Pedido de plano do modelo (só `goal`/`next_action`; o contrato vem do artefacto).
-fn plan_call() -> ProviderEvent {
+pub(super) fn plan_call() -> ProviderEvent {
     ProviderEvent::ToolCall {
         call: CallId::new("p1"),
         name: "plan".to_string(),

@@ -24,6 +24,18 @@ use crate::scope::{self, ScopeError};
 /// Regras do protocolo de memória, versionadas no repositório (dado, não código).
 const MEMORY_POLICY: &str = include_str!("../../../policy/memory.toml");
 
+/// Regras de contenção **soft** (E07-T05): sensíveis e fora do workspace.
+const CONTAINMENT_POLICY: &str = include_str!("../../../policy/containment.toml");
+
+/// Carrega as regras do protocolo de memória **e** as de contenção (DF3: dado versionado).
+fn load_rules() -> Result<RuleSet, PolicyError> {
+    let mut rules = RuleSet::from_toml(MEMORY_POLICY)?;
+    rules
+        .rules
+        .extend(RuleSet::from_toml(CONTAINMENT_POLICY)?.rules);
+    Ok(rules)
+}
+
 /// Falha ao montar ou operar o runtime.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum RuntimeError {
@@ -78,11 +90,13 @@ impl<'a> Runtime<'a> {
         let plan = scope::load(fs, &root)?;
         let memory = KnudgeMemory::open(&root)?;
         memory.status()?;
-        let mut session = Session::create(fs, &root, clock.now().as_millis(), goal)?;
-        // O runtime é um agente a atuar: abre o turno antes de qualquer tool call (§42).
-        session.apply(&Event::TurnStart { turn: 1 })?;
-        let rules = RuleSet::from_toml(MEMORY_POLICY)?;
         let cwd = ResolvedPath::from_canonical(&root)?;
+        let rules = load_rules()?;
+        let mut session = Session::create(fs, &root, clock.now().as_millis(), goal)?;
+        // O runtime é um agente a atuar: define o workspace (destranca o normal dentro da raiz e
+        // exige aprovação fora) e abre o turno antes de qualquer tool call (§42).
+        session.set_workspace(&cwd)?;
+        session.apply(&Event::TurnStart { turn: 1 })?;
         Ok(Self {
             clock,
             session,

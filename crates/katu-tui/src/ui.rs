@@ -150,10 +150,14 @@ fn activity_lines(app: &App) -> Vec<Line<'static>> {
         .live()
         .iter()
         .map(|line| {
-            Line::from(Span::styled(
-                line.clone(),
-                Style::default().fg(Color::Yellow),
-            ))
+            let color = if line.starts_with('⛔') {
+                Color::Red
+            } else if line.starts_with('⚠') {
+                Color::LightYellow
+            } else {
+                Color::Yellow
+            };
+            Line::from(Span::styled(line.clone(), Style::default().fg(color)))
         })
         .collect();
     for raw in app.streaming().lines() {
@@ -200,7 +204,8 @@ mod tests {
     use ratatui::backend::TestBackend;
 
     use super::render;
-    use crate::app::{App, Live, Update};
+    use crate::app::{App, Update};
+    use crate::live::Live;
 
     /// Renderiza num backend de teste e devolve o texto do buffer.
     fn draw(app: &App) -> Result<String, Box<dyn std::error::Error>> {

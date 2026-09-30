@@ -39,8 +39,14 @@ todo o código impuro confinado.
   `Handler` que corre o turno e injeta `Update`s; `Runtime::begin_turn` abre o próximo turno
   (multi-turno) e `Runtime::phase` alimenta o indicador de fase (E10-T06). O streaming do modelo e
   as tools em curso vão **ao vivo** para o painel de atividade via `run_turn_with` + `ActivitySink`
-  (`LivePainter`/`Painter`), sem entrarem no log (E10-T05). O turno é **síncrono** nesta fatia
-  (executor em background é trabalho futuro).
+  (`LivePainter`/`Painter`), sem entrarem no log (E10-T05). As **recusas de política**
+  (`Denied`/`Unavailable`) chegam ao painel/transcript com regra + evidência, e uma
+  `RequireApproval` abre um **challenge-and-response** na TUI: o humano assina
+  (`reason`+`granted_by`), o kernel regista `ApprovalGranted` e concede a capacidade mínima
+  (`katu-policy::capability_for`), re-executando a chamada (E10-T04/E07-T05, §33). O runtime
+  carrega as regras de **memória + contenção** e define o **workspace** no arranque (`Runtime::open`),
+  pelo que a contenção é aplicada no loop. O turno é **síncrono** nesta fatia (executor em
+  background é trabalho futuro).
 - Exit codes na borda (a lógica propaga `Result`).
 - Harness de medição do MVK (`examples/measure_mvk.rs`, feature `profile`, E05-T06): corre o
   caminho real e grava `bench/mvk/raw.json` (evidência tipada, DF5).

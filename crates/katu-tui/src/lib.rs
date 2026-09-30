@@ -9,13 +9,21 @@
 //! fala com o provider.
 
 #![forbid(unsafe_code)]
+#![allow(
+    clippy::redundant_pub_crate,
+    reason = "módulos internos usam pub(crate); a API pública é a reexportação em `lib.rs`"
+)]
 
 mod action;
 mod app;
+mod approval;
+mod live;
 mod run;
 mod ui;
 
 pub use action::{Action, Mode, map_key};
-pub use app::{App, Command, Entry, Live, Role, Status, Update};
+pub use app::{App, Command, Entry, Role, Status, Update};
+pub use approval::{Challenge, ChallengePrompt, ChallengeSignature, QUESTIONS};
+pub use live::Live;
 pub use run::{Handler, Painter, run};
 pub use ui::render;

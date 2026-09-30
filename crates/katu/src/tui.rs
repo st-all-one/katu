@@ -7,12 +7,13 @@
 
 use katu_core::diag::{Level, events};
 use katu_core::error::Error;
+use katu_core::ports::Env;
 use katu_core::provider::{ModelSpec, Provider};
-use katu_tui::{App, Command, Handler, Live, Painter, Update, run};
+use katu_tui::{App, ChallengePrompt, Command, Handler, Live, Painter, Update, run};
 
 use crate::agent::{
-    Activity, ActivitySink, Ports, RunArgs, SYSTEM, TurnOptions, TurnRequest, build_provider,
-    default_base, default_model, run_turn_with,
+    Activity, ActivitySink, Approval, ApprovalPrompt, Ports, RunArgs, SYSTEM, TurnOptions,
+    TurnRequest, build_provider, default_base, default_model, run_turn_with,
 };
 use crate::ports::{StdEnv, StdFs, StdProcess, SystemClock};
 use crate::report::Report;
@@ -79,6 +80,11 @@ impl Handler for AgentHandler<'_> {
 impl AgentHandler<'_> {
     /// Submete um turno e traduz o resultado em atualizações da UI.
     fn submit(&mut self, goal: &str, painter: &mut Painter<'_>) -> Vec<Update> {
+        let granted_by = self
+            .env
+            .var("USER")
+            .or_else(|| self.env.var("USERNAME"))
+            .unwrap_or_else(|| "local".to_string());
         let ports = Ports {
             fs: self.fs,
             process: &self.process,
@@ -91,7 +97,10 @@ impl AgentHandler<'_> {
             temperature: 0.0,
             max_steps: self.max_steps,
         };
-        let mut activity = LivePainter { painter };
+        let mut activity = LivePainter {
+            painter,
+            granted_by,
+        };
         match run_turn_with(
             &mut self.runtime,
             TurnRequest {
@@ -116,12 +125,33 @@ impl AgentHandler<'_> {
     }
 }
 
-/// Adapta o [`Painter`] da UI ao observador efémero do loop (E10-T05).
+/// Adapta o [`Painter`] da UI ao observador efémero do loop (E10-T05) e ao challenge de aprovação
+/// (E10-T04).
 struct LivePainter<'p, 'a> {
     painter: &'p mut Painter<'a>,
+    granted_by: String,
 }
 
 impl ActivitySink for LivePainter<'_, '_> {
+    fn approve(&mut self, prompt: &ApprovalPrompt<'_>) -> Option<Approval> {
+        let request = ChallengePrompt {
+            tool: prompt.tool.to_string(),
+            rule: prompt.request.rule_id.as_str().to_string(),
+            scope: prompt.request.scope.clone(),
+        };
+        let signature = self.painter.challenge(request, &self.granted_by)?;
+        katu_core::event!(
+            Level::Warn,
+            events::TUI_APPROVAL,
+            "tool" => prompt.tool,
+            "rule" => prompt.request.rule_id.as_str()
+        );
+        Some(Approval {
+            reason: signature.reason,
+            granted_by: signature.granted_by,
+        })
+    }
+
     fn activity(&mut self, activity: Activity<'_>) {
         let live = match activity {
             Activity::Text(delta) => {
@@ -139,6 +169,19 @@ impl ActivitySink for LivePainter<'_, '_> {
             Activity::ToolDone { name } => {
                 katu_core::event!(Level::Trace, events::TUI_LIVE, "kind" => "tool_done");
                 Live::ToolDone(name.to_string())
+            }
+            Activity::Refused { rule, evidence, .. } => {
+                katu_core::event!(Level::Warn, events::TUI_LIVE, "kind" => "refused", "rule" => rule);
+                Live::Refused {
+                    rule: rule.to_string(),
+                    evidence: evidence.to_string(),
+                }
+            }
+            Activity::Unavailable { control, .. } => {
+                katu_core::event!(Level::Warn, events::TUI_LIVE, "kind" => "unavailable");
+                Live::Unavailable {
+                    control: control.to_string(),
+                }
             }
         };
         self.painter.live(live);

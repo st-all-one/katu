@@ -13,7 +13,9 @@ use ratatui::crossterm::event::{self, Event, KeyEventKind};
 use ratatui::{DefaultTerminal, restore, try_init};
 
 use crate::action::map_key;
-use crate::app::{App, Command, Live, Update};
+use crate::app::{App, Command, Update};
+use crate::approval::{self, Challenge, ChallengePrompt, ChallengeSignature, Step};
+use crate::live::Live;
 use crate::ui::render;
 
 /// Executor dos efeitos pedidos pela UI (implementado pela borda do binário).
@@ -45,6 +47,47 @@ impl Painter<'_> {
     /// Toma o erro de desenho acumulado, se houver (a borda decide abortar).
     pub fn take_error(&mut self) -> Option<io::Error> {
         self.error.take()
+    }
+
+    /// Apresenta o **challenge-and-response** e devolve a assinatura (E10-T04, §33).
+    ///
+    /// Bloqueia o turno até o humano responder; `Esc`/`Ctrl-C` cancelam (fail-closed → `None`).
+    pub fn challenge(
+        &mut self,
+        prompt: ChallengePrompt,
+        granted_by: &str,
+    ) -> Option<ChallengeSignature> {
+        let mut challenge = Challenge::new(prompt);
+        loop {
+            if self.error.is_some() {
+                return None;
+            }
+            let app: &App = self.app;
+            let drawn = self.terminal.draw(|frame| {
+                render(frame, app);
+                approval::render(frame, &challenge);
+            });
+            if let Err(error) = drawn {
+                self.error = Some(error);
+                return None;
+            }
+            let key = match event::read() {
+                Ok(Event::Key(key)) if key.kind == KeyEventKind::Press => key,
+                Ok(_) => continue,
+                Err(error) => {
+                    self.error = Some(error);
+                    return None;
+                }
+            };
+            let Some(key) = approval::map_key(key) else {
+                continue;
+            };
+            match challenge.apply(key) {
+                Step::Continue => {}
+                Step::Approved => return challenge.signature(granted_by),
+                Step::Cancelled => return None,
+            }
+        }
     }
 
     /// Redesenha se não houver erro pendente (o throttle por tempo é E10-T03).

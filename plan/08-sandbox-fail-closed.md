@@ -120,7 +120,7 @@ Regras:
 - **Aceite:** cada padrão tem teste próprio; env com segredo plantado não chega ao filho (§43.6);
   `timeout` mata o filho direto e **não bloqueia** num neto (o kill do grupo é E17, ADR 0004).
 
-### E07-T05 ◐ Autorização soft fora do workspace e caminhos sensíveis
+### E07-T05 ☑ Autorização soft fora do workspace e caminhos sensíveis
 - **Entregáveis:** regras determinísticas: sensíveis `deny`-by-default; acesso a path/comando fora
   do workspace → `RequireApproval`/`NeedsHuman`; autorização interativa no CLI/TUI registada com
   `override_reason`+`granted_by`; `Capability::Net` idem.
@@ -138,8 +138,18 @@ Regras:
   um caminho sensível (`.ssh`/`.env`) é negado. `Capability::Net` está implementada:
   `argv::inspect` marca programas de rede (`curl`/`ssh`/…) e extrai o host; `is_plain()` recusa-os
   (uma capacidade por programa **não** os destranca) e `command_capability` só cede a
-  `Capability::Net { host }` (`*` = qualquer). **Falta:** o fluxo interativo de autorização
-  (`override_reason`+`granted_by`, CLI/TUI E10 — hoje fica `Unavailable{approval}`).
+  `Capability::Net { host }` (`*` = qualquer). O **runtime do agente** carrega as regras de memória
+  **e** de contenção e define o workspace no arranque (`Runtime::open`), pelo que a contenção é
+  aplicada no loop; as recusas (`Denied`/`Unavailable`) chegam à UI com regra + evidência
+  (E10-T04). A **aprovação interativa** está feita com challenge-and-response (§33):
+  `katu-policy::capability_for` deriva a capacidade **mínima** da regra (path/comando/host), o
+  `ActivitySink::approve` pede a resposta ao humano, `Session::approve` regista o evento
+  `ApprovalGranted { rule_id, capability, reason, granted_by }` (uma assinatura vazia é recusada
+  pelo `step` — `RefusalReason::UnsignedApproval`) e a chamada é **re-executada** com a capacidade
+  concedida. O override cobre `RequireApproval` (warn); um `Deny` **critical** (`.ssh`/`.env`) e um
+  `NeedsHuman` (orçamento/fase) **não** são sobreponíveis por capacidade (muro, fail-closed).
+  **Falta:** um pedido de rede que passe por `RequireApproval` (não há regra de comando em
+  `containment.toml`; `Capability::Net` fica pronto para quando houver).
 - **Aceite:** ler `.ssh`/`.env` sem autorização é `Denied`; um pedido aprovado fica no log e na UI;
   a autorização não é herdada por um comando subsequente.
 

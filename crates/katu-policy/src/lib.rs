@@ -36,6 +36,7 @@
     reason = "módulos internos usam pub(crate); a API pública é a reexportação em `lib.rs`"
 )]
 
+mod approval;
 mod argv;
 mod audit;
 mod decision;
@@ -47,6 +48,7 @@ mod glob;
 mod paths;
 mod rule;
 
+pub use approval::{capability_for, capability_for_request};
 pub use argv::{ArgvInspection, inspect};
 pub use audit::{Activity, AuditIssue, AuditReport, ExampleCoverage, RuleSummary, audit};
 pub use decision::{ApprovalRequest, ControlId, Decision, Evidence, Reason};

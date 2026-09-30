@@ -74,6 +74,7 @@ fn kind_of(text: &str) -> &'static str {
         "plan" => "plan",
         "command" => "command",
         "workspace" => "workspace",
+        "approval" => "approval",
         "verify" => "verify",
         _ => "event",
     }

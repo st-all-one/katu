@@ -23,7 +23,7 @@ pub(super) fn execute(
     call: CallId,
     use_: &ToolUse,
     plan: &Plan,
-) -> Result<(), AgentError> {
+) -> Result<ToolOutcome, AgentError> {
     runtime.session.apply(&Event::ToolCall {
         call: call.clone(),
         tool: use_.clone(),
@@ -38,8 +38,9 @@ pub(super) fn execute(
             .session
             .apply(&Event::PlanRecorded { plan: plan.clone() })?;
     }
-    runtime
-        .session
-        .apply(&Event::ToolResult { call, outcome })?;
-    Ok(())
+    runtime.session.apply(&Event::ToolResult {
+        call,
+        outcome: outcome.clone(),
+    })?;
+    Ok(outcome)
 }

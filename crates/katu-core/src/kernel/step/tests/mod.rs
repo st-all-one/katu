@@ -82,6 +82,7 @@ fn complete(state: &State, id: &str, tool: ToolUse) -> Result<State, Refusal> {
     )
 }
 
+mod approval;
 mod phases;
 mod verification;
 #[test]
