@@ -11,7 +11,13 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph, Wrap};
 
 use crate::action::Mode;
-use crate::app::{App, Role, Status};
+use crate::app::App;
+use crate::entry::{Role, Status};
+
+/// Teto de entradas da conversa projetadas por quadro (E10-T03).
+const MAX_TRANSCRIPT_ENTRIES: usize = 200;
+/// Teto de linhas do painel de atividade por quadro (E10-T03).
+const MAX_ACTIVITY_LINES: usize = 100;
 
 /// Desenha um quadro completo a partir do estado.
 pub fn render(frame: &mut Frame<'_>, app: &App) {
@@ -67,18 +73,19 @@ fn bottom_offset(total: usize, area: Rect) -> u16 {
 
 /// Número de linhas do painel de atividade (sem o histórico de raciocínio).
 fn activity_len(app: &App) -> usize {
-    app.live()
-        .len()
-        .saturating_add(app.streaming().lines().count())
+    let live = usize::min(app.live().len(), MAX_ACTIVITY_LINES);
+    live.saturating_add(app.streaming().lines().count())
 }
 
-/// Cabeçalho: identidade, fase e pendência.
+/// Cabeçalho: identidade, modelo, pensamento, fase e pendência.
 fn header_line(app: &App) -> Line<'static> {
     let state = if app.pending() {
         "a pensar…"
     } else {
         "pronto"
     };
+    let model = app.model().unwrap_or("—");
+    let reasoning = format!("{:?}", app.reasoning()).to_lowercase();
     Line::from(vec![
         Span::styled(
             "katu",
@@ -86,7 +93,10 @@ fn header_line(app: &App) -> Line<'static> {
                 .fg(Color::Magenta)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::raw(format!("  fase {}  ·  {state}", app.phase())),
+        Span::raw(format!(
+            "  {model} · pensamento {reasoning} · fase {}  ·  {state}",
+            app.phase()
+        )),
     ])
 }
 
@@ -103,7 +113,7 @@ fn input_title(app: &App) -> &'static str {
 fn status_line(app: &App) -> Line<'static> {
     match app.status() {
         Status::Idle => Line::from(Span::styled(
-            "q sai  ·  ↑/↓ rola  ·  i escreve".to_string(),
+            "q sai  ·  ↑/↓ rola  ·  i escreve  ·  m modelo  ·  t pensamento".to_string(),
             Style::default().fg(Color::DarkGray),
         )),
         Status::Working => Line::from(Span::styled(
@@ -121,7 +131,11 @@ fn status_line(app: &App) -> Line<'static> {
 /// Projeta a conversa em linhas, com prefixo por papel.
 fn transcript_lines(app: &App) -> Vec<Line<'static>> {
     let mut lines: Vec<Line<'static>> = Vec::new();
-    for entry in app.transcript() {
+    let start = app
+        .transcript()
+        .len()
+        .saturating_sub(MAX_TRANSCRIPT_ENTRIES);
+    for entry in app.transcript().iter().skip(start) {
         let style = role_style(entry.role);
         for (index, raw) in entry.text.lines().enumerate() {
             let prefix = if index == 0 {
@@ -146,9 +160,11 @@ fn transcript_lines(app: &App) -> Vec<Line<'static>> {
 
 /// Painel de atividade (E10-T05): tools em curso + texto do modelo a chegar (efémero).
 fn activity_lines(app: &App) -> Vec<Line<'static>> {
+    let start = app.live().len().saturating_sub(MAX_ACTIVITY_LINES);
     let mut lines: Vec<Line<'static>> = app
         .live()
         .iter()
+        .skip(start)
         .map(|line| {
             let color = if line.starts_with('⛔') {
                 Color::Red
@@ -204,6 +220,7 @@ mod tests {
     use ratatui::backend::TestBackend;
 
     use super::render;
+    use crate::action::Action;
     use crate::app::{App, Update};
     use crate::live::Live;
 
@@ -231,11 +248,34 @@ mod tests {
     }
 
     #[test]
+    fn renders_model_and_thinking_in_the_header() -> Result<(), Box<dyn std::error::Error>> {
+        let mut app = App::new();
+        app.apply_update(Update::Models(vec!["qwen".to_string()]));
+        app.apply_action(Action::CycleThinking);
+        let text = draw(&app)?;
+        assert!(text.contains("qwen"), "{text}");
+        assert!(text.contains("pensamento low"), "{text}");
+        Ok(())
+    }
+
+    #[test]
     fn renders_phase_from_state() -> Result<(), Box<dyn std::error::Error>> {
         let mut app = App::new();
         app.apply_update(Update::Phase("verified".to_string()));
         let text = draw(&app)?;
         assert!(text.contains("verified"), "{text}");
+        Ok(())
+    }
+
+    #[test]
+    fn renders_only_the_tail_of_a_large_transcript() -> Result<(), Box<dyn std::error::Error>> {
+        let mut app = App::new();
+        for index in 0..(super::MAX_TRANSCRIPT_ENTRIES + 40) {
+            app.apply_update(Update::Info(format!("linha {index}")));
+        }
+        let text = draw(&app)?;
+        assert!(text.contains("linha 239"), "mostra o fim: {text}");
+        assert!(!text.contains("linha 0 "), "não mostra o início: {text}");
         Ok(())
     }
 

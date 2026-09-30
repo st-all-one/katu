@@ -35,6 +35,7 @@ pub mod usage;
 mod anthropic;
 mod engine;
 mod error;
+mod google;
 mod responses;
 mod wire;
 

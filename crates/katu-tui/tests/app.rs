@@ -1,5 +1,6 @@
-//! Testes do estado central da UI (E10-T02/T05) pela API pública.
+//! Testes do estado central da UI (E10-T02/T05/T07) pela API pública.
 
+use katu_core::provider::Thinking;
 use katu_tui::{Action, App, Command, Live, Role, Status, Update};
 
 #[test]
@@ -103,4 +104,43 @@ fn refusal_is_shown_and_kept_in_the_transcript() {
     app.apply_update(Update::Done);
     assert!(app.live().is_empty(), "o painel limpa no fim do turno");
     assert_eq!(app.transcript().len(), 1, "o transcript mantém a recusa");
+}
+
+#[test]
+fn cycling_the_model_emits_a_set_model_command() {
+    let mut app = App::new();
+    app.apply_update(Update::Models(vec!["a".to_string(), "b".to_string()]));
+    assert_eq!(app.model(), Some("a"));
+    assert_eq!(
+        app.apply_action(Action::CycleModel),
+        Some(Command::SetModel("b".to_string()))
+    );
+    assert_eq!(app.model(), Some("b"));
+    assert_eq!(
+        app.apply_action(Action::CycleModel),
+        Some(Command::SetModel("a".to_string())),
+        "cicla de volta ao primeiro"
+    );
+}
+
+#[test]
+fn cycling_the_model_without_a_list_is_a_noop() {
+    let mut app = App::new();
+    assert_eq!(app.apply_action(Action::CycleModel), None);
+    assert_eq!(app.model(), None);
+}
+
+#[test]
+fn cycling_thinking_advances_and_wraps() {
+    let mut app = App::new();
+    assert_eq!(app.reasoning(), Thinking::Off);
+    assert_eq!(
+        app.apply_action(Action::CycleThinking),
+        Some(Command::SetThinking(Thinking::Low))
+    );
+    assert_eq!(app.reasoning(), Thinking::Low);
+    for _ in 0..3 {
+        app.apply_action(Action::CycleThinking);
+    }
+    assert_eq!(app.reasoning(), Thinking::Off, "o ciclo fecha");
 }

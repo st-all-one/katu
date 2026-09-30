@@ -17,13 +17,17 @@
 mod action;
 mod app;
 mod approval;
+mod controls;
+mod entry;
 mod live;
 mod run;
+mod throttle;
 mod ui;
 
 pub use action::{Action, Mode, map_key};
-pub use app::{App, Command, Entry, Role, Status, Update};
+pub use app::{App, Command, Update};
 pub use approval::{Challenge, ChallengePrompt, ChallengeSignature, QUESTIONS};
+pub use entry::{Entry, Role, Status};
 pub use live::Live;
 pub use run::{Handler, Painter, run};
 pub use ui::render;

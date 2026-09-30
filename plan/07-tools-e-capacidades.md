@@ -78,16 +78,19 @@ verificação recusa `SUCCESS` com erros (§38).
 - **Aceite:** qualquer tool fora do conjunto mínimo exige uma decisão registada (filtro `00b` §4);
   `xtask check-surface` falha ao exceder o teto; nenhum registo sem teste de teardown (§44).
 
-### E06-T02 ☐ Tool-schema linter
+### E06-T02 ☑ Tool-schema linter
 - **Entregáveis:** linter que impõe `snake_case`, ordem verbo-substantivo, descrição "Use when X.
   Do not use for Y." (< 1024 chars), enums para conjuntos fechados, IDs tipados com `pattern`,
   e **erros que ensinam** (`Invalid input: 'city' is required. Example: {...}`); anti-poisoning
   (rejeitar `<SYSTEM>`, "ignore previous", markdown oculto).
+- **Estado:** `katu_tools::schema` impõe as regras a partir do registry e é executado por
+  `xtask check-schemas` em `make check` (CI falha em violação); `Issue { path, message }`
+  **agregado** e anti-poisoning cobertos por testes.
 - **Erros (OA19):** a validação devolve `Issue { path, message }` **agregado** (nunca `String`
   solta), reusando o mesmo tipo de erro do validador de checkpoint (E09-T02).
 - **Aceite:** o CI falha se um schema violar as regras; o erro de validação de exemplo é testado.
 
-### E06-T03 ◐ Escrita e leitura (`write`, `read`, `edit`)
+### E06-T03 ☑ Escrita e leitura (`write`, `read`, `edit`)
 - **Entregáveis:** argumentos tipados, paths resolvidos, output determinístico; truncagem
   **determinística**; deltas (só o que mudou) como regra de contexto (§18).
 - **Estado:** `read` com **views** `full`/`range`/`outline`/`summary`/`symbol`/`diff` (heurística
@@ -95,8 +98,9 @@ verificação recusa `SUCCESS` com erros (§38).
   `katu_tools::diff`) devolve `ToolReport` com `id`/`hash`/`loc`/`page`/`next`; `write`
   (`write_file`) só para ficheiros **novos** (existentes → `Unavailable`); `edit` otimista com
   `write_atomic_if` (CAS), `dry-run` e `Unavailable{stale}`/`ambiguous`. Truncagem determinística
-  (linhas/bytes) testada. **Falta:** a matriz multibyte exata de §45.22; tree-sitter fica gated por
-  medição (não-objetivo até E18).
+  (linhas/bytes) testada; **matriz multibyte (§45.22)** coberta (`edit.hunks`/`added`/`removed`
+  reais; chunk único truncado em limite UTF-8). `read view=diff` sem `base` é integração CLI (§3.2);
+  tree-sitter fica gated por medição (não-objetivo até E18).
 - **Views e envelope (DF12):** `read` aceita `view=outline|summary|symbol|diff|full` (default
   `summary`), devolvendo o **envelope** com `id`/`hash`/`loc`/`truncated`/`next`; `symbol` devolve
   só o range. A view `diff` compara com a versão anterior (`base`) e devolve só o delta (hunks

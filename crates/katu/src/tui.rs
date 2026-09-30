@@ -50,10 +50,24 @@ pub(crate) fn run_tui(args: &RunArgs<'_>) -> Report {
         max_tokens: args.max_tokens,
         max_steps: args.max_steps,
     };
-    match run(App::new(), &mut handler) {
+    let mut app = App::new();
+    app.apply_update(Update::Models(models_for(args.provider)));
+    match run(app, &mut handler, &clock) {
         Ok(()) => Report::ok("tui", None),
         Err(error) => Report::failed("tui", &Error::io("<tui>", error)),
     }
+}
+
+/// Modelos oferecidos no seletor da TUI, por provider (E10-T07).
+///
+/// Lista estática até o `dynamic_models` (E12-T02) expor o catálogo; o **default** vem primeiro
+/// para o índice zero coincidir com o modelo do arranque.
+fn models_for(provider: &str) -> Vec<String> {
+    let mut models = vec![default_model(provider).to_string()];
+    if provider == "opencode-go" {
+        models.push("deepseek-v4.1-flash".to_string());
+    }
+    models
 }
 
 /// Executor do loop de turnos para a UI (dono do runtime e do provider).
@@ -73,6 +87,14 @@ impl Handler for AgentHandler<'_> {
         match command {
             Command::Quit => Vec::new(),
             Command::Submit(goal) => self.submit(&goal, painter),
+            Command::SetModel(model) => {
+                self.model.model = model;
+                vec![Update::Info(format!("modelo: {}", self.model.model))]
+            }
+            Command::SetThinking(thinking) => {
+                self.model.thinking = thinking;
+                vec![Update::Info(format!("pensamento: {thinking:?}"))]
+            }
         }
     }
 }

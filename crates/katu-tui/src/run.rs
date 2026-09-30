@@ -9,6 +9,7 @@ use std::io;
 use std::time::Duration;
 
 use katu_core::diag::{Level, events};
+use katu_core::ports::Clock;
 use ratatui::crossterm::event::{self, Event, KeyEventKind};
 use ratatui::{DefaultTerminal, restore, try_init};
 
@@ -16,6 +17,7 @@ use crate::action::map_key;
 use crate::app::{App, Command, Update};
 use crate::approval::{self, Challenge, ChallengePrompt, ChallengeSignature, Step};
 use crate::live::Live;
+use crate::throttle::{FRAME_INTERVAL_MS, Throttle};
 use crate::ui::render;
 
 /// Executor dos efeitos pedidos pela UI (implementado pela borda do binário).
@@ -30,10 +32,12 @@ const POLL_MILLIS: u64 = 50;
 
 /// Pintor do painel de atividade durante um turno (E10-T05).
 ///
-/// Recebe só eventos **efémeros** e redesenha no terminal; nunca escreve no log nem no transcript.
+/// Recebe só eventos **efémeros** e redesenha no terminal (governado pelo [`Throttle`], E10-T03);
+/// nunca escreve no log nem no transcript.
 pub struct Painter<'a> {
     app: &'a mut App,
     terminal: &'a mut DefaultTerminal,
+    throttle: &'a Throttle<'a>,
     error: Option<io::Error>,
 }
 
@@ -90,9 +94,9 @@ impl Painter<'_> {
         }
     }
 
-    /// Redesenha se não houver erro pendente (o throttle por tempo é E10-T03).
+    /// Redesenha se o orçamento de render o permitir (E10-T03) e não houver erro pendente.
     fn redraw(&mut self) {
-        if self.error.is_some() {
+        if self.error.is_some() || !self.throttle.due() {
             return;
         }
         let app: &App = self.app;
@@ -123,22 +127,31 @@ impl Drop for TerminalGuard {
 
 /// Corre a UI até o utilizador sair; o handler executa os efeitos.
 ///
+/// O desenho é governado pelo [`Throttle`] (E10-T03): quadros coalescidos por [`Clock`], forçados
+/// em cada tecla e fim de turno. O `ratatui` aplica o **diff** das células entre quadros.
+///
 /// # Errors
 /// [`io::Error`] em falha de terminal (setup, desenho ou leitura de eventos).
-pub fn run<H: Handler>(mut app: App, handler: &mut H) -> io::Result<()> {
+pub fn run<H: Handler>(mut app: App, handler: &mut H, clock: &dyn Clock) -> io::Result<()> {
     let mut guard = TerminalGuard::enter()?;
+    let throttle = Throttle::new(clock, FRAME_INTERVAL_MS);
     loop {
-        guard.terminal.draw(|frame| render(frame, &app))?;
+        if throttle.due() {
+            guard.terminal.draw(|frame| render(frame, &app))?;
+        }
         if event::poll(Duration::from_millis(POLL_MILLIS))?
             && let Event::Key(key) = event::read()?
             && key.kind == KeyEventKind::Press
             && let Some(action) = map_key(key, app.mode())
         {
             katu_core::event!(Level::Trace, events::TUI_INPUT);
-            if let Some(command) = app.apply_action(action) {
+            let command = app.apply_action(action);
+            throttle.request();
+            if let Some(command) = command {
                 let mut painter = Painter {
                     app: &mut app,
                     terminal: &mut guard.terminal,
+                    throttle: &throttle,
                     error: None,
                 };
                 let updates = handler.handle(command, &mut painter);

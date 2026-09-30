@@ -16,9 +16,10 @@ A **interface de terminal** do katu (uma das duas superfícies, com a CLI — G7
   `poll(50 ms)`. O panic hook reencaminha para o hook anterior depois de restaurar.
 - **E10-T02 ☑** — keymap **puro** (`src/action.rs`): `Mode`, `Action`, `map_key`; `App::apply_action`
   devolve um `Command` só quando há efeito. Testado por modo, sem terminal.
-- **E10-T03 ◐** — render diferencial delegado ao `Terminal`; sem alocações no hot path e
-  orçamento/benchmark por frame (E15) por medir. O `Painter` redesenha a cada evento (throttle por
-  tempo exige o port `Clock`, adiado para T03).
+- **E10-T03 ◐** — render diferencial delegado ao `Terminal` (diff de células); **throttle** por
+  `Clock` (`src/throttle.rs`; ~60 fps, forçado em cada tecla/fim de turno) e **teto de trabalho**
+  por quadro (200 entradas de conversa, 100 linhas de painel, cauda de 8 KiB do stream). **Falta:**
+  benchmark por frame e verificação de zero alocações no hot path (E15-T01/E18-T10).
 - **E10-T05 ◐** — **painel de atividade efémero** (`App::live`/`streaming`/`thinking` + `Update::Live`
   + `Painter`): o stream do modelo e as tools em curso aparecem ao vivo, **fora** do log e do
   transcript (`katu_core::event!` `tui.live`). O durável é o próprio log de sessão. **Falta:**
@@ -31,8 +32,12 @@ A **interface de terminal** do katu (uma das duas superfícies, com a CLI — G7
   perguntas positivas + justificação, `Esc`/`Ctrl-C` cancelam) é apresentado numa sobreposição
   centrada (`approval::render`); o `Painter::challenge` corre o sub-loop de teclado durante o turno
   (E07-T05).
-- **E10-T07 ☐** — controlos do core (modelo/pensamento, compactar, lixeira) por fazer. O turno corre
-  de forma **síncrona** no handler da borda (executor em background é trabalho futuro).
+- **E10-T07 ◐** — **modelo** (`m` → `Action::CycleModel`) e **grau de pensamento**
+  (`t` → `Action::CycleThinking`) como `Action`s puras, com o estado em `src/controls.rs`
+  (`Controls`) refletido no cabeçalho; a borda aplica ao **próximo** turno e publica a lista via
+  `Update::Models`. **Falta:** compactar (E09-T07), ver lixeira (E06-T09) e a lista de modelos vir
+  do catálogo (`dynamic_models`, E12-T02). O turno corre de forma **síncrona** no handler da borda
+  (executor em background é trabalho futuro).
 
 ## Fronteira
 

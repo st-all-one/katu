@@ -7,52 +7,25 @@
 //! O **painel de atividade** (E10-T05) é efémero: mostra o stream do modelo e as tools em curso,
 //! e **nunca** entra no transcript durável nem no contexto do modelo.
 
+use katu_core::provider::Thinking;
+
 use crate::action::{Action, Mode};
-use crate::live::Live;
+use crate::controls::Controls;
+use crate::entry::{Entry, Role, Status};
+use crate::live::{Live, trim_tail};
 
-/// Papel de uma entrada da conversa (cor e prefixo no render).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Role {
-    /// Mensagem do utilizador.
-    User,
-    /// Resposta do modelo.
-    Assistant,
-    /// Chamada/resultado de tool.
-    Tool,
-    /// Nota informativa.
-    Info,
-    /// Erro.
-    Error,
-}
-
-/// Uma linha da conversa (durável na sessão; o `App` só a mostra).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Entry {
-    /// Papel.
-    pub role: Role,
-    /// Texto.
-    pub text: String,
-}
-
-/// Estado da barra de estado.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub enum Status {
-    /// Parado.
-    #[default]
-    Idle,
-    /// À espera de um efeito (o utilizador não acha que travou).
-    Working,
-    /// Mensagem transitória.
-    Message(String),
-    /// Falha.
-    Failure(String),
-}
+/// Teto do buffer efémero de streaming (bytes); o painel mostra só a cauda (E10-T03).
+const STREAM_TAIL_BYTES: usize = 8 * 1024;
 
 /// Comando emitido pela UI para a borda executar (I/O fora do render).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     /// Submeter uma mensagem ao agente.
     Submit(String),
+    /// Altera o modelo do **próximo** turno (E10-T07/E12-T10); o agente não se auto-escala.
+    SetModel(String),
+    /// Altera o grau de pensamento do **próximo** turno (E10-T07/E12-T10).
+    SetThinking(Thinking),
     /// Sair.
     Quit,
 }
@@ -72,6 +45,8 @@ pub enum Update {
     Phase(String),
     /// Observação efémera do turno (E10-T05): só o painel de atividade.
     Live(Live),
+    /// Modelos disponíveis no provider (E10-T07); o primeiro é o default.
+    Models(Vec<String>),
     /// Turno concluído (limpa a pendência).
     Done,
 }
@@ -90,6 +65,8 @@ pub struct App {
     thinking: String,
     /// Eventos discretos do painel (tools, notas).
     live: Vec<String>,
+    /// Controlos do core: modelo e grau de pensamento (E10-T07/E12-T10).
+    controls: Controls,
     /// Deslocamento a partir do fundo (0 = mensagem mais recente).
     scroll: u16,
     quit: bool,
@@ -114,6 +91,7 @@ impl App {
             streaming: String::new(),
             thinking: String::new(),
             live: Vec::new(),
+            controls: Controls::new(),
             scroll: 0,
             quit: false,
         }
@@ -123,6 +101,18 @@ impl App {
     #[must_use]
     pub const fn mode(&self) -> Mode {
         self.mode
+    }
+
+    /// Modelo selecionado no seletor (E10-T07); `None` até a borda publicar a lista.
+    #[must_use]
+    pub fn model(&self) -> Option<&str> {
+        self.controls.model()
+    }
+
+    /// Grau de pensamento escolhido (E10-T07/E12-T10).
+    #[must_use]
+    pub const fn reasoning(&self) -> Thinking {
+        self.controls.reasoning()
     }
 
     /// Linha de mensagem em edição.
@@ -206,6 +196,8 @@ impl App {
             Action::Confirm => self.status = Status::Message("nada a confirmar".to_string()),
             Action::ScrollUp => self.scroll = self.scroll.saturating_add(1),
             Action::ScrollDown => self.scroll = self.scroll.saturating_sub(1),
+            Action::CycleModel => return self.controls.cycle_model(),
+            Action::CycleThinking => return Some(self.controls.cycle_thinking()),
             Action::Quit => {
                 self.quit = true;
                 return Some(Command::Quit);
@@ -244,6 +236,7 @@ impl App {
             }
             Update::Phase(phase) => self.phase = phase,
             Update::Live(live) => self.apply_live(live),
+            Update::Models(models) => self.controls.set_models(models),
             Update::Done => {
                 self.clear_live();
                 self.status = Status::Idle;
@@ -254,7 +247,10 @@ impl App {
     /// Aplica um evento efémero ao painel de atividade (não toca no transcript).
     fn apply_live(&mut self, live: Live) {
         match live {
-            Live::Text(delta) => self.streaming.push_str(&delta),
+            Live::Text(delta) => {
+                self.streaming.push_str(&delta);
+                trim_tail(&mut self.streaming, STREAM_TAIL_BYTES);
+            }
             Live::Thinking(delta) => self.thinking.push_str(&delta),
             Live::Tool(name) => self.live.push(format!("→ {name}")),
             Live::ToolDone(name) => self.live.push(format!("✓ {name}")),

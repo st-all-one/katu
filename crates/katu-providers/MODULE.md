@@ -30,11 +30,12 @@ A camada de **providers**: o caminho built-in first-party é nosso; o resto é c
   despacha.
 - **Streaming.** [`sse`](src/sse.rs) é um parser SSE incremental; [`wire`](src/wire.rs) é o driver
   comum (retry só antes do primeiro evento, captura de erro, contagem de chunks).
-  [`openai`](src/openai.rs) (`chat/completions`), [`responses`](src/responses.rs) e
-  [`anthropic`](src/anthropic.rs) (`messages`) normalizam texto, thinking (aceita `reasoning_content`
-  /`reasoning`/`reasoning_text`) e tool calls **completas**; o `chat/completions` serializa direto
-  (sem árvore `Value`); `usage` com base `provider_reported`; preços [`usage`](src/usage.rs)
-  devolvem `unpriced` sem tabela (DF5).
+  [`openai`](src/openai.rs) (`chat/completions`), [`responses`](src/responses.rs),
+  [`anthropic`](src/anthropic.rs) (`messages`) e [`google`](src/google.rs)
+  (`models/<id>:streamGenerateContent`) normalizam texto, thinking (aceita `reasoning_content`
+  /`reasoning`/`reasoning_text` e `thought: true`) e tool calls **completas**; o `chat/completions`
+  serializa direto (sem árvore `Value`); `usage` com base `provider_reported`; preços
+  [`usage`](src/usage.rs) devolvem `unpriced` sem tabela (DF5).
 - **Cache de prefixo (por modelo).** `prompt_cache`/`prompt_cache_retention` vêm do catálogo; o
   `prompt_cache_key` deriva da sessão. Medido em `deepseek-v4.1-flash` (2.º turno `cached=896/1004`;
   ADR 0013).
@@ -57,6 +58,6 @@ delegados. A HttpApi v2 do agente OpenCode **não** é o seam.
 
 - É **cliente** do plano de dados, não substrato do loop.
 - `katu-core`/`katu-policy`/`katu-tools` nunca dependem deste crate.
-- Dialetos `google` e WebSocket/HTTP2 são explicitamente `Unsupported`: o `ureq` 3 é HTTP/1.1 e a
-  troca de stack não se justifica para um só stream (`responses`/`messages` estão implementados mas
-  sem validação ao vivo; ADR 0012/0013).
+- WebSocket/HTTP2 são explicitamente `Unsupported`: o `ureq` 3 é HTTP/1.1 e a troca de stack não
+  se justifica para um só stream (`responses`/`messages`/`google` estão implementados mas sem
+  validação ao vivo; ADR 0012/0013).

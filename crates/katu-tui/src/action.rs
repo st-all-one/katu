@@ -38,6 +38,10 @@ pub enum Action {
     ScrollUp,
     /// Rola a conversa para baixo (mais recente).
     ScrollDown,
+    /// Avança para o próximo modelo (E10-T07).
+    CycleModel,
+    /// Avança o grau de pensamento (E10-T07).
+    CycleThinking,
     /// Sai da UI.
     Quit,
 }
@@ -53,6 +57,8 @@ pub fn map_key(key: KeyEvent, mode: Mode) -> Option<Action> {
         Mode::Normal => match key.code {
             KeyCode::Char('q') => Some(Action::Quit),
             KeyCode::Enter | KeyCode::Char('i') => Some(Action::EnterInsert),
+            KeyCode::Char('m') => Some(Action::CycleModel),
+            KeyCode::Char('t') => Some(Action::CycleThinking),
             KeyCode::Up => Some(Action::ScrollUp),
             KeyCode::Down => Some(Action::ScrollDown),
             _ => None,
@@ -96,6 +102,14 @@ mod tests {
         assert_eq!(
             map_key(key(KeyCode::Char('i')), Mode::Normal),
             Some(Action::EnterInsert)
+        );
+        assert_eq!(
+            map_key(key(KeyCode::Char('m')), Mode::Normal),
+            Some(Action::CycleModel)
+        );
+        assert_eq!(
+            map_key(key(KeyCode::Char('t')), Mode::Normal),
+            Some(Action::CycleThinking)
         );
         assert_eq!(
             map_key(key(KeyCode::Up), Mode::Normal),

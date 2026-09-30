@@ -62,8 +62,15 @@ fecha o ponto em aberto **OA3** com um desenho testado. Padrões a herdar:
   `app.rs` (devolve `Command` só quando há efeito). Testado por modo (Normal/Insert/Confirm) e para
   `Ctrl-C`/caracteres de controlo; o loop de eventos só traduz a tecla em `Action`.
 
-### E10-T03 ☐ Render diferencial e orçamento de render
+### E10-T03 ◐ Render diferencial e orçamento de render
 - **Entregáveis:** diff de frames; throttle; teto de trabalho por frame.
+- **Estado:** o `diff` de células é delegado ao `Terminal` do `ratatui`; o **throttle** vive em
+  `katu-tui/src/throttle.rs` (`Throttle`, guiado pela porta `Clock` — sem `Instant::now`, testado
+  com relógio determinístico) e coalesce os quadros a ~60 fps, forçando um quadro em cada tecla e
+  fim de turno. O **teto de trabalho** limita entradas da conversa (200), linhas do painel (100) e
+  a cauda do buffer de streaming (8 KiB, em fronteira de caractere).
+- **Falta:** o **benchmark** por frame e a verificação de **zero alocações** no hot path
+  (E15-T01/E18-T10).
 - **Aceite:** benchmark de render por frame dentro do orçamento (E15); sem alocações no hot path
   de render (verificado por lint/bench).
 
@@ -96,11 +103,18 @@ fecha o ponto em aberto **OA3** com um desenho testado. Padrões a herdar:
   (derivada do `Status`); a barra mostra o estado. **Falta:** checkpoint atual/próxima ação quando
   o checkpoint tipado (E09-T02) for ligado à UI.
 
-### E10-T07 ☐ Controlos do core na TUI
+### E10-T07 ◐ Controlos do core na TUI
 - **Entregáveis:** selector de **modelo** e de **grau de pensamento** (`set_model`/`set_thinking`,
   E12-T10); comando de **compactar conversa** (E09-T07) com pré-visualização antes/depois; vista
   da **lixeira** (`.katu/trash`) com `restore` (E06-T09); confirmação explícita em toda a ação
   destrutiva.
+- **Estado:** o **seletor de modelo** (`m`) e o **grau de pensamento** (`t`) estão feitos como
+  `Action`s puras (`CycleModel`/`CycleThinking`) + `Command::{SetModel, SetThinking}`, com o estado
+  em `katu-tui/src/controls.rs` (`Controls`) e o modelo/pensamento no cabeçalho. A borda aplica a
+  escolha ao **próximo** turno (o agente **nunca** se auto-escala) e publica a lista de modelos via
+  `Update::Models` (lista estática até `dynamic_models`, E12-T02). **Falta:** a lista vir do
+  catálogo, o **comando de compactar** (E09-T07; `Session::compact_context` já existe) e a **vista
+  da lixeira** (E06-T09; `trash::restore` já existe).
 - **Aceite:** cada controlo mapeia para uma `Action` pura (E10-T02) e é testável por modo; o
   agente **não** altera modelo/pensamento sem o utilizador; esvaziar a lixeira exige
   challenge-and-response.

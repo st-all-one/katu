@@ -81,8 +81,8 @@ permanentes, o `usage` robusto de cache, o **catálogo `model → dialeto`** e a
 ADR 0013); os cabeçalhos de afinidade extra (`x-client-request-id`/`x-session-affinity`) seguem o
 `pi`; o `chat/completions` serializa direto, sem árvore `Value`. A **compressão do pedido** foi
 **rejeitada** pelos endpoints (opencode `401`, llama `415`) e fica opt-in desligada; HTTP/2 está
-bloqueado pelo `ureq` (HTTP/1.1). Os dialetos `responses`/`messages` estão implementados;
-**por adotar:** `google`/WebSocket, `dynamic_models` e `Control::SetModel` (E12-T10).
+bloqueado pelo `ureq` (HTTP/1.1). Os dialetos `responses`/`messages`/`google` estão implementados;
+**por adotar:** WebSocket, `dynamic_models` e `Control::SetModel` (E12-T10).
 
 ---
 
@@ -175,10 +175,11 @@ bloqueado pelo `ureq` (HTTP/1.1). Os dialetos `responses`/`messages` estão impl
   `chunkTimeout` próprio; header `x-opencode-session` para afinidade; streaming incremental por
   delta (texto parcial) e tool calls **completas** (paridade com `MessageStream` do GDK);
   cancelamento imediato; zero re-encode; reconexão explícita.
-- **Estado:** `chat/completions`, `responses` e `messages` normalizados pelo mesmo `wire`,
-  com retry/erro partilhados; `x-opencode-session`, keep-alive/`TCP_NODELAY`, sem compressão;
-  catálogo `model → dialeto` (ADR 0012). `google` e WebSocket/HTTP2 explícitos `Unsupported`;
-  `responses`/`messages` ainda sem validação ao vivo.
+- **Estado:** `chat/completions`, `responses`, `messages` e `google`
+  (`models/<id>:streamGenerateContent?alt=sse`; `thought: true` vira thinking, `functionCall`
+  completo) normalizados pelo mesmo `wire`, com retry/erro partilhados; `x-opencode-session`,
+  keep-alive/`TCP_NODELAY`, sem compressão; catálogo `model → dialeto` (ADR 0012). WebSocket/HTTP2
+  são explícitos `Unsupported`; `responses`/`messages`/`google` ainda sem validação ao vivo.
 - **Aceite:** TTFT dentro do orçamento (E12-T07); nenhum buffer integral da resposta; cancelar
   interrompe o stream e não vaza conexão/tarefa; a sessão mantém afinidade via
   `x-opencode-session`.
@@ -221,8 +222,10 @@ bloqueado pelo `ureq` (HTTP/1.1). Os dialetos `responses`/`messages` estão impl
   capacidade — os demais via GDK quando suportarem; **o utilizador** aciona; o agente **não** se
   auto-escala (custo/qualidade) e, se pedir, vira `NeedsHuman`.
 - **Estado:** o `Catalog` já expõe `model → {dialect, context_limit, reasoning}` e o wire aceita
-  `reasoning_effort`/`reasoning_format` por modelo; falta o `Control::{SetModel, SetThinking}` no
-  kernel e a recusa que ensina para grau inválido.
+  `reasoning_effort`/`reasoning_format` por modelo. A TUI já tem o seletor (`katu-tui::Controls`:
+  `m`/`t` → `Command::{SetModel, SetThinking}`, aplicado ao **próximo** turno pela borda). Falta o
+  `Control::{SetModel, SetThinking}` **no kernel** (evento/estado) e a recusa que ensina para grau
+  inválido, além de a lista de modelos vir do catálogo (`dynamic_models`, E12-T02).
 - **Aceite:** trocar de modelo a meio da sessão preserva log/estado (só muda o provider do próximo
   turno); grau de pensamento inválido para o modelo é recusado com erro que ensina; nenhum caminho
   deixa o agente escolher um modelo mais caro sem aprovação.

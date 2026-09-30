@@ -13,6 +13,12 @@ use crate::transport::MockTransport;
 
 mod retry;
 
+/// Stream de texto do dialeto Google (`streamGenerateContent`).
+const GOOGLE_STREAM: &str = concat!(
+    "data: {\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Ola\"}]}}]}\n\n",
+    "data: {\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[]},\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":5,\"candidatesTokenCount\":2}}\n\n",
+);
+
 /// Pedido mínimo de teste.
 fn request(model: &str) -> ProviderRequest {
     ProviderRequest {
@@ -117,14 +123,19 @@ fn opencode_go_sets_session_header() {
 }
 
 #[test]
-fn unimplemented_dialects_are_explicit() {
-    let transport = MockTransport::ok("", 4);
+fn google_dialect_streams_through_the_generate_content_path()
+-> Result<(), Box<dyn std::error::Error>> {
     let config =
-        OpenCodeConfig::at("https://example.invalid/v1", "k").with_dialect(Dialect::Google);
+        OpenCodeConfig::at("https://example.invalid/v1beta", "k").with_dialect(Dialect::Google);
+    let transport = MockTransport::ok(GOOGLE_STREAM, 5);
     let provider = OpenCode::new(transport, config);
     let mut sink = CollectSink::default();
-    let result = provider.stream(&request("m"), &mut sink);
-    assert!(matches!(result, Err(ProviderError::Unsupported(_))));
+    let outcome = provider.stream(&request("gemini-2.5-pro"), &mut sink)?;
+    assert_eq!(sink.text, "Ola");
+    assert_eq!(outcome.stop, StopReason::EndTurn);
+    let usage: TokenUsage = outcome.usage.ok_or("sem usage")?;
+    assert_eq!(usage.input, Some(5));
+    Ok(())
 }
 
 #[test]

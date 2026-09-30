@@ -7,11 +7,14 @@
 ## 0. Snapshot
 
 - **6 crates + `xtask`**: `katu-policy`, `katu-core`, `katu-tools`, `katu` (bin), `katu-providers`, `katu-tui`*.
-- **510 testes** · catálogo de instrumentação **77 ids** · **11 tools** · **8 regras** (5 memória + 3 contenção) · **15 ADRs**.
+- **524 testes** · catálogo de instrumentação **77 ids** · **11 tools** · **8 regras** (5 memória + 3 contenção) · **15 ADRs**.
 - `make check` verde (fmt + clippy `-D warnings` + testes + `check-layers` + `check-diag` + `check-schemas` + `check-docs` + `check-memory-swap` + `policy:audit` + `gate:bench` + `gate:provider` + file-length ≤300) · `make instrument` verde.
 - **O MVK passou** ([ADR 0001](docs/adr/0001-mvk-gate-aprovado.md)); o kernel (E04) e a política (E02) estão completos.
 
-\* `katu-tui` traz a base E10 (T01/T02/T05◐/T06◐): esqueleto panic-safe, keymap puro, render e painel de atividade efémero; `katu-providers` implementa a porta `Provider` e os built-in `opencode go/zen` + `llama.cpp` (ADR 0011).
+\* `katu-tui` traz a base E10 (T01/T02/T03◐/T04/T05◐/T06◐/T07◐): esqueleto panic-safe, keymap puro,
+render com throttle/teto de trabalho, painel de atividade efémero, recusas com regra + evidência e
+seletor de modelo/pensamento;
+`katu-providers` implementa a porta `Provider` e os built-in `opencode go/zen` + `llama.cpp` (ADR 0011).
 
 ## 1. O que já funciona
 
@@ -56,16 +59,16 @@
 | **E09-T04** | ☑ | Carregar `scope_contract.json`/`feature_list.json` no arranque (`katu/src/scope.rs`): valida o `Plan` (schema + ≤ 1 `in_progress`) antes do turno e liga a tool `plan` ao kernel (`PlanRecorded` §42, `katu/src/agent/plan.rs`) — **destranca a fase `Planned`**; sem artefacto, `plan` mantém `Unavailable{scope-contract}`. |
 | **E09-T05** | ◐ | `Metric`/portão de publicação — fecho. |
 | **E09-T07** | ◐ | Comando do utilizador para compactar (CLI/TUI); gatilho do kernel feito. |
-| **E10-T01…T07** | ◐ | **CLI/TUI**: T01 (esqueleto panic-safe + restauro), T02 (keymap puro testado por modo), T04 (recusas com regra + evidência **e** override por challenge-and-response — `katu-tui::Challenge`), T05◐ (painel de atividade efémero + streaming visível; falta transcrição/viewer) e T06◐ (fase/pendência no ecrã) feitos em `katu-tui` + `katu tui`; faltam T03 (orçamento de render/sem alocações) e T07 (controlos de modelo/compactação/lixeira). O executor em background fica por fazer. |
+| **E10-T01…T07** | ◐ | **CLI/TUI**: T01 (esqueleto panic-safe + restauro), T02 (keymap puro testado por modo), T03◐ (render diferencial + throttle por `Clock` + teto de trabalho; falta benchmark/zero alocações), T04 (recusas com regra + evidência **e** override por challenge-and-response — `katu-tui::Challenge`), T05◐ (painel de atividade efémero + streaming visível; falta transcrição/viewer), T06◐ (fase/pendência no ecrã) e T07◐ (`m`/`t` → modelo/pensamento por `Action` pura, `katu-tui::Controls`; faltam compactar e vista da lixeira) feitos em `katu-tui` + `katu tui`; faltam a vista da lixeira/comando de compactação e o benchmark de render. O executor em background fica por fazer. |
 | **E12-T01** | ☑ | Porta no núcleo + adaptadores `opencode`/`llama` com catálogo `model → dialeto`; o binário **liga o loop** (`katu run`, E12-T05). |
 | **E12-T02** | ◐ | Formato declarativo próprio (`ProviderSpec`+JSON) e `Declarative<T>`; GDK `goose` rejeitado (ADR 0012); falta `dynamic_models`. |
 | **E12-T03** | ◐ | `TokenUsage`/`PriceTable` (base `provider_reported`, `unpriced`); falta `Metric`/tier. |
 | **E12-T04** | ☑ | Retry classificado (transitório vs conta/quota) só antes do 1.º delta, honrando `Retry-After`; timeout + cancelamento. |
 | **E12-T05** | ☑ | **Loop de turnos** ligado ao kernel com tool execution §42 (`katu run`; roteador fail-closed em `src/agent/`; ADR 0015); testes de loop sem rede e e2e real verificado. |
-| **E12-T06** | ◐ | `chat/completions`+`responses`+`messages` pelo mesmo `wire`; faltam `google`/WebSocket e validação ao vivo. |
+| **E12-T06** | ◐ | `chat/completions`+`responses`+`messages`+`google` (`models/<id>:streamGenerateContent`) pelo mesmo `wire`; faltam WebSocket/HTTP2 e validação ao vivo. |
 | **E12-T07** | ◐ | Artefacto cru (`bench/providers/latency.json`, offline+live) e **gate de orçamento** (`xtask gate:provider` em `make check`, ADR 0014); falta `criterion`/`dhat` e a matriz por dialeto/transporte (E18-T10). |
 | **E12-T08** | ☑ | `llama-server` (L1) pelo mesmo trait; smoke real com Qwen2.5-Coder-1.5B Q4_K_M. |
-| **E12-T10** | ◐ | `Catalog` com dialeto/contexto/reasoning e `reasoning_effort`/`reasoning_format` por modelo; falta `Control::SetModel`. |
+| **E12-T10** | ◐ | `Catalog` com dialeto/contexto/reasoning, `reasoning_effort`/`reasoning_format` por modelo e seletor de modelo/pensamento na TUI (`katu-tui::Controls` → `Command::{SetModel, SetThinking}`); falta o `Control::{SetModel, SetThinking}` **no kernel** e a validação por modelo com erro que ensina. |
 | **E13-T01…T07** | ☐ | Camadas de teste, teste real por regra, regressão invertida, Miri/geiger/machete, goldens, matriz de aceitação. |
 | **E14-T02…T07** | ☐ | Postmortems, "um facto um lar", `policy/` versionado, teto de superfície, catálogos gerados, slices. |
 | **E15-T01** | ◐ | `criterion` + gate de performance no CI. |
@@ -83,7 +86,12 @@
 
 ### 3.1 Bloqueadores (impedem a experiência completa)
 
-1. **TUI (E10) — base feita; faltam controlos do core.** `katu tui` abre uma UI panic-safe com keymap puro, multi-turno síncrono, **streaming visível**, **recusas com regra + evidência** e **aprovação por challenge-and-response** (`katu-tui`, T01/T02/T04/T05◐/T06◐). Faltam o executor em background, T03 (render) e T07 (modelo/compactação/lixeira).
+1. **TUI (E10) — base feita; faltam dois controlos do core.** `katu tui` abre uma UI panic-safe com
+   keymap puro, multi-turno síncrono, **streaming visível**, **recusas com regra + evidência**,
+   **aprovação por challenge-and-response**, **orçamento de render** (throttle por `Clock` + teto de
+   trabalho) e **seletor de modelo/pensamento** (`m`/`t`) (`katu-tui`, T01/T02/T03◐/T04/T05◐/T06◐/
+   T07◐). Faltam o executor em background, o benchmark de render, o comando de compactação e a vista
+   da lixeira.
 2. **Compactação por comando e override de verificação (E09-T03/E09-T07).** A lógica do core está feita; falta a superfície de CLI/TUI.
 3. **`spawn_blocking`+timeout (E03-T04).** O adaptador in-process está ligado e o loop usa a tool
    `memory` (§42); o timeout do worker bloqueante continua gated (E12/E01-T09).
@@ -130,14 +138,15 @@ buffer adaptativo (E18-T04).
 ## 4. Ordem recomendada (próximos passos)
 
 1. **E10 (CLI/TUI)** — a superfície sobre o loop já acionável. **Feito:** loop de eventos,
-   keymap puro, render, multi-turno síncrono, streaming visível, recusas com regra + evidência e
-   **aprovação por challenge-and-response** (T01/T02/T04/T05◐/T06◐; E07-T05 ☑). **Falta:**
-   orçamento de render/sem alocações (T03), compactação por comando (E09-T07), controlo de
-   modelo/pensamento (T07/E12-T10) e o override do gate de verificação (E09-T03).
+   keymap puro, render com throttle/teto de trabalho, multi-turno síncrono, streaming visível,
+   recusas com regra + evidência e **aprovação por challenge-and-response**
+   (T01/T02/T03◐/T04/T05◐/T06◐/T07◐; E07-T05 ☑). **Falta:** o benchmark de render (T03), a
+   compactação por comando e a vista da lixeira (T07/E09-T07/E06-T09), o `Control` no kernel
+   (E12-T10) e o override do gate de verificação (E09-T03).
 2. **E03-T04** — `spawn_blocking` + timeout do adaptador (gated no worker bloqueante; E12/E01-T09).
 3. **E15-T01 + E18-T10** — `criterion`/`hyperfine`/`dhat` + gate de regressão no CI; generaliza o
    que a E12-T07 já faz para o provider (harness de medição antes de otimizar).
-4. **E12-T06/T10** — dialeto `google` + WebSocket/HTTP2 e validação ao vivo de `responses`/`messages`;
+4. **E12-T06/T10** — WebSocket/HTTP2 e validação ao vivo de `responses`/`messages`/`google`;
    `Control::{SetModel, SetThinking}` no kernel.
 5. Fechos core/policy/tools: **E06-T02/T03/T12**, **E07-T02/T03**, **E01-T07**, **E19-T04/T06** — ✅;
    faltam **E06-T07** (rotação gated), a iteração de densidade colunar (§3.4) e a integração de

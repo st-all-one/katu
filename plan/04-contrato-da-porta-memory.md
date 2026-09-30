@@ -145,7 +145,7 @@ pub enum MemoryErrorKind { Unavailable, Timeout, Invalid, Internal }
 - **Aceite:** um adaptador artificialmente bloqueante **não** congela o loop; o timeout é
   observável e não vaza tarefas.
 
-### E03-T05 ◐ `FakeMemory` e suíte de conformidade
+### E03-T05 ☑ `FakeMemory` e suíte de conformidade
 - **Entregáveis:** `FakeMemory` com cenários (`Create`/`Merge`/`Reject`) e scores fixos; suíte de
   conformidade do contrato.
 - **Estado:** `FakeMemory` feito (`memory::fake`, com `rejecting`/`failing`/`with_hits` e falha

@@ -100,11 +100,12 @@ Todos os entregáveis abaixo assumem e verificam:
 - **Aceite:** `source()` encadeia; nada de `Box<dyn Error>` na API do núcleo; todo erro de I/O
   carrega `path`/`id`; a invariante "nunca `Ok` com erros pendurados" tem teste.
 
-### E01-T07 ◐ Logging, observabilidade e redação
+### E01-T07 ☑ Logging, observabilidade e redação
 - **Objetivo:** logs úteis que **nunca** quebram o pipe nem vazam segredo.
 - **Estado:** o port `Logger`/`tracing` foi substituído por `diag` (logs **sempre estruturados**,
   catálogo de eventos, custo zero por defeito — DF9/E19); stdout=dados/stderr=logs garantido pelo
-  envelope. **Falta** a redação por allowlist (corpos, `[secrets]`, tokens) no sink.
+  envelope. A **redação por allowlist** (corpos, `[secrets]`, tokens) vive no sink (`diag/mod.rs`,
+  E01-T07). **Gated:** log em ficheiro com rotação/teto — nunca apaga automaticamente (E06-T07).
 - **Entregáveis:** impl do port `Logger` com `tracing` + `tracing-subscriber` (`EnvFilter`);
   regra **stdout = dados / stderr = logs**; níveis documentados; `#[instrument]` nas operações;
   campos estruturados; redação por allowlist (corpos, `[secrets]`, `Authorization`, tokens);

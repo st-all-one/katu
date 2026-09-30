@@ -8,6 +8,7 @@ use katu_core::provider::{ProviderError, ProviderOutcome, ProviderRequest, Provi
 
 use crate::anthropic;
 use crate::catalog::{Dialect, MaxTokensField, ModelEntry};
+use crate::google;
 use crate::openai::{self, EncodeOptions, Endpoint};
 use crate::responses;
 use crate::retry::RetryPolicy;
@@ -65,7 +66,11 @@ pub(crate) fn stream<T: Transport>(
     dispatch: &Dispatch<'_>,
     sink: &mut dyn ProviderSink,
 ) -> Result<ProviderOutcome, ProviderError> {
-    let endpoint = endpoint(&dispatch.wire, dispatch.dialect);
+    let endpoint = endpoint_for(
+        &dispatch.wire,
+        dispatch.dialect,
+        &dispatch.request.model.model,
+    );
     let options = options(&dispatch.wire);
     let call = Call {
         endpoint: &endpoint,
@@ -77,18 +82,23 @@ pub(crate) fn stream<T: Transport>(
         Dialect::ChatCompletions => openai::stream_chat(transport, &call, sink),
         Dialect::Responses => responses::stream(transport, &call, sink),
         Dialect::Messages => anthropic::stream(transport, &call, sink),
-        Dialect::Google => Err(ProviderError::Unsupported("google".to_string())),
+        Dialect::Google => google::stream(transport, &call, sink),
     }
 }
 
-/// Constrói o endpoint (URL + cabeçalhos) para o dialeto.
+/// Constrói o endpoint (URL + cabeçalhos) para o dialeto (modelo vazio usa o default do gateway).
 pub(crate) fn endpoint(wire: &WireConfig<'_>, dialect: Dialect) -> Endpoint {
+    endpoint_for(wire, dialect, "")
+}
+
+/// Constrói o endpoint (URL + cabeçalhos) para o dialeto, com o id de modelo (Google: caminho).
+pub(crate) fn endpoint_for(wire: &WireConfig<'_>, dialect: Dialect, model: &str) -> Endpoint {
     let base = wire.base_url.trim_end_matches('/');
     let path = match dialect {
-        Dialect::ChatCompletions => "/chat/completions",
-        Dialect::Responses => "/responses",
-        Dialect::Messages => "/messages",
-        Dialect::Google => "/models",
+        Dialect::ChatCompletions => "/chat/completions".to_string(),
+        Dialect::Responses => "/responses".to_string(),
+        Dialect::Messages => "/messages".to_string(),
+        Dialect::Google => format!("/models/{model}:streamGenerateContent?alt=sse"),
     };
     let mut headers = vec![
         ("content-type".to_string(), "application/json".to_string()),
