@@ -17,9 +17,11 @@ path = "examples/measure_mvk.rs"
 required-features = ["profile"]
 
 [features]
-default = []
+default = ["memory-in-process"]
 # Instrumentação transversal (DF9/E19): compila o caminho ativo e o sink de `stderr`.
 profile = ["katu-core/instrument"]
+# Adaptador in-process do knudge (E03-T02): a memória de primeira classe (G4).
+memory-in-process = ["dep:knudge-core"]
 
 [dependencies]
 katu-core.workspace = true
@@ -30,6 +32,7 @@ katu-tui.workspace = true
 clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+knudge-core = { path = "../knudge/crates/knudge-core", optional = true }
 
 [lints]
 workspace = true

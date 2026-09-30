@@ -12,8 +12,10 @@ todo o código impuro confinado.
   com timeout, `process_group` e leitura limitada — E07-T04; `fs/` = `StdFs` com escrita atómica
   **endurecida**: temporário exclusivo `O_EXCL`/`0600` e nome imprevisível, para não seguir um
   symlink plantado — E07-T04). Sem FFI no MVP (ADR 0004).
-- Adaptador in-process da porta `Memory` sobre o `knudge-core` (`KnudgeBuilder`, D214) — o único
-  sítio com dependência do knudge.
+- Adaptador in-process da porta `Memory` sobre o `knudge-core` (`src/memory/`, feature
+  `memory-in-process` **default**) — o único sítio com dependência do knudge. A fachada `Knudge`
+  (`!Sync`) é protegida por `Mutex` com cache de índice/grafo; `doctor --json` expõe
+  `memory.status()` e a suíte de conformidade corre contra o adaptador (E03-T02/T05/T07).
 - Exit codes na borda (a lógica propaga `Result`).
 - Harness de medição do MVK (`examples/measure_mvk.rs`, feature `profile`, E05-T06): corre o
   caminho real e grava `bench/mvk/raw.json` (evidência tipada, DF5).

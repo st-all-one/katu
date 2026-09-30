@@ -7,7 +7,7 @@
 ## 0. Snapshot
 
 - **6 crates + `xtask`**: `katu-policy`, `katu-core`, `katu-tools`, `katu` (bin), `katu-providers`*, `katu-tui`*.
-- **402 testes** · catálogo de instrumentação **73 ids** · **11 tools** · **8 regras** (5 memória + 3 contenção) · **9 ADRs**.
+- **405 testes** · catálogo de instrumentação **73 ids** · **11 tools** · **8 regras** (5 memória + 3 contenção) · **9 ADRs**.
 - `make check` verde (fmt + clippy `-D warnings` + testes + `check-layers` + `check-diag` + `check-schemas` + `check-docs` + `policy:audit` + `gate:bench` + file-length ≤300) · `make instrument` verde.
 - **O MVK passou** ([ADR 0001](docs/adr/0001-mvk-gate-aprovado.md)); o kernel (E04) e a política (E02) estão completos.
 
@@ -35,12 +35,12 @@
 | **E01-T08** | ☐ | Política de memória e `unsafe` (documento/decisão). |
 | **E01-T09** | ☐ | Política de recursos e runtime mínimo. |
 | **E01-T10** | ◐ | `xtask` e CI em camadas (fecho). |
-| **E03-T02** | ☐ | **Adaptador in-process do `knudge-core`** (primário, no binário). |
-| **E03-T03** | ☐ | Construtor à moda `build_with_transport()`. |
+| **E03-T02** | ☑ | **Adaptador in-process do `knudge-core`** (primário, no binário; feature default). |
+| **E03-T03** | ◐ | Seleção por feature feita; falta `build_with_memory(adapter)` no kernel (E10). |
 | **E03-T04** | ☐ | `spawn_blocking` + timeout no caminho async. |
-| **E03-T05** | ◐ | Suíte de conformidade existe; falta correr contra o adaptador in-process. |
+| **E03-T05** | ☑ | Suíte de conformidade corre contra o fake **e** o adaptador in-process. |
 | **E03-T06** | ☐ | Gate de substituibilidade (`check-memory-swap`). |
-| **E03-T07** | ☐ | Memória como invariante (produção sempre com memória; fail-closed no arranque). |
+| **E03-T07** | ◐ | `status()` exposto no `doctor`; falta fail-closed no arranque do loop (E10). |
 | **E06-T02** | ☑ | Linter de schema (`katu-tools::schema`) + `xtask check-schemas` em `make check`. |
 | **E06-T03** | ☑ | Matriz multibyte (§45.22); `edit.hunks`/`added`/`removed` reais; chunk único truncado em limite UTF-8. `read.diff` sem `base` é integração CLI (§3.2). |
 | **E06-T12** | ☑ | Formato ao modelo **colunar v3** (ADR 0006): sem headers (registo no prime), blocos literais, `k` explícito, aliases de sessão; qualidade (`rank`/`basis`/`ev`/`sym`). A/B: **-21%** vs JSON; aliases neutros no corpus sintético (§3.4). |
@@ -73,7 +73,9 @@
 
 1. **Sem loop acionável (E10).** O binário só faz `version`/`doctor`. Não há driver do kernel nem TUI.
 2. **Sem provider (E12).** `katu-providers` é stub; não há LLM.
-3. **Sem memória real (E03-T02).** Só `FakeMemory`; o adaptador in-process do `knudge-core` não está ligado — **bloqueado** por dep (path `crates/knudge/crates/knudge-core`, fora do registry).
+3. **Memória real ligada, kernel ainda não.** O adaptador in-process está no binário
+   (`katu/src/memory/`, feature `memory-in-process` **default**) e passa a conformidade; falta o
+   kernel consumir a porta no loop real (E10) — hoje só o `doctor` a expõe.
 
 ### 3.2 Integração CLI/TUI (lógica já feita no core)
 
@@ -100,9 +102,9 @@ Nenhuma fórmula implementada: contexto submodular+MMR (T02), compactação por 
 
 1. **E10 (CLI/TUI)** — transforma o kernel+toolset num agente executável e destranca as autorizações de E07/E09.
 2. **E12-T01/T05** — port `Provider` + provider fake (desbloqueia testes de loop reais).
-3. **E03-T02** — adaptador in-process do knudge (memória real; decisão de dep pendente).
+3. **E03-T02 feito** — adaptador in-process do knudge no binário (memória real, feature default); falta o wiring do kernel (E10) e `check-memory-swap` (E03-T06).
 4. **E15-T01 + E18-T10** — harness de medição antes de qualquer otimização.
-5. Fechos core/policy/tools: **E06-T02/T03/T12**, **E07-T02/T03**, **E01-T07**, **E19-T04/T06** — ✅; faltam **E06-T07** (rotação gated), **E03-T06/T07** (bloqueados em E03-T02), a iteração de densidade colunar (§3.4) e a integração de `read.diff`/CLI.
+5. Fechos core/policy/tools: **E06-T02/T03/T12**, **E07-T02/T03**, **E01-T07**, **E19-T04/T06** — ✅; faltam **E06-T07** (rotação gated), **E03-T03/T04/T06/T07** (wiring do kernel e gate de *swap*), a iteração de densidade colunar (§3.4) e a integração de `read.diff`/CLI.
 
 ## 5. Regras que não se quebram
 

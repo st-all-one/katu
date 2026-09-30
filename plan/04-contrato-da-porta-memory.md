@@ -112,13 +112,18 @@ pub enum MemoryErrorKind { Unavailable, Timeout, Invalid, Internal }
 - **Aceite:** `xtask check-layers` falha se `knudge-core` aparecer fora do módulo do adaptador
   (`katu/src/memory/`); nenhum tipo do knudge na API pública.
 
-### E03-T02 ☐ Adaptador in-process (primário, no binário)
-- **Entregáveis:** no binário `katu` (`src/memory/`): dependência `knudge-core = "0.5"` (v0.5.2) ou
-  git-dep pinada; feature `memory-in-process`; montagem via fachada `KnudgeBuilder` (adaptadores
-  `std` + `Project` + config); tradução de tipos katu ↔ knudge com proptest de round-trip; `behavior.strict` fixado (avisos *soft* do knudge promovidos a erro); sem perda
-  silenciosa (lacunas explícitas `None`, §15.3).
-- **Aceite:** o adaptador cumpre a suíte de conformidade; nenhum tipo do knudge vaza para a API
-  pública; `cargo tree` mostra `knudge-core` **apenas** em `katu/src/memory/`.
+### E03-T02 ☑ Adaptador in-process (primário, no binário)
+- **Entregáveis:** no binário `katu` (`src/memory/`): dependência `knudge-core` (path do submódulo,
+  feature `memory-in-process`, **default**); fachada `Knudge` protegida por `Mutex` (é `!Sync`) com
+  cache de índice/grafo invalidado em cada escrita; tradução de tipos katu ↔ knudge
+  (`memory/translate.rs`); `behavior.strict` fixado na abertura (avisos *soft* promovidos a erro
+  no `recall`).
+- **Estado:** implementado em `crates/katu/src/memory/{mod,translate,tests}.rs`; a suíte de
+  conformidade (`katu_core::memory::assert_contract`) corre contra o adaptador; `doctor --json`
+  expõe `memory.status()` (`backend = knudge-in-process`). A seleção por feature e o teste de
+  *swap* ficam em E03-T03/T06.
+- **Aceite:** nenhum tipo do knudge vaza para a API pública; `cargo tree` mostra `knudge-core`
+  **apenas** em `katu/src/memory/`.
 
 ### E03-T03 ☐ Construtor à moda `build_with_transport()`
 - **Entregáveis:** `build_with_memory(adapter)` (molde do `HttpTransport` do open-mtr, §16);
@@ -136,9 +141,8 @@ pub enum MemoryErrorKind { Unavailable, Timeout, Invalid, Internal }
 - **Entregáveis:** `FakeMemory` com cenários (`Create`/`Merge`/`Reject`) e scores fixos; suíte de
   conformidade do contrato.
 - **Estado:** `FakeMemory` feito (`memory::fake`, com `rejecting`/`failing`/`with_hits` e falha
-  injetável). A suíte de conformidade `memory::assert_contract` (E03-T05) corre contra o fake e
-  fica pronta para o adaptador in-process (E03-T02) e o futuro MCP (E08). **Falta** correr a suíte
-  contra o adaptador in-process (bloqueado por E03-T02, que precisa do `knudge-core`).
+  injetável). A suíte de conformidade `memory::assert_contract` (E03-T05) corre contra o fake **e**
+  contra o adaptador in-process (E03-T02, provado em `katu/src/memory/tests.rs`).
 - **Aceite:** a suíte passa com o fake **e** com o adaptador in-process; fica pronta para reuso
   pelo futuro adaptador MCP (E08), testando paridade entre backends (§16.6).
 

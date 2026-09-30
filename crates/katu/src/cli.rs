@@ -55,11 +55,36 @@ pub(crate) fn execute(cli: &Cli) -> Report {
     }
 }
 
-/// Diagnóstico de arranque: portas, instrumentação e MSRV efetivo.
+/// Diagnóstico de arranque: portas, instrumentação, MSRV efetivo e memória.
 fn doctor() -> Report {
-    let data: Value = json!({
+    let mut data: Value = json!({
         "instrumented": diag::enabled(),
         "rust_version": env!("CARGO_PKG_RUST_VERSION"),
     });
+    #[cfg(feature = "memory-in-process")]
+    if let Some(object) = data.as_object_mut() {
+        object.insert("memory".to_string(), memory_status());
+    }
     Report::ok(Command::Doctor.name(), Some(data))
+}
+
+/// Estado do backend de memória (adaptador in-process do knudge, E03-T07).
+#[cfg(feature = "memory-in-process")]
+fn memory_status() -> Value {
+    use crate::memory::KnudgeMemory;
+    use katu_core::memory::Memory;
+
+    let root = std::env::current_dir().unwrap_or_default();
+    match KnudgeMemory::open(&root) {
+        Ok(memory) => match memory.status() {
+            Ok(status) => json!({
+                "backend": status.backend,
+                "health": format!("{:?}", status.health),
+                "warnings": status.warnings,
+                "knowledge_dir": memory.knowledge_dir().display().to_string(),
+            }),
+            Err(error) => json!({ "error": error.to_string() }),
+        },
+        Err(error) => json!({ "error": error.to_string() }),
+    }
 }

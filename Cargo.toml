@@ -1,5 +1,7 @@
 [workspace]
 resolver = "2"
+# `crates/knudge` é um workspace à parte (submódulo); não herda as deps daqui.
+exclude = ["crates/knudge"]
 members = [
     "crates/katu-core",
     "crates/katu-policy",

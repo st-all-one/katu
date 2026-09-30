@@ -14,6 +14,9 @@ mod cli;
 #[cfg(feature = "profile")]
 mod diag;
 
+#[cfg(feature = "memory-in-process")]
+mod memory;
+
 #[allow(dead_code, reason = "adaptadores ligados ao kernel em E04")]
 mod ports;
 
