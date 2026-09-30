@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use super::bin;
+use super::bloom::Bloom;
 use super::codec;
 use super::index::{Index, Query};
 use super::record::{self, AuditRecord};
@@ -149,13 +151,14 @@ impl<'a> AuditStore<'a> {
             "events" => self.buffer.len(),
         );
         let index = Index::build(&self.buffer);
+        let bloom = Bloom::from_terms(index.postings().keys().map(String::as_str));
         let name = format!("seg-{:06}", self.manifest.next);
         let rec = emit(&[Section::Rows(record::table(&self.buffer))]);
-        let idx = emit(&[Section::Rows(codec::index_table(&index))]);
+        let idx = bin::encode(&index, &bloom);
         let rec_path = self.dir.join(format!("{name}.rec"));
         self.fs.write_atomic(&rec_path, rec.as_bytes())?;
         let idx_path = self.dir.join(format!("{name}.idx"));
-        self.fs.write_atomic(&idx_path, idx.as_bytes())?;
+        self.fs.write_atomic(&idx_path, &idx)?;
         let from = self.buffer.first().map_or(0, |record| record.seq);
         let to = self.buffer.last().map_or(0, |record| record.seq);
         let events = u64::try_from(self.buffer.len()).unwrap_or(u64::MAX);
@@ -179,10 +182,17 @@ impl<'a> AuditStore<'a> {
         let _span = crate::span!(Level::Debug, events::AUDIT_QUERY);
         let mut hits = Vec::new();
         for info in self.manifest.segments.iter().rev() {
+            let (index, bloom) = if let Some(stored) = self.read_index(&info.name)? {
+                stored
+            } else {
+                let index = Index::build(&self.read_records(&info.name)?);
+                let bloom = Bloom::from_terms(index.postings().keys().map(String::as_str));
+                (index, bloom)
+            };
+            if !might_match(&bloom, query) {
+                continue;
+            }
             let records = self.read_records(&info.name)?;
-            let index = self
-                .read_index(&info.name)?
-                .unwrap_or_else(|| Index::build(&records));
             let mut lines: Vec<u32> = Vec::new();
             for group in &query.groups {
                 lines.extend(index.matches(&records, group));
@@ -208,14 +218,28 @@ impl<'a> AuditStore<'a> {
     }
 
     /// Lê o índice derivado (ausente → `None`; o chamador reconstrói).
-    fn read_index(&self, name: &str) -> Result<Option<Index>, AuditError> {
+    fn read_index(&self, name: &str) -> Result<Option<StoredIndex>, AuditError> {
         let path = self.dir.join(format!("{name}.idx"));
         if !self.fs.exists(&path) {
             return Ok(None);
         }
-        let text = codec::read_text(self.fs, &path)?;
-        Ok(Some(codec::parse_index(&codec::parse_rows(&text, "t"))))
+        Ok(bin::decode(&self.fs.read(&path)?))
     }
+}
+
+/// Índice + Bloom lidos de um segmento.
+type StoredIndex = (Index, Bloom);
+
+/// `true` se algum grupo da consulta pode existir no segmento (o Bloom só prova ausência).
+fn might_match(bloom: &Bloom, query: &Query) -> bool {
+    query.groups.is_empty()
+        || query.groups.iter().any(|group| {
+            group.terms.iter().all(|term| bloom.might_contain(term))
+                && group
+                    .phrases
+                    .iter()
+                    .all(|phrase| phrase.first().is_none_or(|word| bloom.might_contain(word)))
+        })
 }
 
 fn hit(seg: &str, ln: u32, record: &AuditRecord) -> Hit {

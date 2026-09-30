@@ -1,16 +1,13 @@
-//! Codificação/parse dos artefactos de auditoria: manifesto, tabela `a` e índice `t`.
+//! Codificação/parse dos artefactos de auditoria: manifesto e tabela `a` (segmento colunar).
 //!
 //! A leitura é uma desserialização mínima do formato colunar (linhas `\x1f` de uma secção `\x1e`),
-//! segura porque as células são sanitizadas (sem `\n`/`\x1f`).
+//! segura porque as células são sanitizadas (sem `\n`/`\x1f`). O índice binário vive em [`super::bin`].
 
-use std::collections::BTreeMap;
 use std::path::Path;
 
-use super::index::{Index, Posting};
 use super::record::AuditRecord;
 use super::store::{AUDIT_SCHEMA_VERSION, AuditError, Manifest};
 use crate::ports::Fs;
-use crate::toon::{Cell, RowTable};
 
 /// Prefixo de secção (Record Separator).
 const RS: char = '\u{1e}';
@@ -45,42 +42,6 @@ pub(super) fn write_manifest(
         serde_json::to_vec(manifest).map_err(|err| AuditError::Manifest(err.to_string()))?;
     fs.write_atomic(&dir.join("manifest.json"), &bytes)?;
     Ok(())
-}
-
-/// Tabela `t` com o índice (termo, campo, linha, posição).
-pub(super) fn index_table(index: &Index) -> RowTable {
-    let mut table = RowTable::new("t");
-    for (term, postings) in index.postings() {
-        for posting in postings {
-            table.push(vec![
-                Cell::text(term.clone()),
-                Cell::int(i64::from(posting.field)),
-                Cell::int(i64::from(posting.ln)),
-                Cell::int(i64::from(posting.pos)),
-            ]);
-        }
-    }
-    table
-}
-
-/// Reconstrói o índice a partir das linhas da tabela `t`.
-pub(super) fn parse_index(rows: &[Vec<String>]) -> Index {
-    let mut postings: BTreeMap<String, Vec<Posting>> = BTreeMap::new();
-    for row in rows {
-        let (Some(term), Some(field), Some(ln), Some(pos)) = (
-            row.first(),
-            row.get(1).and_then(|value| value.parse::<u8>().ok()),
-            row.get(2).and_then(|value| value.parse::<u32>().ok()),
-            row.get(3).and_then(|value| value.parse::<u32>().ok()),
-        ) else {
-            continue;
-        };
-        postings
-            .entry(term.clone())
-            .or_default()
-            .push(Posting { field, ln, pos });
-    }
-    Index::from_postings(postings)
 }
 
 /// Reconstrói uma linha de auditoria a partir da tabela `a`.

@@ -18,12 +18,14 @@
     reason = "binário: sem API externa; os módulos internos usam pub(crate)"
 )]
 
+mod audit_bench;
 mod bench;
 mod diag;
 mod docs;
 mod ledger;
 mod policy;
 mod schemas;
+mod session_bench;
 #[cfg(feature = "tokenizer")]
 mod toon_bench;
 mod walk;
@@ -62,11 +64,19 @@ fn main() -> ExitCode {
         Some("gate:bench") => bench::gate_bench(&rest),
         Some("policy:audit") => policy::policy_audit(&rest),
         Some("ledger:validate") => ledger::ledger_validate(&rest),
+        Some("bench-audit") => {
+            audit_bench::run();
+            Ok(())
+        }
+        Some("bench-resume") => {
+            session_bench::run();
+            Ok(())
+        }
         #[cfg(feature = "tokenizer")]
         Some("bench-toon") => toon_bench::run(),
         Some(other) => Err(format!("tarefa desconhecida: {other}")),
         None => Err(
-            "uso: xtask <check-layers|check-crate-coverage|check-diag|check-schemas|check-docs|gate:bench|policy:audit|ledger:validate>"
+            "uso: xtask <check-layers|check-crate-coverage|check-diag|check-schemas|check-docs|gate:bench|policy:audit|ledger:validate|bench-audit|bench-resume>"
                 .to_string(),
         ),
     };

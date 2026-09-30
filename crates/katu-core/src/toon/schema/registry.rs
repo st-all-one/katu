@@ -104,11 +104,6 @@ pub(super) const REGISTRY: &[TableSpec] = &[
         ],
     },
     TableSpec {
-        name: "t",
-        mode: Mode::Rows,
-        cols: &[free("term"), free("field"), free("ln"), free("pos")],
-    },
-    TableSpec {
         name: "symbols",
         mode: Mode::Rows,
         cols: &[

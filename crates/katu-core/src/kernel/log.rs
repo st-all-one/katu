@@ -67,6 +67,7 @@ pub struct Log<'a> {
     fs: &'a dyn Fs,
     path: PathBuf,
     seq: u64,
+    offset: u64,
 }
 
 impl<'a> Log<'a> {
@@ -76,9 +77,24 @@ impl<'a> Log<'a> {
     /// [`LogError`] se o log existente estiver corrompido.
     pub fn open(fs: &'a dyn Fs, dir: &Path) -> Result<Self, LogError> {
         let path = session_path(dir);
-        let records = read_records(fs, &path)?;
+        let (records, len) = read_records_with_len(fs, &path)?;
         let seq = records.last().map_or(0, |record| record.seq);
-        Ok(Self { fs, path, seq })
+        Ok(Self {
+            fs,
+            path,
+            seq,
+            offset: u64::try_from(len).unwrap_or(u64::MAX),
+        })
+    }
+
+    /// Retoma o log a partir dos valores já conhecidos (sem reler o ficheiro — ADR 0008).
+    pub(crate) fn resume(fs: &'a dyn Fs, dir: &Path, seq: u64, offset: u64) -> Self {
+        Self {
+            fs,
+            path: session_path(dir),
+            seq,
+            offset,
+        }
     }
 
     /// Caminho do ficheiro de log.
@@ -91,6 +107,12 @@ impl<'a> Log<'a> {
     #[must_use]
     pub fn seq(&self) -> u64 {
         self.seq
+    }
+
+    /// Offset (bytes) do início da próxima linha.
+    #[must_use]
+    pub fn offset(&self) -> u64 {
+        self.offset
     }
 
     /// Anexa um evento e devolve o `seq` atribuído.
@@ -109,6 +131,9 @@ impl<'a> Log<'a> {
         line.push(b'\n');
         self.fs.append(&self.path, &line).map_err(from_io)?;
         self.seq = seq;
+        self.offset = self
+            .offset
+            .saturating_add(u64::try_from(line.len()).unwrap_or(u64::MAX));
         Ok(seq)
     }
 }
@@ -118,15 +143,47 @@ impl<'a> Log<'a> {
 /// # Errors
 /// [`LogError`] se o ficheiro não for UTF-8, tiver uma linha ilegível ou um salto de `seq`.
 pub fn read_records(fs: &dyn Fs, path: &Path) -> Result<Vec<LogRecord>, LogError> {
+    read_records_with_len(fs, path).map(|(records, _)| records)
+}
+
+/// Lê todos os registos e devolve também o tamanho (bytes) do ficheiro.
+pub(super) fn read_records_with_len(
+    fs: &dyn Fs,
+    path: &Path,
+) -> Result<(Vec<LogRecord>, usize), LogError> {
     let _span = crate::span!(Level::Trace, events::LOG_REPLAY);
     if !fs.exists(path) {
-        return Ok(Vec::new());
+        return Ok((Vec::new(), 0));
     }
     let bytes = fs.read(path).map_err(from_io)?;
-    let text = String::from_utf8(bytes)
+    let len = bytes.len();
+    Ok((parse_records(&bytes, 1)?, len))
+}
+
+/// Lê só a cauda a partir de `offset` (retomada incremental, ADR 0008) e devolve o tamanho total.
+///
+/// # Errors
+/// [`LogError`] se o ficheiro não for UTF-8 ou a cauda tiver uma linha ilegível/salto de `seq`.
+pub(super) fn read_records_from(
+    fs: &dyn Fs,
+    path: &Path,
+    offset: u64,
+    first_seq: u64,
+) -> Result<(Vec<LogRecord>, usize), LogError> {
+    let _span = crate::span!(Level::Trace, events::LOG_REPLAY);
+    let tail = fs.read_from(path, offset).map_err(from_io)?;
+    let len = usize::try_from(offset)
+        .unwrap_or(usize::MAX)
+        .saturating_add(tail.len());
+    Ok((parse_records(&tail, first_seq)?, len))
+}
+
+/// Valida e desserializa as linhas de um log, exigindo `seq` contíguo desde `first_seq`.
+fn parse_records(bytes: &[u8], first_seq: u64) -> Result<Vec<LogRecord>, LogError> {
+    let text = std::str::from_utf8(bytes)
         .map_err(|err| LogError::new(LogErrorKind::Corrupt, format!("log não é UTF-8: {err}")))?;
     let mut records = Vec::new();
-    let mut expected: u64 = 1;
+    let mut expected = first_seq;
     for line in text.lines() {
         if line.trim().is_empty() {
             continue;
@@ -156,120 +213,4 @@ fn from_io(err: FsError) -> LogError {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{Log, LogErrorKind, read_records, session_path};
-    use crate::error::ToolOutcome;
-    use crate::kernel::{CallId, Event, derive_messages, state_of};
-    use crate::ports::{Fs, MemFs};
-    use katu_policy::{Phase, ResolvedPath, ToolArgs, ToolName, ToolUse};
-    use std::path::Path;
-
-    #[test]
-    fn append_then_read_round_trips() -> Result<(), Box<dyn std::error::Error>> {
-        let fs = MemFs::new();
-        let mut log = Log::open(&fs, Path::new("/sessions"))?;
-        assert_eq!(log.seq(), 0);
-        assert_eq!(log.append(&Event::TurnStart { turn: 1 })?, 1);
-        assert_eq!(log.append(&Event::TurnEnd { turn: 1 })?, 2);
-
-        let records = read_records(&fs, log.path())?;
-        assert_eq!(records.len(), 2);
-        assert_eq!(records.first().map(|record| record.seq), Some(1));
-        assert_eq!(records.get(1).map(|record| record.seq), Some(2));
-        Ok(())
-    }
-
-    #[test]
-    fn reopen_resumes_sequence() -> Result<(), Box<dyn std::error::Error>> {
-        let fs = MemFs::new();
-        let dir = Path::new("/sessions");
-        {
-            let mut log = Log::open(&fs, dir)?;
-            log.append(&Event::TurnStart { turn: 1 })?;
-        }
-        let mut reopened = Log::open(&fs, dir)?;
-        assert_eq!(reopened.seq(), 1);
-        assert_eq!(reopened.append(&Event::TurnEnd { turn: 1 })?, 2);
-        Ok(())
-    }
-
-    #[test]
-    fn sequence_gap_is_detected() -> Result<(), Box<dyn std::error::Error>> {
-        let fs = MemFs::new();
-        let path = session_path(Path::new("/sessions"));
-        let line = b"{\"seq\":1,\"event\":{\"type\":\"turn_start\",\"turn\":1}}\n\
-                     {\"seq\":3,\"event\":{\"type\":\"turn_end\",\"turn\":1}}\n";
-        fs.write_atomic(&path, line)?;
-        let err = read_records(&fs, &path).err();
-        assert!(err.is_some_and(|error| error.kind == LogErrorKind::SequenceGap));
-        Ok(())
-    }
-
-    #[test]
-    fn corrupt_line_is_detected() -> Result<(), Box<dyn std::error::Error>> {
-        let fs = MemFs::new();
-        let path = session_path(Path::new("/sessions"));
-        fs.write_atomic(&path, b"{nao e json}\n")?;
-        let err = read_records(&fs, &path).err();
-        assert!(err.is_some_and(|error| error.kind == LogErrorKind::Corrupt));
-        Ok(())
-    }
-
-    #[test]
-    fn replay_from_log_is_byte_stable() -> Result<(), Box<dyn std::error::Error>> {
-        let fs = MemFs::new();
-        let dir = Path::new("/sessions");
-        let call = CallId::new("c1");
-        let events = vec![
-            Event::TurnStart { turn: 7 },
-            Event::UserMessage {
-                text: "escreve".into(),
-            },
-            Event::ToolCall {
-                call: call.clone(),
-                tool: tool()?,
-            },
-            Event::ToolResult {
-                call,
-                outcome: ToolOutcome::Ok,
-            },
-            Event::Waiver {
-                transition: Phase::KnowledgeConsulted,
-                reason: "teste do log".into(),
-            },
-            Event::PhaseTransition {
-                to: Phase::KnowledgeConsulted,
-                outcome: None,
-            },
-            Event::TurnEnd { turn: 7 },
-        ];
-        {
-            let mut log = Log::open(&fs, dir)?;
-            for event in &events {
-                log.append(event)?;
-            }
-        }
-        let recovered: Vec<Event> = read_records(&fs, &session_path(dir))?
-            .into_iter()
-            .map(|record| record.event)
-            .collect();
-        assert_eq!(recovered, events, "o log deve reidratar byte-a-byte");
-        assert_eq!(state_of(&recovered)?, state_of(&events)?);
-        assert_eq!(derive_messages(&recovered), derive_messages(&events));
-        Ok(())
-    }
-
-    fn tool() -> Result<ToolUse, katu_policy::PolicyError> {
-        let path = ResolvedPath::from_canonical("/work/src/main.rs")?;
-        Ok(ToolUse {
-            name: ToolName::Write,
-            args: ToolArgs::Write {
-                path: path.clone(),
-                bytes: 1,
-            },
-            resolved_paths: vec![path.clone()],
-            argv: None,
-            cwd: path,
-        })
-    }
-}
+mod tests;

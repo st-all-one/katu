@@ -78,6 +78,9 @@ impl<'a> Session<'a> {
         let snapshot = StateSnapshot {
             schema_version: SNAPSHOT_SCHEMA_VERSION,
             seq: self.log.seq(),
+            offset: self.log.offset(),
+            budget: self.cost.global().usage(),
+            per_tool: self.cost.per_tool_used().clone(),
             state: self.state.clone(),
         };
         super::snapshot::save(self.fs, &self.dir, &snapshot)?;

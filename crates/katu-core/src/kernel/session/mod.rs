@@ -6,10 +6,10 @@
 
 use std::path::{Path, PathBuf};
 
-use super::budget::{BudgetCap, BudgetGate};
+use super::budget::{Budget, BudgetCap, BudgetGate};
 use super::cost::{CostCaps, CostGovernor, cost_charge_for};
 use super::event::{CallId, Event};
-use super::log::{Log, read_records, session_path};
+use super::log::{Log, read_records_from, read_records_with_len, session_path};
 use super::memory_gate::{MemoryWriteRequest, enforce_memory_write, memory_write_use};
 use super::pipeline::{Dispatch, dispatch};
 use super::state::State;
@@ -77,26 +77,42 @@ impl<'a> Session<'a> {
         dir: &Path,
         caps: CostCaps,
     ) -> Result<Self, SessionError> {
-        let records = read_records(fs, &session_path(dir))?;
+        let path = session_path(dir);
         let meta = identity::load_meta(fs, dir);
         let root = meta
             .as_ref()
             .map_or_else(|| dir.to_path_buf(), |meta| PathBuf::from(&meta.root));
-        let last_seq = records.last().map_or(0, |record| record.seq);
-        let (mut state, start_seq) = snapshot::load(fs, dir)
-            .filter(|snapshot| snapshot.seq <= last_seq)
-            .map_or_else(
-                || (State::initial(), 0),
-                |snapshot| (snapshot.state, snapshot.seq),
-            );
+        let snapshot = snapshot::load(fs, dir);
+        let snapshot_seq = snapshot.as_ref().map_or(0, |snapshot| snapshot.seq);
+        // Só lê a cauda depois do snapshot (ADR 0008); qualquer desalinhamento cai no replay total.
+        let tail = snapshot.as_ref().and_then(|snapshot| {
+            (snapshot.offset > 0)
+                .then(|| {
+                    read_records_from(fs, &path, snapshot.offset, snapshot.seq.saturating_add(1))
+                })
+                .and_then(Result::ok)
+        });
+        let (mut state, mut cost, records, total) =
+            if let (Some(snapshot), Some((records, len))) = (snapshot, tail) {
+                let cost = CostGovernor::with_usage(caps, snapshot.budget, snapshot.per_tool);
+                (snapshot.state, cost, records, len)
+            } else {
+                let (records, len) = read_records_with_len(fs, &path)?;
+                (
+                    State::initial(),
+                    CostGovernor::new(caps, Budget::ZERO),
+                    records,
+                    len,
+                )
+            };
         for record in &records {
-            if record.seq > start_seq {
-                state = step(&state, &record.event)?;
+            state = step(&state, &record.event)?;
+            if let Some(charge) = cost_charge_for(&record.event) {
+                cost.commit(&charge);
             }
         }
-        let all: Vec<Event> = records.into_iter().map(|record| record.event).collect();
-        let cost = CostGovernor::from_events(caps, &all);
-        let log = Log::open(fs, dir)?;
+        let last_seq = records.last().map_or(snapshot_seq, |record| record.seq);
+        let log = Log::resume(fs, dir, last_seq, u64::try_from(total).unwrap_or(u64::MAX));
         Ok(Self {
             fs,
             dir: dir.to_path_buf(),

@@ -2,7 +2,7 @@
 //! E07-T04).
 
 use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::UNIX_EPOCH;
@@ -23,6 +23,17 @@ impl Fs for StdFs {
     fn read(&self, path: &Path) -> Result<Vec<u8>, FsError> {
         let _span = katu_core::span!(Level::Trace, events::FS_READ);
         fs::read(path).map_err(|err| FsError::from_io(&err))
+    }
+
+    fn read_from(&self, path: &Path, offset: u64) -> Result<Vec<u8>, FsError> {
+        let _span = katu_core::span!(Level::Trace, events::FS_READ);
+        let mut file = fs::File::open(path).map_err(|err| FsError::from_io(&err))?;
+        file.seek(SeekFrom::Start(offset))
+            .map_err(|err| FsError::from_io(&err))?;
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)
+            .map_err(|err| FsError::from_io(&err))?;
+        Ok(bytes)
     }
 
     fn canonicalize(&self, path: &Path) -> Result<PathBuf, FsError> {

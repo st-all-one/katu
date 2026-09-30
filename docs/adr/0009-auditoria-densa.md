@@ -35,17 +35,21 @@ termo. Nada disto cria um segundo motor de retrieval: é o **índice lexical do 
 
 ## Decisão (formato e algoritmo)
 
-1. **Registos — segmentos imutáveis, colunares** (`seg-<NNNN>.rec`):
+1. **Registos — segmentos imutáveis, colunares** (`seg-<NNNNNN>.rec`):
    reutiliza o registo [`toon::schema`](../../crates/katu-core/src/toon/schema.rs). Tabela `a`
-   (uma linha por evento): `seq,ts,kind,tool,path,status,rule,bytes,ms,tok,msg`; conteúdo pesado
-   (`stdout`/`diff`/`statement`/`preview`) em **blocos literais**. Segmento selado a cada `N`
-   eventos **ou** limite de fase, com **hash de conteúdo** (nunca reescrito).
-2. **Índice invertido — colunar na v1, delta+varint/Bloom como densificação medida**:
-   - por segmento, uma tabela `t` colunar com `term,field,ln,pos` (uma linha por ocorrência);
-   - os postings são ordenados por `(term, field, ln, pos)` e a leitura reconstrói o mapa;
-   - **fase seguinte (gated por A/B):** delta+varint binário e um *Bloom* por segmento para evitar
-     abrir segmentos sem o termo — só se moverem o ponteiro de bytes/evento;
-   - determinístico (`BTreeMap`), sem `HashMap` iterado.
+   (uma linha por evento): `seq,kind,tool,path,status,rule,text`; o `text` é um excerto limitado
+   (`MAX_TEXT_BYTES`) e o corpo integral fica no log. Segmento selado a cada `SEGMENT_EVENTS`
+   eventos (256) e **nunca reescrito**.
+2. **Índice invertido — binário `KAI1` (delta+varint) + Bloom por segmento** (adotado por A/B):
+   - `seg-<NNNNNN>.idx`: magic `KAI1`, `bloom_len` varint, bits do Bloom, `term_count` varint e,
+     por termo (ordem canónica), `term_len`+bytes, `count` e postings com `field` (u8), `ln` em
+     **delta** e `pos` absoluto, ambos varint LEB128;
+   - **Bloom** (4 hashes FNV-1a, ≈10 bits/termo) por segmento: a consulta **não abre** um segmento
+     quando um termo obrigatório está garantidamente ausente (sem falsos negativos);
+   - **A/B (DF5, dev-only)**: índice binário **76–79% menor** que a tabela `t` colunar
+     (100k eventos: 4,85 MB vs 23,9 MB) e `decode` ~8× mais rápido que `Index::build`
+     (0,29 s vs 2,4 s a 100k) — `cargo run -p xtask -- bench-audit`;
+   - determinístico (`BTreeMap`), sem `HashMap` iterado e sem RNG.
 3. **Manifesto** (`manifest.json`): `{schema, segments:[{id,from,to,events,rec_hash,idx_hash}],
    terms}`. É a raiz para `is_fresh`/`rebuild`.
 4. **Consulta**: termos e frases; `AND`/`OR`; filtros `kind:`/`tool:`/`phase:`/`path:<glob>`;
@@ -72,11 +76,13 @@ termo. Nada disto cria um segundo motor de retrieval: é o **índice lexical do 
 
 ## Consequências
 
-- **Positivas:** consulta em `O(candidatos)`; frase/campos/filtros; densidade colunar; índice
-  reconstruível; completude estrutural sob compactação; nada versionado.
-- **Negativas/dívida:** a v1 usa postings colunares (não comprimidos); medir delta+varint/Bloom
-  antes de adotar; o índice tem de ser validado (`is_fresh`) e reconstruído quando o formato muda.
-- **Medição (DF5):** bytes/evento (colunar vs JSONL), latência p50/p95 de consulta a 1k/10k/100k
-  eventos, custo de `rebuild`, e bytes do índice por evento — via `xtask` (dev-only).
+- **Positivas:** consulta em `O(candidatos)`; frase/campos/filtros; densidade colunar; **índice
+  binário 76–79% menor** e leitura offline do Bloom; reconstruível; completude estrutural sob
+  compactação; nada versionado.
+- **Negativas/dívida:** o índice tem de ser validado (`is_fresh`) e reconstruído quando o formato
+  muda; o `manifest.json` ainda não guarda `rec_hash`/`idx_hash` (selagem é a ordem do manifesto).
+- **Medição (DF5):** `bench-audit` mede bytes (colunar `t` vs binário) e o custo de
+  `build`/`encode`/`decode` a 1k/10k/100k eventos (números acima); a latência p50/p95 de consulta
+  com/sem Bloom fica para o próximo A/B.
 - **Travas:** testes de segmento/índice/consulta (determinismo, frase, filtros, rebuild),
   `check-layers` (sem dependência de provider) e `check-diag`.
