@@ -32,6 +32,7 @@ const PATTERNS: &[(&str, &str)] = &[
     ("/<comando>", "comando da UI"),
     ("!<cmd>", "shell pela política (bloqueado em /plan)"),
     ("@<path>", "cita um caminho (só o caminho)"),
+    ("/skill:<nome>", "força o carregamento de uma skill"),
 ];
 
 /// Teclas.

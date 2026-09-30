@@ -6,12 +6,10 @@
 use serde_json::{Value, json};
 
 use super::KnudgeMemory;
-use crate::ports::{StdFs, SystemClock};
 use crate::report::Report;
-use crate::runtime::{Runtime, RuntimeError};
+use crate::runtime::RuntimeError;
 use katu_core::error::Error;
-use katu_core::kernel::Dispatch;
-use katu_core::memory::Memory;
+use katu_core::memory::{Anchor, Memory, NoteRef, QueryHit, QueryOutcome, QueryReq, QueryResult};
 
 /// Estado do backend de memória (adaptador in-process do knudge, E03-T07).
 pub(crate) fn memory_status() -> Value {
@@ -27,22 +25,6 @@ pub(crate) fn memory_status() -> Value {
             Err(error) => json!({ "error": error.to_string() }),
         },
         Err(error) => json!({ "error": error.to_string() }),
-    }
-}
-
-/// Comando `memo ask`: monta o runtime e consulta a memória pelo caminho §42.
-pub(crate) fn memory_recall(query: &str, limit: usize) -> Report {
-    let fs = StdFs;
-    let clock = SystemClock;
-    let start = std::env::current_dir().unwrap_or_default();
-    let mut runtime = match Runtime::open(&fs, &clock, &start, "cli: recall") {
-        Ok(runtime) => runtime,
-        Err(error) => return runtime_failure("recall", error),
-    };
-    let project = runtime.root().display().to_string();
-    match runtime.recall(query, limit) {
-        Ok(dispatch) => Report::ok("memo.ask", Some(dispatch_value(&project, &dispatch))),
-        Err(error) => runtime_failure("recall", error),
     }
 }
 
@@ -74,23 +56,67 @@ pub(crate) fn memory_drain(force: bool) -> Report {
     }
 }
 
+/// Comando `memo ask`/`memo knowledge`: consulta rica pelo adaptador (E20-T06).
+///
+/// Read-only (não escreve memória); sem o adaptador, recusa (fail-closed).
+pub(crate) fn memory_query(command: &'static str, req: &QueryReq) -> Report {
+    let root = std::env::current_dir().unwrap_or_default();
+    match KnudgeMemory::open(&root) {
+        Ok(memory) => match memory.query(req) {
+            Ok(result) => Report::ok(command, Some(query_value(&result))),
+            Err(error) => runtime_failure(command, RuntimeError::Memory(error)),
+        },
+        Err(error) => runtime_failure(command, RuntimeError::Memory(error)),
+    }
+}
+
+/// Envelope de uma consulta rica (forma + avisos).
+fn query_value(result: &QueryResult) -> Value {
+    let outcome = match &result.outcome {
+        QueryOutcome::Hits(hits) => json!({
+            "kind": "hits",
+            "hits": hits.iter().map(hit_value).collect::<Vec<_>>(),
+        }),
+        QueryOutcome::Tags(tags) => json!({
+            "kind": "tags",
+            "tags": tags.iter().map(|tag| json!({"tag": tag.tag, "count": tag.count})).collect::<Vec<_>>(),
+        }),
+        QueryOutcome::Suggestions(items) => json!({
+            "kind": "suggestions",
+            "suggestions": items.iter().map(|item| json!({
+                "relation": item.relation,
+                "from": item.from.as_str(),
+                "to": item.to.as_str(),
+                "score": item.score.as_basis_points(),
+            })).collect::<Vec<_>>(),
+        }),
+        QueryOutcome::Clusters(clusters) => json!({
+            "kind": "clusters",
+            "clusters": clusters.iter().map(|cluster| json!({
+                "axis": cluster.axis,
+                "key": cluster.key,
+                "members": cluster.members.iter().map(NoteRef::as_str).collect::<Vec<_>>(),
+            })).collect::<Vec<_>>(),
+        }),
+        _ => json!({ "kind": "unknown" }),
+    };
+    json!({ "outcome": outcome, "warnings": result.warnings })
+}
+
+/// Um hit como JSON.
+fn hit_value(hit: &QueryHit) -> Value {
+    json!({
+        "note": hit.note.as_str(),
+        "statement": hit.statement,
+        "score": hit.score.as_basis_points(),
+        "basis": hit.basis.as_str(),
+        "anchor": hit.anchor.as_ref().map(Anchor::as_str),
+        "body": hit.body,
+    })
+}
+
 /// Converte a falha do runtime na taxonomia estável de erro do katu.
 fn runtime_failure(command: &'static str, error: RuntimeError) -> Report {
     let core: Error = error.into();
     Report::failed(command, &core)
-}
-
-/// Envelope de dados de um `Dispatch` (resultado + relatório TOON projetado para JSON).
-fn dispatch_value(project: &str, dispatch: &Dispatch) -> Value {
-    let report = dispatch
-        .report()
-        .and_then(|report| report.to_json().ok())
-        .and_then(|text| serde_json::from_str::<Value>(&text).ok())
-        .unwrap_or(Value::Null);
-    json!({
-        "project": project,
-        "ran": dispatch.ran(),
-        "outcome": format!("{:?}", dispatch.outcome()),
-        "report": report,
-    })
 }

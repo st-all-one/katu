@@ -33,12 +33,6 @@ impl Runtime<'_> {
         self.instructions.as_deref()
     }
 
-    /// Skills descobertas no arranque (E20-T13).
-    #[must_use]
-    pub(crate) fn skills(&self) -> &[Skill] {
-        &self.skills
-    }
-
     /// Skill pelo nome (E20-T13).
     #[must_use]
     pub(crate) fn skill(&self, name: &str) -> Option<&Skill> {

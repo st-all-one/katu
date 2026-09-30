@@ -58,3 +58,43 @@ fn system_for(
     }
     (!system.is_empty()).then_some(system)
 }
+
+#[cfg(test)]
+mod tests {
+    use katu_core::context::Context;
+    use katu_core::provider::ModelSpec;
+
+    use super::system_for;
+    use crate::agent::TurnOptions;
+
+    fn options() -> TurnOptions {
+        TurnOptions {
+            model: ModelSpec::new("m"),
+            system: Some("instrução".to_string()),
+            max_tokens: 16,
+            temperature: 0.0,
+            max_steps: 1,
+        }
+    }
+
+    fn context() -> Context {
+        Context {
+            prime: "prime".to_string(),
+            summary: None,
+            messages: Vec::new(),
+            raw_tokens: 0,
+            tokens: 0,
+        }
+    }
+
+    #[test]
+    fn agents_md_leads_the_system_prompt() {
+        let system = system_for(&options(), &context(), Some("regra máxima"), "skills: rust")
+            .unwrap_or_default();
+        assert!(system.starts_with("# AGENTS.md"), "{system}");
+        let agents = system.find("regra máxima");
+        let instruction = system.find("instrução");
+        assert!(agents < instruction, "AGENTS.md vem primeiro: {system}");
+        assert!(system.contains("skills: rust"), "{system}");
+    }
+}

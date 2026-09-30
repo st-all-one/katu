@@ -49,6 +49,18 @@ impl Thinking {
             Self::High => "high",
         }
     }
+
+    /// Interpreta um grau pelo nome estável (`off`/`low`/`medium`/`high`).
+    #[must_use]
+    pub fn parse(raw: &str) -> Option<Self> {
+        match raw {
+            "off" => Some(Self::Off),
+            "low" => Some(Self::Low),
+            "medium" => Some(Self::Medium),
+            "high" => Some(Self::High),
+            _ => None,
+        }
+    }
 }
 
 /// Modelo + grau de pensamento de um turno.

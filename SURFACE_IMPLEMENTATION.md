@@ -79,17 +79,23 @@ S4  Contexto e IA                T13 · T17
 
 ## 3. Tarefas
 
-### E20-T00 ◐ ADR da superfície v2 + doc de uso
+### E20-T00 ☑ ADR da superfície v2 + doc de uso
 - **Entregáveis:** ADRs 0019–0023 (§4); `docs/CLI_TUI_SURFACE.md` reescrito.
-- **Feito:** ADR 0019 aceite; `docs/CLI_TUI_SURFACE.md` reescrito para a v2. Falta: ADRs 0020–0023.
+- **Feito:** ADRs 0019–0023 aceites; `docs/CLI_TUI_SURFACE.md` reescrito para a v2 (verbos, flags,
+  teclas, `/` e padrões).
 - **Aceite:** ADRs com `## Alternatives considered`; `check-docs` verde; doc de uso descreve cada
   verbo/flag/tecla e o que **espera**.
 
-### E20-T06 ◐ Verbos exclusivos e agrupamento `memo`
+### E20-T06 ☑ Verbos exclusivos e agrupamento `memo`
 - **Feito:** topo = `prime`, `upgrade`, `config`, `memo`, `run`, `tui`; `memo` =
   `ask`/`knowledge`/`doctor`/`sessions`/`drain`/`prime`; verbos antigos → exit 2; `memo` não
-  escreve (`remember`/`memory` removidos). Falta: `knowledge`/`drain` reais (stubs fail-closed) e
-  as flags `kd` completas de `ask`.
+  escreve (`remember`/`memory` removidos). **Paridade `memo`/`kd` (E20-T06):** `memo ask` cobre as
+  flags do `kd ask` (filtros `--type`/`--class`/`--tag`/`--status`/`--scope`/`--anchor`,
+  `--with-task`/`--full-content`/`--brief`, modos `--rank`/`--tags`/`--suggest`, `--id`/`--around`/
+  `--via`/`--depth`, `--limit`/`--top-k`/`--relation`, `--since`/`--until`/`--as-of` aceites) e
+  `memo knowledge` é o **mapa estrutural** real (`--axis`/`--scope`/`--members` + filtros). A porta
+  `Memory` ganhou `query(QueryReq)`. ADR 0023. Adiados: `--semantic`/`--communities`/`--write` do
+  mapa e a reconstrução temporal (`--since`/`--until`/`--as-of` são aceites, semântica adiada).
 - **Entregáveis:** topo = `prime`, `upgrade`, `config`, `memo`, `run`, `tui`; `memo` =
   `ask`/`knowledge`/`doctor`/`sessions`/`drain`/`prime`, **espelhando o `kd`** (flags em §5.1);
   `doctor`/`sessions`/`recall`/`remember`/`memory` deixam de existir no topo (sem
@@ -193,8 +199,9 @@ S4  Contexto e IA                T13 · T17
 - **Aceite:** `--status` não toca no índice; `--digest` esvazia/estagna; `--force` reconstrói;
   `--watch-service` instala e remove o worker; fail-closed sem provider.
 
-### E20-T03 ◐ `katu` sozinho abre a TUI e inicializa o projeto
-- **Feito:** default TUI com `ensure` (bootstrap) e falha fechada sem TTY. Falta: a TUI v2 (S3).
+### E20-T03 ☑ `katu` sozinho abre a TUI e inicializa o projeto
+- **Feito:** default TUI com `ensure` (bootstrap) e falha fechada sem TTY (exit 3); a TUI v2 (S3)
+  está completa (T10–T16), pelo que o último item em falta fechou.
 - **Entregáveis:** comando opcional (default `tui`); bootstrap do `.katu` no arranque
   (T19) + `memo doctor --fix` (T07); se `stdout` não for TTY, falha fechado com erro claro.
 - **Aceite:** `katu` sem verbo abre a UI num TTY; sem TTY devolve erro de I/O (não bloqueia);
@@ -282,21 +289,29 @@ S4  Contexto e IA                T13 · T17
 - **Aceite:** um prompt de steering é aplicado no passo seguinte sem reiniciar a rodada; ordem FIFO;
   testes com provider falso.
 
-### E20-T13 ☐ `AGENTS.md` e skills
+### E20-T13 ☑ `AGENTS.md` e skills
+- **Feito:** o runtime lê `<raiz>/AGENTS.md` no arranque e injeta-o **no topo** do prompt de
+  sistema (`# AGENTS.md (fonte de verdade do projeto)`), antes da instrução e do prime; descobre
+  `.agents/skill{,s}/*/SKILL.md` (`katu_core::skill`) e injeta o catálogo (nome/descrição/caminho);
+  `/skill:<nome>` força o carregamento. Tudo fail-open. ADR 0023. Testes `katu_core::skill::tests`,
+  `runtime::tests::skills`, `agent::turn::request::tests` e `slash_skill_forces_a_load_by_name`.
 - **Entregáveis:** `AGENTS.md` da raiz é a **fonte de verdade máxima** do projeto no contexto;
   `.agents/skill{,s}/*/SKILL.md` são skills acionáveis (descobertas e oferecidas).
 - **Aceite:** o prime/contexto inclui o `AGENTS.md`; uma skill é acionável por nome; ausência não
   quebra o arranque.
 
-### E20-T17 ◐ Padrões globais + embeddings (2 IAs, serviço externo)
-- **Feito:** os padrões de `provider`/`model`/`base`/`behavior.auto_compact`/`recall.default_limit`
-  ligam-se a `run`/`tui`/`memo ask` (flags > `--params` > config > default do comando). Falta: o
-  sistema de embeddings (URL/modelo/comando) e a segunda IA.
+### E20-T17 ☑ Padrões globais + embeddings (2 IAs, serviço externo)
+- **Feito:** os padrões de `provider`/`model`/`base`/`thinking`/`behavior.auto_compact`/
+  `recall.default_limit` ligam-se a `run`/`tui`/`memo ask` (flags > `--params` > config > default do
+  comando); `run`/`tui` ganham `--thinking`. A **segunda IA** (embeddings) projeta-se em runtime na
+  config efetiva do knudge (`embeddings.enabled`/`provider`/`endpoint`/`model`); `url` ausente →
+  `off` (nunca inventa endpoint). `memo doctor` publica o estado. ADR 0023. Testes
+  `run_params::tests`, `memory::drain::tests` e `memory::tests`.
 - **Entregáveis:** config global de provider/modelo/thinking padrão e do sistema de embeddings;
   operação com **duas** IAs (embedding + execução). O embedding reutiliza o modelo recomendado do
   knudge e é **sempre um serviço externo plugável** por config: **URL** (`http://host:porta/v1`)
-  + nome do modelo, com `command` **opcional** para o katu lançar o `llama-server`. Sobrescrevível
-  localmente.
+  + nome do modelo, com `command` **opcional** para o katu lançar o `llama-server` (reservado).
+  Sobrescrevível localmente.
 - **Aceite:** default aplicado quando não há override; endpoint de embedding ausente fica `off`
   (nunca inventado); teste de precedência; nenhuma dependência de rede embutida.
 
@@ -310,7 +325,7 @@ S4  Contexto e IA                T13 · T17
 | **0020** | Configuração global/local (`katu.toml`), precedência e `--params` (XOR flags) |
 | **0021** | `.katu/` como layout central e política de versionamento (default versionado) |
 | **0022** | TUI por comandos `/`, steering linear e modo de planeamento |
-| **0023** | Duas IAs (embedding + execução), serviço externo plugável |
+| **0023** | Contexto do projeto (`AGENTS.md`/skills) e duas IAs (embedding + execução) |
 
 ---
 
@@ -343,11 +358,15 @@ S4  Contexto e IA                T13 · T17
     git-excluded; `--git-excluded` exclui a árvore inteira e `--git-tracked` força o resto.
 11. **Embeddings** — **reutilizar** o knudge (mesmo modelo recomendado, mesmo `llama.cpp`), como
     **serviço externo por URL** (`http://host:porta/v1`) + nome do modelo; opcionalmente `command`
-    para o katu lançar o `llama-server`. Nada de rede embutida.
+    para o katu lançar o `llama-server` (reservado). Nada de rede embutida. **`url` ausente →
+    `off`** (nunca inventado, DF5); a projeção para o knudge é em runtime, sem escrever ficheiros
+    (ADR 0023).
 
 ### TUI e agente
 12. **`prime` não inclui `AGENTS.md`** (mantém-se byte-idêntico); o `AGENTS.md` entra no
-    **contexto do turno** como fonte de verdade máxima.
+    **contexto do turno** como fonte de verdade máxima (topo do prompt de sistema). As skills
+    `.agents/skill{,s}/*/SKILL.md` são **descobertas e oferecidas** (catálogo nome/descrição/
+    caminho) e acionáveis por nome via `/skill:<nome>` (ADR 0023).
 13. **`/plan`** — **estado do runtime** que injeta as regras **Enforced** `plan-write-only-katu`
     (`deny_write_outside`; escrita só sob `.katu/`) e `plan-no-shell` (`deny_command` exec),
     registadas no log (`plan.mode`); o plano é escrito em `.katu/plan/<UTC>.md` (ADR 0022).

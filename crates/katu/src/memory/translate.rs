@@ -2,9 +2,11 @@
 
 use katu_core::memory::{
     Basis, MemoryError, NoteRef, NoteType, PreEditOutcome, PreWriteOutcome, RecallHit, Score,
+    Status,
 };
 use knudge_core::retrieval::RecallHit as KnudgeHit;
 use knudge_core::schema::NoteType as KnudgeNoteType;
+use knudge_core::schema::Status as KnudgeStatus;
 use knudge_core::schema::id::note_id;
 use knudge_core::write::{DedupDecision, Draft};
 
@@ -21,6 +23,34 @@ pub(crate) fn note_type(note_type: NoteType) -> KnudgeNoteType {
         NoteType::Meta => KnudgeNoteType::Meta,
         NoteType::Risk => KnudgeNoteType::Risk,
         _ => KnudgeNoteType::Fact,
+    }
+}
+
+/// Converte o tipo de nota do knudge no do katu.
+pub(crate) fn from_note_type(note_type: KnudgeNoteType) -> NoteType {
+    match note_type {
+        KnudgeNoteType::Fact => NoteType::Fact,
+        KnudgeNoteType::Decision => NoteType::Decision,
+        KnudgeNoteType::Question => NoteType::Question,
+        KnudgeNoteType::Task | KnudgeNoteType::Epic => NoteType::Task,
+        KnudgeNoteType::Def => NoteType::Def,
+        KnudgeNoteType::Error => NoteType::Error,
+        KnudgeNoteType::Snippet => NoteType::Snippet,
+        KnudgeNoteType::Link => NoteType::Link,
+        KnudgeNoteType::Meta => NoteType::Meta,
+        KnudgeNoteType::Risk => NoteType::Risk,
+    }
+}
+
+/// Converte o estado do knudge no do katu.
+pub(crate) fn from_status(status: KnudgeStatus) -> Status {
+    match status {
+        KnudgeStatus::Active => Status::Active,
+        KnudgeStatus::InProgress => Status::InProgress,
+        KnudgeStatus::Blocked => Status::Blocked,
+        KnudgeStatus::Closed => Status::Closed,
+        KnudgeStatus::Superseded => Status::Superseded,
+        KnudgeStatus::Forgotten => Status::Forgotten,
     }
 }
 
@@ -100,7 +130,7 @@ pub(crate) fn hit(hit: &KnudgeHit) -> Result<RecallHit, MemoryError> {
     clippy::cast_sign_loss,
     reason = "confidence ∈ [0,1] × 10000 cabe em u16; conversão documentada na borda do adaptador"
 )]
-fn points(confidence: f64) -> Result<Score, MemoryError> {
+pub(crate) fn points(confidence: f64) -> Result<Score, MemoryError> {
     let clamped = confidence.clamp(0.0, 1.0);
     let scaled = (clamped * f64::from(Score::MAX_BASIS_POINTS)).round() as i64;
     let raw = u16::try_from(scaled).unwrap_or(Score::MAX_BASIS_POINTS);

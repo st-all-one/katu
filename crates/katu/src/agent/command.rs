@@ -5,7 +5,7 @@
 
 use katu_core::context::CompactionMode;
 use katu_core::error::Error;
-use katu_core::provider::{ModelSpec, Provider};
+use katu_core::provider::{ModelSpec, Provider, Thinking};
 use serde_json::{Value, json};
 use std::path::Path;
 
@@ -29,6 +29,8 @@ pub(crate) struct RunArgs<'a> {
     pub model: Option<&'a str>,
     /// Base URL (por omissão depende do provider).
     pub base: Option<&'a str>,
+    /// Grau de pensamento resolvido (config/flags).
+    pub thinking: Option<Thinking>,
     /// Teto de tokens de saída.
     pub max_tokens: u32,
     /// Máximo de passos (tool calls) por turno.
@@ -92,13 +94,7 @@ pub(crate) fn run(args: &RunArgs<'_>) -> Report {
         },
         str::to_string,
     );
-    let options = TurnOptions {
-        model: ModelSpec::new(model.clone()),
-        system: Some(SYSTEM.to_string()),
-        max_tokens: args.max_tokens,
-        temperature: 0.0,
-        max_steps: args.max_steps,
-    };
+    let options = turn_options(model.clone(), args);
     let ports = Ports {
         fs: &fs,
         process: &process,
@@ -118,6 +114,20 @@ pub(crate) fn run(args: &RunArgs<'_>) -> Report {
             Report::ok("run", Some(value))
         }
         Err(error) => Report::failed("run", &error.into()),
+    }
+}
+
+/// Opções do turno (modelo + pensamento resolvidos, E20-T17).
+fn turn_options(model: String, args: &RunArgs<'_>) -> TurnOptions {
+    TurnOptions {
+        model: ModelSpec {
+            model,
+            thinking: args.thinking.unwrap_or_default(),
+        },
+        system: Some(SYSTEM.to_string()),
+        max_tokens: args.max_tokens,
+        temperature: 0.0,
+        max_steps: args.max_steps,
     }
 }
 

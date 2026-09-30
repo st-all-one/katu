@@ -5,6 +5,7 @@
 //! `body` recusa; um lote inválido recusa **antes** de executar seja o que for.
 
 use katu_core::error::Error;
+use katu_core::provider::Thinking;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -28,6 +29,8 @@ pub(crate) struct RunParams {
     pub(crate) model: Option<String>,
     /// Base URL.
     pub(crate) base: Option<String>,
+    /// Grau de pensamento.
+    pub(crate) thinking: Option<String>,
     /// Teto de tokens de saída.
     pub(crate) max_tokens: Option<u32>,
     /// Máximo de passos por turno.
@@ -49,6 +52,8 @@ pub(crate) struct RunConfig {
     pub(crate) model: Option<String>,
     /// Base URL.
     pub(crate) base: Option<String>,
+    /// Grau de pensamento resolvido.
+    pub(crate) thinking: Option<Thinking>,
     /// Teto de tokens de saída.
     pub(crate) max_tokens: u32,
     /// Máximo de passos por turno.
@@ -65,6 +70,7 @@ struct Flags {
     provider: Option<String>,
     model: Option<String>,
     base: Option<String>,
+    thinking: Option<String>,
     max_tokens: Option<u32>,
     max_steps: Option<u32>,
     compact: Option<bool>,
@@ -78,6 +84,7 @@ impl Flags {
             provider: args.provider.clone(),
             model: args.model.clone(),
             base: args.base.clone(),
+            thinking: args.thinking.clone(),
             max_tokens: args.max_tokens,
             max_steps: args.max_steps,
             compact: args.compact,
@@ -91,6 +98,7 @@ impl Flags {
             provider: args.provider.clone(),
             model: args.model.clone(),
             base: args.base.clone(),
+            thinking: args.thinking.clone(),
             max_tokens: args.max_tokens,
             max_steps: args.max_steps,
             compact: args.compact,
@@ -103,6 +111,7 @@ impl Flags {
         self.provider.is_some()
             || self.model.is_some()
             || self.base.is_some()
+            || self.thinking.is_some()
             || self.max_tokens.is_some()
             || self.max_steps.is_some()
             || self.compact.is_some()
@@ -110,28 +119,52 @@ impl Flags {
     }
 
     /// Combina flags, `--params` e defaults (flags > params > config > default do comando).
-    fn assemble(self, goal: String, parsed: RunParams, defaults: &Defaults) -> RunConfig {
-        RunConfig {
+    fn assemble(
+        self,
+        goal: String,
+        parsed: RunParams,
+        defaults: &Defaults,
+    ) -> Result<RunConfig, Error> {
+        let RunParams {
+            body: _,
+            provider,
+            model,
+            base,
+            thinking,
+            max_tokens,
+            max_steps,
+            compact,
+            resume,
+        } = parsed;
+        let thinking = self
+            .thinking
+            .or(thinking)
+            .or_else(|| defaults.thinking.clone());
+        let thinking = match thinking {
+            Some(raw) => Some(Thinking::parse(&raw).ok_or_else(|| {
+                Error::invalid_input(format!("thinking inválido: `{raw}` (off/low/medium/high)"))
+            })?),
+            None => None,
+        };
+        Ok(RunConfig {
             goal,
             provider: self
                 .provider
-                .or(parsed.provider)
+                .or(provider)
                 .or_else(|| defaults.provider.clone())
                 .unwrap_or_else(|| "llama".to_owned()),
-            model: self
-                .model
-                .or(parsed.model)
-                .or_else(|| defaults.model.clone()),
-            base: self.base.or(parsed.base).or_else(|| defaults.base.clone()),
-            max_tokens: self.max_tokens.or(parsed.max_tokens).unwrap_or(512),
-            max_steps: self.max_steps.or(parsed.max_steps).unwrap_or(8),
+            model: self.model.or(model).or_else(|| defaults.model.clone()),
+            base: self.base.or(base).or_else(|| defaults.base.clone()),
+            thinking,
+            max_tokens: self.max_tokens.or(max_tokens).unwrap_or(512),
+            max_steps: self.max_steps.or(max_steps).unwrap_or(8),
             compact: self
                 .compact
-                .or(parsed.compact)
+                .or(compact)
                 .or(defaults.auto_compact)
                 .unwrap_or(false),
-            resume: self.resume.or(parsed.resume),
-        }
+            resume: self.resume.or(resume),
+        })
     }
 }
 
@@ -150,7 +183,7 @@ pub(crate) fn execute(args: &RunCli) -> Report {
 pub(crate) fn resolve_tui(args: &TuiCli) -> Result<RunConfig, Error> {
     let flags = Flags::from_tui(args);
     let parsed = parse_params(args.params.as_deref(), flags.any())?;
-    Ok(flags.assemble("tui".to_owned(), parsed, &defaults::current()))
+    flags.assemble("tui".to_owned(), parsed, &defaults::current())
 }
 
 /// Resolve uma rodada a partir das flags e/ou de `--params` (XOR).
@@ -169,7 +202,7 @@ fn resolve(args: &RunCli) -> Result<RunConfig, Error> {
             None => input::resolve(None)?,
         },
     };
-    Ok(flags.assemble(goal, parsed, &defaults::current()))
+    flags.assemble(goal, parsed, &defaults::current())
 }
 
 /// Lê `--params` (recusando a coexistência com flags explícitas).
@@ -233,5 +266,8 @@ fn config_from_params(parsed: RunParams, defaults: &Defaults) -> Result<RunConfi
     let Some(goal) = parsed.body.clone() else {
         return Err(Error::invalid_input("item de lote sem `body`"));
     };
-    Ok(Flags::default().assemble(goal, parsed, defaults))
+    Flags::default().assemble(goal, parsed, defaults)
 }
+
+#[cfg(test)]
+mod tests;

@@ -43,6 +43,9 @@ função, o log é a fonte da verdade.
     `0..=10_000`, determinístico — E18-T01);
   - `memory::io` — `PreWriteReq/Outcome`, `PreEditReq/Outcome`, `RecallReq`/`RecallHit`,
     `SessionEndReq/Outcome`, `MemoryStatus`, `Health`;
+  - `memory::query` — `QueryReq`/`QueryResult`/`QueryMode`/`QueryOutcome`/`QueryHit`/
+    `QueryFilter`/`TagCount`/`Suggestion`/`Cluster` (E20-T06: paridade `memo`/`kd`; a porta
+    `Memory::query` tem default fail-closed `Unavailable`);
   - `memory::error` — `MemoryError`/`MemoryErrorKind` (`retryable()` só em `Timeout`);
   - `memory::fake` — `FakeMemory` (cenários fixos, sem puxar `knudge-core`);
   - `memory::conformance` — `assert_contract` (E03-T05): suíte partilhada por backend.
@@ -86,6 +89,9 @@ função, o log é a fonte da verdade.
   saída das tools ao modelo — sem `null`, vazios omitidos, ordem canónica; JSON é a alternativa.
 - Envelope [`report`](src/report.rs) (DF12/E06-T12): `ToolReport`/`Page`/`Cost`, ids
   content-addressed e hash; renderiza em TOON ou JSON. Transportado por `ToolOutput`.
+- Skills do projeto [`skill`](src/skill.rs) (E20-T13): `Skill` (nome/descrição/caminho),
+  `discover`/`parse` (frontmatter `name`/`description`) e `catalog` (texto do prompt de sistema).
+  Descoberta **fail-open**: sem `.agents/skill{,s}/` → lista vazia; sem descrição → não carregada.
 - Porta `Provider` [`provider`](src/provider.rs) (E12-T01/T02/T03/T10): `Provider::{models, dynamic_models,
   capabilities, model_for_tier}` (`dynamic_models` descobre o catálogo do endpoint, com default =
   catálogo estático; `model_for_tier` escolhe a classe do catálogo, E12-T03),

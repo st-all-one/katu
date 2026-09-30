@@ -7,15 +7,18 @@ use clap::{Args, Subcommand};
 use katu_core::error::Error;
 use serde_json::json;
 
+use crate::defaults;
 use crate::report::Report;
 
 #[cfg(feature = "memory-in-process")]
 use crate::memory::commands::{memory_drain, memory_status};
 
+mod args;
 #[cfg(feature = "memory-in-process")]
 mod ask;
 use super::prime::{self, Group};
 use super::sessions;
+use args::{AskArgs, KnowledgeArgs};
 
 /// Argumentos de `katu memo`.
 #[derive(Debug, Clone, Args)]
@@ -34,9 +37,13 @@ pub(crate) struct MemoArgs {
 }
 
 /// Subcomandos de `memo` (só consulta).
+#[allow(
+    clippy::large_enum_variant,
+    reason = "args de clap; boxear complicaria a derivação do subcomando"
+)]
 #[derive(Debug, Clone, Subcommand)]
 pub(crate) enum MemoCommand {
-    /// Consulta a memória (recall pelo caminho §42).
+    /// Consulta rica à memória (espelha `kd ask`; E20-T06).
     Ask(AskArgs),
     /// Visão geral do mapa de conhecimento.
     Knowledge(KnowledgeArgs),
@@ -52,30 +59,6 @@ pub(crate) enum MemoCommand {
         #[arg(long)]
         long: bool,
     },
-}
-
-/// Argumentos de `memo ask`.
-#[derive(Debug, Clone, Args)]
-pub(crate) struct AskArgs {
-    /// Consulta (posicional = body; `-`/ausente lê `stdin`).
-    pub(crate) query: Option<String>,
-    /// Número máximo de resultados.
-    #[arg(long)]
-    pub(crate) limit: Option<usize>,
-    /// Config universal do comando (JSON; XOR com as flags explícitas).
-    #[arg(long)]
-    pub(crate) params: Option<String>,
-    /// Lote JSONL (uma linha = um item; XOR com `--params` e flags).
-    #[arg(long)]
-    pub(crate) batch: Option<String>,
-}
-
-/// Argumentos de `memo knowledge`.
-#[derive(Debug, Clone, Args)]
-pub(crate) struct KnowledgeArgs {
-    /// Eixo do mapa (`tag`, `class`, `anchor`, …).
-    #[arg(long)]
-    pub(crate) axis: Option<String>,
 }
 
 /// Argumentos de `memo doctor`.
@@ -123,7 +106,7 @@ pub(crate) struct DrainArgs {
 pub(crate) fn execute(args: &MemoArgs) -> Report {
     match &args.command {
         MemoCommand::Ask(args) => ask_report(args),
-        MemoCommand::Knowledge(_) => knowledge(),
+        MemoCommand::Knowledge(args) => knowledge_report(args),
         MemoCommand::Doctor(doctor) => diagnose(doctor),
         MemoCommand::Sessions => sessions::list(),
         MemoCommand::Drain(args) => drain(args),
@@ -131,7 +114,7 @@ pub(crate) fn execute(args: &MemoArgs) -> Report {
     }
 }
 
-/// `memo ask`: resolve o body e consulta a memória pelo caminho §42.
+/// `memo ask`: resolve a consulta rica (E20-T06).
 #[cfg(feature = "memory-in-process")]
 fn ask_report(args: &AskArgs) -> Report {
     ask::report(args)
@@ -146,12 +129,31 @@ fn ask_report(_args: &AskArgs) -> Report {
     )
 }
 
-/// `memo knowledge`: visão geral do mapa (ainda não implementado — E20-T06).
-fn knowledge() -> Report {
+/// `memo knowledge`: visão geral do mapa estrutural (E20-T06).
+#[cfg(feature = "memory-in-process")]
+fn knowledge_report(args: &KnowledgeArgs) -> Report {
+    ask::knowledge(args)
+}
+
+/// Sem adaptador de memória, `knowledge` recusa (fail-closed).
+#[cfg(not(feature = "memory-in-process"))]
+fn knowledge_report(_args: &KnowledgeArgs) -> Report {
     Report::failed(
         "memo.knowledge",
-        &Error::unavailable("memo knowledge ainda não implementado (E20-T06)"),
+        &Error::unavailable("adaptador de memória não compilado (feature `memory-in-process`)"),
     )
+}
+
+/// Estado do serviço de embeddings (E20-T17): a **segunda IA**, externa e plugável.
+fn embeddings_status() -> serde_json::Value {
+    let embeddings = defaults::current().embeddings;
+    let enabled = embeddings.url.as_deref().is_some_and(|url| !url.is_empty());
+    json!({
+        "enabled": enabled,
+        "url": embeddings.url,
+        "model": embeddings.model,
+        "command": embeddings.command,
+    })
 }
 
 /// `memo doctor`: diagnóstico do backend de memória.
@@ -166,6 +168,7 @@ fn diagnose(args: &DoctorArgs) -> Report {
         "instrumented": diag::enabled(),
         "rust_version": env!("CARGO_PKG_RUST_VERSION"),
         "memory": memory_status(),
+        "embeddings": embeddings_status(),
     });
     Report::ok("memo.doctor", Some(data))
 }
@@ -182,6 +185,7 @@ fn diagnose(args: &DoctorArgs) -> Report {
         "instrumented": diag::enabled(),
         "rust_version": env!("CARGO_PKG_RUST_VERSION"),
         "memory": { "error": "adaptador não compilado" },
+        "embeddings": embeddings_status(),
     });
     Report::ok("memo.doctor", Some(data))
 }

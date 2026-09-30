@@ -9,6 +9,7 @@ use katu_core::context::CompactionMode;
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::Dispatch;
 use katu_core::kernel::next_phase;
+use katu_core::ports::Fs as _;
 use katu_core::provider::{ModelSpec, Provider};
 use katu_core::report::ToolReport;
 use katu_providers::PriceTable;
@@ -54,6 +55,7 @@ impl Handler for AgentHandler<'_> {
             Command::Verify => self.verify(painter),
             Command::Plan => self.toggle_plan(),
             Command::Shell(command) => self.shell(&command),
+            Command::Skill(name) => self.skill(&name, painter),
         }
     }
 }
@@ -113,6 +115,18 @@ impl AgentHandler<'_> {
         match shell_dispatch(&mut self.runtime, &ports, command) {
             Ok(dispatch) => shell_updates(&dispatch),
             Err(error) => vec![Update::Error(error.to_string())],
+        }
+    }
+
+    /// Força o carregamento de uma skill pelo nome (E20-T13): o `SKILL.md` vira objetivo do turno.
+    fn skill(&mut self, name: &str, painter: &mut Painter<'_>) -> Vec<Update> {
+        let Some(skill) = self.runtime.skill(name) else {
+            return vec![Update::Error(format!("skill desconhecida: {name}"))];
+        };
+        let path = skill.path.clone();
+        match self.fs.read(&path) {
+            Ok(bytes) => self.submit(&String::from_utf8_lossy(&bytes), painter),
+            Err(error) => vec![Update::Error(format!("skill {name}: {error}"))],
         }
     }
 
@@ -243,46 +257,4 @@ fn usage_line(model: &str, turn: &TurnReport, prices: &PriceTable) -> Option<Str
 }
 
 #[cfg(test)]
-mod tests {
-    use katu_core::evidence::EvidenceBasis;
-    use katu_core::provider::TokenUsage;
-    use katu_providers::{Price, PriceTable};
-
-    use super::usage_line;
-    use crate::agent::TurnReport;
-
-    fn report(usage: Option<TokenUsage>) -> TurnReport {
-        TurnReport {
-            steps: 1,
-            text: String::new(),
-            calls: 0,
-            usage,
-            cancelled: false,
-        }
-    }
-
-    #[test]
-    fn usage_line_shows_tokens_and_cost_when_priced() {
-        let mut usage = TokenUsage::new(EvidenceBasis::ProviderReported);
-        usage.input = Some(1_000);
-        usage.output = Some(500);
-        let mut prices = PriceTable::new();
-        prices.set(
-            "m",
-            Price {
-                input: 1_000_000,
-                output: 3_000_000,
-                cached_input: 0,
-            },
-        );
-        let line = usage_line("m", &report(Some(usage)), &prices).unwrap_or_default();
-        assert!(line.contains("in 1000"), "{line}");
-        assert!(line.contains("out 500"), "{line}");
-        assert!(line.contains("custo"), "{line}");
-    }
-
-    #[test]
-    fn usage_line_without_usage_is_none() {
-        assert!(usage_line("m", &report(None), &PriceTable::new()).is_none());
-    }
-}
+mod tests;

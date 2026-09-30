@@ -8,7 +8,7 @@
 use katu_core::context::CompactionMode;
 use katu_core::diag::{Level, events};
 use katu_core::error::Error;
-use katu_core::provider::{ModelSpec, Provider};
+use katu_core::provider::{ModelSpec, Provider, Thinking};
 use katu_tui::{App, Update, run};
 
 use crate::agent::{RunArgs, build_provider, default_base, default_model, open_runtime};
@@ -83,9 +83,20 @@ pub(crate) fn run_tui(args: &RunArgs<'_>) -> Report {
         max_tokens: args.max_tokens,
         max_steps: args.max_steps,
     };
+    // Pensamento por omissão da config (E20-T17), aplicado como controlo **logado** no arranque.
+    apply_thinking(&mut app, &mut handler, args.thinking);
     match run(app, &mut handler, &clock) {
         Ok(()) => Report::ok("tui", None),
         Err(error) => Report::failed("tui", &Error::io("<tui>", error)),
+    }
+}
+
+/// Aplica o pensamento por omissão da config como controlo **logado** (E20-T17).
+fn apply_thinking(app: &mut App, handler: &mut AgentHandler<'_>, thinking: Option<Thinking>) {
+    if let Some(thinking) = thinking {
+        for update in handler.set_thinking(thinking) {
+            app.apply_update(update);
+        }
     }
 }
 

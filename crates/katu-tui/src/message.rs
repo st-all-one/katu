@@ -32,6 +32,8 @@ pub enum Command {
     Plan,
     /// Executa um comando shell pela política/contenção (E20-T12).
     Shell(String),
+    /// Força o carregamento de uma skill pelo nome (E20-T13).
+    Skill(String),
     /// Sair.
     Quit,
 }

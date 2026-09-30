@@ -9,6 +9,7 @@ use super::io::{
     MemoryStatus, PreEditOutcome, PreEditReq, PreWriteOutcome, PreWriteReq, RecallHit, RecallReq,
     SessionEndOutcome, SessionEndReq,
 };
+use super::query::{QueryHit, QueryMode, QueryOutcome, QueryReq, QueryResult};
 use super::types::{Basis, NoteRef, Score};
 
 /// Memória de teste com respostas fixas e falha injetável.
@@ -122,6 +123,38 @@ impl Memory for FakeMemory {
         Ok(self.recall.iter().take(req.limit).cloned().collect())
     }
 
+    fn query(&self, req: &QueryReq) -> Result<QueryResult, MemoryError> {
+        if let Some(err) = self.failure() {
+            return Err(err);
+        }
+        let hits: Vec<QueryHit> = self
+            .recall
+            .iter()
+            .take(req.limit)
+            .map(|hit| QueryHit {
+                note: hit.note.clone(),
+                statement: hit.statement.clone(),
+                score: hit.score,
+                basis: hit.basis,
+                anchor: hit.anchor.clone(),
+                note_type: None,
+                status: None,
+                tags: Vec::new(),
+                body: None,
+            })
+            .collect();
+        let outcome = match req.mode {
+            QueryMode::Tags => QueryOutcome::Tags(Vec::new()),
+            QueryMode::Suggest => QueryOutcome::Suggestions(Vec::new()),
+            QueryMode::Map => QueryOutcome::Clusters(Vec::new()),
+            _ => QueryOutcome::Hits(hits),
+        };
+        Ok(QueryResult {
+            outcome,
+            warnings: Vec::new(),
+        })
+    }
+
     fn session_end(&self, _req: &SessionEndReq) -> Result<SessionEndOutcome, MemoryError> {
         match self.failure() {
             Some(err) => Err(err),
@@ -142,7 +175,8 @@ mod tests {
     use super::FakeMemory;
     use crate::memory::{
         Basis, Health, Memory, MemoryError, MemoryErrorKind, MemoryStatus, NoteRef, NoteType,
-        PreWriteOutcome, PreWriteReq, RecallHit, RecallReq, Score, Status,
+        PreWriteOutcome, PreWriteReq, QueryMode, QueryOutcome, QueryReq, RecallHit, RecallReq,
+        Score, Status,
     };
 
     fn request() -> PreWriteReq {
@@ -230,6 +264,27 @@ mod tests {
         })?;
         assert_eq!(hits.len(), 1, "o limite é respeitado");
         assert_eq!(hits.first(), Some(&hit));
+        Ok(())
+    }
+
+    #[test]
+    fn query_maps_fixed_hits_and_modes() -> Result<(), Box<dyn std::error::Error>> {
+        let score = Score::from_basis_points(9_000).ok_or("score inválido")?;
+        let hit = RecallHit {
+            note: NoteRef::new("n1"),
+            statement: "cache usa LRU".to_string(),
+            score,
+            basis: Basis::Measured,
+            anchor: None,
+        };
+        let memory = FakeMemory::with_hits(vec![hit]);
+        let recall = memory.query(&QueryReq::recall("cache", 5))?;
+        assert!(matches!(recall.outcome, QueryOutcome::Hits(ref hits) if hits.len() == 1));
+        let tags = memory.query(&QueryReq {
+            mode: QueryMode::Tags,
+            ..QueryReq::default()
+        })?;
+        assert!(matches!(tags.outcome, QueryOutcome::Tags(_)));
         Ok(())
     }
 

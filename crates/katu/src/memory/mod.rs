@@ -7,6 +7,7 @@
 
 pub(crate) mod commands;
 mod drain;
+mod query;
 mod translate;
 
 pub(crate) use drain::DrainSummary;
@@ -17,8 +18,8 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 use katu_core::diag::{Level, events};
 use katu_core::memory::{
     Anchor, Health, Memory, MemoryError, MemoryErrorKind, MemoryStatus, NoteRef, PreEditOutcome,
-    PreEditReq, PreWriteOutcome, PreWriteReq, RecallHit, RecallReq, SessionEndOutcome,
-    SessionEndReq,
+    PreEditReq, PreWriteOutcome, PreWriteReq, QueryReq, QueryResult, RecallHit, RecallReq,
+    SessionEndOutcome, SessionEndReq,
 };
 use knudge_core::graph::Graph;
 use knudge_core::retrieval::{Index, RecallQuery, recall};
@@ -167,6 +168,11 @@ impl Memory for KnudgeMemory {
         query.strict = inner.strict;
         let output = recall(index, graph, &query).map_err(to_memory_error)?;
         output.hits.iter().map(translate::hit).collect()
+    }
+
+    fn query(&self, req: &QueryReq) -> Result<QueryResult, MemoryError> {
+        let mut inner = lock(&self.inner);
+        query::run(&mut inner, req)
     }
 
     fn session_end(&self, req: &SessionEndReq) -> Result<SessionEndOutcome, MemoryError> {

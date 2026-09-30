@@ -203,3 +203,4 @@ fn checkpoint_records_the_declared_next_action() -> Result<(), Box<dyn std::erro
 }
 
 mod plan;
+mod skills;

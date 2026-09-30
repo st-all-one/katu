@@ -54,12 +54,19 @@ existir** no topo → `invalid_input` (exit 2), sem retrocompatibilidade.
   no projeto (ou na global com `--global`). Conjunto **fechado** de chaves (E20-T09); chave/valor
   inválido → exit 2. O `init` copia a global 1:1 (snapshot, E20-T18).
 - **`memo`** — só consulta, espelhando o `kd`:
-  - `memo ask [QUERY] [--limit N]` — recall pelo caminho §42 (posicional = body).
-  - `memo knowledge [--axis <e>]` — visão geral do mapa (**E20-T06**; recusa até lá).
+  - `memo ask [QUERY]` — consulta rica (espelha `kd ask`): filtros `--type`/`--class`/`--tag`/
+    `--status`/`--scope`/`--anchor`, `--with-task`/`--full-content`/`--brief`, modos `--rank`/
+    `--tags`/`--suggest`, `--id`/`--around`/`--via`/`--depth`, `--limit`/`--top-k`/`--relation`;
+    `--since`/`--until`/`--as-of` aceites (semântica temporal adiada). Posicional = body; `--params`
+    (XOR flags) e `--batch` JSONL como os restantes comandos (**E20-T06**).
+  - `memo knowledge [--axis <e>] [--scope <c>] [--members] [--type/--class/--tag/--anchor]
+    [--around/--depth] [--universe] [--limit N]` — **mapa estrutural** real de conhecimento
+    (**E20-T06**); `--semantic`/`--communities`/`--write` adiados.
   - `memo doctor [--fix]` — diagnóstico do backend; `--fix` garante o layout do projeto (**E20-T07**).
   - `memo sessions` — lista as sessões do projeto (para `--resume`).
   - `memo drain [--status\|--digest [--force]]` — `--status` é read-only (não toca no índice);
-    `--digest` drena a fila de embeddings (`--force` apaga `.idx/` e redigeri; **E20-T20**).
+    `--digest` drena a fila de embeddings (`--force` apaga `.idx/` e redigeri; **E20-T20**). Sem
+    `embeddings.url` na config, fica **`off`** (não inventa endpoint; **E20-T17**).
   - `memo drain --watch-service [--install\|--subscribe\|--unsubscribe\|--uninstall]` — instala/remove
     um **timer systemd `--user`** que corre `--digest` nos projetos subscritos (**E20-T20**).
   - `memo prime [--long]` — prime do grupo.
@@ -95,6 +102,7 @@ existir** no topo → `invalid_input` (exit 2), sem retrocompatibilidade.
 | `--provider <NAME>` | `run`, `tui` | Provider a usar. | `llama` |
 | `--model <MODEL>` | `run`, `tui` | Modelo explícito (vence o tier). | pelo **tier** da fase |
 | `--base <URL>` | `run`, `tui` | Base URL do endpoint. | por provider (§2.3) |
+| `--thinking <GRAU>` | `run`, `tui` | Grau de pensamento (`off`/`low`/`medium`/`high`). | config, senão `off` |
 | `--max-tokens <N>` | `run`, `tui` | Teto de tokens de saída. | `512` |
 | `--max-steps <N>` | `run`, `tui` | Máximo de passos (tool calls) por turno. | `8` |
 | `--compact` | `run`, `tui` | Liga a compactação do histórico no turno (E09-T07). | `false` |
@@ -188,12 +196,17 @@ Modos: `Normal` (navegação), `Insert` (edição/mensagem ou comando `/`), `Men
 | qualquer | `Ctrl-C` | Sai da UI (em todos os modos) |
 
 **Comandos `/`** (na linha de mensagem): `/model` (menu de modelos), `/thinking` (menu dos graus
-**suportados pelo modelo**), `/compact`, `/verify`, `/trash`, `/transcript`, `/help`, `/quit`.
+**suportados pelo modelo**), `/compact`, `/verify`, `/trash`, `/transcript`, `/help`, `/quit`,
+`/skill:<nome>` (força o carregamento de uma skill, E20-T13).
 Comando desconhecido → erro na barra de estado (não é enviado ao modelo). `@<path>` **cita** um
 caminho: fica pendente e é prefixado (só o caminho, sem conteúdo) ao próximo turno (E20-T12).
 `!<cmd>` executa `sh -c` **pela política** (§42); no modo `/plan` é recusado com evidência
 (`plan-no-shell`). `/plan` liga o modo de planeamento (regra `plan-write-only-katu`: escrita só sob
 `.katu/`) e escreve `.katu/plan/<yymmddhhmmZ>-<slug>.md`; a barra de estado mostra `PLANO`.
+
+O **contexto do turno** inclui o `AGENTS.md` da raiz (fonte de verdade máxima, no topo do prompt de
+sistema) e o **catálogo de skills** descobertas em `.agents/skill{,s}/*/SKILL.md` (nome/descrição/
+caminho); o modelo lê o `SKILL.md` com a tool `read` quando precisa (E20-T13).
 
 **Rato:** arrastar com o botão esquerdo seleciona texto e copia-o automaticamente para o clipboard
 via **OSC 52** (E20-T14); terminais sem suporte ignoram a sequência. A captura de rato é ligada no

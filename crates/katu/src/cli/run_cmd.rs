@@ -26,6 +26,9 @@ pub(crate) struct RunCli {
     /// Base URL do endpoint (por omissão depende do provider).
     #[arg(long)]
     pub(crate) base: Option<String>,
+    /// Grau de pensamento (`off`/`low`/`medium`/`high`).
+    #[arg(long)]
+    pub(crate) thinking: Option<String>,
     /// Teto de tokens de saída.
     #[arg(long)]
     pub(crate) max_tokens: Option<u32>,
@@ -61,6 +64,9 @@ pub(crate) struct TuiCli {
     /// Base URL do endpoint (por omissão depende do provider).
     #[arg(long)]
     pub(crate) base: Option<String>,
+    /// Grau de pensamento (`off`/`low`/`medium`/`high`).
+    #[arg(long)]
+    pub(crate) thinking: Option<String>,
     /// Teto de tokens de saída.
     #[arg(long)]
     pub(crate) max_tokens: Option<u32>,
@@ -91,6 +97,7 @@ pub(crate) fn execute_tui(args: &TuiCli) -> Report {
             provider: &config.provider,
             model: config.model.as_deref(),
             base: config.base.as_deref(),
+            thinking: config.thinking,
             max_tokens: config.max_tokens,
             max_steps: config.max_steps,
             compact: config.compact,
@@ -107,6 +114,7 @@ pub(crate) fn run_once(config: &run_params::RunConfig) -> Report {
         provider: &config.provider,
         model: config.model.as_deref(),
         base: config.base.as_deref(),
+        thinking: config.thinking,
         max_tokens: config.max_tokens,
         max_steps: config.max_steps,
         compact: config.compact,

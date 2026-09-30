@@ -120,6 +120,9 @@ impl App {
     /// Trata a linha submetida quando começa por `/` (E20-T10).
     pub(super) fn slash(&mut self, command: &str) -> Option<Command> {
         let name = command.split_whitespace().next().unwrap_or("");
+        if let Some(skill) = name.strip_prefix("skill:") {
+            return self.skill(skill);
+        }
         match name {
             "model" => {
                 self.open_model_menu();
@@ -220,6 +223,23 @@ impl App {
         let cited = self.citations.join(" ");
         self.citations.clear();
         format!("{cited}\n\n{goal}")
+    }
+
+    /// Força o carregamento de uma skill pelo nome (E20-T13).
+    fn skill(&mut self, name: &str) -> Option<Command> {
+        let name = name.trim();
+        if name.is_empty() {
+            self.status = Status::Failure("uso: /skill:<nome>".to_string());
+            return None;
+        }
+        self.transcript.push(Entry {
+            role: Role::User,
+            text: format!("/skill:{name}"),
+        });
+        self.scroll = 0;
+        self.status = Status::Working;
+        self.clear_live();
+        Some(Command::Skill(name.to_string()))
     }
 
     /// Prepara um comando shell `!<cmd>` (E20-T12).

@@ -86,6 +86,10 @@ pub(crate) struct Cli {
 }
 
 /// Verbos do `katu`.
+#[allow(
+    clippy::large_enum_variant,
+    reason = "args de clap; boxear complicaria a derivação do subcomando"
+)]
 #[derive(Debug, Clone, Subcommand)]
 pub(crate) enum Command {
     /// Contexto de arranque estático para IA.

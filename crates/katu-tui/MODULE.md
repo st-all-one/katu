@@ -57,7 +57,8 @@ A **interface de terminal** do katu (uma das duas superfícies, com a CLI — G7
   `@<path>` enfileira caminhos (`src/app/menu.rs`, E20-T12) que são prefixados ao próximo turno, e
   escrever durante o turno enfileira prompts aplicados no passo seguinte (E20-T16). `/plan`
   (E20-T11) liga o modo de planeamento (barra mostra `PLANO`; `Update::Plan`) e `!<cmd>` (E20-T12)
-  emite `Command::Shell` para a borda executar pela política.
+  emite `Command::Shell` para a borda executar pela política. `/skill:<nome>` (E20-T13) emite
+  `Command::Skill` e a borda força o carregamento do `SKILL.md`.
 
 ## Fronteira
 

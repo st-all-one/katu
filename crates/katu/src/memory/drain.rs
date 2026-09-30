@@ -13,6 +13,7 @@ use knudge_core::ports::{Embedder, Env};
 use knudge_core::{Config, Error as KnudgeError, Knudge};
 
 use super::to_memory_error;
+use crate::defaults::{self, EmbeddingDefaults};
 
 /// Teto de lotes por dreno (evita laço infinito num provedor que nunca esvazia).
 const MAX_BATCHES: usize = 1024;
@@ -60,8 +61,11 @@ impl DrainSummary {
     reason = "`force` é o modo `--force` do dreno"
 )]
 pub(super) fn run(kd: &Knudge, force: bool) -> Result<DrainSummary, MemoryError> {
-    let config = kd.config();
-    let Some(embedder) = build_embedder(config, kd.env()).map_err(to_memory_error)? else {
+    // E20-T17: a config de embeddings do katu (segunda IA) sobrepõe-se à do knudge; URL ausente → off.
+    let mut config = kd.config().clone();
+    let embeddings = defaults::from_root(kd.project_root()).embeddings;
+    apply_embeddings(&mut config, &embeddings).map_err(to_memory_error)?;
+    let Some(embedder) = build_embedder(&config, kd.env()).map_err(to_memory_error)? else {
         return Ok(DrainSummary::disabled());
     };
     let mut warnings = Vec::new();
@@ -84,7 +88,7 @@ pub(super) fn run(kd: &Knudge, force: bool) -> Result<DrainSummary, MemoryError>
         let outcome = drain(&DrainInput {
             store: &store,
             embedder: embedder.as_ref(),
-            config,
+            config: &config,
             now_ms: kd.now_ms(),
         })
         .map_err(to_memory_error)?;
@@ -98,6 +102,37 @@ pub(super) fn run(kd: &Knudge, force: bool) -> Result<DrainSummary, MemoryError>
     }
     summary.warnings = warnings;
     Ok(summary)
+}
+
+/// Projeta a config de embeddings do katu (E20-T17) na config efetiva do knudge.
+///
+/// URL ausente/vazia → `embeddings.enabled=false` (nunca inventa endpoint, DF5). URL presente →
+/// liga o provedor HTTP e aponta `embeddings.endpoint` para `<url>/embeddings`; o modelo, se dado,
+/// sobrepõe-se ao default do knudge.
+fn apply_embeddings(
+    config: &mut Config,
+    embeddings: &EmbeddingDefaults,
+) -> Result<(), KnudgeError> {
+    let Some(url) = embeddings.url.as_deref().filter(|url| !url.is_empty()) else {
+        config.set_str("embeddings.enabled", "false")?;
+        return Ok(());
+    };
+    config.set_str("embeddings.enabled", "true")?;
+    config.set_str("embeddings.provider", "http")?;
+    config.set_str("embeddings.endpoint", &endpoint_from(url))?;
+    if let Some(model) = embeddings
+        .model
+        .as_deref()
+        .filter(|model| !model.is_empty())
+    {
+        config.set_str("embeddings.model", model)?;
+    }
+    Ok(())
+}
+
+/// `<url>/embeddings`, sem barra dupla.
+fn endpoint_from(url: &str) -> String {
+    format!("{}/embeddings", url.trim_end_matches('/'))
 }
 
 /// Constrói o provedor de vetores a partir da config efetiva.
@@ -145,4 +180,38 @@ fn remove_derived(kd: &Knudge) -> Result<Vec<String>, MemoryError> {
         .collect();
     fs.remove_dir_all(&dir).map_err(to_memory_error)?;
     Ok(names)
+}
+
+#[cfg(test)]
+mod tests {
+    use knudge_core::Config;
+
+    use super::apply_embeddings;
+    use crate::defaults::EmbeddingDefaults;
+
+    #[test]
+    fn absent_url_disables_embeddings() -> Result<(), Box<dyn std::error::Error>> {
+        let mut config = Config::defaults();
+        apply_embeddings(&mut config, &EmbeddingDefaults::default())?;
+        assert_eq!(config.get_bool("embeddings.enabled"), Some(false));
+        Ok(())
+    }
+
+    #[test]
+    fn url_maps_to_endpoint_and_model() -> Result<(), Box<dyn std::error::Error>> {
+        let mut config = Config::defaults();
+        let embeddings = EmbeddingDefaults {
+            url: Some("http://127.0.0.1:8889/v1/".to_string()),
+            model: Some("granite".to_string()),
+            command: None,
+        };
+        apply_embeddings(&mut config, &embeddings)?;
+        assert_eq!(config.get_bool("embeddings.enabled"), Some(true));
+        assert_eq!(
+            config.get_str("embeddings.endpoint"),
+            Some("http://127.0.0.1:8889/v1/embeddings")
+        );
+        assert_eq!(config.get_str("embeddings.model"), Some("granite"));
+        Ok(())
+    }
 }

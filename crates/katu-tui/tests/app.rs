@@ -240,6 +240,20 @@ fn slash_plan_toggles_and_the_border_confirms() {
 }
 
 #[test]
+fn slash_skill_forces_a_load_by_name() {
+    let mut app = App::new();
+    app.apply_action(Action::StartCommand);
+    for character in "skill:rust".chars() {
+        app.apply_action(Action::Insert(character));
+    }
+    assert_eq!(
+        app.apply_action(Action::Submit),
+        Some(Command::Skill("rust".to_string()))
+    );
+    assert_eq!(app.transcript().first().map(|e| e.role), Some(Role::User));
+}
+
+#[test]
 fn opening_the_trash_lists_navigates_and_restores() {
     let mut app = App::new();
     assert_eq!(app.apply_action(Action::OpenTrash), Some(Command::Trash));

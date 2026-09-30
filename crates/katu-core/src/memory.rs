@@ -9,6 +9,7 @@ mod conformance;
 mod error;
 mod fake;
 mod io;
+mod query;
 mod types;
 
 pub use conformance::assert_contract;
@@ -17,6 +18,10 @@ pub use fake::FakeMemory;
 pub use io::{
     Health, MemoryStatus, PreEditOutcome, PreEditReq, PreWriteOutcome, PreWriteReq, RecallHit,
     RecallReq, SessionEndOutcome, SessionEndReq,
+};
+pub use query::{
+    Cluster, QueryFilter, QueryHit, QueryMode, QueryOutcome, QueryReq, QueryResult, QueryUniverse,
+    Suggestion, TagCount,
 };
 pub use types::{Anchor, Basis, NoteRef, NoteType, Score, Status};
 
@@ -49,6 +54,18 @@ pub trait Memory: Send + Sync {
     /// # Errors
     /// [`MemoryError`] se o backend falhar ou o pedido for inválido.
     fn search(&self, req: &RecallReq) -> Result<Vec<RecallHit>, MemoryError>;
+
+    /// Consulta rica (E20-T06): filtros, modos e mapa. O default recusa (fail-closed) — os
+    /// backends que suportam a superfície `memo` sobrepõem-no.
+    ///
+    /// # Errors
+    /// [`MemoryError`] se o backend falhar, o pedido for inválido ou não suportado.
+    fn query(&self, _req: &QueryReq) -> Result<QueryResult, MemoryError> {
+        Err(MemoryError::new(
+            MemoryErrorKind::Unavailable,
+            "consulta rica não suportada por este backend",
+        ))
+    }
 
     /// Finaliza a sessão: commit/sync e inferência do `outcome`.
     ///

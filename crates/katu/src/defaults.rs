@@ -19,10 +19,25 @@ pub(crate) struct Defaults {
     pub(crate) model: Option<String>,
     /// Base URL por omissão.
     pub(crate) base: Option<String>,
+    /// Grau de pensamento por omissão (`off`/`low`/`medium`/`high`).
+    pub(crate) thinking: Option<String>,
     /// Compactação automática do histórico.
     pub(crate) auto_compact: Option<bool>,
     /// Limite de recall por omissão.
     pub(crate) recall_limit: Option<usize>,
+    /// Embeddings (E20-T17): a **segunda IA**, externa e plugável.
+    pub(crate) embeddings: EmbeddingDefaults,
+}
+
+/// Configuração do serviço de embeddings (E20-T17): serviço externo por URL + modelo.
+#[derive(Debug, Default, Clone)]
+pub(crate) struct EmbeddingDefaults {
+    /// URL base (`http://host:porta/v1`); ausente/vazio → embeddings `off`.
+    pub(crate) url: Option<String>,
+    /// Modelo de embeddings.
+    pub(crate) model: Option<String>,
+    /// Comando opcional para lançar o serviço (reservado; não lança sozinho).
+    pub(crate) command: Option<String>,
 }
 
 /// Padrões do projeto atual (raiz descoberta a subir do diretório atual).
@@ -34,7 +49,7 @@ pub(crate) fn current() -> Defaults {
 }
 
 /// Padrões de um projeto.
-fn from_root(root: &Path) -> Defaults {
+pub(crate) fn from_root(root: &Path) -> Defaults {
     let mut table = match config::global_path() {
         Ok(path) => config::load(&path).unwrap_or_default(),
         Err(_) => toml::Table::new(),
@@ -46,9 +61,15 @@ fn from_root(root: &Path) -> Defaults {
         provider: text(&table, "provider"),
         model: text(&table, "model"),
         base: text(&table, "base"),
+        thinking: text(&table, "thinking"),
         auto_compact: boolean(&table, "behavior.auto_compact"),
         recall_limit: integer(&table, "recall.default_limit")
             .and_then(|value| usize::try_from(value).ok()),
+        embeddings: EmbeddingDefaults {
+            url: text(&table, "embeddings.url"),
+            model: text(&table, "embeddings.model"),
+            command: text(&table, "embeddings.command"),
+        },
     }
 }
 

@@ -134,16 +134,26 @@ mod tests {
     use std::path::Path;
 
     use super::{Skill, catalog, discover, parse};
+    use crate::ports::Fs as _;
     use crate::ports::MemFs;
 
     const SKILL: &str = "---\nname: rust\ndescription: >\n  Rust moderno.\n  Usa quando escreves Rust.\ncategory: languages\n---\n\n# Rust\n";
 
     #[test]
     fn parses_folded_frontmatter() {
-        let skill = parse(SKILL, Path::new("/p/.agents/skill/rust/SKILL.md"), Path::new("/p/.agents/skill/rust"))
-            .expect("skill válido");
-        assert_eq!(skill.name, "rust");
-        assert_eq!(skill.description, "Rust moderno. Usa quando escreves Rust.");
+        let parsed = parse(
+            SKILL,
+            Path::new("/p/.agents/skill/rust/SKILL.md"),
+            Path::new("/p/.agents/skill/rust"),
+        );
+        assert_eq!(
+            parsed.as_ref().map(|skill| skill.name.as_str()),
+            Some("rust")
+        );
+        assert_eq!(
+            parsed.map(|skill| skill.description),
+            Some("Rust moderno. Usa quando escreves Rust.".to_string())
+        );
     }
 
     #[test]
@@ -155,9 +165,11 @@ mod tests {
     #[test]
     fn name_falls_back_to_the_directory() {
         let content = "---\ndescription: só descrição\n---\n";
-        let skill = parse(content, Path::new("/p/SKILL.md"), Path::new("/p/meu-skill"))
-            .expect("skill válido");
-        assert_eq!(skill.name, "meu-skill");
+        let parsed = parse(content, Path::new("/p/SKILL.md"), Path::new("/p/meu-skill"));
+        assert_eq!(
+            parsed.map(|skill| skill.name),
+            Some("meu-skill".to_string())
+        );
     }
 
     #[test]
@@ -166,8 +178,14 @@ mod tests {
         let root = Path::new("/p");
         for (dir, body) in [
             (".agents/skill/rust", SKILL),
-            (".agents/skills/grpc", "---\nname: grpc\ndescription: gRPC.\n---\n"),
-            (".agents/skills/rust", "---\nname: rust\ndescription: duplicado.\n---\n"),
+            (
+                ".agents/skills/grpc",
+                "---\nname: grpc\ndescription: gRPC.\n---\n",
+            ),
+            (
+                ".agents/skills/rust",
+                "---\nname: rust\ndescription: duplicado.\n---\n",
+            ),
         ] {
             let path = root.join(dir).join("SKILL.md");
             if let Some(parent) = path.parent() {
@@ -178,7 +196,10 @@ mod tests {
         let skills = discover(&fs, root);
         let names: Vec<&str> = skills.iter().map(|skill| skill.name.as_str()).collect();
         assert_eq!(names, ["grpc", "rust"]);
-        assert_eq!(skills.first().map(|skill| skill.name.as_str()), Some("grpc"));
+        assert_eq!(
+            skills.first().map(|skill| skill.name.as_str()),
+            Some("grpc")
+        );
         Ok(())
     }
 

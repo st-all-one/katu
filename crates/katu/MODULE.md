@@ -16,8 +16,11 @@ todo o código impuro confinado.
   estruturada `--params` (XOR com flags) e `--batch` JSONL vive em `cli/params.rs` +
   `cli/run_params.rs` (E20-T08). Cada grupo expõe `<grupo> prime` (`memo prime`, `config prime`),
   equivalente a `katu prime --group <g>`. Os **padrões** da config efetiva
-  (`provider`/`model`/`base`/`behavior.auto_compact`/`recall.default_limit`) alimentam
-  `run`/`tui`/`memo ask` via `src/defaults.rs` (E20-T17). O **bootstrap** do `.katu/` vive em `src/bootstrap.rs` (layout
+  (`provider`/`model`/`base`/`thinking`/`behavior.auto_compact`/`recall.default_limit`) alimentam
+  `run`/`tui`/`memo ask` via `src/defaults.rs` (E20-T17); o `thinking` da config entra como
+  controlo **logado** no arranque da TUI. A **segunda IA** (embeddings) projeta-se em runtime na
+  config do knudge (`src/memory/drain.rs`): `embeddings.url` ausente → `off` (nunca inventado).
+  O **bootstrap** do `.katu/` vive em `src/bootstrap.rs` (layout
   idempotente, snapshot 1:1 da config, guardrails e blocos geridos em `.gitignore`/`.gitattributes`/
   `.git/info/exclude`, ADR 0021); `--init` e o arranque de sessão (`run`/`tui`/default TUI) correm-no
   antes do primeiro turno, e `memo doctor --fix` é o mesmo caminho.
@@ -31,12 +34,14 @@ todo o código impuro confinado.
   `memory-in-process` **default**) — o único sítio com dependência do knudge. A fachada `Knudge`
   (`!Sync`) é protegida por `Mutex` com cache de índice/grafo; `pre_edit` decide *supersede* em
   *dry-run* fiel ao `update`; `memo doctor` expõe `memory.status()` e a suíte de
-  conformidade corre contra o adaptador (E03-T02/T05/T06/T07). O conhecimento vive em
-  `.katu/knowledge` (E20-T19) e `memo drain --digest [--force]` drena a fila de embeddings pelo
-  pipeline do `knudge-core` (`src/memory/drain.rs`, E20-T20), fail-closed sem provedor; o worker de
-  auto-drain (`--watch-service`) vive em `src/watch_service.rs` (+ script `scripts/katu-idle.sh`).
-  Sem o adaptador, `katu memory` **falha fechado** (`unavailable`, exit 10) — a memória é invariante
-  de produção (G4).
+  conformidade corre contra o adaptador (E03-T02/T05/T06/T07). A **paridade `memo`/`kd`** (E20-T06)
+  vive em `src/memory/query.rs` (+ `query/{convert,map,suggest}.rs`): filtros, modos
+  `--rank`/`--tags`/`--suggest`, `--id`/`--around` e o mapa estrutural (`memo knowledge`). O
+  conhecimento vive em `.katu/knowledge` (E20-T19) e `memo drain --digest [--force]` drena a fila de
+  embeddings pelo pipeline do `knudge-core` (`src/memory/drain.rs`, E20-T20), fail-closed sem
+  provedor; o worker de auto-drain (`--watch-service`) vive em `src/watch_service.rs` (+ script
+  `scripts/katu-idle.sh`). Sem o adaptador, `katu memory` **falha fechado** (`unavailable`, exit 10)
+  — a memória é invariante de produção (G4).
 - **Runtime** (`src/runtime.rs`, feature `memory-in-process`): ponto de composição do loop
   (E03-T03/T07) — descobre a raiz, abre o adaptador, **recusa arrancar** sem memória saudável
   (fail-closed) e expõe `recall`/`remember` pelo caminho §42 (`src/runtime/memory.rs`). O comando
@@ -67,7 +72,10 @@ todo o código impuro confinado.
   passos** (`ActivitySink::steer`) e injetado como mensagem de utilizador no passo seguinte. O
   **modo de planeamento** (`/plan`, E20-T11) vive em `src/runtime/plan_mode.rs` (regras
   `plan-write-only-katu`/`plan-no-shell` + artefacto `.katu/plan/<UTC>.md`), e `!<cmd>` (E20-T12)
-  corre `sh -c` pelo pipeline em `src/agent/shell.rs`. A **transcrição durável** é projetada do log
+  corre `sh -c` pelo pipeline em `src/agent/shell.rs`. O **contexto do projeto** (E20-T13) é lido
+  no arranque (`src/runtime/skills.rs`): o `AGENTS.md` da raiz vai para o **topo** do prompt de
+  sistema (fonte de verdade máxima) e as skills `.agents/skill{,s}/*/SKILL.md` entram como
+  catálogo (nome/descrição/caminho); `/skill:<nome>` força o carregamento. A **transcrição durável** é projetada do log
   (`Runtime::transcript`, `src/runtime/transcript.rs`) e escrita atomicamente em
   `<root>/.katu/transcript.md` após cada turno (`src/tui/transcript.rs`); a TUI serve-a numa vista
   read-only (`T`, E10-T05). As **recusas de política**
