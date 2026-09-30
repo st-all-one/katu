@@ -12,11 +12,12 @@ use katu_core::provider::Thinking;
 use crate::action::{Action, Mode};
 use crate::controls::Controls;
 use crate::entry::{Entry, Role, Status};
-use crate::message::{Command, Update};
+use crate::message::Command;
 use crate::transcript::TranscriptView;
 use crate::trash::{Trash, TrashEntry};
 
 mod panel;
+mod update;
 mod viewer;
 
 /// Estado central da UI.
@@ -41,6 +42,8 @@ pub struct App {
     viewer: TranscriptView,
     /// Próxima ação declarada no checkpoint (E10-T06).
     next_action: Option<String>,
+    /// Uso/custo do último turno (E12-T03/T10); `None` antes do primeiro turno.
+    usage: Option<String>,
     /// Deslocamento a partir do fundo (0 = mensagem mais recente).
     scroll: u16,
     quit: bool,
@@ -69,6 +72,7 @@ impl App {
             trash: Trash::new(),
             viewer: TranscriptView::new(),
             next_action: None,
+            usage: None,
             scroll: 0,
             quit: false,
         }
@@ -164,6 +168,12 @@ impl App {
         self.next_action.as_deref()
     }
 
+    /// Uso/custo do último turno (E12-T03/T10); `None` antes do primeiro turno.
+    #[must_use]
+    pub fn usage(&self) -> Option<&str> {
+        self.usage.as_deref()
+    }
+
     /// Deslocamento a partir do fundo (para o render).
     #[must_use]
     pub const fn scroll(&self) -> u16 {
@@ -251,36 +261,5 @@ impl App {
         self.status = Status::Working;
         self.clear_live();
         Some(Command::Submit(text))
-    }
-
-    /// Injeta o resultado do executor.
-    pub fn apply_update(&mut self, update: Update) {
-        match update {
-            Update::Assistant(text) => self.push(Role::Assistant, text),
-            Update::Tool(text) => self.push(Role::Tool, text),
-            Update::Info(text) => self.push(Role::Info, text),
-            Update::Error(text) => {
-                self.status = Status::Failure(text.clone());
-                self.push(Role::Error, text);
-            }
-            Update::Phase(phase) => self.phase = phase,
-            Update::Live(live) => self.apply_live(live),
-            Update::Models(models) => self.controls.set_models(models),
-            Update::NextAction(action) => self.next_action = Some(action),
-            Update::Trash(items) => self.trash.set_items(items),
-            Update::Transcript(lines) => self.viewer.set_lines(lines),
-            Update::Done => {
-                self.clear_live();
-                self.status = Status::Idle;
-            }
-        }
-    }
-
-    /// Acrescenta uma entrada (ignora texto vazio) e volta ao fundo.
-    fn push(&mut self, role: Role, text: String) {
-        if !text.is_empty() {
-            self.transcript.push(Entry { role, text });
-            self.scroll = 0;
-        }
     }
 }

@@ -11,7 +11,9 @@ todo o código impuro confinado.
 - Adaptadores das portas em `src/ports/` (`mod.rs` = relógio/RNG/env; `process.rs` = `StdProcess`
   com timeout, `process_group` e leitura limitada — E07-T04; `fs/` = `StdFs` com escrita atómica
   **endurecida**: temporário exclusivo `O_EXCL`/`0600` e nome imprevisível, para não seguir um
-  symlink plantado — E07-T04). Sem FFI no MVP (ADR 0004).
+  symlink plantado — E07-T04). O `process.rs` mata o **grupo** de processos no timeout
+  (`kill(-pgid, SIGKILL)`, `kill_group`): é o **único ponto `unsafe`** do projeto (ADR 0016;
+  exceção registada em `xtask check-unsafe`), isolado com a fronteira de segurança documentada.
 - Adaptador in-process da porta `Memory` sobre o `knudge-core` (`src/memory/`, feature
   `memory-in-process` **default**) — o único sítio com dependência do knudge. A fachada `Knudge`
   (`!Sync`) é protegida por `Mutex` com cache de índice/grafo; `pre_edit` decide *supersede* em
@@ -20,9 +22,11 @@ todo o código impuro confinado.
   **falha fechado** (`unavailable`, exit 10) — a memória é invariante de produção (G4).
 - **Runtime** (`src/runtime.rs`, feature `memory-in-process`): ponto de composição do loop
   (E03-T03/T07) — descobre a raiz, abre o adaptador, **recusa arrancar** sem memória saudável
-  (fail-closed) e expõe `recall`/`remember` pelo caminho §42. Os comandos `katu remember` e
-  `katu recall` exercitam-no. Os submodules `src/runtime/context.rs` (contexto efetivo +
-  compactação, E09-T01/T07) e `src/runtime/verify.rs` (gate de verificação sobre o log, E09-T03)
+  (fail-closed) e expõe `recall`/`remember` pelo caminho §42 (`src/runtime/memory.rs`). Os comandos
+  `katu remember` e `katu recall` exercitam-no. `Runtime::open` cria sessão; `Runtime::resume`
+  (por id ou a mais recente) retoma o log durável e **fecha** um turno aberto antes do seguinte.
+  Os submodules `src/runtime/context.rs` (contexto efetivo + compactação, E09-T01/T07),
+  `src/runtime/verify.rs` (gate de verificação sobre o log, E09-T03) e `src/runtime/memory.rs`
   estendem o runtime; o teto de contexto tem **um único dono** (`DEFAULT_CONTEXT_BUDGET`).
 - **Contrato de escopo** (`src/scope.rs`, E09-T04): carrega `scope_contract.json` +
   `feature_list.json` da raiz no arranque e valida o `Plan` (schema + "≤ 1 `in_progress`"),
@@ -60,8 +64,13 @@ todo o código impuro confinado.
   E12-T03). O turno
   seguinte usa o estado de controlo (o agente nunca se auto-escala). O **checkpoint** de fase é
   escrito no fim de cada turno (`Runtime::write_checkpoint`, próxima ação de `next_phase`) e lido no
-  arranque (`Runtime::checkpoint`); o cabeçalho mostra a próxima ação (E10-T06). O turno é
-  **síncrono** nesta fatia (executor em background é trabalho futuro).
+  arranque (`Runtime::checkpoint`); o cabeçalho mostra a próxima ação (E10-T06). O handler vive em
+  `src/tui/handler.rs` (a borda ficou sob o teto de linhas). O utilizador pode **cancelar** o turno
+  (Esc/Ctrl-C durante o stream → `ActivitySink::cancelled` → `Flow::Break`, diag `tui.cancel`); o
+  **uso/custo** do turno aparece no cabeçalho (`usage_line`, `src/pricing.rs` + `policy/prices.toml`)
+  e os **argumentos crus** do modelo no painel (`Activity::Tool { args }`). `--resume [last|id]`
+  retoma uma sessão e `katu sessions` lista-as. O turno é **síncrono** nesta fatia (executor em
+  background é trabalho futuro).
 - Exit codes na borda (a lógica propaga `Result`).
 - Harness de medição do MVK (`examples/measure_mvk.rs`, feature `profile`, E05-T06): corre o
   caminho real e grava `bench/mvk/raw.json` (evidência tipada, DF5).

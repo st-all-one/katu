@@ -19,6 +19,8 @@ use crate::tui::run_tui;
 
 use crate::report::Report;
 
+mod sessions;
+
 /// `katu` — loop possuído, política e memória.
 #[derive(Debug, Parser)]
 #[command(name = "katu", version, about, long_about = None, arg_required_else_help = true)]
@@ -40,6 +42,8 @@ pub(crate) enum Command {
     Doctor,
     /// Estado da memória de primeira classe (fail-closed sem adaptador).
     Memory,
+    /// Lista as sessões do projeto (id, instante, objetivo) para retomar com `--resume`.
+    Sessions,
     /// Consulta a memória (recall pelo caminho §42).
     Recall {
         /// Consulta em linguagem natural.
@@ -79,6 +83,9 @@ pub(crate) enum Command {
         /// Liga a compactação do histórico no turno (E09-T07).
         #[arg(long)]
         compact: bool,
+        /// Retoma a sessão: sem valor usa a mais recente; com valor, o id indicado.
+        #[arg(long, num_args = 0..=1, default_missing_value = "last")]
+        resume: Option<String>,
     },
     /// Abre a UI de terminal sobre o loop de turnos (E10).
     #[cfg(feature = "memory-in-process")]
@@ -101,6 +108,9 @@ pub(crate) enum Command {
         /// Liga a compactação do histórico no turno (E09-T07).
         #[arg(long)]
         compact: bool,
+        /// Retoma a sessão: sem valor usa a mais recente; com valor, o id indicado.
+        #[arg(long, num_args = 0..=1, default_missing_value = "last")]
+        resume: Option<String>,
     },
 }
 
@@ -111,6 +121,7 @@ impl Command {
             Self::Version => "version",
             Self::Doctor => "doctor",
             Self::Memory => "memory",
+            Self::Sessions => "sessions",
             Self::Recall { .. } => "recall",
             Self::Remember { .. } => "remember",
             #[cfg(feature = "memory-in-process")]
@@ -133,6 +144,7 @@ pub(crate) fn execute(cli: &Cli) -> Report {
         ),
         Command::Doctor => doctor(),
         Command::Memory => memory_command(),
+        Command::Sessions => sessions::list(),
         Command::Recall { query, limit } => memory_recall(query, *limit),
         Command::Remember { statement, anchor } => memory_remember(statement, anchor.as_deref()),
         #[cfg(feature = "memory-in-process")]
@@ -144,6 +156,7 @@ pub(crate) fn execute(cli: &Cli) -> Report {
             max_tokens,
             max_steps,
             compact,
+            resume,
         } => run(&RunArgs {
             goal,
             provider,
@@ -152,6 +165,7 @@ pub(crate) fn execute(cli: &Cli) -> Report {
             max_tokens: *max_tokens,
             max_steps: *max_steps,
             compact: *compact,
+            resume: resume.as_deref(),
         }),
         #[cfg(feature = "memory-in-process")]
         Command::Tui {
@@ -161,6 +175,7 @@ pub(crate) fn execute(cli: &Cli) -> Report {
             max_tokens,
             max_steps,
             compact,
+            resume,
         } => run_tui(&RunArgs {
             goal: "tui",
             provider,
@@ -169,6 +184,7 @@ pub(crate) fn execute(cli: &Cli) -> Report {
             max_tokens: *max_tokens,
             max_steps: *max_steps,
             compact: *compact,
+            resume: resume.as_deref(),
         }),
     }
 }

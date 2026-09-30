@@ -110,6 +110,9 @@ fn header_line(app: &App) -> Line<'static> {
     if let Some(next) = app.next_action() {
         spans.push(Span::raw(format!("  ·  próximo {next}")));
     }
+    if let Some(usage) = app.usage() {
+        spans.push(Span::raw(format!("  ·  {usage}")));
+    }
     Line::from(spans)
 }
 
@@ -131,7 +134,7 @@ fn status_line(app: &App) -> Line<'static> {
             Style::default().fg(Color::DarkGray),
         )),
         Status::Working => Line::from(Span::styled(
-            "a trabalhar…".to_string(),
+            "a trabalhar…  ·  Esc cancela".to_string(),
             Style::default().fg(Color::Yellow),
         )),
         Status::Message(text) => Line::from(Span::raw(text.clone())),

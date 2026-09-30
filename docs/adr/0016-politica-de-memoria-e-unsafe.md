@@ -17,10 +17,15 @@ contrato escrito.
 ## Decisão
 
 1. **`#![forbid(unsafe_code)]` na raiz de todos os crates puros** (`katu-core`, `katu-policy`,
-   `katu-tools`, `katu-providers`, `katu-tui`, `katu`). `forbid` (não `deny`) porque **não** pode
-   ser anulado por `#[allow]` local: a única forma de usar `unsafe` é mudar a política do crate.
-2. **`unsafe` só no sandbox/FFI** (E17), com `#[allow(unsafe_code)]` e `// SAFETY:` **colado** ao
-   bloco (`accept-comment-above-attributes = false`), provando a invariante. Fora daí, zero `unsafe`.
+   `katu-tools`, `katu-providers`, `katu-tui`). `forbid` (não `deny`) porque **não** pode ser
+   anulado por `#[allow]` local: a única forma de usar `unsafe` é mudar a política do crate. A única
+   exceção registada é o binário `katu`, que declara `#![deny(unsafe_code)]` e tem **um** `#[allow]`
+   local, listado em `xtask check-unsafe` (que exige que a lista esteja **exatamente** esgotada).
+2. **`unsafe` só onde `std` não chega, com fronteira provada.** A exceção atual: `kill(-pgid,
+   SIGKILL)` no `StdProcess` (E07-T04), para matar o **grupo** de processos no timeout — o único
+   sítio sem wrapper seguro. Usa `#[allow(unsafe_code, reason = …)]` e um `// SAFETY:` **colado** ao
+   bloco (`accept-comment-above-attributes = false`), provando a invariante (o `pgid` é o do grupo
+   que criámos). Fora daí, zero `unsafe`.
 3. **Tipos proibidos** (`clippy.toml`, `disallowed_types`): `Rc`/`Weak` (não `Send`/`Sync`),
    `RefCell`/`Cell` (interior mutability em runtime; use atómicos/`Mutex`), `LinkedList`
    (cache-hostil), `HashMap`/`HashSet` (iteração **não determinística** — G8; use `BTreeMap`/`Vec`).
@@ -35,8 +40,10 @@ contrato escrito.
 
 ## Alternatives considered
 
-1. **Só `deny(unsafe_code)` (o nível do workspace).** Rejeitada: um `#[allow(unsafe_code)]` local
-   anularia a política sem revisão; `forbid` torna a exceção uma decisão de crate.
+1. **Só `deny(unsafe_code)` (o nível do workspace).** Rejeitada como regra geral: um
+   `#[allow(unsafe_code)]` local anularia a política sem revisão; `forbid` torna a exceção uma
+   decisão de crate. Adotada **só** no binário `katu`, onde a exceção do `kill(-pgid)` é registada
+   e verificada por `check-unsafe` (lista esgotada).
 2. **Permitir `unsafe` no transporte/parse (hot path).** Rejeitada: não há ganho medido; o
    transporte bloqueante é seguro e o gate de latência (E12-T07) não exige `unsafe`.
 3. **`HashMap` para o catálogo/política.** Rejeitada: iteração não determinística quebra G8 e os
@@ -50,5 +57,6 @@ contrato escrito.
   do sandbox; o contrato é verificável por gate.
 - **Negativas / dívida:** algumas APIs de conveniência ficam indisponíveis (mapas O(log n) em vez
   de O(1) amortizado); qualquer `unsafe` futuro obriga a uma ADR/feature.
-- **Travas:** `#![forbid(unsafe_code)]` por crate; `clippy -D warnings` com os `disallowed_types`;
-  Miri verde (E13); `xtask check` no CI.
+- **Travas:** `#![forbid(unsafe_code)]` por crate (exceto o binário, `deny` + exceção registada);
+  `xtask check-unsafe` exige que a lista de exceções esteja **exatamente** esgotada;
+  `clippy -D warnings` com os `disallowed_types`; Miri verde (E13); `xtask check` no CI.

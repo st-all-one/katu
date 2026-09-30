@@ -1,9 +1,15 @@
 # ADR 0004 — Sem FFI no MVP: kill do grupo de processos fica para a jail (E17)
 
-- **Estado:** aceite
+- **Estado:** substituída por [ADR 0018](0018-kill-do-grupo-com-unsafe-unico.md)
 - **Data:** 2026-10-06
 - **Decisões fundacionais:** DF1 (núcleo possuído), DF4 (fail-closed), G3 (superfície mínima)
 - **Épicos:** E07 (E07-T04), E17 (jail futura)
+
+---
+
+> **Nota (2026-10-08):** esta decisão foi **revertida**. O kill do grupo foi implementado com `libc`
+> e um único `unsafe` registado — ver [ADR 0018](0018-kill-do-grupo-com-unsafe-unico.md). O texto
+> abaixo mantém-se como registo histórico.
 
 ---
 

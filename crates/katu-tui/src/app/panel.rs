@@ -17,7 +17,13 @@ impl App {
                 trim_tail(&mut self.streaming, STREAM_TAIL_BYTES);
             }
             Live::Thinking(delta) => self.thinking.push_str(&delta),
-            Live::Tool(name) => self.live.push(format!("→ {name}")),
+            Live::Tool { name, args } => {
+                if args.is_empty() || args == "{}" {
+                    self.live.push(format!("→ {name}"));
+                } else {
+                    self.live.push(format!("→ {name} {args}"));
+                }
+            }
             Live::ToolDone(name) => self.live.push(format!("✓ {name}")),
             Live::Refused { rule, evidence } => {
                 let text = format!("⛔ {rule}: {evidence}");

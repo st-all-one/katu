@@ -114,12 +114,13 @@ Regras:
   **recusado** (`atomic_write_refuses_a_planted_symlink`), o que cobre o `lstat`/não-seguir-links. O
   `StdProcess` corre o filho num **process group** próprio (`process_group(0)`), mata/reaproveita o
   filho direto no timeout (sem zombie) e **limita a leitura** de `stdout`/`stderr` (`READ_GRACE_MS`)
-  para um neto que segure o pipe não bloquear o loop. **Decisão (ADR 0004):** sem FFI no MVP — o
-  kill do **grupo** (netos) e a supervisão de processos ficam para a jail (E17), onde
-  `rustix`/cgroups entram uma única vez; o diretório de *scratch* `0700` é dispensado (o temporário
-  tem de ficar no mesmo diretório do alvo, para o rename atómico).
+  para um neto que segure o pipe não bloquear o loop. **Kill do grupo (netos): feito** — no timeout
+  o grupo inteiro é morto com `kill(-pgid, SIGKILL)` (`kill_group`), o **único ponto `unsafe`** do
+  projeto (ADR 0016; exceção registada em `xtask check-unsafe`), isolado com a fronteira de
+  segurança documentada. O diretório de *scratch* `0700` é dispensado (o temporário tem de ficar no
+  mesmo diretório do alvo, para o rename atómico); a supervisão/cgroups continuam para a jail (E17).
 - **Aceite:** cada padrão tem teste próprio; env com segredo plantado não chega ao filho (§43.6);
-  `timeout` mata o filho direto e **não bloqueia** num neto (o kill do grupo é E17, ADR 0004).
+  `timeout` mata o filho direto **e o grupo** (netos) sem bloquear (`timeout_kills_the_process_group`).
 
 ### E07-T05 ☑ Autorização soft fora do workspace e caminhos sensíveis
 - **Entregáveis:** regras determinísticas: sensíveis `deny`-by-default; acesso a path/comando fora

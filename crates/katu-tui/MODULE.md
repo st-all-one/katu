@@ -27,9 +27,13 @@ A **interface de terminal** do katu (uma das duas superfícies, com a CLI — G7
   **transcrição durável** vive em `<root>/.katu/transcript.md` (a borda projeta o log e escreve-a
   atomicamente após cada turno) e o **viewer read-only** (`T` → `Action::OpenTranscript`,
   `Command::Transcript`, `src/transcript.rs`) lê o ficheiro com scroll e sem edição — o live nunca
-  entra na transcrição (§50.3).
+  entra na transcrição (§50.3). O **cancelamento** (Esc/Ctrl-C durante o stream) é cooperativo
+  (`Painter::cancelled`/`poll_cancel` → `ActivitySink::cancelled`): o turno fecha limpo e a UI
+  mostra `Update::Cancelled`. Os **argumentos crus** do modelo (`Live::Tool { name, args }`) aparecem
+  no painel ao lado da tool.
 - **E10-T06 ☑** — cabeçalho mostra fase + pendência + **próxima ação** do checkpoint
-  (`Update::NextAction`) a partir do `App` (alimentado pelo binário com `Runtime::phase`).
+  (`Update::NextAction`) a partir do `App` (alimentado pelo binário com `Runtime::phase`), e o
+  **uso/custo** do turno (`Update::Usage`, formatado pela borda).
 - **E10-T04 ☑** — **superfície de política**: as recusas do kernel (`Denied`/`Unavailable`) chegam
   ao painel e ao transcript com **regra + evidência** (`Live::Refused`/`Live::Unavailable`, evento
   `tui.live` com `kind=refused`) e o **override** por **challenge-and-response** (`approval::Challenge`:

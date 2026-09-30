@@ -20,7 +20,9 @@ mod turn;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use command::{RunArgs, SYSTEM, build_provider, default_base, default_model, run};
+pub(crate) use command::{
+    RunArgs, SYSTEM, build_provider, default_base, default_model, open_runtime, run,
+};
 pub(crate) use turn::{Activity, ActivitySink, Approval, ApprovalPrompt, run_turn, run_turn_with};
 
 use katu_core::error::{Error, ToolOutcome};
@@ -83,6 +85,8 @@ pub(crate) struct TurnReport {
     pub calls: usize,
     /// Contabilização do provider (base `provider_reported`).
     pub usage: Option<TokenUsage>,
+    /// `true` se o turno foi **cancelado** pelo utilizador (E: cancelamento cooperativo).
+    pub cancelled: bool,
 }
 
 /// Falha do loop de turnos.

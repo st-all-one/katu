@@ -1,10 +1,10 @@
 //! Adaptador `StdProcess`: execução real com timeout e leitura **limitada** (E07-T04).
 //!
 //! O filho corre com o **utilizador** que evocou o katu (sem `sudo`/setuid) e num **process group**
-//! próprio (`process_group(0)`). O `timeout` mata o filho direto e reaproveita-o. Matar o **grupo**
-//! inteiro (netos) exige FFI (`rustix`/libc), vedado por `#![forbid(unsafe_code)]`; fica para a jail
-//! real (E17). Sem isso, a leitura de `stdout`/`stderr` é limitada por [`READ_GRACE_MS`], para um
-//! neto que segure o pipe não bloquear o loop.
+//! próprio (`process_group(0)`). No timeout, o grupo inteiro (filho + netos) é morto com
+//! `kill(-pgid, SIGKILL)` — o **único** ponto `unsafe` do projeto (ADR 0016/E07-T04), isolado em
+//! [`kill_group`] com a fronteira de segurança documentada. Sem isso, um neto que segure o `stdout`
+//! sobreviveria ao timeout; a leitura é ainda limitada por [`READ_GRACE_MS`].
 
 use std::io::Read;
 use std::process::{Child, Command, ExitStatus, Stdio};
@@ -12,6 +12,7 @@ use std::sync::mpsc::{self, Receiver};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use katu_core::diag::{Level, events};
 use katu_core::ports::{ExecRequest, ExecResult, Process, ProcessError};
 
 #[cfg(unix)]
@@ -81,7 +82,7 @@ fn start_readers(child: &mut Child) -> (Receiver<String>, Receiver<String>) {
     (out_rx, err_rx)
 }
 
-/// Espera pelo filho com deadline; no timeout mata e reaproveita o filho (sem zombie).
+/// Espera pelo filho com deadline; no timeout mata o **grupo** e reaproveita o filho (sem zombie).
 #[allow(
     clippy::disallowed_methods,
     reason = "adaptador: relógio do SO para o timeout de execução"
@@ -98,6 +99,7 @@ fn wait_with_timeout(
             return Ok((status, false));
         }
         if Instant::now() >= deadline {
+            kill_group(child);
             drop(child.kill());
             let status = child.wait().map_err(|err| map_io_error(&err))?;
             return Ok((status, true));
@@ -105,6 +107,34 @@ fn wait_with_timeout(
         thread::sleep(Duration::from_millis(POLL_MS));
     }
 }
+
+/// Mata o **grupo de processos** do filho (o filho e os netos), em unix.
+///
+/// O filho é líder do seu próprio grupo (`process_group(0)`, logo pgid = pid do filho); enviar
+/// `SIGKILL` ao grupo (`kill(-pgid)`) atinge o filho e os netos. Em não-unix é um no-op: o filho
+/// direto continua a ser morto por `Child::kill`.
+#[cfg(unix)]
+#[allow(
+    unsafe_code,
+    reason = "kill(2) com pid negativo (grupo) não tem wrapper em std; único `unsafe` do projeto (ADR 0016/E07-T04)"
+)]
+fn kill_group(child: &Child) {
+    let Ok(pid) = i32::try_from(child.id()) else {
+        return;
+    };
+    let Some(group) = pid.checked_neg() else {
+        return;
+    };
+    // SAFETY: `pid` vem de `Child::id()` (o líder do grupo criado por `process_group(0)`); `-pid`
+    // refere **apenas** esse grupo, criado por nós nesta chamada — nunca um grupo alheio. O retorno
+    // é ignorado de propósito (`ESRCH` = já morreu).
+    let _status: i32 = unsafe { libc::kill(group, libc::SIGKILL) };
+    katu_core::event!(Level::Warn, events::PROCESS_KILL, "pgid" => pid);
+}
+
+/// Não-unix: sem process group; o filho direto é morto por `Child::kill`.
+#[cfg(not(unix))]
+fn kill_group(_child: &Child) {}
 
 /// Sinal que matou o processo (unix).
 #[cfg(unix)]
@@ -181,6 +211,30 @@ mod tests {
         assert!(result.timed_out, "o timeout tem de disparar");
         assert_eq!(result.signal, Some(9), "SIGKILL ao filho direto");
         assert!(result.duration_ms < 10_000, "não pode bloquear 30s");
+        Ok(())
+    }
+
+    #[test]
+    fn timeout_kills_the_process_group() -> Result<(), Box<dyn std::error::Error>> {
+        use std::time::Duration;
+        let dir = std::env::temp_dir().join(format!("katu-pgid-{}", std::process::id()));
+        drop(std::fs::create_dir_all(&dir));
+        let marker = dir.join("late.txt");
+        drop(std::fs::remove_file(&marker));
+        // O neto dorme 2s e só depois escreve o marcador. Se o grupo for morto no timeout (~300ms),
+        // o neto nunca chega a escrever; se só o filho direto morrer, o neto sobrevive e escreve.
+        let script = "( sleep 2; echo late > \"$1\" ) & sleep 30";
+        let path = marker.to_str().ok_or("caminho inválido")?;
+        let result = StdProcess
+            .run(&request(&["/bin/sh", "-c", script, "sh", path], 300))
+            .map_err(|err| format!("run: {err:?}"))?;
+        assert!(result.timed_out, "o timeout tem de disparar");
+        std::thread::sleep(Duration::from_millis(2_500));
+        assert!(
+            !marker.exists(),
+            "o neto sobreviveu ao timeout (grupo não morto)"
+        );
+        drop(std::fs::remove_dir_all(&dir));
         Ok(())
     }
 

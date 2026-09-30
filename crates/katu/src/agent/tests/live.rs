@@ -22,6 +22,7 @@ struct Recorder {
     text: String,
     thinking: String,
     tools: Vec<String>,
+    args: Vec<String>,
     refusals: Vec<String>,
     unavailable: Vec<String>,
 }
@@ -31,11 +32,34 @@ impl ActivitySink for Recorder {
         match activity {
             Activity::Text(delta) => self.text.push_str(delta),
             Activity::Thinking(delta) => self.thinking.push_str(delta),
-            Activity::Tool { name } => self.tools.push(format!("→ {name}")),
+            Activity::Tool { name, args } => {
+                self.tools.push(format!("→ {name}"));
+                self.args.push(args.to_string());
+            }
             Activity::ToolDone { name } => self.tools.push(format!("✓ {name}")),
             Activity::Refused { rule, .. } => self.refusals.push(rule.to_string()),
             Activity::Unavailable { control, .. } => self.unavailable.push(control.to_string()),
         }
+    }
+}
+
+/// Observador que **cancela** logo no primeiro evento (Esc/Ctrl-C).
+#[derive(Default)]
+struct Canceller {
+    text: String,
+    cancel: bool,
+}
+
+impl ActivitySink for Canceller {
+    fn cancelled(&self) -> bool {
+        self.cancel
+    }
+
+    fn activity(&mut self, activity: Activity<'_>) {
+        if let Activity::Text(delta) = activity {
+            self.text.push_str(delta);
+        }
+        self.cancel = true;
     }
 }
 
@@ -81,12 +105,60 @@ fn live_observer_sees_deltas_but_they_stay_out_of_the_log() -> Result<(), Box<dy
         recorder.tools,
         ["→ write".to_string(), "✓ write".to_string()]
     );
+    assert_eq!(
+        recorder.args,
+        [json!({"path": "new.txt", "content": "olá"}).to_string()],
+        "os argumentos crus do modelo chegam ao observador (transparência)"
+    );
     let messages = runtime.messages()?;
     assert!(
         !messages
             .iter()
             .any(|m| matches!(m, Message::Assistant { text } if text.contains("penso"))),
         "o raciocínio efémero não entra no contexto do modelo"
+    );
+    runtime.session().verify()?;
+    drop(runtime);
+    std::fs::remove_dir_all(&root)?;
+    Ok(())
+}
+
+#[test]
+fn cancel_stops_the_turn_and_closes_it_cleanly() -> Result<(), Box<dyn std::error::Error>> {
+    let root = root("cancel")?;
+    let fs = StdFs;
+    let clock = FixedClock::new(Timestamp::from_millis(1_000));
+    let mut runtime = Runtime::open(&fs, &clock, &root, "cancelar")?;
+    // O provider emite texto e depois pede uma tool; o observador cancela ao ver o primeiro delta.
+    let provider = FakeProvider::new(
+        "fake",
+        vec![
+            Turn {
+                events: vec![ProviderEvent::Text("parcial".to_string()), write_call()],
+                stop: StopReason::ToolCalls,
+            },
+            Turn::text("nunca"),
+        ],
+    );
+    let process = StdProcess;
+    let env = StdEnv;
+    let ports = Ports {
+        fs: &fs,
+        process: &process,
+        env: &env,
+    };
+    let mut canceller = Canceller::default();
+    let report = run_turn_with(
+        &mut runtime,
+        request(&provider, ports, "cancelar", &options(4)),
+        &mut canceller,
+    )?;
+    assert!(report.cancelled, "o turno é marcado como cancelado");
+    assert_eq!(report.calls, 0, "nenhuma tool corre depois do cancelamento");
+    assert_eq!(canceller.text, "parcial", "o texto parcial é registado");
+    assert!(
+        !runtime.session().state().turn_open,
+        "o turno fecha de forma limpa"
     );
     runtime.session().verify()?;
     drop(runtime);

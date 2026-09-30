@@ -55,7 +55,10 @@ fn live_stream_accumulates_outside_the_transcript() {
     app.apply_update(Update::Live(Live::Text("olá ".to_string())));
     app.apply_update(Update::Live(Live::Text("mundo".to_string())));
     app.apply_update(Update::Live(Live::Thinking("hmm".to_string())));
-    app.apply_update(Update::Live(Live::Tool("grep".to_string())));
+    app.apply_update(Update::Live(Live::Tool {
+        name: "grep".to_string(),
+        args: "{}".to_string(),
+    }));
     app.apply_update(Update::Live(Live::ToolDone("grep".to_string())));
     assert_eq!(app.streaming(), "olá mundo");
     assert_eq!(app.thinking(), "hmm");
@@ -67,10 +70,25 @@ fn live_stream_accumulates_outside_the_transcript() {
 }
 
 #[test]
+fn usage_and_cancellation_updates_are_visible() {
+    let mut app = App::new();
+    app.apply_update(Update::Usage("tokens in 10 out 5".to_string()));
+    assert_eq!(app.usage(), Some("tokens in 10 out 5"));
+    app.apply_update(Update::Cancelled);
+    assert!(
+        matches!(app.status(), Status::Message(_)),
+        "o cancelamento fica visível na barra"
+    );
+}
+
+#[test]
 fn done_clears_the_live_panel() {
     let mut app = App::new();
     app.apply_update(Update::Live(Live::Text("parcial".to_string())));
-    app.apply_update(Update::Live(Live::Tool("read".to_string())));
+    app.apply_update(Update::Live(Live::Tool {
+        name: "read".to_string(),
+        args: "{}".to_string(),
+    }));
     app.apply_update(Update::Assistant("final".to_string()));
     app.apply_update(Update::Done);
     assert!(app.streaming().is_empty());

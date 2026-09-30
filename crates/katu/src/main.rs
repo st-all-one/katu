@@ -3,7 +3,7 @@
 //! E01 define o esqueleto, os adaptadores das portas, o modelo de erro e o diagnóstico estruturado;
 //! o wiring real chega com E04 (kernel). Toda a operação de topo abre um `span!` (DF9/E19).
 
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 #![allow(
     clippy::redundant_pub_crate,
     reason = "binário: sem API externa; os módulos internos usam pub(crate)"
@@ -19,6 +19,9 @@ mod diag;
 
 #[cfg(feature = "memory-in-process")]
 mod memory;
+
+#[cfg(feature = "memory-in-process")]
+mod pricing;
 
 #[allow(dead_code, reason = "adaptadores ligados ao kernel em E04")]
 mod ports;

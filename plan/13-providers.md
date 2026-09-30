@@ -151,7 +151,9 @@ bloqueado pelo `ureq` (HTTP/1.1). Os dialetos `responses`/`messages`/`google` es
   (`katu-core::provider`), `ModelEntry.tier` + `Catalog::select_tier` (`katu-providers`),
   `Provider::model_for_tier`, `policy/tiers.toml` (fase → tier, dado versionado) e `TierPolicy`
   na borda (`crates/katu/src/tier.rs`, diag `provider.tier`); um modelo explícito do utilizador
-  (E12-T10) vence sempre.
+  (E12-T10) vence sempre. A borda mostra o **uso/custo** do turno no cabeçalho da TUI (`usage_line`:
+  tokens in/out/cache/think + custo quando há preço), com `policy/prices.toml` versionado (vazio =
+  `unpriced`, nunca se inventa preço).
 - **Aceite:** custo reportado usa a base correta; `unpriced` para modelo sem preço público; nunca
   inventar preço (DF5).
 

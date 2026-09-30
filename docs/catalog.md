@@ -31,7 +31,7 @@
 | `mem-recall-before-write` | enforced | Memória: não gravar nota sem ter consultado o conhecimento (recall) na mesma fase |
 | `mem-single-claim` | enforced | Memória: uma afirmação por nota |
 
-## Eventos de diag (82)
+## Eventos de diag (84)
 
 - `katu.run`
 - `katu.setup`
@@ -72,6 +72,7 @@
 - `contain.check`
 - `contain.deny`
 - `contain.mode`
+- `process.kill`
 - `memory.read`
 - `memory.write`
 - `memory.recall`
@@ -113,10 +114,11 @@
 - `tui.render`
 - `tui.input`
 - `tui.live`
+- `tui.cancel`
 - `tui.approval`
 - `tui.trash_empty`
 
-## ADRs (17)
+## ADRs (18)
 
 - [ADR 0001 — MVK aprovado: o loop possuído (DF1) torna-se compromisso](adr/0001-mvk-gate-aprovado.md)
 - [ADR 0002 — Ferramentas AI-first: envelope + views + TOON (core por medição)](adr/0002-ferramentas-ai-first.md)
@@ -135,3 +137,4 @@
 - [ADR 0015 — Loop de turnos e roteador de tool calls](adr/0015-loop-de-turnos-e-roteador.md)
 - [ADR 0016 — Política de memória e `unsafe`](adr/0016-politica-de-memoria-e-unsafe.md)
 - [ADR 0017 — Política de recursos e runtime mínimo](adr/0017-recursos-e-runtime-minimo.md)
+- [ADR 0018 — Kill do grupo de processos com um único `unsafe`](adr/0018-kill-do-grupo-com-unsafe-unico.md)

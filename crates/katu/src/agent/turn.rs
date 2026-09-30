@@ -1,18 +1,17 @@
 //! Execução de um turno (E12-T05/E10): pedido ao provider, observação efémera e tools §42.
 
-use katu_core::diag::{Level, events};
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::CallId;
-use katu_core::provider::{Flow, ProviderEvent, ProviderSink};
 use katu_policy::ApprovalRequest;
 use serde_json::Value;
 
-use super::{AgentError, CallOutcome, Ports, TurnReport, TurnRequest, catalog, execute_call};
+use super::{AgentError, CallOutcome, Ports, TurnReport, TurnRequest, execute_call};
 use crate::runtime::Runtime;
 
 mod request;
+mod run;
 
-use request::build_request;
+pub(crate) use run::run_turn_with;
 
 /// Evento **efémero** do turno (E10-T05): observação ao vivo, fora do log e do contexto.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,6 +24,8 @@ pub(crate) enum Activity<'a> {
     Tool {
         /// Nome ao modelo da tool.
         name: &'a str,
+        /// Argumentos **crus** enviados pelo modelo (transparência/diagnóstico).
+        args: &'a str,
     },
     /// Tool concluída (sucesso/parcial).
     ToolDone {
@@ -59,6 +60,14 @@ pub(crate) trait ActivitySink {
     fn approve(&mut self, _prompt: &ApprovalPrompt<'_>) -> Option<Approval> {
         None
     }
+
+    /// `true` se o utilizador pediu para **cancelar** o turno (cancelamento cooperativo).
+    ///
+    /// O loop verifica-o em cada fronteira (antes de cada passo e de cada tool call) e o sink do
+    /// provider devolve [`Flow::Break`] quando cancelado. Por omissão, nunca cancela.
+    fn cancelled(&self) -> bool {
+        false
+    }
 }
 
 /// Pedido de aprovação apresentado ao humano (E07-T05, §33).
@@ -84,37 +93,6 @@ impl ActivitySink for NoActivity {
     fn activity(&mut self, _activity: Activity<'_>) {}
 }
 
-/// Sink que acumula o turno e reencaminha a atividade efémera.
-struct TurnSink<'a> {
-    activity: &'a mut dyn ActivitySink,
-    text: String,
-    calls: Vec<(CallId, String, Value)>,
-}
-
-impl ProviderSink for TurnSink<'_> {
-    fn on_event(&mut self, event: ProviderEvent) -> Flow {
-        match event {
-            ProviderEvent::Text(delta) => {
-                self.activity.activity(Activity::Text(&delta));
-                self.text.push_str(&delta);
-            }
-            ProviderEvent::Thinking(delta) => {
-                self.activity.activity(Activity::Thinking(&delta));
-            }
-            ProviderEvent::ToolCall {
-                call,
-                name,
-                arguments,
-            } => {
-                self.activity.activity(Activity::Tool { name: &name });
-                self.calls.push((call, name, arguments));
-            }
-            _ => {}
-        }
-        Flow::Continue
-    }
-}
-
 /// Executa um turno completo sem observador externo.
 ///
 /// # Errors
@@ -126,76 +104,19 @@ pub(crate) fn run_turn(
     run_turn_with(runtime, request, &mut NoActivity)
 }
 
-/// Executa um turno completo, reencaminhando atividade efémera ao `activity` (E10-T05).
-///
-/// # Errors
-/// [`AgentError`] em falha do provider, da sessão ou do roteamento (fail-closed).
-pub(crate) fn run_turn_with(
-    runtime: &mut Runtime<'_>,
-    request: TurnRequest<'_>,
-    activity: &mut dyn ActivitySink,
-) -> Result<TurnReport, AgentError> {
-    let TurnRequest {
-        provider,
-        ports,
-        goal,
-        options,
-    } = request;
-    let _span = katu_core::span!(Level::Info, events::KERNEL_TURN);
-    if !runtime.session.state().turn_open {
-        runtime.begin_turn()?;
-    }
-    runtime.record_user(goal)?;
-    let tools = catalog::tool_defs();
-    let mut text = String::new();
-    let mut calls = 0_usize;
-    let mut usage = None;
-    let mut steps = 0_u32;
-    loop {
-        steps = steps.saturating_add(1);
-        let request = build_request(runtime, options, &tools)?;
-        let mut sink = TurnSink {
-            activity: &mut *activity,
-            text: String::new(),
-            calls: Vec::new(),
-        };
-        let outcome = provider.stream(&request, &mut sink)?;
-        usage = outcome.usage.or(usage);
-        let TurnSink {
-            text: sink_text,
-            calls: sink_calls,
-            activity: _,
-        } = sink;
-        if !sink_text.is_empty() {
-            runtime.record_assistant(&sink_text)?;
-            text.push_str(&sink_text);
-        }
-        calls = calls.saturating_add(sink_calls.len());
-        if sink_calls.is_empty() {
-            let turn = runtime.turn();
-            runtime.record_turn_end(turn)?;
-            return Ok(TurnReport {
-                steps,
-                text,
-                calls,
-                usage,
-            });
-        }
-        run_calls(runtime, &ports, sink_calls, activity)?;
-        if steps >= options.max_steps {
-            return Err(AgentError::TooManySteps { steps });
-        }
-    }
-}
-
 /// Executa as tool calls de um passo pela ordem §42, com o caminho de aprovação (E07-T05).
+///
+/// Devolve `false` se o utilizador cancelou a meio (o chamador fecha o turno).
 fn run_calls(
     runtime: &mut Runtime<'_>,
     ports: &Ports<'_>,
     calls: Vec<(CallId, String, Value)>,
     activity: &mut dyn ActivitySink,
-) -> Result<(), AgentError> {
+) -> Result<bool, AgentError> {
     for (call, name, arguments) in calls {
+        if activity.cancelled() {
+            return Ok(false);
+        }
         let mut outcome = execute_call(runtime, ports, call.clone(), &name, &arguments)?;
         emit_outcome(activity, &name, &outcome.outcome);
         retry_with_approval(
@@ -208,7 +129,7 @@ fn run_calls(
             activity,
         )?;
     }
-    Ok(())
+    Ok(true)
 }
 
 /// Reencaminha o resultado de uma tool ao observador: sucesso, recusa ou indisponibilidade

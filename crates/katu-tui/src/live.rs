@@ -10,8 +10,13 @@ pub enum Live {
     Text(String),
     /// Delta de raciocínio (guardado, fora do ecrã por omissão).
     Thinking(String),
-    /// Tool pedida pelo modelo.
-    Tool(String),
+    /// Tool pedida pelo modelo, com os argumentos **crus** (transparência).
+    Tool {
+        /// Nome ao modelo da tool.
+        name: String,
+        /// Argumentos crus enviados pelo modelo.
+        args: String,
+    },
     /// Tool concluída (sucesso/parcial).
     ToolDone(String),
     /// **Recusa de política** com a regra e a evidência (E10-T04); fica no painel e no transcript.

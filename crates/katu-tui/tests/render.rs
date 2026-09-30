@@ -104,7 +104,10 @@ fn renders_only_the_tail_of_a_large_transcript() -> Result<(), Box<dyn std::erro
 #[test]
 fn renders_live_activity_panel() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = App::new();
-    app.apply_update(Update::Live(Live::Tool("grep".to_string())));
+    app.apply_update(Update::Live(Live::Tool {
+        name: "grep".to_string(),
+        args: "{}".to_string(),
+    }));
     app.apply_update(Update::Live(Live::Text("a responder".to_string())));
     let text = draw(&app)?;
     assert!(text.contains("atividade"), "{text}");

@@ -76,6 +76,13 @@ catalog! {
     (CONTAIN_DENY, "contain.deny", "Contenção negou a operação."),
     (CONTAIN_MODE, "contain.mode", "Modo de contenção relatado (soft; honestidade obrigatória)."),
 
+    // -- Processos (E07-T04) -------------------------------------------------
+    (
+        PROCESS_KILL,
+        "process.kill",
+        "Morte do grupo de processos de um comando no timeout (filho + netos)."
+    ),
+
     // -- Memória -------------------------------------------------------------
     (MEMORY_READ, "memory.read", "Leitura da porta de memória."),
     (MEMORY_WRITE, "memory.write", "Escrita pela porta de memória."),
@@ -142,6 +149,7 @@ catalog! {
     (TUI_RENDER, "tui.render", "Desenho de um quadro."),
     (TUI_INPUT, "tui.input", "Entrada do utilizador."),
     (TUI_LIVE, "tui.live", "Observação efémera do turno (painel de atividade)."),
+    (TUI_CANCEL, "tui.cancel", "Turno cancelado pelo utilizador (Esc/Ctrl-C durante o stream)."),
     (TUI_APPROVAL, "tui.approval", "Challenge-and-response de aprovação humana respondido."),
     (
         TUI_TRASH_EMPTY,

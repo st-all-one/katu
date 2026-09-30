@@ -35,3 +35,31 @@ fn missing_subcommand_is_usage_error() -> Result<(), io::Error> {
     assert_eq!(output.status.code(), Some(2));
     Ok(())
 }
+
+/// `katu --json sessions` lista as sessões do projeto (possivelmente vazio) sem erro.
+#[test]
+fn sessions_lists_without_error() -> Result<(), io::Error> {
+    let output = Command::new(env!("CARGO_BIN_EXE_katu"))
+        .args(["--json", "sessions"])
+        .output()?;
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let text = String::from_utf8_lossy(&output.stdout);
+    assert!(text.contains("\"command\":\"sessions\""), "stdout: {text}");
+    Ok(())
+}
+
+/// `--resume` com um id desconhecido **recusa** (fail-closed), sem inventar sessão.
+#[test]
+fn resume_unknown_session_fails_closed() -> Result<(), io::Error> {
+    let output = Command::new(env!("CARGO_BIN_EXE_katu"))
+        .args(["--json", "run", "--resume", "s_0000000000000000", "olá"])
+        .output()?;
+    assert!(!output.status.success(), "devia falhar");
+    let text = String::from_utf8_lossy(&output.stdout);
+    assert!(text.contains("\"success\":false"), "stdout: {text}");
+    Ok(())
+}

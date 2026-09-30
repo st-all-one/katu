@@ -7,6 +7,7 @@ use katu_core::context::CompactionMode;
 use katu_core::error::Error;
 use katu_core::provider::{ModelSpec, Provider};
 use serde_json::{Value, json};
+use std::path::Path;
 
 use super::{Ports, TurnOptions, TurnRequest, run_turn};
 use crate::ports::{StdEnv, StdFs, StdProcess, SystemClock};
@@ -34,6 +35,26 @@ pub(crate) struct RunArgs<'a> {
     pub max_steps: u32,
     /// Liga a compactação do histórico no turno (E09-T07).
     pub compact: bool,
+    /// Retoma a sessão: `None` cria nova; `Some("last")` retoma a mais recente; `Some(id)` a indicada.
+    pub resume: Option<&'a str>,
+}
+
+/// Abre o runtime: sessão **nova** (`resume == None`) ou **retomada** (`last`/id).
+///
+/// # Errors
+/// [`RuntimeError`] se a memória, o layout, as regras ou a retomada falharem.
+pub(crate) fn open_runtime<'a>(
+    fs: &'a StdFs,
+    clock: &'a SystemClock,
+    start: &Path,
+    goal: &str,
+    resume: Option<&str>,
+) -> Result<Runtime<'a>, RuntimeError> {
+    match resume {
+        Some("last") => Runtime::resume(fs, clock, start, goal, None),
+        Some(id) => Runtime::resume(fs, clock, start, goal, Some(id)),
+        None => Runtime::open(fs, clock, start, goal),
+    }
 }
 
 /// Executa um turno do agente e devolve o relatório do comando.
@@ -43,7 +64,7 @@ pub(crate) fn run(args: &RunArgs<'_>) -> Report {
     let env = StdEnv;
     let process = StdProcess;
     let start = std::env::current_dir().unwrap_or_default();
-    let mut runtime = match Runtime::open(&fs, &clock, &start, "cli: run") {
+    let mut runtime = match open_runtime(&fs, &clock, &start, "cli: run", args.resume) {
         Ok(runtime) => runtime,
         Err(error) => return runtime_failure(error),
     };
@@ -166,6 +187,7 @@ fn turn_value(model: &str, turn: &super::TurnReport) -> Value {
         "steps": turn.steps,
         "chars": turn.text.chars().count(),
         "calls": turn.calls,
+        "cancelled": turn.cancelled,
         "usage": usage,
     })
 }

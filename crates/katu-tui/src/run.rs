@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use katu_core::diag::{Level, events};
 use katu_core::ports::Clock;
-use ratatui::crossterm::event::{self, Event, KeyEventKind};
+use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{DefaultTerminal, restore, try_init};
 
 use crate::action::map_key;
@@ -40,13 +40,51 @@ pub struct Painter<'a> {
     terminal: &'a mut DefaultTerminal,
     throttle: &'a Throttle<'a>,
     error: Option<io::Error>,
+    cancel: bool,
 }
 
 impl Painter<'_> {
     /// Regista um evento efémero e redesenha.
     pub fn live(&mut self, live: Live) {
+        self.poll_cancel();
         self.app.apply_update(Update::Live(live));
         self.redraw();
+    }
+
+    /// `true` se o utilizador pediu para **cancelar** o turno (Esc/Ctrl-C durante o stream).
+    #[must_use]
+    pub fn cancelled(&self) -> bool {
+        self.cancel
+    }
+
+    /// Sonda o teclado (não bloqueante) durante o turno: Esc/Ctrl-C pedem cancelamento.
+    ///
+    /// A borda corre o turno na thread da UI, pelo que este é o único ponto que lê o teclado
+    /// enquanto o modelo responde. Teclas que não sejam de cancelamento são descartadas.
+    fn poll_cancel(&mut self) {
+        loop {
+            match event::poll(Duration::ZERO) {
+                Ok(true) => {}
+                Ok(false) => return,
+                Err(error) => {
+                    self.error = Some(error);
+                    return;
+                }
+            }
+            match event::read() {
+                Ok(Event::Key(key)) if key.kind == KeyEventKind::Press => {
+                    if is_cancel_key(key) && !self.cancel {
+                        self.cancel = true;
+                        katu_core::event!(Level::Info, events::TUI_CANCEL);
+                    }
+                }
+                Ok(_) => {}
+                Err(error) => {
+                    self.error = Some(error);
+                    return;
+                }
+            }
+        }
     }
 
     /// Toma o erro de desenho acumulado, se houver (a borda decide abortar).
@@ -107,6 +145,12 @@ impl Painter<'_> {
     }
 }
 
+/// `true` se a tecla pede o cancelamento do turno (Esc ou Ctrl-C).
+fn is_cancel_key(key: KeyEvent) -> bool {
+    matches!(key.code, KeyCode::Esc)
+        || (key.modifiers.contains(KeyModifiers::CONTROL) && matches!(key.code, KeyCode::Char('c')))
+}
+
 /// Guarda RAII do terminal: restaura em qualquer saída (o `panic` já é coberto pelo hook).
 struct TerminalGuard {
     terminal: DefaultTerminal,
@@ -154,6 +198,7 @@ pub fn run<H: Handler>(mut app: App, handler: &mut H, clock: &dyn Clock) -> io::
                     terminal: &mut guard.terminal,
                     throttle: &throttle,
                     error: None,
+                    cancel: false,
                 };
                 let updates = handler.handle(command, &mut painter);
                 if let Some(error) = painter.take_error() {

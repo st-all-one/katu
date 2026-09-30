@@ -1,0 +1,10 @@
+# Preços por modelo (E12-T03/T10) — micro-USD por 1M tokens.
+#
+# Vazio por omissão: um modelo **sem** entrada fica `unpriced` e o custo não é mostrado. O katu
+# **nunca inventa preço** (DF5); preencher aqui é uma decisão explícita do dono.
+#
+# Exemplo:
+# [models."meu-modelo"]
+# input = 1000000        # 1 US$ / 1M tokens de entrada
+# output = 3000000       # 3 US$ / 1M tokens de saída
+# cached_input = 100000  # 0,1 US$ / 1M tokens de cache

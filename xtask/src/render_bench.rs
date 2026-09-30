@@ -151,7 +151,10 @@ fn scenario() -> App {
             ))),
         }
     }
-    app.apply_update(Update::Live(Live::Tool("grep".to_string())));
+    app.apply_update(Update::Live(Live::Tool {
+        name: "grep".to_string(),
+        args: "{}".to_string(),
+    }));
     app.apply_update(Update::Live(Live::Text("a responder ao vivo ".repeat(8))));
     app
 }

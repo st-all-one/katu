@@ -124,8 +124,8 @@ verificação recusa `SUCCESS` com erros (§38).
   (`tool.exec`). O `argv` vem de `ToolUse.argv` (fail-closed se ausente) e o `cwd` é fixado; o
   ambiente é **filtrado** de segredos (`*KEY*`/`*SECRET*`/`*TOKEN*`/`*PASSWORD*`/…); outcomes
   ortogonais (`exit`/`signal`/`timed_out`) com `stdout`/`stderr` truncados. `StdProcess` corre com o
-  utilizador que evocou o katu (sem elevação) e mata o filho no timeout; **kill do grupo** e scrub
-  de env mais amplo ficam em E07-T04 (exigem `nix`/`libc`; hoje `forbid(unsafe_code)`).
+  utilizador que evocou o katu (sem elevação) e mata o **filho direto e o grupo** no timeout
+  (`kill(-pgid)`, o único ponto `unsafe` — ADR 0018); o scrub de env mais amplo fica em E07-T04.
 - **Aceite:** `cd x && rm`, `bash -c`, `find -delete`, `r''m` são avaliados sobre factos; o golden
   de E02-T05 cobre estes casos; `Deny` = efeito não ocorre; o filho herda o utilizador e nenhum
   caminho eleva privilégio.

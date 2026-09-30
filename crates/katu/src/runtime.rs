@@ -11,15 +11,12 @@ use katu_core::error::Error;
 #[cfg(test)]
 use katu_core::kernel::Message;
 use katu_core::kernel::{
-    CallContext, CallId, ControlError, Dispatch, Event, MemoryWriteRequest, Session, SessionError,
-    SessionId, discover_root, memory_recall_use,
+    CallId, ControlError, Event, Session, SessionError, SessionId, discover_root,
 };
-use katu_core::memory::{Anchor, Memory, MemoryError, NoteType, PreWriteReq, RecallReq};
+use katu_core::memory::{Memory, MemoryError};
 use katu_core::plan::Plan;
 use katu_core::ports::{Clock, Fs};
 use katu_policy::{PolicyError, ResolvedPath, RuleSet};
-use katu_tools::recall::RecallTool;
-use katu_tools::write::WriteNoteTool;
 
 use crate::memory::KnudgeMemory;
 use crate::scope::{self, ScopeError};
@@ -27,6 +24,7 @@ use crate::scope::{self, ScopeError};
 mod checkpoint;
 mod context;
 mod control;
+mod memory;
 mod transcript;
 mod verify;
 
@@ -60,6 +58,14 @@ fn load_rules() -> Result<RuleSet, PolicyError> {
     Ok(rules)
 }
 
+/// Id da sessão mais recente do projeto (ordem temporal `(created_ms, id)`).
+fn latest_session(fs: &dyn Fs, root: &Path) -> Result<SessionId, RuntimeError> {
+    Session::list(fs, root)?
+        .pop()
+        .map(|meta| meta.id)
+        .ok_or_else(|| RuntimeError::Resume("nenhuma sessão para retomar".to_string()))
+}
+
 /// Falha ao montar ou operar o runtime.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum RuntimeError {
@@ -81,6 +87,9 @@ pub(crate) enum RuntimeError {
     /// Controlo de modelo/pensamento inválido (E12-T10).
     #[error("controlo: {0}")]
     Control(#[from] ControlError),
+    /// Não foi possível retomar a sessão (id inválido/desconhecido ou nenhuma sessão).
+    #[error("retomada: {0}")]
+    Resume(String),
 }
 
 impl From<RuntimeError> for Error {
@@ -89,7 +98,9 @@ impl From<RuntimeError> for Error {
             RuntimeError::Memory(source) => Self::unavailable(source.to_string()),
             RuntimeError::Policy(source) => Self::invalid_input(source.to_string()),
             RuntimeError::Scope(source) => Self::invalid_input(source.to_string()),
-            RuntimeError::Verification(message) => Self::invalid_input(message),
+            RuntimeError::Verification(message) | RuntimeError::Resume(message) => {
+                Self::invalid_input(message)
+            }
             RuntimeError::Control(source) => Self::invalid_input(source.to_string()),
             RuntimeError::Session(source) => Self::internal(source.to_string()),
         }
@@ -122,16 +133,60 @@ impl<'a> Runtime<'a> {
         goal: &str,
     ) -> Result<Self, RuntimeError> {
         let root = discover_root(fs, start);
+        let session = Session::create(fs, &root, clock.now().as_millis(), goal)?;
+        Self::assemble(fs, clock, goal, session)
+    }
+
+    /// Retoma a sessão mais recente do projeto (ou a indicada por `id`) e abre o próximo turno.
+    ///
+    /// Um turno deixado **aberto** por um processo morto a meio é fechado de forma determinística
+    /// (`TurnEnd`) antes de abrir o seguinte — a retomada nunca reabre um turno parcial.
+    ///
+    /// # Errors
+    /// [`RuntimeError::Resume`] se não houver sessão, o id for inválido ou desconhecido;
+    /// [`RuntimeError`] se a memória, o layout ou as regras falharem.
+    pub(crate) fn resume(
+        fs: &'a dyn Fs,
+        clock: &'a dyn Clock,
+        start: &Path,
+        goal: &str,
+        id: Option<&str>,
+    ) -> Result<Self, RuntimeError> {
+        let root = discover_root(fs, start);
+        let id = match id {
+            Some(id) => SessionId::parse(id)
+                .ok_or_else(|| RuntimeError::Resume(format!("id de sessão inválido: {id}")))?,
+            None => latest_session(fs, &root)?,
+        };
+        let session = Session::resume(fs, &root, &id)?;
+        Self::assemble(fs, clock, goal, session)
+    }
+
+    /// Monta o runtime sobre uma sessão já aberta (criação ou retomada) — ponto único de composição.
+    fn assemble(
+        fs: &'a dyn Fs,
+        clock: &'a dyn Clock,
+        goal: &str,
+        mut session: Session<'a>,
+    ) -> Result<Self, RuntimeError> {
+        let root = session.root().to_path_buf();
         let plan = scope::load(fs, &root)?;
         let memory = KnudgeMemory::open(&root)?;
         memory.status()?;
         let cwd = ResolvedPath::from_canonical(&root)?;
         let rules = load_rules()?;
-        let mut session = Session::create(fs, &root, clock.now().as_millis(), goal)?;
         // O runtime é um agente a atuar: define o workspace (destranca o normal dentro da raiz e
-        // exige aprovação fora) e abre o turno antes de qualquer tool call (§42).
+        // exige aprovação fora) antes de qualquer tool call (§42).
         session.set_workspace(&cwd)?;
-        session.apply(&Event::TurnStart { turn: 1 })?;
+        if session.state().turn_open {
+            let open = session.state().turn;
+            session.apply(&Event::TurnEnd { turn: open })?;
+        }
+        let next = session.state().turn.saturating_add(1);
+        session.apply(&Event::TurnStart { turn: next })?;
+        let goal = session
+            .meta()
+            .map_or_else(|| goal.to_string(), |meta| meta.goal.clone());
         Ok(Self {
             clock,
             session,
@@ -140,7 +195,7 @@ impl<'a> Runtime<'a> {
             cwd,
             calls: 0,
             plan,
-            goal: goal.to_string(),
+            goal,
             budget: DEFAULT_CONTEXT_BUDGET,
             compaction: CompactionMode::Disabled,
         })
@@ -224,67 +279,6 @@ impl<'a> Runtime<'a> {
     #[cfg(test)]
     pub(crate) fn session(&self) -> &Session<'a> {
         &self.session
-    }
-
-    /// Consulta a memória pelo caminho §42 (logado antes de executar; policy-gated).
-    ///
-    /// # Errors
-    /// [`RuntimeError`] se a transição, o custo ou a política falharem.
-    pub(crate) fn recall(&mut self, query: &str, limit: usize) -> Result<Dispatch, RuntimeError> {
-        let call = self.call("recall");
-        let tool = RecallTool {
-            memory: &self.memory,
-            req: RecallReq {
-                query: query.to_string(),
-                limit,
-            },
-        };
-        let use_ = memory_recall_use(&self.cwd);
-        let now = self.clock.now().as_millis();
-        self.session
-            .tool_call(
-                call,
-                &use_,
-                CallContext {
-                    rules: &self.rules,
-                    now_millis: now,
-                    tool: &tool,
-                },
-            )
-            .map_err(RuntimeError::from)
-    }
-
-    /// Regista uma nota: recall prévio (protocolo) + escrita pelo gate de E05 (ordem §42).
-    ///
-    /// # Errors
-    /// [`RuntimeError`] se o recall, a transição, o custo ou a política falharem.
-    pub(crate) fn remember(&mut self, req: &PreWriteReq) -> Result<Dispatch, RuntimeError> {
-        self.recall(&req.statement, 5)?;
-        let call = self.call("write");
-        let tool = WriteNoteTool {
-            memory: &self.memory,
-            req: req.clone(),
-        };
-        let now = self.clock.now().as_millis();
-        let request = MemoryWriteRequest {
-            cwd: &self.cwd,
-            req,
-            memory: &self.memory,
-            rules: &self.rules,
-            now_millis: now,
-            tool: &tool,
-        };
-        Ok(self.session.memory_write(call, request)?)
-    }
-
-    /// Constrói o `PreWriteReq` de uma nota simples (afirmação; tipo e âncora opcionais).
-    pub(crate) fn note(statement: &str, note_type: NoteType, anchor: Option<&str>) -> PreWriteReq {
-        PreWriteReq {
-            statement: statement.to_string(),
-            note_type,
-            anchor: anchor.map(Anchor::new),
-            body: String::new(),
-        }
     }
 
     /// Identificador de chamada único e determinístico dentro da sessão.

@@ -97,7 +97,10 @@ fecha o ponto em aberto **OA3** com um desenho testado. Padrões a herdar:
   **transcrição em ficheiro** é `<root>/.katu/transcript.md` (`Runtime::transcript` projeta o log;
   a borda escreve-a atomicamente após cada turno) e o **viewer read-only** (`T` →
   `Command::Transcript`, `katu-tui::TranscriptView`) lê o ficheiro com scroll e **sem** edição — o
-  live nunca entra na transcrição (§50.3).
+  live nunca entra na transcrição (§50.3). O **cancelamento cooperativo** (Esc/Ctrl-C durante o
+  stream) fecha o turno de forma limpa (`ActivitySink::cancelled` → `Flow::Break`; o texto parcial é
+  registado, o turno é fechado e `TurnReport.cancelled` sobe à UI, diag `tui.cancel`). Os
+  **argumentos crus** do modelo aparecem no painel ao lado da tool (`Activity::Tool { args }`).
 
 ### E10-T06 ☑ Checkpoint e estado visíveis
 - **Entregáveis:** indicador de fase, checkpoint atual, pendências, próxima ação.

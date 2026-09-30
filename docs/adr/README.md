@@ -23,7 +23,7 @@
 | [0001](0001-mvk-gate-aprovado.md) | MVK aprovado — o loop possuído (DF1) torna-se compromisso | aceite |
 | [0002](0002-ferramentas-ai-first.md) | Ferramentas AI-first: envelope + views + TOON (core por medição) | aceite |
 | [0003](0003-vocabulario-v2-contencao.md) | Vocabulário de política v2: leitura sensível e acesso fora do workspace | aceite |
-| [0004](0004-sem-ffi-kill-grupo-e17.md) | Sem FFI no MVP: kill do grupo de processos fica para a jail (E17) | aceite |
+| [0004](0004-sem-ffi-kill-grupo-e17.md) | Sem FFI no MVP: kill do grupo de processos fica para a jail (E17) | substituída por 0018 |
 | [0005](0005-formato-colunar-d39.md) | Formato ao modelo: colunar D39 (header autodescritivo, `\x1f`) | emendado por 0006 |
 | [0006](0006-toon-colunar-v3.md) | TOON colunar v3: sem headers, blocos literais e aliases de sessão | emendado por 0007 |
 | [0007](0007-projecoes-model-facing.md) | Projeções model-facing, digest `m`, catálogo de tools e emissor direto | aceite |
@@ -37,6 +37,7 @@
 | [0015](0015-loop-de-turnos-e-roteador.md) | Loop de turnos e roteador de tool calls | aceite |
 | [0016](0016-politica-de-memoria-e-unsafe.md) | Política de memória e `unsafe` | aceite |
 | [0017](0017-recursos-e-runtime-minimo.md) | Política de recursos e runtime mínimo | aceite |
+| [0018](0018-kill-do-grupo-com-unsafe-unico.md) | Kill do grupo de processos com um único `unsafe` | aceite |
 
 ## Template
 

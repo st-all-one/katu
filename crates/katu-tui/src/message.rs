@@ -51,10 +51,14 @@ pub enum Update {
     Models(Vec<String>),
     /// Próxima ação declarada no checkpoint de fase (E10-T06).
     NextAction(String),
+    /// Uso/custo do último turno (E12-T03/T10), já formatado pela borda.
+    Usage(String),
     /// Lista da lixeira publicada pela borda (E10-T07/E06-T09).
     Trash(Vec<TrashEntry>),
     /// Linhas da transcrição durável, lidas do ficheiro pela borda (E10-T05).
     Transcript(Vec<String>),
+    /// Turno cancelado pelo utilizador (cancelamento cooperativo).
+    Cancelled,
     /// Turno concluído (limpa a pendência).
     Done,
 }

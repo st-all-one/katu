@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use katu_core::kernel::Control;
+use katu_core::kernel::{Control, Message};
 use katu_core::memory::NoteType;
 use katu_core::ports::{FixedClock, Timestamp};
 use katu_core::provider::{ModelCapabilities, Thinking};
@@ -40,6 +40,57 @@ fn runtime_recalls_and_remembers_through_the_gate() -> Result<(), Box<dyn std::e
     runtime.session().verify()?;
 
     drop(runtime);
+    std::fs::remove_dir_all(&root)?;
+    Ok(())
+}
+
+#[test]
+fn resume_reopens_the_session_and_continues() -> Result<(), Box<dyn std::error::Error>> {
+    let root = root("resume")?;
+    let fs = StdFs;
+    let clock = FixedClock::new(Timestamp::from_millis(1_000));
+    let mut runtime = Runtime::open(&fs, &clock, &root, "objetivo")?;
+    let id = runtime.session_id().map(str::to_owned).ok_or("sem id")?;
+    runtime.record_user("olá")?;
+    runtime.record_assistant("resposta")?;
+    let turn = runtime.turn();
+    runtime.record_turn_end(turn)?;
+    drop(runtime);
+
+    let resumed = Runtime::resume(&fs, &clock, &root, "cli: resume", None)?;
+    assert_eq!(resumed.session_id(), Some(id.as_str()));
+    assert_eq!(resumed.turn(), turn.saturating_add(1));
+    let messages = resumed.messages()?;
+    assert!(
+        messages
+            .iter()
+            .any(|m| matches!(m, Message::Assistant { text } if text == "resposta")),
+        "a retomada vê o histórico durável"
+    );
+    resumed.session().verify()?;
+    drop(resumed);
+    std::fs::remove_dir_all(&root)?;
+    Ok(())
+}
+
+#[test]
+fn resume_closes_an_open_turn_before_the_next() -> Result<(), Box<dyn std::error::Error>> {
+    let root = root("resume-open")?;
+    let fs = StdFs;
+    let clock = FixedClock::new(Timestamp::from_millis(1_000));
+    let mut runtime = Runtime::open(&fs, &clock, &root, "objetivo")?;
+    runtime.record_user("olá")?;
+    let turn = runtime.turn();
+    drop(runtime); // o processo "morre" com o turno aberto
+
+    let resumed = Runtime::resume(&fs, &clock, &root, "cli: resume", None)?;
+    assert_eq!(
+        resumed.turn(),
+        turn.saturating_add(1),
+        "fecha o turno aberto e abre o seguinte"
+    );
+    resumed.session().verify()?;
+    drop(resumed);
     std::fs::remove_dir_all(&root)?;
     Ok(())
 }
