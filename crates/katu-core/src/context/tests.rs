@@ -275,6 +275,22 @@ fn long_prime_is_versioned_and_longer() {
 }
 
 #[test]
+fn prime_teaches_the_delta_only_contract() {
+    // B-07: o prime ensina o modelo a extrair só o necessário do delta (não copies o output
+    // inteiro). É o contrato "só o delta" — model-visible, logo no prime.
+    let compact = prime();
+    assert!(
+        compact.contains("extrai so o necessario"),
+        "o prime tem de ensinar o contrato só o delta: {compact}"
+    );
+    let long = prime_long();
+    assert!(
+        long.contains("extrai so o necessario"),
+        "o prime longo tem de ensinar o contrato só o delta: {long}"
+    );
+}
+
+#[test]
 fn assemble_with_prime_uses_the_long_variant() {
     let events = conversation();
     let budget = budget(1_000);

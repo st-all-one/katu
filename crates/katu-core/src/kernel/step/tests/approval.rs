@@ -16,6 +16,7 @@ fn approval_grants_a_capability_and_requires_a_signature() -> Result<(), Box<dyn
         capability: capability.clone(),
         reason: reason.to_string(),
         granted_by: granted_by.to_string(),
+        signature: "test-sig".to_string(),
     };
 
     let granted = step(&State::initial(), &event("necessário para o teste", "ana"))?;
@@ -44,6 +45,7 @@ fn approval_revoked_removes_the_capability() -> Result<(), Box<dyn std::error::E
             capability: capability.clone(),
             reason: "necessário".to_string(),
             granted_by: "ana".to_string(),
+            signature: "test-sig".to_string(),
         },
     )?;
     assert!(granted.capabilities.contains(&capability));

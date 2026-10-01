@@ -117,6 +117,8 @@ pub enum RefusalReason {
     },
     /// Aprovação sem assinatura (`reason` ou `granted_by` vazios): recusada (§33, fail-closed).
     UnsignedApproval,
+    /// Aprovação sem chave MAC (D3): recusada (fail-closed).
+    MissingMacKey,
 }
 
 /// Recusa de uma transição: o estado **não** muda (§42).

@@ -111,6 +111,11 @@ pub(crate) const KEYS: &[KeySpec] = &[
         kind: Kind::Text,
         doc: "Comando opcional para lançar o serviço de embeddings.",
     },
+    KeySpec {
+        key: "audit.mac_key",
+        kind: Kind::Text,
+        doc: "Chave secreta para o MAC das aprovações (D3). Sem ela, as aprovações são recusadas (fail-closed).",
+    },
 ];
 
 /// Devolve a especificação de uma chave canônica.

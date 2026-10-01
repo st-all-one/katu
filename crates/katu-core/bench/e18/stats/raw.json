@@ -1,0 +1,12 @@
+{
+  "c7_stats_robust": {
+    "clean_p50": 10, "clean_mean": 11, "clean_mad": 5, "clean_robust_ci95": [8, 12],
+    "outlier_p50": 11, "outlier_mean": 47629, "outlier_mad": 5, "outlier_robust_ci95": [9, 13],
+    "criteria": [
+      {"name": "mad_robust_to_outliers", "met": true},
+      {"name": "mean_not_robust", "met": true},
+      {"name": "robust_ci_contains_median", "met": true},
+      {"name": "robust_ci_stable_under_outliers", "met": true}
+    ]
+  }
+}

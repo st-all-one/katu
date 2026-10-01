@@ -83,6 +83,7 @@ fn the_approved_retry_does_not_collide_with_the_denial() -> Result<(), PolicyErr
             },
             reason: "justificado".into(),
             granted_by: "humano".into(),
+            signature: "test-sig".into(),
         },
         call("c1#approved", ToolName::Read)?,
         ran("c1#approved"),

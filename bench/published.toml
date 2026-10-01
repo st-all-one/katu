@@ -461,6 +461,29 @@ unit = "count"
 basis = "measured"
 artifact = { path = "bench/e18/approval/raw.json", note = "a aprovação de escalação de sandbox é revogada depois de usada e a segunda escalação exige nova aprovação (não herdada). Default on" }
 
+# --- D2/D3: auditoria e aprovações (OPTIMIZATION_PLAN.md Anexo A) ---
+[[metrics]]
+name = "w10.audit.tamper_detected"
+value = 1.0
+unit = "count"
+basis = "measured"
+artifact = { path = "bench/e18/audit/raw.json", note = "a cadeia de hash da auditoria deteta adulteração do conteúdo e remoção de segmentos. FNV-1a (zero-dep); não é um MAC criptográfico" }
+
+[[metrics]]
+name = "w10.approval.mac_required"
+value = 1.0
+unit = "count"
+basis = "measured"
+artifact = { path = "bench/e18/approval/raw.json", note = "a aprovação exige a chave MAC (audit.mac_key); sem ela, é recusada (fail-closed). D3" }
+
+# --- C7: estatística robusta (OPTIMIZATION_PLAN.md Anexo A) ---
+[[metrics]]
+name = "w10.stats.mad_robust"
+value = 1.0
+unit = "count"
+basis = "measured"
+artifact = { path = "bench/e18/stats/raw.json", note = "o MAD é resistente a outliers (5 com vs sem outlier 1M); a média dispara (11 → 47629). O IC robusto (mediana ± 1,96·MAD/√n) é estável" }
+
 # --- Q-15: retomada com cauda limitada (OPTIMIZATION_PLAN.md §Q-15) ---
 [[metrics]]
 name = "q15.resume.bounded.micros"

@@ -21,7 +21,7 @@ mod pipeline;
 mod project;
 mod session;
 mod state;
-mod step;
+pub(crate) mod step;
 
 pub use budget::{Budget, BudgetCap, BudgetGate, BudgetRefusal, Charge};
 pub use bus::{EventBus, HandlerError, HandlerResult, Middleware, Next, Observer};

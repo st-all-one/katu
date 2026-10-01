@@ -8,6 +8,7 @@ use katu_tools::schema::concurrency_of;
 use serde_json::Value;
 
 use super::{AgentError, CallOutcome, Ports, TurnReport, TurnRequest, execute_call};
+use crate::defaults;
 use crate::runtime::Runtime;
 
 mod batch;
@@ -250,11 +251,16 @@ fn retry_with_approval(
     let Some(capability) = capability else {
         return Ok(());
     };
+    // D3: a aprovação exige a chave MAC (fail-closed sem ela).
+    let mac_key = defaults::from_root(runtime.root())
+        .mac_key
+        .unwrap_or_default();
     runtime.session.approve(
         request.rule_id.clone(),
         capability.clone(),
         &approval.reason,
         &approval.granted_by,
+        &mac_key,
     )?;
     let retry = CallId::new(format!("{}#approved", call.as_str()));
     *outcome = execute_call(runtime, ports, retry, name, arguments)?;

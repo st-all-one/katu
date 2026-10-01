@@ -14,13 +14,19 @@ fn approval_survives_replay_and_requires_a_signature() -> Result<(), Box<dyn std
     };
     let rule = RuleId::from("contain-read-outside-workspace");
     let mut session = Session::open(&fs, dir)?;
-    session.approve(rule.clone(), capability.clone(), "necessário", "ana")?;
+    session.approve(
+        rule.clone(),
+        capability.clone(),
+        "necessário",
+        "ana",
+        "test-key",
+    )?;
     session.verify()?;
 
     let mut reopened = Session::open(&fs, dir)?;
     assert!(reopened.state().capabilities.contains(&capability));
 
-    let unsigned = reopened.approve(rule, capability, "   ", "ana");
+    let unsigned = reopened.approve(rule, capability, "   ", "ana", "test-key");
     assert!(
         matches!(unsigned, Err(SessionError::Refusal(_))),
         "assinatura vazia tem de ser recusada"
@@ -38,7 +44,7 @@ fn one_shot_approval_is_revoked_after_use() -> Result<(), Box<dyn std::error::Er
     };
     let rule = RuleId::from("contain-read-outside-workspace");
     let mut session = Session::open(&fs, dir)?;
-    session.approve(rule, capability.clone(), "necessário", "ana")?;
+    session.approve(rule, capability.clone(), "necessário", "ana", "test-key")?;
     assert!(session.state().capabilities.contains(&capability));
 
     session.revoke_approval(&capability)?;
@@ -59,7 +65,7 @@ fn one_shot_approval_does_not_survive_replay() -> Result<(), Box<dyn std::error:
     };
     let rule = RuleId::from("contain-read-outside-workspace");
     let mut session = Session::open(&fs, dir)?;
-    session.approve(rule, capability.clone(), "necessário", "ana")?;
+    session.approve(rule, capability.clone(), "necessário", "ana", "test-key")?;
     session.revoke_approval(&capability)?;
     session.verify()?;
 
@@ -83,7 +89,13 @@ fn a_second_escalation_requires_a_new_approval() -> Result<(), Box<dyn std::erro
     let mut session = Session::open(&fs, dir)?;
 
     // Primeira aprovação + revogação (one-shot).
-    session.approve(rule.clone(), capability.clone(), "primeira", "ana")?;
+    session.approve(
+        rule.clone(),
+        capability.clone(),
+        "primeira",
+        "ana",
+        "test-key",
+    )?;
     assert!(session.state().capabilities.contains(&capability));
     session.revoke_approval(&capability)?;
     assert!(!session.state().capabilities.contains(&capability));
@@ -93,8 +105,44 @@ fn a_second_escalation_requires_a_new_approval() -> Result<(), Box<dyn std::erro
         !session.state().capabilities.contains(&capability),
         "a segunda escalação não pode reutilizar a aprovação anterior"
     );
-    session.approve(rule, capability.clone(), "segunda", "ana")?;
+    session.approve(rule, capability.clone(), "segunda", "ana", "test-key")?;
     assert!(session.state().capabilities.contains(&capability));
+    Ok(())
+}
+
+#[test]
+fn approval_without_mac_key_is_refused() -> Result<(), Box<dyn std::error::Error>> {
+    // D3: sem chave MAC, a aprovação é recusada (fail-closed).
+    let fs = MemFs::new();
+    let dir = Path::new("/sessions-no-mac");
+    let capability = Capability::ReadPath {
+        root: ResolvedPath::from_canonical("/etc/hosts")?,
+    };
+    let rule = RuleId::from("contain-read-outside-workspace");
+    let mut session = Session::open(&fs, dir)?;
+    let result = session.approve(rule, capability, "necessário", "ana", "");
+    assert!(
+        matches!(result, Err(SessionError::Refusal(_))),
+        "aprovação sem chave MAC tem de ser recusada"
+    );
+    Ok(())
+}
+
+#[test]
+fn approval_with_mac_key_is_accepted() -> Result<(), Box<dyn std::error::Error>> {
+    // D3: com chave MAC, a aprovação é aceite e a capacidade concedida.
+    let fs = MemFs::new();
+    let dir = Path::new("/sessions-mac-ok");
+    let capability = Capability::ReadPath {
+        root: ResolvedPath::from_canonical("/etc/hosts")?,
+    };
+    let rule = RuleId::from("contain-read-outside-workspace");
+    let mut session = Session::open(&fs, dir)?;
+    session.approve(rule, capability.clone(), "necessário", "ana", "key-1")?;
+    assert!(
+        session.state().capabilities.contains(&capability),
+        "a aprovação com MAC válido tem de ser aceite"
+    );
     Ok(())
 }
 
@@ -115,14 +163,20 @@ fn ab_approval_by_artifact() -> Result<(), Box<dyn std::error::Error>> {
     let mut session = Session::open(&fs, dir)?;
 
     // Cenário 1: aprovação one-shot é revogada depois de usada.
-    session.approve(rule.clone(), capability.clone(), "primeira", "ana")?;
+    session.approve(
+        rule.clone(),
+        capability.clone(),
+        "primeira",
+        "ana",
+        "test-key",
+    )?;
     let granted = session.state().capabilities.contains(&capability);
     session.revoke_approval(&capability)?;
     let revoked = !session.state().capabilities.contains(&capability);
 
     // Cenário 2: a segunda escalação exige nova aprovação (não é herdada).
     let needs_new = !session.state().capabilities.contains(&capability);
-    session.approve(rule, capability.clone(), "segunda", "ana")?;
+    session.approve(rule, capability.clone(), "segunda", "ana", "test-key")?;
     let reapproved = session.state().capabilities.contains(&capability);
 
     let value = serde_json::json!({

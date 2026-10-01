@@ -118,6 +118,9 @@ pub enum Event {
         reason: String,
         /// Quem assinou (`granted_by`).
         granted_by: String,
+        /// Assinatura MAC (D3): hash do conteúdo + chave secreta. Sem chave, a aprovação é
+        /// recusada (fail-closed).
+        signature: String,
     },
     /// Revogação de capacidade **one-shot** (B-06): a aprovação de escalação de sandbox não é
     /// herdada — depois de usada, a capacidade é removida e a próxima escalação exige nova

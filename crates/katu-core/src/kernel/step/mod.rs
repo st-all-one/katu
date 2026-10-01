@@ -288,7 +288,7 @@ fn require_open(state: &State) -> Result<(), Refusal> {
 }
 
 /// Constrói uma recusa ancorada na fase corrente.
-fn refuse(state: &State, reason: RefusalReason) -> Refusal {
+pub(super) fn refuse(state: &State, reason: RefusalReason) -> Refusal {
     let _span = crate::trace_fn!("kernel::step::refuse");
 
     crate::event!(Level::Warn, events::KERNEL_REFUSAL);

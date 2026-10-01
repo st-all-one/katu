@@ -66,6 +66,12 @@ pub struct Summary {
     pub ci95_low: u64,
     /// Limite superior do IC 95 % da média.
     pub ci95_high: u64,
+    /// Desvio absoluto mediano (MAD) — robusto a outliers (C7).
+    pub mad: u64,
+    /// Limite inferior do IC 95 % robusto (mediana ± 1,96·MAD/√n).
+    pub robust_ci95_low: u64,
+    /// Limite superior do IC 95 % robusto.
+    pub robust_ci95_high: u64,
 }
 
 impl Summary {
@@ -102,6 +108,22 @@ impl Summary {
         (self.ci95_low, self.ci95_high)
     }
 
+    /// Limites do IC 95 % **robusto** `(inferior, superior)` — mediana ± 1,96·MAD/√n.
+    ///
+    /// Resistente a outliers: ao contrário de [`Summary::ci95`], que segue a média, este
+    /// intervalo segue a mediana e o MAD. Quando os dois discordam, a diferença mede o
+    /// efeito de valores extremos.
+    #[must_use]
+    pub const fn robust_ci95(&self) -> (u64, u64) {
+        (self.robust_ci95_low, self.robust_ci95_high)
+    }
+
+    /// `true` se o **limite superior** do IC 95 % robusto cabe no orçamento.
+    #[must_use]
+    pub const fn robust_within_budget(&self, budget: u64) -> bool {
+        self.robust_ci95_high <= budget
+    }
+
     /// `true` se o **limite superior** do IC 95 % cabe no orçamento.
     #[must_use]
     pub const fn within_budget(&self, budget: u64) -> bool {
@@ -118,6 +140,8 @@ impl Summary {
         // Invariante: o IC contém o centro da amostra (mediana e média).
         ci95_low = ci95_low.min(p50).min(mean);
         ci95_high = ci95_high.max(p50).max(mean);
+        let mad = mad(sorted, p50);
+        let (robust_ci95_low, robust_ci95_high) = robust_interval(p50, mad, sorted.len());
         Self {
             n: len_u64(sorted.len()),
             p50,
@@ -125,6 +149,9 @@ impl Summary {
             mean,
             ci95_low,
             ci95_high,
+            mad,
+            robust_ci95_low,
+            robust_ci95_high,
         }
     }
 }
@@ -169,6 +196,42 @@ fn mean(sorted: &[u64]) -> u64 {
             .unwrap_or(u128::MAX),
     )
     .unwrap_or(u64::MAX)
+}
+
+/// Desvio absoluto mediano (MAD): `mediana(|x_i − mediana|)`. Robusto a outliers (C7).
+///
+/// Ao contrário do desvio padrão, o MAD não é afetado por valores extremos: uma amostra
+/// com um outlier gigante tem um MAD pequeno e um desvio padrão enorme.
+fn mad(sorted: &[u64], median: u64) -> u64 {
+    let _span = crate::trace_fn!("stats::mad");
+    if sorted.is_empty() {
+        return 0;
+    }
+    let mut deviations: Vec<u64> = sorted.iter().map(|&value| value.abs_diff(median)).collect();
+    deviations.sort_unstable();
+    percentile(&deviations, 5_000)
+}
+
+/// IC 95 % robusto: `mediana ± 1,96 · MAD / √n`.
+///
+/// Aproximação normal sobre o MAD (consistente com o IC da média). Para `n < 2` o MAD é
+/// zero e o intervalo colapsa na mediana.
+#[allow(
+    clippy::as_conversions,
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "fronteira do IC robusto: inteiro→f64 só para arredondar; a decisão usa o inteiro"
+)]
+fn robust_interval(median: u64, mad: u64, n: usize) -> (u64, u64) {
+    let _span = crate::trace_fn!("stats::robust_interval");
+    if n == 0 {
+        return (0, 0);
+    }
+    let n_f = f64::from(u32::try_from(n).unwrap_or(u32::MAX));
+    let margin = Z95 * (mad as f64 / n_f.sqrt());
+    let median_f = median as f64;
+    (saturate(median_f - margin), saturate(median_f + margin))
 }
 
 /// IC 95 % da média: normal para `n ≥ 30`, *bootstrap* determinístico abaixo disso.

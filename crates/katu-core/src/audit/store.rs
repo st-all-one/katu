@@ -16,6 +16,7 @@ use super::record::{self, AuditRecord};
 use crate::diag::{Level, events};
 use crate::kernel::{Event, audit_dir};
 use crate::ports::{Fs, FsError};
+use crate::report::content_hash;
 use crate::toon::{Section, emit};
 
 /// Versão do esquema do manifesto.
@@ -37,6 +38,16 @@ pub enum AuditError {
     /// Segmento inválido.
     #[error("segmento: {0}")]
     Parse(String),
+    /// Adulteração detetada (D2): a cadeia de hash está quebrada.
+    #[error("adulteração no segmento {segment}: esperado {expected}, encontrado {found}")]
+    Tamper {
+        /// Segmento adulterado.
+        segment: String,
+        /// Hash esperado.
+        expected: String,
+        /// Hash encontrado.
+        found: String,
+    },
 }
 
 /// Informação de um segmento selado.
@@ -50,6 +61,10 @@ pub struct SegmentInfo {
     pub to: u64,
     /// Número de eventos.
     pub events: u64,
+    /// Hash do conteúdo do segmento (FNV-1a 64-bit, 16 hex) — D2: deteção de adulteração.
+    pub hash: String,
+    /// Hash do segmento anterior (cadeia de hash; vazio no primeiro) — D2.
+    pub prev_hash: String,
 }
 
 /// Manifesto da auditoria.
@@ -173,11 +188,21 @@ impl<'a> AuditStore<'a> {
         let from = self.buffer.first().map_or(0, |record| record.seq);
         let to = self.buffer.last().map_or(0, |record| record.seq);
         let events = u64::try_from(self.buffer.len()).unwrap_or(u64::MAX);
+        // D2: cadeia de hash — o hash do segmento é o hash do seu conteúdo; o `prev_hash` é o
+        // hash do segmento anterior (vazio no primeiro). Qualquer adulteração quebra a cadeia.
+        let prev_hash = self
+            .manifest
+            .segments
+            .last()
+            .map_or(String::new(), |seg| seg.hash.clone());
+        let hash = content_hash(rec.as_bytes());
         self.manifest.segments.push(SegmentInfo {
             name,
             from,
             to,
             events,
+            hash,
+            prev_hash,
         });
         self.manifest.next = self.manifest.next.saturating_add(1);
         codec::write_manifest(self.fs, &self.dir, &self.manifest)?;
@@ -239,6 +264,40 @@ impl<'a> AuditStore<'a> {
             return Ok(None);
         }
         Ok(bin::decode(&self.fs.read(&path)?))
+    }
+
+    /// Verifica a cadeia de hash dos segmentos (D2: deteção de adulteração).
+    ///
+    /// Para cada segmento, lê o `.rec`, computa o hash e compara com o `hash` do manifesto;
+    /// verifica também que o `prev_hash` liga ao segmento anterior. Qualquer adulteração
+    /// (conteúdo modificado, segmento removido, ordem trocada) é detetada.
+    ///
+    /// # Errors
+    /// [`AuditError::Tamper`] se a cadeia estiver quebrada.
+    pub fn verify(&self) -> Result<(), AuditError> {
+        let _span = crate::fn_span!(Level::Debug, events::AUDIT_SEAL, "audit::store::verify");
+        let mut prev_hash = String::new();
+        for info in &self.manifest.segments {
+            let path = self.dir.join(format!("{}.rec", info.name));
+            let bytes = self.fs.read(&path)?;
+            let computed = content_hash(&bytes);
+            if computed != info.hash {
+                return Err(AuditError::Tamper {
+                    segment: info.name.clone(),
+                    expected: info.hash.clone(),
+                    found: computed,
+                });
+            }
+            if info.prev_hash != prev_hash {
+                return Err(AuditError::Tamper {
+                    segment: info.name.clone(),
+                    expected: prev_hash.clone(),
+                    found: info.prev_hash.clone(),
+                });
+            }
+            prev_hash.clone_from(&info.hash);
+        }
+        Ok(())
     }
 }
 

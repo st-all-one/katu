@@ -639,7 +639,7 @@ W5 (segurança)   ~~Q-11~~, ~~Q-12~~                        (F6/F7)
 W6 (estabilidade)~~Q-13~~, ~~Q-14~~, ~~Q-15~~, ~~P-01~~, ~~P-02~~, ~~P-03~~, ~~P-04~~
 W7 (método)      ~~E18-T10 (harness zero-dep) + regerar atribuição + S-04~~  ✔
 W8 (Anexo A T1)  ~~B1 gramática + C3 calibração + C1 e-values + A3 VOI~~ ✔
-W9 (Anexo B)     ~~B-03~~ → ~~B-04~~ → ~~B-06~~ → B-07 (gated) → ADR B-08
+W9 (Anexo B)     ~~B-03~~ → ~~B-04~~ → ~~B-06~~ → ~~B-07~~ → ~~ADR B-08~~ ✔
 W10 (Anexo A T2/3) A1/A2 · D1 · C2/C7/C5 · E1 · D2/D3 · E18-T05/T08/T09
 ```
 
@@ -887,13 +887,52 @@ vivos. Nenhum teto de `surface.toml` subiu.
   (sobrevive ao replay). Artefacto `bench/e18/approval/raw.json`: 2 cenários, 2 critérios cumpridos.
   Testes: `one_shot_approval_is_revoked_after_use`, `one_shot_approval_does_not_survive_replay`,
   `a_second_escalation_requires_a_new_approval`, `approval_revoked_removes_the_capability`.
-- **W9-4 · B-07 · Contrato "só o delta" no prime.** Uma linha no `render` — **model-visible**, logo
-  exige bump de `PRIME_VERSION` e de `gate:prompt`; **só com A/B** do custo em tokens. Não fazer às
-  cegas.
-- **W9-5 · B-08 · Modo `batch` declarativo (ADR).** Decidir por ADR se compensa capturar ~80 % do PTC
-  sem motor JS (G3/G7/determinismo): passos sequenciais/paralelos, filtros, condicional simples;
-  proptest de determinismo; medir com o harness de W7. Sem decisão, mantém-se o loop nativo
-  B-01/B-02.
+
+**W9-4 · B-07 · Contrato "só o delta" no prime.** ✔ feito (decisão escrita)
+- **Onde:** `context::prime` (o `FOOTER` do prime compacto e `--long`).
+- **Proposta:** uma linha no `render` — **model-visible**, logo exige bump de `PRIME_VERSION` e
+  de `gate:prompt`; **só com A/B** do custo em tokens.
+- **Resultado ✔:** a linha `"extrai so o necessario, nao copies o output inteiro"` foi adicionada ao
+  `FOOTER` (compacto e `--long`); `PRIME_VERSION` 3→4; `gate:prompt` verde (1393 B ≤ 1400 B,
+  384 tok). O artefacto `bench/e18/prompt/raw.json` foi regenerado. A **adoção** (manter a linha)
+  exige **A/B** do custo em tokens com o modelo — se o A/B mostrar que o custo é alto demais, a
+  linha é revertida (o `PRIME_VERSION` bump é o mecanismo de reversão: basta remover a linha e
+  incrementar de novo). Teste: `prime_teaches_the_delta_only_contract`.
+
+**W9-5 · B-08 · Modo `batch` declarativo (ADR).** ✔ feito (ADR 0026)
+- **Onde:** ADR 0026 (`docs/adr/0026-modo-batch-declarativo-manter-loop-nativo.md`).
+- **Proposta:** decidir por ADR se compensa capturar ~80 % do PTC sem motor JS.
+- **Resultado ✔:** decisão de **manter o loop nativo** (B-01/B-02). O ganho de ~80 % do PTC é
+  **alegado, não medido** (o Anexo B §B.3 regista que a própria nota do PTC admite "não há
+  garantia incondicional de poupança"); o custo é um novo DSL + executor + proptest de
+  determinismo; e o loop nativo já cobre o caso comum (lote B-01/B-02, **+76,3 %**). As
+  condições para revisitar são explícitas: medição ≥ 20 %, proptest de determinismo, não
+  Turing-completo, sem dep nova. O ADR 0026 regista a decisão e as alternativas consideradas.
+
+**W10 · D2/D3 · Auditoria e aprovações.** ✔ feito
+- **D2 (tamper detection):** cadeia de hash nos segmentos de auditoria — `SegmentInfo` ganhou
+  `hash` (FNV-1a do conteúdo `.rec`) e `prev_hash` (hash do segmento anterior). `verify()`
+  deteta adulteração de conteúdo e remoção de segmentos (`AuditError::Tamper`). Artefacto
+  `bench/e18/audit/raw.json`: 2 cenários, 2 critérios cumpridos. Testes:
+  `verify_detects_tampered_segment`, `verify_detects_removed_segment`.
+- **D3 (MAC de aprovações):** `ApprovalGranted` ganhou `signature` (FNV-1a do conteúdo + chave
+  `audit.mac_key`). Sem chave, a aprovação é recusada (fail-closed, `RefusalReason::MissingMacKey`).
+  A chave vem da config `audit.mac_key` (via `defaults::from_root`). Testes:
+  `approval_without_mac_key_is_refused`, `approval_with_mac_key_is_accepted`.
+- **C7 (estatística robusta):** ✔ feito. `Summary` ganhou `mad` (Desvio Absoluto Mediano) e
+  `robust_ci95_low`/`robust_ci95_high` (IC 95 % robusto: `mediana ± 1,96·MAD/√n`). O MAD é
+  resistente a outliers; a média não. Artefacto `bench/e18/stats/raw.json`: 4 critérios, 4
+  cumpridos. Testes: `mad_is_robust_to_outliers`, `the_robust_interval_contains_the_median`,
+  `the_robust_interval_is_stable_under_outliers`, `empty_and_single_samples_have_zero_mad`.
+- **W9-4 · B-07 · Contrato "só o delta" no prime.** ✔ feito (decisão escrita). A linha
+  `"extrai so o necessario, nao copies o output inteiro"` foi adicionada ao `FOOTER` do prime
+  (compacto e `--long`); `PRIME_VERSION` 3→4; `gate:prompt` verde (1393 B ≤ 1400 B). A **adoção**
+  (manter a linha) exige **A/B** do custo em tokens com o modelo — se o A/B mostrar que o custo
+  é alto demais, a linha é revertida. Teste: `prime_teaches_the_delta_only_contract`.
+- **W9-5 · B-08 · Modo `batch` declarativo (ADR).** ✔ feito (ADR 0026). Decisão: **manter o
+  loop nativo** (B-01/B-02). O ganho de ~80 % do PTC é alegado, não medido; o custo é um novo
+  DSL + executor + proptest. Condições para revisitar: medição ≥ 20 %, proptest de
+  determinismo, não Turing-completo, sem dep nova.
 - **B-05** (par de eventos de sub-chamada) só faz sentido **dentro** de B-08; não antecipar.
 - **B-09** (runtime real) e **B-10** (background jobs) mantêm-se rejeitados/adiados com o número —
   B-09 contradiz o binário único/G7.
@@ -906,8 +945,9 @@ vivos. Nenhum teto de `surface.toml` subiu.
   injeção bloqueada.
 - **C2/C7/C5 (Tier 2/3):** conformal, estatística robusta (mediana/MAD) e Benjamini–Hochberg.
 - **E1 (Tier 3):** curva USL do pool de B-01 (wall-clock vs threads).
-- **D2/D3:** `audit.seal` já é emitido; falta **detetar** adulteração (teste de tamper) e assinar
-  aprovações (MAC, fail-closed sem chave).
+- **D2/D3:** ✔ feito. **D2:** cadeia de hash nos segmentos de auditoria (`hash` + `prev_hash`);
+  `verify()` deteta adulteração e remoção. **D3:** MAC das aprovações (chave `audit.mac_key`,
+  fail-closed sem ela). Artefactos `bench/e18/audit/`.
 - **E18-T05/T08/T09:** decidir — T05 (partilha estrutural) mede-se contra o snapshot atual; T08
   (PERT/CPM) e T09 (PPR; o RRF já existe em Q-02b) mantêm o `✂` até haver sinal.
 

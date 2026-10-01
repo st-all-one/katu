@@ -15,6 +15,14 @@ use crate::agent::{Activity, ActivitySink, Approval, ApprovalPrompt, Ports, run_
 use crate::ports::{StdEnv, StdFs, StdProcess};
 use crate::runtime::Runtime;
 
+/// Escreve a config de teste com a chave MAC (D3).
+fn write_mac_config(workspace: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let dir = workspace.join(".katu");
+    std::fs::create_dir_all(&dir)?;
+    std::fs::write(dir.join("katu.toml"), "audit.mac_key = \"test-key\"\n")?;
+    Ok(())
+}
+
 /// Aprovador de teste: aprova só quando o âmbito contém `approve_containing`.
 #[derive(Default)]
 struct Approver {
@@ -62,6 +70,7 @@ fn outcomes(runtime: &Runtime<'_>) -> Result<Vec<ToolOutcome>, Box<dyn std::erro
 #[test]
 fn approval_unlocks_an_outside_read_and_is_logged() -> Result<(), Box<dyn std::error::Error>> {
     let workspace = root("approval-ws")?;
+    write_mac_config(&workspace)?;
     let target_dir = root("approval-target")?;
     let target = target_dir.join("dados.txt");
     std::fs::write(&target, "conteúdo")?;
@@ -116,6 +125,7 @@ fn approval_unlocks_an_outside_read_and_is_logged() -> Result<(), Box<dyn std::e
 #[test]
 fn an_approval_is_not_inherited_by_a_different_path() -> Result<(), Box<dyn std::error::Error>> {
     let workspace = root("approval-scope-ws")?;
+    write_mac_config(&workspace)?;
     let dir = root("approval-scope-target")?;
     let first = dir.join("dados.txt");
     let second = dir.join("outro.txt");

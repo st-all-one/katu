@@ -1,0 +1,25 @@
+{
+  "caveat": "proxy determinístico (sem I/O real): mede a deteção de adulteração, não a segurança criptográfica do hash (FNV-1a não é um MAC)",
+  "criterion": "a cadeia está intacta e a adulteração é detetada",
+  "criterion_met": true,
+  "decision": "default on (a cadeia de hash é o mecanismo de deteção de adulteração)",
+  "question": "a cadeia de hash da auditoria deteta adulteração",
+  "rule": "cada segmento tem um hash do conteúdo e um ponteiro ao hash anterior; qualquer adulteração quebra a cadeia",
+  "scenarios": [
+    {
+      "name": "intact_chain",
+      "segments": 2,
+      "verify_passes": true
+    },
+    {
+      "name": "tamper_detected",
+      "verify_fails": true
+    }
+  ],
+  "schema": "katu.bench.audit.v1",
+  "totals": {
+    "intact": true,
+    "segments": 2,
+    "tamper_detected": true
+  }
+}

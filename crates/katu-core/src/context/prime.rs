@@ -10,7 +10,7 @@ use crate::toon::schema::{self, Mode};
 use super::AssembleOptions;
 
 /// Versão do prime (DF12). Mudar o texto do prime exige incrementar isto.
-pub const PRIME_VERSION: u32 = 3;
+pub const PRIME_VERSION: u32 = 4;
 
 /// Variante do prime (E09-T01): compacto (default) ou completo (`--long`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -34,12 +34,12 @@ const TOOLS_LINE: &str = "tools: read/write/edit/move/trash/bash/grep/find/ls/pl
 /// Cabeçalho que substitui a linha de tools quando o catálogo é injetado.
 const CATALOG_HEADER: &str = "tools (tabela `tool`; `?` opcional, `{a,b}` dominio fechado):";
 
-/// Rodapé do prime compacto.
-const FOOTER: &str = "JSON com format=json; so o delta chega ao modelo.";
+/// Rodapé do prime compacto (B-07: contrato "só o delta" — extrai o necessário, não copies o
+/// output inteiro).
+const FOOTER: &str = "JSON com format=json; so o delta chega ao modelo; extrai so o necessario, nao copies o output inteiro.";
 
-/// Rodapé do prime completo (`--long`).
-const LONG_FOOTER: &str =
-    "JSON equivalente com `format=json`/`--json`; so o delta chega ao modelo.";
+/// Rodapé do prime completo (`--long`) (B-07: contrato "só o delta").
+const LONG_FOOTER: &str = "JSON equivalente com `format=json`/`--json`; so o delta chega ao modelo; extrai so o necessario, nao copies o output inteiro.";
 
 /// Gramática completa (spec TOON colunar v3) — `--long`.
 const LONG_GRAMMAR: &str = "\

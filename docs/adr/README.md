@@ -45,6 +45,7 @@
 | [0023](0023-contexto-e-duas-ias.md) | Contexto do projeto (`AGENTS.md`/skills) e duas IAs (embedding + execução) | aceite |
 | [0024](0024-durabilidade-do-log.md) | Durabilidade do log: `fsync` por evento ou por turno (opt-in) | aceite |
 | [0025](0025-decodificacao-estruturada-por-schema.md) | Decodificação estruturada por JSON Schema: opt-in, fail-open | aceite |
+| [0026](0026-modo-batch-declarativo-manter-loop-nativo.md) | Modo `batch` declarativo: manter o loop nativo (B-08) | aceite |
 
 ## Template
 

@@ -36,9 +36,9 @@ prime 1400 B · tools 5100 B · `system` (AGENTS+prime+skills) 2200 tok.
 | `tools` (wire JSON) | 5013 B / 1381 tok | 5013 B / 1381 tok | — (contrato do endpoint) |
 | catálogo de skills | 4828 B / 1330 tok | **1211 B / 334 tok** | **−73,9 %** (Q-05) |
 | `AGENTS.md` | 1591 B / 438 tok | **1128 B / 311 tok** | **−29,1 %** (Q-19) |
-| prime | 1340 B / 369 tok | 1340 B / 370 tok | — |
-| **`system`** | 7759 B / 2137 tok | **3679 B / 1014 tok** | **−51,4 %** |
-| **prompt (system + tools)** | ~3518 tok | **~2394 tok** | **−30,9 %** |
+| prime | 1340 B / 369 tok | **1393 B / 384 tok** | **+3,9 %** (B-07: contrato "só o delta") |
+| **`system`** | 7759 B / 2137 tok | **3732 B / 1028 tok** | **−51,8 %** |
+| **prompt (system + tools)** | ~3518 tok | **~2454 tok** | **−30,2 %** |
 
 Os dois alvos controláveis caíram: o catálogo de skills por **descrição de uma linha + caminho
 relativo** (Q-05) e o `AGENTS.md` por **condensação determinística** (Q-19). Os `tools` (38 % do

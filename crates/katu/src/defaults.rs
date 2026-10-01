@@ -36,6 +36,8 @@ pub(crate) struct Defaults {
     pub(crate) structured_output: Option<bool>,
     /// Limite de recall por omissão.
     pub(crate) recall_limit: Option<usize>,
+    /// Chave MAC das aprovações (D3): sem ela, as aprovações são recusadas (fail-closed).
+    pub(crate) mac_key: Option<String>,
     /// Embeddings (E20-T17): a **segunda IA**, externa e plugável.
     pub(crate) embeddings: EmbeddingDefaults,
 }
@@ -83,6 +85,7 @@ pub(crate) fn from_root(root: &Path) -> Defaults {
         structured_output: boolean(&table, "provider.structured_output"),
         recall_limit: integer(&table, "recall.default_limit")
             .and_then(|value| usize::try_from(value).ok()),
+        mac_key: text(&table, "audit.mac_key"),
         embeddings: EmbeddingDefaults {
             url: text(&table, "embeddings.url"),
             model: text(&table, "embeddings.model"),
