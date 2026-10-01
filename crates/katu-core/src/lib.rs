@@ -23,6 +23,7 @@ pub mod provider;
 pub mod report;
 pub mod skill;
 pub mod stats;
+pub mod taint;
 pub mod toon;
 pub mod validate;
 pub mod verify;

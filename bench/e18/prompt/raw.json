@@ -2,16 +2,16 @@
   "baseline": {
     "agents_bytes": 1590,
     "skills_bytes": 4636,
-    "system_bytes": 7619,
-    "system_tokens": 2099,
-    "total_tokens": 3524
+    "system_bytes": 7705,
+    "system_tokens": 2123,
+    "total_tokens": 3548
   },
   "bytes_per_token_milli": 3631,
   "gains": {
     "agents": 0.2906,
     "skills": 0.7388,
-    "system": 0.5102,
-    "total": 0.3038
+    "system": 0.5045,
+    "total": 0.3018
   },
   "parts": [
     {
@@ -25,9 +25,9 @@
       "tokens": 334
     },
     {
-      "bytes": 1393,
+      "bytes": 1479,
       "name": "prime",
-      "tokens": 384
+      "tokens": 408
     },
     {
       "bytes": 5175,
@@ -40,8 +40,8 @@
     "tools_core_gain": 0.1358
   },
   "protocol": "bench/e18/prompt/PROTOCOL.md",
-  "system_bytes": 3732,
-  "system_tokens": 1028,
-  "total_bytes": 8907,
-  "total_tokens": 2454
+  "system_bytes": 3818,
+  "system_tokens": 1052,
+  "total_bytes": 8993,
+  "total_tokens": 2477
 }

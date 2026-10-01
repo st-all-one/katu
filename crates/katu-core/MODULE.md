@@ -151,6 +151,14 @@ função, o log é a fonte da verdade.
   **−62,0 %** em dev e **−33,3 %** em release (P-02).
 - Envelope [`report`](src/report.rs) (DF12/E06-T12): `ToolReport`/`Page`/`Cost`, ids
   content-addressed e hash; renderiza em TOON ou JSON. Transportado por `ToolOutput`.
+- *Taint*/*spotlighting* do output de tool [`taint`](src/taint.rs) (D1): o delta *model-visible*
+  viaja entre `<katu:untrusted kind=… bytes=…>` e `</katu:untrusted>` — dado **não confiável**,
+  nunca instrução. `escape` neutraliza (`<` → `[`) qualquer `<` que inicia `katu:`/`/katu:` **sem
+  alterar o comprimento**, logo `MAX_DELTA_BYTES` (8 KiB) continua a ser um teto exato sobre o delta
+  completo; `inspect` é o teste estrutural do envelope. O embrulho vive em `ToolReport::to_delta`
+  (não no encoder) para manter `Model-visible ⟺ logged`. Medido em
+  [`bench/e18/taint`](../../bench/e18/taint/PROTOCOL.md): **6/6 ataques bloqueados**, custo
+  **71 B** por resultado (0,87 % de um delta de 8 KiB).
 - Skills do projeto [`skill`](src/skill.rs) (E20-T13): `Skill` (nome/descrição/caminho),
   `discover`/`parse` (frontmatter `name`/`description`) e `catalog` (texto do prompt de sistema).
   Descoberta **fail-open**: sem `.agents/skill{,s}/` → lista vazia; sem descrição → não carregada.

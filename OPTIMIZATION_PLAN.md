@@ -941,8 +941,15 @@ vivos. Nenhum teto de `surface.toml` subiu.
 
 - **A1/A2 (Tier 2):** formalizar o proxy de Q-02b/Q-03 com distorção `D ≤ D0`; artefacto
   `bench/e18/select/`.
-- **D1 (Tier 2):** *taint*/*spotlighting* do output de tool antes do modelo; suíte red-team; mede
-  injeção bloqueada.
+- **D1 (Tier 2):** ✔ feito. *Taint*/*spotlighting* do output de tool antes do modelo
+  ([`katu-core/src/taint.rs`](crates/katu-core/src/taint.rs)): o delta viaja entre
+  `<katu:untrusted …>`/`</katu:untrusted>`, com `escape` a neutralizar (`<` → `[`) qualquer `<` que
+  forme `katu:`/`/katu:` **sem alterar o comprimento** (o teto `MAX_DELTA_BYTES` continua exato) e
+  `inspect` como teste estrutural. O embrulho fica em `ToolReport::to_delta` — não no encoder de
+  cada provider — para não partir `Model-visible ⟺ logged`; o *prime* (`PRIME_VERSION` 4 → 5)
+  ensina o modelo a tratar as tags como dado. Artefacto `bench/e18/taint/`: **6/6 ataques da
+  suíte red-team bloqueados**, custo **71 B** por resultado de tool (0,87 % de um delta de 8 KiB).
+  Limite declarado: mede escape *estrutural*, não obediência do modelo.
 - **C2/C7/C5 (Tier 2/3):** conformal, estatística robusta (mediana/MAD) e Benjamini–Hochberg.
 - **E1 (Tier 3):** curva USL do pool de B-01 (wall-clock vs threads).
 - **D2/D3:** ✔ feito. **D2:** cadeia de hash nos segmentos de auditoria (`hash` + `prev_hash`);

@@ -9,7 +9,16 @@ use serde::Serialize;
 
 use crate::diag::{Level, events};
 use crate::error::ToolOutcome;
+use crate::taint;
 use crate::toon::{self, Aliases, Cell, RowTable, Section, Value};
+
+/// Orçamento de payload: o teto menos o custo fixo do envelope de *taint* (D1).
+///
+/// O envelope tem largura fixa (`bytes="0000000"`), logo o custo não depende do payload e o corte
+/// continua exato.
+fn budget(kind: &str) -> usize {
+    MAX_DELTA_BYTES.saturating_sub(taint::reserve(kind))
+}
 
 /// Paginação de um resultado (cursor opaco; `total` sempre presente).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -53,6 +62,9 @@ pub struct Cost {
 /// **ponteiro** (`kind`/`id`) para o modelo pedir uma página (`read` com `range`/`view`): o
 /// envelope já traz `trunc`/`cur`/`tot` quando a tool pagina, e este teto é a rede de segurança
 /// para as que não paginam.
+///
+/// O teto conta o delta **completo**, envelope de *taint* incluído (D1): [`crate::taint::escape`]
+/// não altera o comprimento do payload, logo o corte é exato — `|delta| ≤ MAX_DELTA_BYTES`.
 pub const MAX_DELTA_BYTES: usize = 8_192;
 
 /// Conteúdo que o modelo recebe por um resultado de tool: o **delta** (payload TOON, §18/G6) quando
@@ -163,33 +175,38 @@ impl ToolReport {
         toon::emit(&sections)
     }
 
-    /// Delta **model-visible**: o TOON do envelope, cortado ao teto [`MAX_DELTA_BYTES`].
+    /// Delta **model-visible**: o TOON do envelope, cortado ao teto [`MAX_DELTA_BYTES`] e
+    /// embrulhado no envelope de dado não confiável ([`crate::taint`], D1).
     ///
     /// É este texto que entra no log (evento `ToolResult.delta`) e no pedido ao provider — a
-    /// mesma string, para que `Model-visible ⟺ logged` seja exato (E04).
+    /// mesma string, para que `Model-visible ⟺ logged` seja exato (E04). O embrulho acontece aqui
+    /// e **não** na codificação do provider por essa razão: um texto marcado no log e cru no wire
+    /// quebraria o invariante.
     #[must_use]
     pub fn to_delta(&self) -> String {
         let _span = crate::fn_span!(Level::Debug, events::TOON_EMIT, "report::to_delta", "kind" => self.kind);
 
         let text = self.to_toon();
-        if text.len() <= MAX_DELTA_BYTES {
-            return text;
+        if text.len() <= budget(self.kind) {
+            return taint::spotlight(self.kind, &text);
         }
+        let notice = format!(
+            "\n# delta truncado em {MAX_DELTA_BYTES} B; kind={}; id={}\n",
+            self.kind,
+            self.id.as_deref().unwrap_or("-")
+        );
+        let room = budget(self.kind).saturating_sub(notice.len());
         let cut = text
             .char_indices()
             .map(|(index, ch)| index.saturating_add(ch.len_utf8()))
-            .take_while(|end| *end <= MAX_DELTA_BYTES)
+            .take_while(|end| *end <= room)
             .last()
             .unwrap_or(0);
         let prefix = text.get(..cut).unwrap_or("");
         let prefix = prefix
             .rfind('\n')
             .map_or(prefix, |end| prefix.get(..end).unwrap_or(prefix));
-        format!(
-            "{prefix}\n# delta truncado em {MAX_DELTA_BYTES} B; kind={}; id={}\n",
-            self.kind,
-            self.id.as_deref().unwrap_or("-")
-        )
+        taint::spotlight(self.kind, &format!("{prefix}{notice}"))
     }
 
     /// Renderiza com **aliases de sessão** (`#N`/`@N`) e a secção `sym` dos novos.

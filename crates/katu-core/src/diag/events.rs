@@ -10,7 +10,7 @@
 //! chamador** — o kernel abre o span em torno da avaliação.
 
 /// Versão do catálogo. Incrementa ao remover/renomear ids.
-pub const CATALOG_VERSION: u16 = 3;
+pub const CATALOG_VERSION: u16 = 4;
 
 macro_rules! catalog {
     ($(($name:ident, $id:literal, $doc:literal)),* $(,)?) => {
@@ -121,6 +121,11 @@ catalog! {
     (MODEL_PROJECT, "model.project", "Projeção model-facing (outcome/erro/verificação)."),
     (CONTEXT_DIGEST, "context.digest", "Construção do digest de compactação (tabela `m`)."),
     (SCHEMA_CATALOG, "schema.catalog", "Geração do catálogo compacto de tools."),
+    (
+        TAINT_SPOTLIGHT,
+        "taint.spotlight",
+        "Embrulho do delta da tool no envelope de dado nao confiavel (D1)."
+    ),
 
     // -- Custo (E09-T06) -----------------------------------------------------
     (COST_CHECK, "cost.check", "Verificação das camadas do cost governor."),

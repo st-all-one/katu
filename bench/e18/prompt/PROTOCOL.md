@@ -26,8 +26,10 @@ cargo run -p xtask -- gate:prompt            # verifica os orçamentos (corre no
 cargo run -p xtask -- gate:prompt --write    # regrava `raw.json` (determinístico)
 ```
 
-**Orçamentos** (teto; exceder falha o gate): `AGENTS.md` 1600 B · catálogo de skills 1300 B ·
-prime 1400 B · tools 5100 B · `system` (AGENTS+prime+skills) 2200 tok.
+**Orçamentos** (teto; exceder falha o gate): `AGENTS.md` 1300 B · catálogo de skills 1300 B ·
+prime 1550 B · tools 5200 B · `system` (AGENTS+prime+skills) 2200 tok. O teto do prime subiu de
+1400 B em **D1** (+86 B: ensinar que `<katu:untrusted>` é dado, não instrução — ver
+[`bench/e18/taint`](../taint/PROTOCOL.md)); o das tools subiu de 5100 B em Q-07.
 
 ## Resultado
 
@@ -36,9 +38,9 @@ prime 1400 B · tools 5100 B · `system` (AGENTS+prime+skills) 2200 tok.
 | `tools` (wire JSON) | 5013 B / 1381 tok | 5013 B / 1381 tok | — (contrato do endpoint) |
 | catálogo de skills | 4828 B / 1330 tok | **1211 B / 334 tok** | **−73,9 %** (Q-05) |
 | `AGENTS.md` | 1591 B / 438 tok | **1128 B / 311 tok** | **−29,1 %** (Q-19) |
-| prime | 1340 B / 369 tok | **1393 B / 384 tok** | **+3,9 %** (B-07: contrato "só o delta") |
-| **`system`** | 7759 B / 2137 tok | **3732 B / 1028 tok** | **−51,8 %** |
-| **prompt (system + tools)** | ~3518 tok | **~2454 tok** | **−30,2 %** |
+| prime | 1340 B / 369 tok | **1479 B / 408 tok** | **+10,4 %** (B-07: contrato "só o delta"; D1: contrato *taint*) |
+| **`system`** | 7759 B / 2137 tok | **3818 B / 1052 tok** | **−50,8 %** |
+| **prompt (system + tools)** | ~3548 tok | **~2478 tok** | **−30,2 %** |
 
 Os dois alvos controláveis caíram: o catálogo de skills por **descrição de uma linha + caminho
 relativo** (Q-05) e o `AGENTS.md` por **condensação determinística** (Q-19). Os `tools` (38 % do

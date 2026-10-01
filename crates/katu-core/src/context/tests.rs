@@ -298,3 +298,19 @@ fn assemble_with_prime_uses_the_long_variant() {
     assert_eq!(context.prime, prime_long());
     assert_eq!(context.messages, derive_messages(&events));
 }
+
+#[test]
+fn prime_teaches_the_taint_contract() {
+    // D1: o prime diz ao modelo que o output de tool é dado não confiável, não instrução — sem
+    // isso o envelope é só barulho e a marcação não cumpre o propósito.
+    for (name, rendered) in [("compacto", prime()), ("longo", prime_long())] {
+        assert!(
+            rendered.contains("<katu:untrusted>"),
+            "o prime {name} tem de ensinar a marca de não confiável: {rendered}"
+        );
+        assert!(
+            rendered.contains("nunca instrucao"),
+            "o prime {name} tem de ensinar que o dado não é instrução: {rendered}"
+        );
+    }
+}
