@@ -10,7 +10,7 @@
 //! chamador** — o kernel abre o span em torno da avaliação.
 
 /// Versão do catálogo. Incrementa ao remover/renomear ids.
-pub const CATALOG_VERSION: u16 = 1;
+pub const CATALOG_VERSION: u16 = 2;
 
 macro_rules! catalog {
     ($(($name:ident, $id:literal, $doc:literal)),* $(,)?) => {
@@ -93,7 +93,6 @@ catalog! {
     (MEMORY_WRITE, "memory.write", "Escrita pela porta de memória."),
     (MEMORY_RECALL, "memory.recall", "Recuperação (busca/grafo)."),
     (MEMORY_HANDOFF, "memory.handoff", "Handoff entre sessões."),
-    (MEMORY_COMPACT, "memory.compact", "Compactação de memória."),
     (MEMORY_STATUS, "memory.status", "Estado da memória."),
 
     // -- Contexto / checkpoint -----------------------------------------------

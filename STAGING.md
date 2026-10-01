@@ -145,12 +145,15 @@ buffer adaptativo (E18-T04).
   (7 escritas atómicas), `session.open` 8,5 ms; arranque 6,5 ms; embeddings 16 ms; prompt de
   3265 tokens (`cached=3254` a quente; cold start local ~40 s). Números em `bench/published.toml`
   (base `measured`, artefacto `bench/e18/raw.json`). Protocolo/relatório: `bench/e18/`.
-- **Pontos cegos de instrumentação** (a fechar antes de otimizar): `KnudgeMemory::open`,
-  `skills::discover`/`read_instructions`, `load_rules`, `HttpEmbedder` (2.ª IA), `context.build`
-  sem `tokens`, `provider.request` sem `prompt_tokens`; 11 ids do catálogo nunca emitidos
-  (`audit.index`, `contain.check/deny`, `context.trim`, `katu.shutdown`, `kernel.stop`,
-  `memory.read/compact`, `policy.waiver`, `store.load/save`); `cli.prime`/`memo.drain`/`tui.slash`/
-  `mouse.copy` prometidos no `SURFACE_IMPLEMENTATION` §7 e ausentes do catálogo.
+- **Instrumentação fechada**: o catálogo está em **113 ids** (`CATALOG_VERSION=2`) com **0 órfãos**
+  — `memory.read` (consulta rica) e `policy.audit` (auditoria no arranque: 8 regras `Enforced`, 0
+  problemas) passaram a ser emitidos; `memory.compact` foi removido (sem operação no katu). Falta,
+  no interior, `context.build{tokens}` e `provider.request{prompt_tokens}`.
+- **Otimização (Q/P/S)**: plano em [`OPTIMIZATION_PLAN.md`](OPTIMIZATION_PLAN.md) (Anexo A —
+  formalismos de ponta; Anexo B — DeepSeek Harness/PTC). Feito: **Q-06** (as descrições de
+  parâmetro deixam de ser descartadas e chegam ao endpoint) e **Q-10** (instrumentação acima).
+  Próximos: **B-01/B-02** (concorrência classificada no loop) e **Q-01/Q-02** (orçamento de
+  contexto exato + seleção por utilidade).
 
 ---
 

@@ -23,7 +23,8 @@ use crate::slices::check_slices;
 use crate::surface::check_surface;
 use crate::unsafe_check::check_unsafe;
 use crate::{
-    check_crate_coverage, check_diag, check_docs, check_layers, provider_bench, render_bench,
+    check_crate_coverage, check_diag, check_diag_coverage, check_docs, check_layers,
+    provider_bench, render_bench,
 };
 
 /// Corre um comando externo; erro com o código de saída se falhar.
@@ -59,7 +60,7 @@ pub(crate) fn run_all() -> Result<(), String> {
     check_layers()?;
     check_crate_coverage()?;
     check_diag()?;
-    crate::diag::check_diag_coverage()?;
+    check_diag_coverage()?;
     check_schemas()?;
     check_docs()?;
     check_surface(&[])?;

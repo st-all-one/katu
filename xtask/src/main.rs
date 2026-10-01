@@ -37,6 +37,7 @@ mod check;
 mod check_policy;
 mod coverage;
 mod diag;
+mod diag_coverage;
 mod docs;
 mod ledger;
 mod memory_swap;
@@ -64,6 +65,7 @@ use std::process::ExitCode;
 use serde::Deserialize;
 
 use diag::check_diag;
+use diag_coverage::check_diag_coverage;
 use walk::collect_by_extension;
 
 /// Firewall de camadas carregado de `layers.toml`.
@@ -79,6 +81,7 @@ const DOC_ROOTS: &[&str] = &[
     "IMPLEMENTATION_PLAN.md",
     "AGENTS.md",
     "SURFACE_IMPLEMENTATION.md",
+    "OPTIMIZATION_PLAN.md",
 ];
 
 #[allow(clippy::print_stderr, reason = "xtask é a borda de linha de comando")]
@@ -101,7 +104,7 @@ fn dispatch(task: Option<&str>, rest: &[String]) -> Result<(), String> {
         Some("check-layers") => check_layers(),
         Some("check-crate-coverage") => check_crate_coverage(),
         Some("check-diag") => check_diag(),
-        Some("diag:coverage") => diag::check_diag_coverage(),
+        Some("diag:coverage") => check_diag_coverage(),
         Some("check-schemas") => schemas::check_schemas(),
         Some("check-docs") => check_docs(),
         Some("check-surface") => surface::check_surface(rest),

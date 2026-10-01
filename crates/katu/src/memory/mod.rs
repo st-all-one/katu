@@ -178,8 +178,7 @@ impl Memory for KnudgeMemory {
     }
 
     fn query(&self, req: &QueryReq) -> Result<QueryResult, MemoryError> {
-        let _span = katu_core::trace_fn!("memory::query");
-
+        let _span = katu_core::fn_span!(Level::Trace, events::MEMORY_READ, "memory::query", "op" => "query");
         let mut inner = lock(&self.inner);
         query::run(&mut inner, req)
     }

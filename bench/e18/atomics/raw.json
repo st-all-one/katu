@@ -1,0 +1,1278 @@
+{
+  "baseline_release": {
+    "artifact": "bench/mvk/raw.json",
+    "timings": [
+      {
+        "count": 2511,
+        "event": "kernel.transition",
+        "max_nanos": 46864,
+        "min_nanos": 8591,
+        "p50_nanos": 14388,
+        "p95_nanos": 21023,
+        "p99_nanos": 30521,
+        "total_nanos": 38139155
+      },
+      {
+        "count": 502,
+        "event": "memory.write",
+        "max_nanos": 23328,
+        "min_nanos": 7054,
+        "p50_nanos": 9918,
+        "p95_nanos": 10477,
+        "p99_nanos": 20324,
+        "total_nanos": 5031159
+      },
+      {
+        "count": 2511,
+        "event": "log.append",
+        "max_nanos": 26679,
+        "min_nanos": 2375,
+        "p50_nanos": 6635,
+        "p95_nanos": 11315,
+        "p99_nanos": 16693,
+        "total_nanos": 18553687
+      },
+      {
+        "count": 502,
+        "event": "policy.evaluate",
+        "max_nanos": 15645,
+        "min_nanos": 908,
+        "p50_nanos": 2374,
+        "p95_nanos": 2445,
+        "p99_nanos": 2864,
+        "total_nanos": 1152756
+      },
+      {
+        "count": 2511,
+        "event": "kernel.step",
+        "max_nanos": 16553,
+        "min_nanos": 908,
+        "p50_nanos": 2305,
+        "p95_nanos": 3353,
+        "p99_nanos": 8102,
+        "total_nanos": 6018557
+      },
+      {
+        "count": 501,
+        "event": "tool.write",
+        "max_nanos": 15295,
+        "min_nanos": 908,
+        "p50_nanos": 1816,
+        "p95_nanos": 1956,
+        "p99_nanos": 2374,
+        "total_nanos": 854030
+      },
+      {
+        "count": 1006,
+        "event": "log.replay",
+        "max_nanos": 13270,
+        "min_nanos": 907,
+        "p50_nanos": 1466,
+        "p95_nanos": 1886,
+        "p99_nanos": 1956,
+        "total_nanos": 1513339
+      }
+    ]
+  },
+  "coverage": {
+    "const_fns_excluded": 121,
+    "instrumentable": {
+      "covered": 1187,
+      "permille": 994,
+      "total": 1194
+    },
+    "policy": "excluded (firewall: instrumented by caller)",
+    "with_const": {
+      "covered": 1187,
+      "permille": 902,
+      "total": 1315
+    }
+  },
+  "functions": [
+    {
+      "count": 1507,
+      "event": "cost.check",
+      "function": "kernel::cost::check",
+      "max_nanos": 48470,
+      "min_nanos": 8521,
+      "p50_nanos": 13270,
+      "p95_nanos": 16413,
+      "p99_nanos": 23816,
+      "total_nanos": 19787081
+    },
+    {
+      "count": 1507,
+      "event": "katu.fn",
+      "function": "kernel::budget::check",
+      "max_nanos": 2445,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1886,
+      "p99_nanos": 1956,
+      "total_nanos": 2075528
+    },
+    {
+      "count": 1507,
+      "event": "katu.fn",
+      "function": "kernel::budget::commit",
+      "max_nanos": 19137,
+      "min_nanos": 838,
+      "p50_nanos": 1397,
+      "p95_nanos": 1886,
+      "p99_nanos": 1956,
+      "total_nanos": 2019165
+    },
+    {
+      "count": 1507,
+      "event": "katu.fn",
+      "function": "kernel::cost::check_kill",
+      "max_nanos": 18159,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1885,
+      "p99_nanos": 1956,
+      "total_nanos": 1979997
+    },
+    {
+      "count": 1507,
+      "event": "katu.fn",
+      "function": "kernel::cost::check_layers",
+      "max_nanos": 44210,
+      "min_nanos": 6146,
+      "p50_nanos": 10127,
+      "p95_nanos": 12641,
+      "p99_nanos": 17600,
+      "total_nanos": 14935099
+    },
+    {
+      "count": 1004,
+      "event": "katu.fn",
+      "function": "kernel::cost::check_per_tool",
+      "max_nanos": 6216,
+      "min_nanos": 839,
+      "p50_nanos": 1397,
+      "p95_nanos": 1886,
+      "p99_nanos": 2304,
+      "total_nanos": 1367917
+    },
+    {
+      "count": 1507,
+      "event": "katu.fn",
+      "function": "kernel::cost::commit",
+      "max_nanos": 30520,
+      "min_nanos": 3701,
+      "p50_nanos": 4749,
+      "p95_nanos": 6775,
+      "p99_nanos": 10057,
+      "total_nanos": 7576419
+    },
+    {
+      "count": 2511,
+      "event": "katu.fn",
+      "function": "kernel::cost::cost_charge_for",
+      "max_nanos": 22070,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1886,
+      "p99_nanos": 1956,
+      "total_nanos": 3288069
+    },
+    {
+      "count": 503,
+      "event": "katu.fn",
+      "function": "kernel::cost::new",
+      "max_nanos": 15156,
+      "min_nanos": 3771,
+      "p50_nanos": 4609,
+      "p95_nanos": 5797,
+      "p99_nanos": 7264,
+      "total_nanos": 2383556
+    },
+    {
+      "count": 503,
+      "event": "katu.fn",
+      "function": "kernel::cost::with_usage",
+      "max_nanos": 2864,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1956,
+      "p99_nanos": 2374,
+      "total_nanos": 728879
+    },
+    {
+      "count": 1506,
+      "event": "katu.fn",
+      "function": "kernel::event::new",
+      "max_nanos": 20394,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1955,
+      "p99_nanos": 2305,
+      "total_nanos": 2190586
+    },
+    {
+      "count": 2511,
+      "event": "katu.fn",
+      "function": "kernel::log::append",
+      "max_nanos": 70400,
+      "min_nanos": 13479,
+      "p50_nanos": 19137,
+      "p95_nanos": 32965,
+      "p99_nanos": 47841,
+      "total_nanos": 51245729
+    },
+    {
+      "count": 503,
+      "event": "katu.fn",
+      "function": "kernel::log::resume",
+      "max_nanos": 26820,
+      "min_nanos": 3771,
+      "p50_nanos": 4749,
+      "p95_nanos": 5867,
+      "p99_nanos": 7962,
+      "total_nanos": 2474842
+    },
+    {
+      "count": 1006,
+      "event": "katu.fn",
+      "function": "kernel::log::session_path",
+      "max_nanos": 22559,
+      "min_nanos": 908,
+      "p50_nanos": 1886,
+      "p95_nanos": 3353,
+      "p99_nanos": 4820,
+      "total_nanos": 2082178
+    },
+    {
+      "count": 502,
+      "event": "katu.fn",
+      "function": "kernel::memory_gate::capabilities_for",
+      "max_nanos": 16343,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1956,
+      "p99_nanos": 2444,
+      "total_nanos": 766378
+    },
+    {
+      "count": 1004,
+      "event": "katu.fn",
+      "function": "kernel::memory_gate::memory_write_use",
+      "max_nanos": 28705,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1955,
+      "p99_nanos": 1956,
+      "total_nanos": 1449419
+    },
+    {
+      "count": 502,
+      "event": "katu.fn",
+      "function": "kernel::pipeline::dispatch_with",
+      "max_nanos": 390972,
+      "min_nanos": 12571,
+      "p50_nanos": 205054,
+      "p95_nanos": 262325,
+      "p99_nanos": 364293,
+      "total_nanos": 107715549
+    },
+    {
+      "count": 502,
+      "event": "katu.fn",
+      "function": "kernel::pipeline::facts_from",
+      "max_nanos": 22489,
+      "min_nanos": 977,
+      "p50_nanos": 1955,
+      "p95_nanos": 2933,
+      "p99_nanos": 3841,
+      "total_nanos": 1075704
+    },
+    {
+      "count": 1004,
+      "event": "katu.fn",
+      "function": "kernel::pipeline::outcome",
+      "max_nanos": 16552,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1886,
+      "p99_nanos": 1956,
+      "total_nanos": 1349989
+    },
+    {
+      "count": 501,
+      "event": "katu.fn",
+      "function": "kernel::pipeline::report",
+      "max_nanos": 2374,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1886,
+      "p99_nanos": 1956,
+      "total_nanos": 670540
+    },
+    {
+      "count": 2,
+      "event": "katu.fn",
+      "function": "kernel::pipeline::skipped_outcome",
+      "max_nanos": 1956,
+      "min_nanos": 1466,
+      "p50_nanos": 1466,
+      "p95_nanos": 1956,
+      "p99_nanos": 1956,
+      "total_nanos": 3422
+    },
+    {
+      "count": 501,
+      "event": "katu.fn",
+      "function": "kernel::pipeline::with_estimated_cost",
+      "max_nanos": 297106,
+      "min_nanos": 136749,
+      "p50_nanos": 157004,
+      "p95_nanos": 201632,
+      "p99_nanos": 278109,
+      "total_nanos": 82839473
+    },
+    {
+      "count": 2511,
+      "event": "katu.fn",
+      "function": "kernel::session::apply",
+      "max_nanos": 160775,
+      "min_nanos": 30032,
+      "p50_nanos": 50705,
+      "p95_nanos": 86324,
+      "p99_nanos": 113213,
+      "total_nanos": 136145590
+    },
+    {
+      "count": 502,
+      "event": "katu.fn",
+      "function": "kernel::session::context::log_outcome",
+      "max_nanos": 27937,
+      "min_nanos": 908,
+      "p50_nanos": 1397,
+      "p95_nanos": 1955,
+      "p99_nanos": 2375,
+      "total_nanos": 770758
+    },
+    {
+      "count": 503,
+      "event": "katu.fn",
+      "function": "kernel::session::identity::load_meta",
+      "max_nanos": 30032,
+      "min_nanos": 9080,
+      "p50_nanos": 11314,
+      "p95_nanos": 16413,
+      "p99_nanos": 24724,
+      "total_nanos": 6089433
+    },
+    {
+      "count": 503,
+      "event": "katu.fn",
+      "function": "kernel::session::identity::meta_path",
+      "max_nanos": 9010,
+      "min_nanos": 908,
+      "p50_nanos": 1466,
+      "p95_nanos": 1956,
+      "p99_nanos": 2444,
+      "total_nanos": 770419
+    },
+    {
+      "count": 503,
+      "event": "katu.fn",
+      "function": "kernel::session::open",
+      "max_nanos": 139613,
+      "min_nanos": 54267,
+      "p50_nanos": 64883,
+      "p95_nanos": 94495,
+      "p99_nanos": 112794,
+      "total_nanos": 34940583
+    },
+    {
+      "count": 503,
+      "event": "katu.fn",
+      "function": "kernel::session::open_with_cap",
+      "max_nanos": 134794,
+      "min_nanos": 51543,
+      "p50_nanos": 61530,
+      "p95_nanos": 89118,
+      "p99_nanos": 107906,
+      "total_nanos": 33211721
+    },
+    {
+      "count": 503,
+      "event": "katu.fn",
+      "function": "kernel::session::snapshot::load",
+      "max_nanos": 42115,
+      "min_nanos": 9149,
+      "p50_nanos": 10895,
+      "p95_nanos": 14457,
+      "p99_nanos": 27658,
+      "total_nanos": 5832465
+    },
+    {
+      "count": 503,
+      "event": "katu.fn",
+      "function": "kernel::session::snapshot::snapshot_path",
+      "max_nanos": 8940,
+      "min_nanos": 908,
+      "p50_nanos": 1466,
+      "p95_nanos": 1955,
+      "p99_nanos": 2375,
+      "total_nanos": 745429
+    },
+    {
+      "count": 503,
+      "event": "katu.fn",
+      "function": "kernel::state::initial",
+      "max_nanos": 4400,
+      "min_nanos": 908,
+      "p50_nanos": 1467,
+      "p95_nanos": 2374,
+      "p99_nanos": 2445,
+      "total_nanos": 788936
+    },
+    {
+      "count": 1004,
+      "event": "katu.fn",
+      "function": "kernel::step::require_open",
+      "max_nanos": 2445,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1886,
+      "p99_nanos": 1956,
+      "total_nanos": 1297931
+    },
+    {
+      "count": 1004,
+      "event": "katu.fn",
+      "function": "kernel::step::tool_call",
+      "max_nanos": 39111,
+      "min_nanos": 3841,
+      "p50_nanos": 6635,
+      "p95_nanos": 10825,
+      "p99_nanos": 14317,
+      "total_nanos": 6819392
+    },
+    {
+      "count": 1004,
+      "event": "katu.fn",
+      "function": "kernel::step::tool_result",
+      "max_nanos": 23257,
+      "min_nanos": 1397,
+      "p50_nanos": 3352,
+      "p95_nanos": 7264,
+      "p99_nanos": 10127,
+      "total_nanos": 3818377
+    },
+    {
+      "count": 503,
+      "event": "katu.fn",
+      "function": "memory::fake::default",
+      "max_nanos": 18228,
+      "min_nanos": 978,
+      "p50_nanos": 1886,
+      "p95_nanos": 2445,
+      "p99_nanos": 3352,
+      "total_nanos": 948322
+    },
+    {
+      "count": 1003,
+      "event": "katu.fn",
+      "function": "memory::fake::failure",
+      "max_nanos": 17740,
+      "min_nanos": 489,
+      "p50_nanos": 1397,
+      "p95_nanos": 1886,
+      "p99_nanos": 2375,
+      "total_nanos": 1358547
+    },
+    {
+      "count": 502,
+      "event": "katu.fn",
+      "function": "memory::fake::pre_write",
+      "max_nanos": 25422,
+      "min_nanos": 3422,
+      "p50_nanos": 4330,
+      "p95_nanos": 5727,
+      "p99_nanos": 7264,
+      "total_nanos": 2289543
+    },
+    {
+      "count": 501,
+      "event": "katu.fn",
+      "function": "memory::fake::record",
+      "max_nanos": 26679,
+      "min_nanos": 6216,
+      "p50_nanos": 7683,
+      "p95_nanos": 10546,
+      "p99_nanos": 16762,
+      "total_nanos": 4112885
+    },
+    {
+      "count": 502,
+      "event": "katu.fn",
+      "function": "memory::fake::recorded",
+      "max_nanos": 2375,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1886,
+      "p99_nanos": 1956,
+      "total_nanos": 692838
+    },
+    {
+      "count": 1002,
+      "event": "katu.fn",
+      "function": "memory::types::as_str",
+      "max_nanos": 17531,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1886,
+      "p99_nanos": 1956,
+      "total_nanos": 1332007
+    },
+    {
+      "count": 501,
+      "event": "katu.fn",
+      "function": "memory::types::new",
+      "max_nanos": 15854,
+      "min_nanos": 907,
+      "p50_nanos": 1466,
+      "p95_nanos": 1956,
+      "p99_nanos": 2445,
+      "total_nanos": 770628
+    },
+    {
+      "count": 2511,
+      "event": "katu.fn",
+      "function": "ports::fs::mem::append",
+      "max_nanos": 28146,
+      "min_nanos": 3771,
+      "p50_nanos": 5098,
+      "p95_nanos": 7124,
+      "p99_nanos": 11384,
+      "total_nanos": 13501409
+    },
+    {
+      "count": 503,
+      "event": "katu.fn",
+      "function": "ports::fs::mem::exists",
+      "max_nanos": 24584,
+      "min_nanos": 3701,
+      "p50_nanos": 4749,
+      "p95_nanos": 6285,
+      "p99_nanos": 8660,
+      "total_nanos": 2461777
+    },
+    {
+      "count": 4020,
+      "event": "katu.fn",
+      "function": "ports::fs::mem::lock",
+      "max_nanos": 22000,
+      "min_nanos": 838,
+      "p50_nanos": 1397,
+      "p95_nanos": 1886,
+      "p99_nanos": 1956,
+      "total_nanos": 5488432
+    },
+    {
+      "count": 503,
+      "event": "katu.fn",
+      "function": "ports::fs::mem::new",
+      "max_nanos": 6635,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1955,
+      "p99_nanos": 2375,
+      "total_nanos": 734371
+    },
+    {
+      "count": 1006,
+      "event": "katu.fn",
+      "function": "ports::fs::mem::read",
+      "max_nanos": 27238,
+      "min_nanos": 3352,
+      "p50_nanos": 4330,
+      "p95_nanos": 6076,
+      "p99_nanos": 16762,
+      "total_nanos": 4794358
+    },
+    {
+      "count": 501,
+      "event": "katu.fn",
+      "function": "report::envelope",
+      "max_nanos": 79270,
+      "min_nanos": 19486,
+      "p50_nanos": 21860,
+      "p95_nanos": 32477,
+      "p99_nanos": 43721,
+      "total_nanos": 11694742
+    },
+    {
+      "count": 501,
+      "event": "katu.fn",
+      "function": "report::push_next",
+      "max_nanos": 2375,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1886,
+      "p99_nanos": 1956,
+      "total_nanos": 674244
+    },
+    {
+      "count": 501,
+      "event": "katu.fn",
+      "function": "report::with_id",
+      "max_nanos": 17390,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1886,
+      "p99_nanos": 1956,
+      "total_nanos": 696394
+    },
+    {
+      "count": 5511,
+      "event": "katu.fn",
+      "function": "toon::colunar::emit_cell",
+      "max_nanos": 57200,
+      "min_nanos": 838,
+      "p50_nanos": 7473,
+      "p95_nanos": 9917,
+      "p99_nanos": 14876,
+      "total_nanos": 30040843
+    },
+    {
+      "count": 3006,
+      "event": "katu.fn",
+      "function": "toon::colunar::has_delimiter",
+      "max_nanos": 21092,
+      "min_nanos": 907,
+      "p50_nanos": 1467,
+      "p95_nanos": 2375,
+      "p99_nanos": 3283,
+      "total_nanos": 5008808
+    },
+    {
+      "count": 1002,
+      "event": "katu.fn",
+      "function": "toon::colunar::new",
+      "max_nanos": 31010,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1955,
+      "p99_nanos": 2375,
+      "total_nanos": 1511288
+    },
+    {
+      "count": 501,
+      "event": "katu.fn",
+      "function": "toon::colunar::optional",
+      "max_nanos": 2444,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1886,
+      "p99_nanos": 1956,
+      "total_nanos": 670467
+    },
+    {
+      "count": 1002,
+      "event": "katu.fn",
+      "function": "toon::colunar::push",
+      "max_nanos": 19206,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1955,
+      "p99_nanos": 2305,
+      "total_nanos": 1437191
+    },
+    {
+      "count": 3006,
+      "event": "katu.fn",
+      "function": "toon::colunar::push_sanitized",
+      "max_nanos": 30521,
+      "min_nanos": 3422,
+      "p50_nanos": 4889,
+      "p95_nanos": 6775,
+      "p99_nanos": 10127,
+      "total_nanos": 15835605
+    },
+    {
+      "count": 2505,
+      "event": "katu.fn",
+      "function": "toon::colunar::text",
+      "max_nanos": 20674,
+      "min_nanos": 489,
+      "p50_nanos": 1397,
+      "p95_nanos": 1886,
+      "p99_nanos": 1956,
+      "total_nanos": 3384148
+    },
+    {
+      "count": 501,
+      "event": "katu.fn",
+      "function": "toon::project::cell",
+      "max_nanos": 8520,
+      "min_nanos": 3352,
+      "p50_nanos": 4331,
+      "p95_nanos": 5727,
+      "p99_nanos": 7264,
+      "total_nanos": 2312112
+    },
+    {
+      "count": 1002,
+      "event": "katu.fn",
+      "function": "toon::project::is_scalar",
+      "max_nanos": 16762,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1885,
+      "p99_nanos": 1956,
+      "total_nanos": 1323218
+    },
+    {
+      "count": 501,
+      "event": "katu.fn",
+      "function": "toon::str",
+      "max_nanos": 13619,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1886,
+      "p99_nanos": 2374,
+      "total_nanos": 677035
+    },
+    {
+      "count": 501,
+      "event": "katu.fn",
+      "function": "write::record_report",
+      "max_nanos": 49727,
+      "min_nanos": 13130,
+      "p50_nanos": 15156,
+      "p95_nanos": 21930,
+      "p99_nanos": 32476,
+      "total_nanos": 8103160
+    },
+    {
+      "count": 2511,
+      "event": "kernel.step",
+      "function": "kernel::step::step",
+      "max_nanos": 49728,
+      "min_nanos": 3771,
+      "p50_nanos": 7543,
+      "p95_nanos": 13269,
+      "p99_nanos": 19905,
+      "total_nanos": 20161785
+    },
+    {
+      "count": 2511,
+      "event": "kernel.transition",
+      "function": "kernel::session::apply_at",
+      "max_nanos": 155467,
+      "min_nanos": 26749,
+      "p50_nanos": 47492,
+      "p95_nanos": 82692,
+      "p99_nanos": 108255,
+      "total_nanos": 127819012
+    },
+    {
+      "count": 503,
+      "event": "kernel.transition",
+      "function": "kernel::step::turn_start",
+      "max_nanos": 18019,
+      "min_nanos": 908,
+      "p50_nanos": 1467,
+      "p95_nanos": 2375,
+      "p99_nanos": 3352,
+      "total_nanos": 847320
+    },
+    {
+      "count": 2511,
+      "event": "log.append",
+      "function": "kernel::log::append",
+      "max_nanos": 66070,
+      "min_nanos": 10267,
+      "p50_nanos": 15645,
+      "p95_nanos": 28914,
+      "p99_nanos": 42953,
+      "total_nanos": 42866113
+    },
+    {
+      "count": 503,
+      "event": "log.replay",
+      "function": "kernel::log::read_records_with_len",
+      "max_nanos": 29822,
+      "min_nanos": 6565,
+      "p50_nanos": 8032,
+      "p95_nanos": 10407,
+      "p99_nanos": 14667,
+      "total_nanos": 4260063
+    },
+    {
+      "count": 502,
+      "event": "memory.write",
+      "function": "kernel::memory_gate::enforce_memory_write",
+      "max_nanos": 418700,
+      "min_nanos": 34851,
+      "p50_nanos": 221886,
+      "p95_nanos": 281042,
+      "p99_nanos": 391881,
+      "total_nanos": 116264360
+    },
+    {
+      "count": 502,
+      "event": "memory.write",
+      "function": "kernel::session::memory_write",
+      "max_nanos": 706796,
+      "min_nanos": 185010,
+      "p50_nanos": 347741,
+      "p95_nanos": 454668,
+      "p99_nanos": 623824,
+      "total_nanos": 182845362
+    },
+    {
+      "count": 502,
+      "event": "policy.evaluate",
+      "function": null,
+      "max_nanos": 19137,
+      "min_nanos": 1396,
+      "p50_nanos": 2444,
+      "p95_nanos": 5238,
+      "p99_nanos": 7612,
+      "total_nanos": 1545650
+    },
+    {
+      "count": 503,
+      "event": "store.load",
+      "function": "kernel::session::open_with_cost",
+      "max_nanos": 127111,
+      "min_nanos": 48679,
+      "p50_nanos": 58178,
+      "p95_nanos": 84369,
+      "p99_nanos": 102178,
+      "total_nanos": 31354224
+    },
+    {
+      "count": 501,
+      "event": "tool.write",
+      "function": "write::execute",
+      "max_nanos": 78712,
+      "min_nanos": 28146,
+      "p50_nanos": 31498,
+      "p95_nanos": 47004,
+      "p99_nanos": 58388,
+      "total_nanos": 16826981
+    },
+    {
+      "count": 501,
+      "event": "toon.emit",
+      "function": "report::to_toon",
+      "max_nanos": 291518,
+      "min_nanos": 133886,
+      "p50_nanos": 153721,
+      "p95_nanos": 197372,
+      "p99_nanos": 272382,
+      "total_nanos": 81080945
+    },
+    {
+      "count": 501,
+      "event": "toon.emit",
+      "function": "toon::colunar::emit",
+      "max_nanos": 171531,
+      "min_nanos": 75708,
+      "p50_nanos": 89118,
+      "p95_nanos": 122083,
+      "p99_nanos": 157981,
+      "total_nanos": 47306495
+    },
+    {
+      "count": 1002,
+      "event": "toon.emit",
+      "function": "toon::colunar::emit_rows",
+      "max_nanos": 119010,
+      "min_nanos": 18228,
+      "p50_nanos": 51962,
+      "p95_nanos": 76058,
+      "p99_nanos": 107206,
+      "total_nanos": 44463397
+    },
+    {
+      "count": 501,
+      "event": "toon.project",
+      "function": "toon::project::project",
+      "max_nanos": 80108,
+      "min_nanos": 25841,
+      "p50_nanos": 29124,
+      "p95_nanos": 41067,
+      "p99_nanos": 53429,
+      "total_nanos": 15578699
+    },
+    {
+      "count": 501,
+      "event": "toon.project",
+      "function": "toon::project::project_map",
+      "max_nanos": 73962,
+      "min_nanos": 22978,
+      "p50_nanos": 25772,
+      "p95_nanos": 36248,
+      "p99_nanos": 46445,
+      "total_nanos": 13743326
+    }
+  ],
+  "gates": {
+    "provider": {
+      "budget_p95_nanos": 5000000,
+      "gate": "gate:provider",
+      "measured_p95_nanos": 2251760
+    },
+    "render": {
+      "budget_p95_nanos": 3000000,
+      "gate": "gate:render",
+      "measured_p95_nanos": 1027438
+    }
+  },
+  "instrument": true,
+  "kind": "diagnostic-atomics",
+  "machine": {
+    "arch": "x86_64",
+    "os": "linux"
+  },
+  "notes": [
+    "functions: MVK path (examples/measure_mvk), aggregating sink, instrument ON, dev build; include nested-modulo diag overhead.",
+    "operations: real CLI/turn runs (prime/config/memo doctor/run llama) with instrument ON, dev build; wrapper spans (katu.run/cli.run/kernel.turn/provider.request) are totals incl. children.",
+    "baseline_release: committed bench/mvk/raw.json, release, instrument OFF (zero-cost path).",
+    "katu-policy and const fn are excluded from coverage by design/possibility.",
+    "live per-function attribution is not in stderr; the sink does not print Record.function (aggregating harness only)."
+  ],
+  "operations": [
+    {
+      "count": 522,
+      "event": "katu.fn",
+      "max_nanos": 20206576829,
+      "min_nanos": 907,
+      "p50_nanos": 3841,
+      "p95_nanos": 394674,
+      "p99_nanos": 20197225683,
+      "total_nanos": 141442827744
+    },
+    {
+      "count": 10,
+      "event": "provider.request",
+      "max_nanos": 20196631193,
+      "min_nanos": 1886,
+      "p50_nanos": 20195339195,
+      "p95_nanos": 20196631193,
+      "p99_nanos": 20196631193,
+      "total_nanos": 121177190519
+    },
+    {
+      "count": 4,
+      "event": "cli.run",
+      "max_nanos": 20205613645,
+      "min_nanos": 1009070,
+      "p50_nanos": 20204551706,
+      "p95_nanos": 20205613645,
+      "p99_nanos": 20205613645,
+      "total_nanos": 60615692603
+    },
+    {
+      "count": 4,
+      "event": "katu.run",
+      "max_nanos": 20206916399,
+      "min_nanos": 639050,
+      "p50_nanos": 1616481,
+      "p95_nanos": 20206916399,
+      "p99_nanos": 20206916399,
+      "total_nanos": 20210478455
+    },
+    {
+      "count": 1,
+      "event": "kernel.turn",
+      "max_nanos": 20200339426,
+      "min_nanos": 20200339426,
+      "p50_nanos": 20200339426,
+      "p95_nanos": 20200339426,
+      "p99_nanos": 20200339426,
+      "total_nanos": 20200339426
+    },
+    {
+      "count": 53,
+      "event": "provider.chunk",
+      "max_nanos": 1241362,
+      "min_nanos": 1327,
+      "p50_nanos": 193880,
+      "p95_nanos": 680116,
+      "p99_nanos": 1000968,
+      "total_nanos": 14750104
+    },
+    {
+      "count": 45,
+      "event": "config.load",
+      "max_nanos": 921837,
+      "min_nanos": 1396,
+      "p50_nanos": 2374,
+      "p95_nanos": 786275,
+      "p99_nanos": 921837,
+      "total_nanos": 4289591
+    },
+    {
+      "count": 2,
+      "event": "cli.memo",
+      "max_nanos": 1436081,
+      "min_nanos": 1417223,
+      "p50_nanos": 1417223,
+      "p95_nanos": 1436081,
+      "p99_nanos": 1436081,
+      "total_nanos": 2853304
+    },
+    {
+      "count": 2,
+      "event": "cli.config",
+      "max_nanos": 1115089,
+      "min_nanos": 1073114,
+      "p50_nanos": 1073114,
+      "p95_nanos": 1115089,
+      "p99_nanos": 1115089,
+      "total_nanos": 2188203
+    },
+    {
+      "count": 5,
+      "event": "bootstrap.init",
+      "max_nanos": 860657,
+      "min_nanos": 30032,
+      "p50_nanos": 181308,
+      "p95_nanos": 860657,
+      "p99_nanos": 860657,
+      "total_nanos": 1618018
+    },
+    {
+      "count": 7,
+      "event": "kernel.transition",
+      "max_nanos": 380636,
+      "min_nanos": 1955,
+      "p50_nanos": 278807,
+      "p95_nanos": 380636,
+      "p99_nanos": 380636,
+      "total_nanos": 1480289
+    },
+    {
+      "count": 1,
+      "event": "session.open",
+      "max_nanos": 1325242,
+      "min_nanos": 1325242,
+      "p50_nanos": 1325242,
+      "p95_nanos": 1325242,
+      "p99_nanos": 1325242,
+      "total_nanos": 1325242
+    },
+    {
+      "count": 4,
+      "event": "katu.shutdown",
+      "max_nanos": 265258,
+      "min_nanos": 119010,
+      "p50_nanos": 261417,
+      "p95_nanos": 265258,
+      "p99_nanos": 265258,
+      "total_nanos": 776917
+    },
+    {
+      "count": 1,
+      "event": "kernel.stop",
+      "max_nanos": 556986,
+      "min_nanos": 556986,
+      "p50_nanos": 556986,
+      "p95_nanos": 556986,
+      "p99_nanos": 556986,
+      "total_nanos": 556986
+    },
+    {
+      "count": 2,
+      "event": "policy.load",
+      "max_nanos": 368833,
+      "min_nanos": 113493,
+      "p50_nanos": 113493,
+      "p95_nanos": 368833,
+      "p99_nanos": 368833,
+      "total_nanos": 482326
+    },
+    {
+      "count": 3,
+      "event": "cli.prime",
+      "max_nanos": 250801,
+      "min_nanos": 10127,
+      "p50_nanos": 160217,
+      "p95_nanos": 250801,
+      "p99_nanos": 250801,
+      "total_nanos": 421145
+    },
+    {
+      "count": 5,
+      "event": "log.append",
+      "max_nanos": 140521,
+      "min_nanos": 39041,
+      "p50_nanos": 74451,
+      "p95_nanos": 140521,
+      "p99_nanos": 140521,
+      "total_nanos": 414999
+    },
+    {
+      "count": 1,
+      "event": "store.load",
+      "max_nanos": 396769,
+      "min_nanos": 396769,
+      "p50_nanos": 396769,
+      "p95_nanos": 396769,
+      "p99_nanos": 396769,
+      "total_nanos": 396769
+    },
+    {
+      "count": 2,
+      "event": "memory.open",
+      "max_nanos": 206172,
+      "min_nanos": 183055,
+      "p50_nanos": 183055,
+      "p95_nanos": 206172,
+      "p99_nanos": 206172,
+      "total_nanos": 389227
+    },
+    {
+      "count": 1,
+      "event": "context.build",
+      "max_nanos": 377075,
+      "min_nanos": 377075,
+      "p50_nanos": 377075,
+      "p95_nanos": 377075,
+      "p99_nanos": 377075,
+      "total_nanos": 377075
+    },
+    {
+      "count": 7,
+      "event": "fs.write",
+      "max_nanos": 145340,
+      "min_nanos": 9638,
+      "p50_nanos": 25283,
+      "p95_nanos": 145340,
+      "p99_nanos": 145340,
+      "total_nanos": 319037
+    },
+    {
+      "count": 3,
+      "event": "log.replay",
+      "max_nanos": 174114,
+      "min_nanos": 27168,
+      "p50_nanos": 79619,
+      "p95_nanos": 174114,
+      "p99_nanos": 174114,
+      "total_nanos": 280901
+    },
+    {
+      "count": 5,
+      "event": "kernel.step",
+      "max_nanos": 47492,
+      "min_nanos": 25701,
+      "p50_nanos": 29962,
+      "p95_nanos": 47492,
+      "p99_nanos": 47492,
+      "total_nanos": 176070
+    },
+    {
+      "count": 1,
+      "event": "skill.discover",
+      "max_nanos": 103435,
+      "min_nanos": 103435,
+      "p50_nanos": 103435,
+      "p95_nanos": 103435,
+      "p99_nanos": 103435,
+      "total_nanos": 103435
+    },
+    {
+      "count": 4,
+      "event": "fs.read",
+      "max_nanos": 30731,
+      "min_nanos": 15645,
+      "p50_nanos": 20743,
+      "p95_nanos": 30731,
+      "p99_nanos": 30731,
+      "total_nanos": 82834
+    },
+    {
+      "count": 1,
+      "event": "cost.check",
+      "max_nanos": 65581,
+      "min_nanos": 65581,
+      "p50_nanos": 65581,
+      "p95_nanos": 65581,
+      "p99_nanos": 65581,
+      "total_nanos": 65581
+    },
+    {
+      "count": 2,
+      "event": "memory.status",
+      "max_nanos": 32896,
+      "min_nanos": 28076,
+      "p50_nanos": 28076,
+      "p95_nanos": 32896,
+      "p99_nanos": 32896,
+      "total_nanos": 60972
+    },
+    {
+      "count": 3,
+      "event": "fs.mkdir",
+      "max_nanos": 36667,
+      "min_nanos": 7194,
+      "p50_nanos": 16273,
+      "p95_nanos": 36667,
+      "p99_nanos": 36667,
+      "total_nanos": 60134
+    },
+    {
+      "count": 2,
+      "event": "fs.list",
+      "max_nanos": 31988,
+      "min_nanos": 26749,
+      "p50_nanos": 26749,
+      "p95_nanos": 31988,
+      "p99_nanos": 31988,
+      "total_nanos": 58737
+    },
+    {
+      "count": 1,
+      "event": "scope.load",
+      "max_nanos": 53917,
+      "min_nanos": 53917,
+      "p50_nanos": 53917,
+      "p95_nanos": 53917,
+      "p99_nanos": 53917,
+      "total_nanos": 53917
+    },
+    {
+      "count": 1,
+      "event": "context.trim",
+      "max_nanos": 48470,
+      "min_nanos": 48470,
+      "p50_nanos": 48470,
+      "p95_nanos": 48470,
+      "p99_nanos": 48470,
+      "total_nanos": 48470
+    },
+    {
+      "count": 2,
+      "event": "cli.input",
+      "max_nanos": 7124,
+      "min_nanos": 1396,
+      "p50_nanos": 1396,
+      "p95_nanos": 7124,
+      "p99_nanos": 7124,
+      "total_nanos": 8520
+    },
+    {
+      "count": 3,
+      "event": "model.project",
+      "max_nanos": 1886,
+      "min_nanos": 1396,
+      "p50_nanos": 1397,
+      "p95_nanos": 1886,
+      "p99_nanos": 1886,
+      "total_nanos": 4679
+    }
+  ],
+  "produced_by": "E19-T03",
+  "profile": "dev",
+  "schema": 1
+}

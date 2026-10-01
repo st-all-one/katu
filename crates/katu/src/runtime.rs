@@ -54,12 +54,28 @@ pub(crate) struct VerifyRequest {
 }
 
 /// Carrega as regras do protocolo de memória **e** as de contenção (DF3: dado versionado).
-fn load_rules() -> Result<RuleSet, PolicyError> {
+#[cfg_attr(
+    not(feature = "profile"),
+    allow(
+        unused_variables,
+        reason = "o macro no-op ignora os campos (custo zero); o audit é barato e determinístico"
+    )
+)]
+fn load_rules(now_millis: u64) -> Result<RuleSet, PolicyError> {
     let _span = katu_core::fn_span!(Level::Debug, events::POLICY_LOAD, "runtime::load_rules");
     let mut rules = RuleSet::from_toml(MEMORY_POLICY)?;
     rules
         .rules
         .extend(RuleSet::from_toml(CONTAINMENT_POLICY)?.rules);
+    // E02-T04 instrumentado **pelo chamador** (firewall): o binário audita o conjunto carregado.
+    let report = katu_policy::audit(&rules, now_millis);
+    katu_core::event!(
+        Level::Debug,
+        events::POLICY_AUDIT,
+        "enforced" => report.enforced.len(),
+        "advisory" => report.advisory.len(),
+        "issues" => report.issues.len(),
+    );
     Ok(rules)
 }
 
@@ -152,7 +168,7 @@ impl<'a> Runtime<'a> {
         let memory = KnudgeMemory::open(&root)?;
         memory.status()?;
         let cwd = ResolvedPath::from_canonical(&root)?;
-        let rules = load_rules()?;
+        let rules = load_rules(clock.now().as_millis())?;
         let instructions = skills::read_instructions(fs, &root);
         let skills = skills::load_skills(fs, &root);
         // O runtime é um agente a atuar: define o workspace (destranca o normal dentro da raiz e
