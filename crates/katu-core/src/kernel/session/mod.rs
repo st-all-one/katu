@@ -6,10 +6,11 @@
 
 use std::path::{Path, PathBuf};
 
+pub use self::snapshot::MAX_TAIL_BYTES;
 use super::budget::{Budget, BudgetCap, BudgetGate};
 use super::cost::{CostCaps, CostCharge, CostGovernor, cost_charge_for};
 use super::event::{CallId, Event};
-use super::log::{Log, read_records_from, read_records_with_len, session_path};
+use super::log::{Durability, Log, read_records_from, read_records_with_len, session_path};
 use super::memory_gate::{MemoryWriteRequest, enforce_memory_write, memory_write_use};
 use super::pipeline::{Dispatch, dispatch};
 use super::state::State;
@@ -43,6 +44,10 @@ pub struct Session<'a> {
     log: Log<'a>,
     state: State,
     cost: CostGovernor,
+    /// Offset do log no último snapshot (Q-15): governa o teto da cauda.
+    snapshot_offset: u64,
+    /// Política de durabilidade do log (ADR 0024/P-01).
+    durability: Durability,
 }
 
 impl<'a> Session<'a> {
@@ -94,6 +99,7 @@ impl<'a> Session<'a> {
             .map_or_else(|| dir.to_path_buf(), |meta| PathBuf::from(&meta.root));
         let snapshot = snapshot::load(fs, dir);
         let snapshot_seq = snapshot.as_ref().map_or(0, |snapshot| snapshot.seq);
+        let snapshot_offset = snapshot.as_ref().map_or(0, |snapshot| snapshot.offset);
         // Só lê a cauda depois do snapshot (ADR 0008); qualquer desalinhamento cai no replay total.
         let tail = snapshot.as_ref().and_then(|snapshot| {
             (snapshot.offset > 0)
@@ -136,6 +142,8 @@ impl<'a> Session<'a> {
             log,
             state,
             cost,
+            snapshot_offset,
+            durability: Durability::Event,
         })
     }
 
@@ -199,9 +207,12 @@ impl<'a> Session<'a> {
             self.cost.commit(charge);
         }
         self.state = next;
-        if matches!(event, Event::PhaseTransition { .. }) && self.write_snapshot().is_err() {
-            crate::event!(Level::Warn, events::SESSION_SNAPSHOT, "ok" => false);
+        // ADR 0024 (P-01): no modo `turn` a barreira fecha no fim do turno, depois de tudo escrito
+        // (o snapshot seguinte já vê os eventos duráveis).
+        if matches!(event, Event::TurnEnd { .. }) {
+            self.log.flush()?;
         }
+        self.maybe_snapshot(event);
         Ok(())
     }
 

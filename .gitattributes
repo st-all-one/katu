@@ -1,0 +1,4 @@
+# katu — gerido (início)
+.katu/audit/** -diff
+.katu/log/** -diff
+# katu — gerido (fim)

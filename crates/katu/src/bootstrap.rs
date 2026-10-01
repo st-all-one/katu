@@ -220,6 +220,12 @@ fn default_config() -> toml::Table {
         "behavior.context_selection",
         toml::Value::String("suffix".to_owned()),
     );
+    // ADR 0024 (P-01): a barreira de durabilidade é dado explícito; o default não muda o contrato.
+    config::set_key(
+        &mut table,
+        "behavior.durability",
+        toml::Value::String("event".to_owned()),
+    );
     config::set_key(&mut table, "recall.default_limit", toml::Value::Integer(5));
     table
 }

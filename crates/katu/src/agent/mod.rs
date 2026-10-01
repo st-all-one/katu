@@ -112,6 +112,16 @@ pub(crate) enum AgentError {
     /// Um worker paralelo de tool call terminou abruptamente (panic vindo de uma porta).
     #[error("tool call paralela terminou abruptamente")]
     Worker,
+    /// O guard de loop cortou o turno (Q-12/F7): repetição patológica antes do teto de passos.
+    #[error("loop detectado no passo {step} ({kind}): {reason}")]
+    LoopDetected {
+        /// Passo em que o detector disparou.
+        step: u32,
+        /// Detector que disparou (`cusum`/`sprt`).
+        kind: &'static str,
+        /// Motivo com a evidência (o que se repetiu).
+        reason: String,
+    },
 }
 
 impl From<AgentError> for Error {
@@ -128,6 +138,7 @@ impl From<AgentError> for Error {
             AgentError::TooManySteps { steps } => {
                 Self::internal(format!("turno excedeu {steps} passos sem terminar"))
             }
+            AgentError::LoopDetected { reason, .. } => Self::conflict(reason),
             AgentError::Worker => {
                 Self::internal("tool call paralela terminou abruptamente".to_string())
             }

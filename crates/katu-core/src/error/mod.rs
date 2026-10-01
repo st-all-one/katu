@@ -186,6 +186,15 @@ impl Error {
         }
     }
 
+    /// Conflito com o estado corrente (ex.: o guard cortou um turno em ciclo, Q-12).
+    pub fn conflict(message: impl Into<String>) -> Self {
+        let _span = crate::trace_fn!("error::conflict");
+
+        Self::Conflict {
+            message: message.into(),
+        }
+    }
+
     /// Serviço indisponível (fail-closed, E03-T07).
     pub fn unavailable(service: impl Into<String>) -> Self {
         let _span = crate::trace_fn!("error::unavailable");

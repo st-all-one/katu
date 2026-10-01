@@ -1,0 +1,25 @@
+{
+  "caveat": "sequências sintéticas determinísticas (nenhum modelo local emite tool calls nativas): mede o detector, não o comportamento de um modelo real. O teto global de passos é configurável (`--max-steps`); aqui usa-se 12 como referência",
+  "criterion": "falso positivo = 0 em 200 turnos normais e alarme do loop antes do teto de passos",
+  "criterion_met": true,
+  "false_positives": {
+    "count": 0,
+    "rate_milli": 0,
+    "steps_per_turn": 12,
+    "turns": 200
+  },
+  "global_step_cap": 12,
+  "loop_turn_first_alarm_step": 4,
+  "normal_turn_first_alarm_step": 0,
+  "params": {
+    "cusum_h_milli": 2000,
+    "cusum_k_milli": 500,
+    "min_steps": 3,
+    "sprt_alpha_milli": 10,
+    "sprt_beta_milli": 100,
+    "sprt_p0_milli": 100,
+    "sprt_p1_milli": 600
+  },
+  "question": "o guard corta o loop antes do teto sem cortar um turno normal",
+  "schema": "katu.bench.loop.v1"
+}

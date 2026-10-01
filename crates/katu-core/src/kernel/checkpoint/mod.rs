@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-use super::state::{CallStatus, State};
+use super::state::State;
 use crate::diag::{Level, events};
 use crate::ports::{Fs, FsError};
 use crate::validate::{Issue, Issues};
@@ -54,10 +54,9 @@ impl Checkpoint {
             "kernel::checkpoint::from_state"
         );
         let pending: Vec<String> = state
-            .calls
-            .iter()
-            .filter(|(_, status)| matches!(status, CallStatus::Pending { .. }))
-            .map(|(call, _)| call.as_str().to_string())
+            .pending
+            .keys()
+            .map(|call| call.as_str().to_string())
             .collect();
         let phase = state.phase;
         let turn = state.turn;

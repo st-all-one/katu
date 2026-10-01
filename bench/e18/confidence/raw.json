@@ -1,0 +1,30 @@
+{
+  "caveat": "fixtures sintéticas sobre as funções de produção: mede a estatística (Wilson/Beta), não o modelo. As sessões locais não têm tool calls nativas, pelo que em dados reais o veredicto é `unmeasured` (ver PROTOCOL.md)",
+  "criterion": "veredicto medido com evidência (n, sucessos, LB) + demolição com uma violação + determinismo (Q-11 não é um ganho de latência: é evidência)",
+  "criterion_met": true,
+  "deterministic": true,
+  "no_observations": {
+    "confidence": "unmeasured",
+    "contradiction": false,
+    "trials": 0
+  },
+  "one_violation": {
+    "clean_lower_milli": 881,
+    "contradiction": true,
+    "lower_milli": 804,
+    "successes": 19,
+    "trials": 20
+  },
+  "perfect_record": {
+    "lower_milli_at_n": 902,
+    "lower_milli_at_n_minus_one": 899,
+    "proves_at_n": 25
+  },
+  "question": "quanto custa provar `Enforced` e quanto custa uma violação",
+  "schema": "katu.bench.confidence.v1",
+  "threshold": {
+    "n_min": 5,
+    "theta_milli": 900,
+    "z_milli": 1645
+  }
+}

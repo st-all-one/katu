@@ -6,6 +6,7 @@ use super::Session;
 use crate::error::ToolOutcome;
 use crate::kernel::Event;
 use crate::kernel::event::CallId;
+use crate::kernel::{Durability, MAX_TAIL_BYTES, read_records};
 use crate::ports::{Fs, MemFs};
 use katu_policy::Phase;
 
@@ -88,6 +89,64 @@ fn snapshot_offset_resumes_the_tail_and_cost() -> Result<(), Box<dyn std::error:
     resumed.verify()?;
     let snapshot = resumed.write_snapshot()?;
     assert!(snapshot.offset > 0, "o snapshot deve fixar o offset do log");
+    Ok(())
+}
+
+#[test]
+fn the_tail_stays_under_the_cap_and_the_state_survives() -> Result<(), Box<dyn std::error::Error>> {
+    // Q-15: uma história longa sem transição de fase tem de continuar a retomar por cauda curta, e o
+    // estado retomado tem de ser **exatamente** o replay do log (`verify`).
+    let fs = MemFs::new();
+    let root = Path::new("/work/proj");
+    repo(&fs, root)?;
+    let id = {
+        let mut session = Session::create(&fs, root, 1_000, "objetivo")?;
+        let id = session.id().cloned().ok_or("sessão sem id")?;
+        let mut snapshots = 0;
+        let mut previous = 0;
+        for turn in 1..=1_200_u32 {
+            session.apply(&Event::TurnStart { turn })?;
+            session.apply(&Event::UserMessage {
+                text: format!("pedido {turn} com algum texto para gastar bytes no log"),
+            })?;
+            session.apply(&Event::TurnEnd { turn })?;
+            let tail = session.tail_bytes();
+            if tail < previous {
+                snapshots += 1;
+            }
+            previous = tail;
+            assert!(tail <= MAX_TAIL_BYTES, "cauda {tail} acima do teto");
+        }
+        assert!(snapshots > 0, "a história longa tem de produzir snapshots");
+        id
+    };
+    let resumed = Session::resume(&fs, root, &id)?;
+    assert_eq!(resumed.state().turn, 1_200);
+    assert!(resumed.tail_bytes() <= MAX_TAIL_BYTES);
+    resumed.verify()?;
+    Ok(())
+}
+
+#[test]
+fn the_turn_boundary_closes_the_durability_barrier() -> Result<(), Box<dyn std::error::Error>> {
+    // ADR 0024 (P-01): no modo `turn` a barreira fecha no `TurnEnd` — antes disso há escritas
+    // pendentes, depois não. O conteúdo do log é o mesmo nos dois modos (só muda quando se
+    // sincroniza).
+    let fs = MemFs::new();
+    let root = Path::new("/work/proj");
+    repo(&fs, root)?;
+    let mut session = Session::create(&fs, root, 1_000, "objetivo")?;
+    session.set_durability(Durability::Turn);
+    assert_eq!(session.durability(), Durability::Turn);
+    session.apply(&Event::TurnStart { turn: 1 })?;
+    session.apply(&Event::UserMessage {
+        text: "pedido".to_string(),
+    })?;
+    assert!(session.is_dirty(), "a meio do turno há barreira pendente");
+    session.apply(&Event::TurnEnd { turn: 1 })?;
+    assert!(!session.is_dirty(), "o fim do turno fecha a barreira");
+    let records = read_records(&fs, session.log_path())?;
+    assert_eq!(records.len(), 3);
     Ok(())
 }
 

@@ -21,6 +21,7 @@
 //! - `gate:provider`/`gate:render` — orçamentos de latência/render (E12-T07/E15-T01);
 //! - `gate:prompt` — composição do prompt medida e travada (Q-20);
 //! - `policy:audit` — regras `Enforced`/`Advisory` coerentes (E02-T04);
+//! - `policy:confidence` — a categoria `Enforced` medida a partir do log (Q-11/F6);
 //! - `ledger:validate` — ledger de cobertura consistente com `policy/` (E02-T06).
 //!
 //! Runbook: `cargo xtask check` (o `make check` delega nele).
@@ -36,6 +37,7 @@ mod bench;
 mod catalog;
 mod check;
 mod check_policy;
+mod confidence;
 mod coverage;
 mod diag;
 mod diag_coverage;
@@ -118,6 +120,7 @@ fn dispatch(task: Option<&str>, rest: &[String]) -> Result<(), String> {
         Some("check-memory-swap") => memory_swap::check_memory_swap(),
         Some("gate:bench") => bench::gate_bench(rest),
         Some("policy:audit") => policy::policy_audit(rest),
+        Some("policy:confidence") => confidence::policy_confidence(rest),
         Some("ledger:validate") => ledger::ledger_validate(rest),
         Some("bench-audit") => {
             audit_bench::run();
@@ -151,7 +154,7 @@ fn dispatch(task: Option<&str>, rest: &[String]) -> Result<(), String> {
         Some("bench-toon") => toon_bench::run(),
         Some(other) => Err(format!("tarefa desconhecida: {other}")),
         None => Err(
-            "uso: xtask <check|check-layers|check-crate-coverage|check-diag|diag:coverage|check-schemas|check-docs|check-surface|check-policy|check-unsafe|check-catalog|check-rule-coverage|check-slices|check-memory-swap|gate:bench|gate:provider|gate:prompt|gate:render|test:unit|test:integration|test:e2e|test:all|policy:audit|ledger:validate|bench-audit|bench-resume|bench-provider|bench-render|provider-smoke>"
+            "uso: xtask <check|check-layers|check-crate-coverage|check-diag|diag:coverage|check-schemas|check-docs|check-surface|check-policy|check-unsafe|check-catalog|check-rule-coverage|check-slices|check-memory-swap|gate:bench|gate:provider|gate:prompt|gate:render|test:unit|test:integration|test:e2e|test:all|policy:audit|policy:confidence|ledger:validate|bench-audit|bench-resume|bench-provider|bench-render|provider-smoke>"
                 .to_string(),
         ),
     }

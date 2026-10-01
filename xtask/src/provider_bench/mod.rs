@@ -15,6 +15,7 @@
 //! código): regressão acima do orçamento **falha**. Nada aqui toca o caminho de produção.
 
 mod report;
+mod sse;
 
 use std::time::{Duration, Instant};
 
@@ -26,9 +27,12 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use report::{DELTAS, corpus, nanos, percentiles, request, usage_value};
+use sse::ab;
 
 /// Repetições do gate (rápido e estável).
 const GATE_REPS: u32 = 200;
+/// Repetições do A/B do parser SSE (P-04): mede-se o mínimo, que precisa de mais amostras.
+const SSE_REPS: u32 = 1_000;
 /// Artefacto cru commitado.
 const ARTIFACT: &str = "bench/providers/latency.json";
 /// Orçamento de latência (dado).
@@ -207,6 +211,7 @@ pub(crate) fn run(args: &[String]) {
         }
     };
     let (p50, p95, p99, max) = percentiles(&offline.samples);
+    let sse = sse_value();
     let live = args.iter().any(|arg| arg == "--live").then(|| {
         let model = value(args, "--model").unwrap_or("qwen");
         live(
@@ -234,6 +239,7 @@ pub(crate) fn run(args: &[String]) {
             "raw_nanos": offline.samples,
             "usage": usage_value(offline.usage),
         },
+        "sse": sse,
         "live": live,
     });
     match serde_json::to_string_pretty(&artifact) {
@@ -271,6 +277,35 @@ pub(crate) fn gate(args: &[String]) -> Result<(), String> {
     }
     println!("gate:provider ok: overhead p95={p95} ns (orçamento {budget} ns)");
     Ok(())
+}
+
+/// A/B do parser SSE (P-04) com a réplica congelada, como JSON.
+fn sse_value() -> Value {
+    let outcome = ab(&corpus(), 4096, SSE_REPS);
+    // O ganho publica-se sobre o **mínimo** (o sinal com menos ruído de alocador/agendamento); as
+    // medianas ficam no artefacto para quem quiser ver a dispersão.
+    let saved = outcome
+        .legacy_min_nanos
+        .saturating_sub(outcome.production_min_nanos);
+    json!({
+        "events": outcome.events,
+        "chunks": outcome.chunks,
+        "production_nanos": outcome.production_nanos,
+        "legacy_nanos": outcome.legacy_nanos,
+        "production_min_nanos": outcome.production_min_nanos,
+        "legacy_min_nanos": outcome.legacy_min_nanos,
+        "gain_ratio": ratio(saved, outcome.legacy_min_nanos),
+    })
+}
+
+/// Fração poupada (4 casas).
+fn ratio(saved: u64, total: u64) -> f64 {
+    if total == 0 {
+        return 0.0;
+    }
+    let value = f64::from(u32::try_from(saved).unwrap_or(u32::MAX))
+        / f64::from(u32::try_from(total).unwrap_or(u32::MAX));
+    (value * 10_000.0).round() / 10_000.0
 }
 
 /// Lê o valor de `--chave`.

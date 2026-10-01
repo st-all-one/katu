@@ -113,7 +113,8 @@ flags explícitas; `-` = stdin) existe em `prime`/`run`/`tui`/`memo ask`; `--bat
 (JSONL; valida tudo antes de executar) em `prime`/`run`/`memo ask`.
 
 **Defaults da config (E20-T17):** `provider`, `model`, `base`, `behavior.auto_compact`,
-`behavior.context_selection` (`suffix`/`utility`), `behavior.prompt_state` e `recall.default_limit` da
+`behavior.context_selection` (`suffix`/`utility`), `behavior.prompt_state`,
+`behavior.durability` (`event`/`turn`; ADR 0024) e `recall.default_limit` da
 config efetiva (projeto > global) são o default de `run`/`tui`/`memo ask` (flags > `--params` >
 config > default do comando).
 
@@ -123,6 +124,13 @@ e `behavior.prompt_state` liga a secção `estado` no prime. Ambas ficam **desli
 números publicados são um *proxy* de informação (`bench/e18/select/`) e a adoção do default exige A/B
 com o modelo. O envelope de `run --json` publica o que correu (`context_selection`, `state`) para que
 a medição não dependa do que se supõe.
+
+**Corte por loop (Q-12/F7):** o turno observa cada passo **antes** de executar as tools e corta um
+ciclo de leitura sem progresso com `conflict` (exit `5`) e a mensagem
+`loop detectado no passo N (sprt): …` — nunca em silêncio. O evento `agent.loop` fica no diagnóstico e
+o turno é **fechado** no log (a sessão continua utilizável). Um ciclo que **escreve** (progresso) não é
+cortado: `bash "make"` em *polling* é legítimo. Medido em `bench/e18/loop/`: **0** falsos positivos
+em 200 turnos normais, corte no 4.º passo de um ciclo puro.
 
 ### 2.3 Defaults de provider/modelo/base
 

@@ -2,6 +2,12 @@
 //!
 //! Uma geração por esquema: `session.v{N}.jsonl`. Cada linha é um [`LogRecord`] com um `seq`
 //! contíguo a partir de 1; um salto de `seq` ou uma linha ilegível é **corrupção** (fail-closed).
+//!
+//! **Durabilidade (ADR 0024, P-01).** [`Durability::Event`] (default) sincroniza em cada `append`;
+//! [`Durability::Turn`] escreve sem sincronizar e faz a barreira em [`Log::flush`], chamada na
+//! fronteira do turno — é o *group commit*, que troca uma janela de perda de um turno por um
+//! `fsync` em vez de um por evento. A **cauda rasgada** de um crash é recuperada (última linha
+//! incompleta descartada, com aviso); a corrupção a meio continua a ser erro.
 
 use std::path::{Path, PathBuf};
 
@@ -21,6 +27,39 @@ pub struct LogRecord {
     pub seq: u64,
     /// Evento.
     pub event: Event,
+}
+
+/// Política de durabilidade do log (ADR 0024).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum Durability {
+    /// Uma barreira por evento: um evento aceite está no disco (default histórico).
+    #[default]
+    Event,
+    /// Uma barreira por turno: os turnos anteriores estão no disco, o corrente pode perder-se.
+    Turn,
+}
+
+impl Durability {
+    /// Nome estável (config/diagnóstico).
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Event => "event",
+            Self::Turn => "turn",
+        }
+    }
+
+    /// Interpreta o valor da config; `None` para um valor desconhecido (fail-closed no chamador).
+    #[must_use]
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "event" => Some(Self::Event),
+            "turn" => Some(Self::Turn),
+            _ => None,
+        }
+    }
 }
 
 /// Natureza de erro do log.
@@ -72,6 +111,9 @@ pub struct Log<'a> {
     path: PathBuf,
     seq: u64,
     offset: u64,
+    durability: Durability,
+    /// Há escritas por sincronizar (só no modo [`Durability::Turn`]).
+    dirty: bool,
 }
 
 impl<'a> Log<'a> {
@@ -89,7 +131,22 @@ impl<'a> Log<'a> {
             path,
             seq,
             offset: u64::try_from(len).unwrap_or(u64::MAX),
+            durability: Durability::Event,
+            dirty: false,
         })
+    }
+
+    /// Define a política de durabilidade (ADR 0024); default [`Durability::Event`].
+    pub fn set_durability(&mut self, durability: Durability) {
+        let _span = crate::trace_fn!("kernel::log::set_durability");
+
+        self.durability = durability;
+    }
+
+    /// Política em vigor.
+    #[must_use]
+    pub const fn durability(&self) -> Durability {
+        self.durability
     }
 
     /// Retoma o log a partir dos valores já conhecidos (sem reler o ficheiro — ADR 0008).
@@ -101,6 +158,8 @@ impl<'a> Log<'a> {
             path: session_path(dir),
             seq,
             offset,
+            durability: Durability::Event,
+            dirty: false,
         }
     }
 
@@ -145,12 +204,45 @@ impl<'a> Log<'a> {
         let mut line = serde_json::to_vec(&record)
             .map_err(|err| LogError::new(LogErrorKind::Corrupt, err.to_string()))?;
         line.push(b'\n');
-        self.fs.append(&self.path, &line).map_err(from_io)?;
+        // Modo `Turn`: escreve sem barreira e marca a pendência; `flush` fecha-a no fim do turno.
+        match self.durability {
+            Durability::Event => self.fs.append(&self.path, &line).map_err(from_io)?,
+            Durability::Turn => {
+                self.fs
+                    .append_unsynced(&self.path, &line)
+                    .map_err(from_io)?;
+                self.dirty = true;
+            }
+        }
         self.seq = seq;
         self.offset = self
             .offset
             .saturating_add(u64::try_from(line.len()).unwrap_or(u64::MAX));
         Ok(seq)
+    }
+}
+
+impl Log<'_> {
+    /// Fecha a barreira pendente do *group commit* (no-op no modo [`Durability::Event`]).
+    ///
+    /// É chamada na fronteira do turno: depois disto, todos os eventos anexados estão no disco.
+    ///
+    /// # Errors
+    /// [`LogError`] se a barreira falhar (o log **não** é dado como durável).
+    pub fn flush(&mut self) -> Result<(), LogError> {
+        let _span = crate::fn_span!(Level::Trace, events::LOG_APPEND, "kernel::log::flush");
+        if !self.dirty {
+            return Ok(());
+        }
+        self.fs.sync(&self.path).map_err(from_io)?;
+        self.dirty = false;
+        Ok(())
+    }
+
+    /// `true` se há escritas por sincronizar.
+    #[must_use]
+    pub const fn is_dirty(&self) -> bool {
+        self.dirty
     }
 }
 
@@ -211,17 +303,53 @@ fn parse_records(bytes: &[u8], first_seq: u64) -> Result<Vec<LogRecord>, LogErro
         events::LOG_REPLAY,
         "kernel::log::parse_records"
     );
-    let text = std::str::from_utf8(bytes)
-        .map_err(|err| LogError::new(LogErrorKind::Corrupt, format!("log não é UTF-8: {err}")))?;
+    // Um crash pode deixar a **última** linha incompleta (sem `\n`): descarta-se e recupera-se
+    // (ADR 0024). A marca do registo rasgado é **não terminar em `\n`**: um ficheiro terminado é
+    // íntegro, pelo que uma linha inválida aí é corrupção de verdade (fail-closed). Sem a
+    // recuperação, um crash tornaria a sessão irrecuperável — e a política por turno trocaria
+    // `fsync` por perda de sessão.
+    let torn_tail = !bytes.ends_with(b"\n");
+    let (text, torn) = match std::str::from_utf8(bytes) {
+        Ok(text) => (text, None),
+        Err(err) => {
+            let valid = err.valid_up_to();
+            let tail = bytes.get(valid..).unwrap_or(&[]);
+            let recoverable =
+                bytes.get(valid.saturating_sub(1)) != Some(&b'\n') && !tail.contains(&b'\n');
+            if !recoverable {
+                return Err(LogError::new(
+                    LogErrorKind::Corrupt,
+                    format!("log não é UTF-8: {err}"),
+                ));
+            }
+            let text = std::str::from_utf8(bytes.get(..valid).unwrap_or(&[])).map_err(|err| {
+                LogError::new(LogErrorKind::Corrupt, format!("log não é UTF-8: {err}"))
+            })?;
+            (text, Some(valid))
+        }
+    };
     let mut records = Vec::new();
     let mut expected = first_seq;
-    for line in text.lines() {
+    let lines: Vec<&str> = text.lines().collect();
+    let last = lines.len().saturating_sub(1);
+    for (index, line) in lines.iter().enumerate() {
         if line.trim().is_empty() {
             continue;
         }
-        let record: LogRecord = serde_json::from_str(line).map_err(|err| {
-            LogError::new(LogErrorKind::Corrupt, format!("linha inválida: {err}"))
-        })?;
+        let record: LogRecord = match serde_json::from_str(line) {
+            Ok(record) => record,
+            // Linha rasgada: só a **última** é recuperável.
+            Err(_) if index == last && torn_tail => {
+                crate::event!(Level::Warn, events::LOG_REPLAY, "recovered" => true, "reason" => "cauda rasgada");
+                break;
+            }
+            Err(err) => {
+                return Err(LogError::new(
+                    LogErrorKind::Corrupt,
+                    format!("linha inválida: {err}"),
+                ));
+            }
+        };
         if record.seq != expected {
             return Err(LogError::new(
                 LogErrorKind::SequenceGap,
@@ -230,6 +358,9 @@ fn parse_records(bytes: &[u8], first_seq: u64) -> Result<Vec<LogRecord>, LogErro
         }
         expected = expected.saturating_add(1);
         records.push(record);
+    }
+    if torn.is_some() {
+        crate::event!(Level::Warn, events::LOG_REPLAY, "recovered" => true, "reason" => "cauda não-UTF-8");
     }
     Ok(records)
 }

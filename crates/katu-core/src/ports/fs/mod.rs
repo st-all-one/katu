@@ -77,6 +77,32 @@ pub trait Fs: Send + Sync {
     /// Anexa bytes ao fim de um ficheiro (cria se não existir), de forma durável.
     fn append(&self, path: &Path, bytes: &[u8]) -> Result<(), FsError>;
 
+    /// Anexa bytes **sem** garantir durabilidade: a barreira é feita depois por [`Fs::sync`].
+    ///
+    /// É o que permite o *group commit* do log (ADR 0024, P-01): o `fsync` passa a acontecer na
+    /// fronteira do turno em vez de uma vez por evento. O default **cai em [`Fs::append`]** — um
+    /// backend que não saiba adiar continua correto (só mais lento).
+    ///
+    /// # Errors
+    /// Como [`Fs::append`].
+    fn append_unsynced(&self, path: &Path, bytes: &[u8]) -> Result<(), FsError> {
+        let _span = crate::trace_fn!("ports::fs::append_unsynced");
+
+        self.append(path, bytes)
+    }
+
+    /// Torna durável o que já foi escrito em `path` (barreira do *group commit*).
+    ///
+    /// O default é **no-op** (nada a fazer num backend sem `fsync`): quem adia tem de o sobrepor.
+    ///
+    /// # Errors
+    /// [`FsError::Io`] se a barreira falhar.
+    fn sync(&self, _path: &Path) -> Result<(), FsError> {
+        let _span = crate::trace_fn!("ports::fs::sync");
+
+        Ok(())
+    }
+
     /// Move/renomeia atomicamente `from` → `to` (o conteúdo **não** muda).
     ///
     /// Semântica POSIX: substitui `to` se já existir. O executor `move` verifica a existência do

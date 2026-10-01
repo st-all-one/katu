@@ -1,0 +1,91 @@
+{
+  "bounded": [
+    {
+      "calls_per_turn": 0,
+      "log_bytes": 387563,
+      "resume_us": 663,
+      "snapshots": 2,
+      "tail_bytes": 125244,
+      "turns": 2000
+    },
+    {
+      "calls_per_turn": 0,
+      "log_bytes": 3995564,
+      "resume_us": 321,
+      "snapshots": 30,
+      "tail_bytes": 61812,
+      "turns": 20000
+    },
+    {
+      "calls_per_turn": 5,
+      "log_bytes": 3223564,
+      "resume_us": 575,
+      "snapshots": 24,
+      "tail_bytes": 69617,
+      "turns": 2000
+    }
+  ],
+  "limits": [
+    "MemFs não tem fsync: o custo de gravar o snapshot (tmp→sync_all→rename) não está aqui; o E18 mediu ~3,7 ms por escrita atómica em disco real (7 escritas = 25,8 ms/turno)",
+    "as sessões são sintéticas (turnos + tool calls Ok), sem conteúdo de tools: mede-se a retomada, não o trabalho do modelo"
+  ],
+  "machine": {
+    "arch": "x86_64",
+    "os": "linux"
+  },
+  "max_tail_bytes": 131072,
+  "phase": [
+    {
+      "calls_per_turn": 0,
+      "log_bytes": 387730,
+      "resume_us": 231,
+      "snapshots": 1,
+      "tail_bytes": 39200,
+      "turns": 2000
+    },
+    {
+      "calls_per_turn": 0,
+      "log_bytes": 3995733,
+      "resume_us": 2165,
+      "snapshots": 1,
+      "tail_bytes": 404000,
+      "turns": 20000
+    },
+    {
+      "calls_per_turn": 5,
+      "log_bytes": 3223733,
+      "resume_us": 2668,
+      "snapshots": 1,
+      "tail_bytes": 323800,
+      "turns": 2000
+    }
+  ],
+  "replay": [
+    {
+      "calls_per_turn": 0,
+      "log_bytes": 387563,
+      "resume_us": 2138,
+      "snapshots": 0,
+      "tail_bytes": 387563,
+      "turns": 2000
+    },
+    {
+      "calls_per_turn": 0,
+      "log_bytes": 3995564,
+      "resume_us": 23839,
+      "snapshots": 0,
+      "tail_bytes": 3995564,
+      "turns": 20000
+    },
+    {
+      "calls_per_turn": 5,
+      "log_bytes": 3223564,
+      "resume_us": 26430,
+      "snapshots": 0,
+      "tail_bytes": 3223564,
+      "turns": 2000
+    }
+  ],
+  "reps": 7,
+  "schema": "katu.bench.resume.v1"
+}

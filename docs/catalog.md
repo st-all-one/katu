@@ -31,7 +31,7 @@
 | `mem-recall-before-write` | enforced | Memória: não gravar nota sem ter consultado o conhecimento (recall) na mesma fase | chame `memory_recall` no mesmo turno antes de `memory_write` |
 | `mem-single-claim` | enforced | Memória: uma afirmação por nota | divida em várias notas, uma afirmação por nota |
 
-## Eventos de diag (113)
+## Eventos de diag (114)
 
 - `katu.run`
 - `katu.setup`
@@ -140,6 +140,7 @@
 - `skill.read`
 - `embed.request`
 - `agent.route`
+- `agent.loop`
 - `memory.open`
 - `bus.publish`
 - `bus.deliver`
@@ -147,7 +148,7 @@
 - `policy.audit`
 - `policy.capability`
 
-## ADRs (23)
+## ADRs (24)
 
 - [ADR 0001 — MVK aprovado: o loop possuído (DF1) torna-se compromisso](adr/0001-mvk-gate-aprovado.md)
 - [ADR 0002 — Ferramentas AI-first: envelope + views + TOON (core por medição)](adr/0002-ferramentas-ai-first.md)
@@ -172,3 +173,4 @@
 - [ADR 0021 — Layout central do `.katu/` e versionamento](adr/0021-layout-katu-e-versionamento.md)
 - [ADR 0022 — Modo de planeamento (`/plan`) e `deny_write_outside`](adr/0022-modo-plano-e-deny-write-outside.md)
 - [ADR 0023 — Contexto do projeto (`AGENTS.md`/skills) e duas IAs (embedding + execução)](adr/0023-contexto-e-duas-ias.md)
+- [0024 — Durabilidade do log: `fsync` por evento ou por turno (opt-in)](adr/0024-durabilidade-do-log.md)

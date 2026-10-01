@@ -10,7 +10,9 @@ use katu_core::context::{CompactionMode, ContextBudget};
 use katu_core::diag::{Level, events};
 #[cfg(test)]
 use katu_core::kernel::Message;
-use katu_core::kernel::{CallId, Event, Session, SessionError, SessionId, discover_root};
+use katu_core::kernel::{
+    CallId, Durability, Event, Session, SessionError, SessionId, discover_root,
+};
 use katu_core::memory::Memory;
 use katu_core::plan::Plan;
 use katu_core::ports::{Clock, Fs};
@@ -187,6 +189,11 @@ impl<'a> Runtime<'a> {
         let (rules, enforced) = load_rules(clock.now().as_millis())?;
         // Q-04/Q-02b: as duas opções são **dados** do projeto (config fechada), lidas uma vez.
         let defaults = defaults::from_root(&root);
+        // ADR 0024 (P-01): a política de durabilidade é dado do projeto; `event` (default) mantém o
+        // contrato histórico — um valor desconhecido **não** muda nada (fail-safe).
+        if let Some(durability) = defaults.durability.as_deref().and_then(Durability::parse) {
+            session.set_durability(durability);
+        }
         let instructions = skills::read_instructions(fs, &root);
         let skills = skills::load_skills(fs, &root);
         // O runtime é um agente a atuar: define o workspace (destranca o normal dentro da raiz e

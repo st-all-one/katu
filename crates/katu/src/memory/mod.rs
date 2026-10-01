@@ -23,7 +23,7 @@ use katu_core::memory::{
 };
 use knudge_core::graph::Graph;
 use knudge_core::retrieval::{Index, RecallQuery, recall};
-use knudge_core::write::{Draft, propose, write};
+use knudge_core::write::{Draft, WriteContext, propose, write};
 use knudge_core::{Error as KnudgeError, ErrorKind, Knudge};
 
 /// Layout do conhecimento dentro de `.katu/` (E20-T19): `notas/` + `.idx/`.
@@ -150,7 +150,22 @@ impl Memory for KnudgeMemory {
         let draft = make_draft(req);
         let id = {
             let thresholds = inner.kd.thresholds().map_err(to_memory_error)?;
-            let ctx = inner.kd.write_context().map_err(to_memory_error)?;
+            // P-03: o commit **reusa** o índice que o `pre_write` do mesmo gate já construiu (e sobre
+            // o qual decidiu). `Knudge::write_context()` re-lê todas as notas do disco
+            // (`Index::from_store`), o que domina o custo da escrita a partir de ~100 notas; o índice
+            // em cache é o mesmo que a decisão viu, pelo que o reuso também torna o caminho
+            // coerente. A escrita **invalida** o cache: a próxima operação volta a ler do disco.
+            inner.ensure_index()?;
+            let index = inner
+                .index
+                .clone()
+                .ok_or_else(|| MemoryError::internal("índice ausente após construção"))?;
+            let ctx = WriteContext::new(
+                inner.kd.store(),
+                inner.kd.events(),
+                index,
+                inner.kd.now_ms(),
+            );
             write(&ctx, &draft, &thresholds)
                 .map_err(to_memory_error)?
                 .id

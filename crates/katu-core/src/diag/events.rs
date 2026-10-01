@@ -10,7 +10,7 @@
 //! chamador** — o kernel abre o span em torno da avaliação.
 
 /// Versão do catálogo. Incrementa ao remover/renomear ids.
-pub const CATALOG_VERSION: u16 = 2;
+pub const CATALOG_VERSION: u16 = 3;
 
 macro_rules! catalog {
     ($(($name:ident, $id:literal, $doc:literal)),* $(,)?) => {
@@ -193,6 +193,11 @@ catalog! {
     (SKILL_READ, "skill.read", "Leitura de uma `SKILL.md` para o contexto."),
     (EMBED_REQUEST, "embed.request", "Pedido à segunda IA (embeddings)."),
     (AGENT_ROUTE, "agent.route", "Roteamento fail-closed de uma tool call do modelo."),
+    (
+        AGENT_LOOP,
+        "agent.loop",
+        "Corte por repetição patológica do turno (Q-12/F7)."
+    ),
     (MEMORY_OPEN, "memory.open", "Abertura do adaptador de memória."),
     (BUS_PUBLISH, "bus.publish", "Publicação de um evento no bus do kernel."),
     (BUS_DELIVER, "bus.deliver", "Entrega de um evento aos observadores (waterfall)."),

@@ -2,7 +2,7 @@
 
 use super::control::Control;
 use super::event::{CallId, Event};
-use super::state::{CallStatus, Refusal, RefusalReason, State, can_transition};
+use super::state::{Refusal, RefusalReason, State, can_transition};
 use crate::diag::{Level, events};
 use crate::error::ToolOutcome;
 use crate::feedback::{CommandRecord, CommandStatus};
@@ -69,15 +69,16 @@ fn tool_call(state: &State, call: &CallId, tool: &ToolUse) -> Result<State, Refu
     let _span = crate::trace_fn!("kernel::step::tool_call");
 
     require_open(state)?;
-    if state.calls.contains_key(call) {
+    // Duplicado **pendente**: dois pedidos vivos com o mesmo id tornariam o resultado ambíguo. Um id
+    // já concluído (noutro passo ou turno) é legítimo: `call_0` é o que o provider emite sem id.
+    if state.pending.contains_key(call) {
         return Err(refuse(
             state,
             RefusalReason::DuplicateCall { call: call.clone() },
         ));
     }
     let mut next = state.clone();
-    next.calls
-        .insert(call.clone(), CallStatus::Pending { tool: tool.clone() });
+    next.pending.insert(call.clone(), tool.clone());
     Ok(next)
 }
 
@@ -85,7 +86,7 @@ fn tool_call(state: &State, call: &CallId, tool: &ToolUse) -> Result<State, Refu
 fn tool_result(state: &State, call: &CallId, outcome: &ToolOutcome) -> Result<State, Refusal> {
     let _span = crate::trace_fn!("kernel::step::tool_result");
 
-    let Some(CallStatus::Pending { tool }) = state.calls.get(call) else {
+    let Some(tool) = state.pending.get(call) else {
         return Err(refuse(
             state,
             RefusalReason::UnknownCall { call: call.clone() },
@@ -93,12 +94,8 @@ fn tool_result(state: &State, call: &CallId, outcome: &ToolOutcome) -> Result<St
     };
     let name = tool.name;
     let mut next = state.clone();
-    next.calls.insert(
-        call.clone(),
-        CallStatus::Done {
-            outcome: outcome.clone(),
-        },
-    );
+    // O efeito vive no log; aqui só se **fecha** o intervalo pendente.
+    next.pending.remove(call);
     if outcome.is_success() {
         next.completed_tools.insert(name);
     }

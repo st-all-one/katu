@@ -9,9 +9,12 @@
 pub mod budget;
 pub mod bus;
 pub mod checkpoint;
+mod confidence;
 mod control;
 pub mod cost;
 mod event;
+mod guard;
+mod hash;
 mod log;
 mod memory_gate;
 mod pipeline;
@@ -23,14 +26,18 @@ mod step;
 pub use budget::{Budget, BudgetCap, BudgetGate, BudgetRefusal, Charge};
 pub use bus::{EventBus, HandlerError, HandlerResult, Middleware, Next, Observer};
 pub use checkpoint::{CHECKPOINT_SCHEMA_VERSION, Checkpoint, CheckpointError, checkpoint_path};
+pub use confidence::{enforced_verdicts, rule_trials, tool_trials};
 pub use control::{Control, ControlError, ControlState};
 pub use cost::{
     CostCaps, CostCharge, CostGovernor, CostLayer, CostRefusal, KillSwitch, Reenable,
     ReenableError, RollingWindowCap, VelocityCap, cost_charge_for,
 };
 pub use event::{CallId, Event};
+pub use guard::{Alarm, AlarmKind, Call, Fingerprint, Guard, GuardParams};
+pub use hash::{canonical as canonical_hash, fnv1a};
 pub use log::{
-    LOG_SCHEMA_VERSION, Log, LogError, LogErrorKind, LogRecord, read_records, session_path,
+    Durability, LOG_SCHEMA_VERSION, Log, LogError, LogErrorKind, LogRecord, read_records,
+    session_path,
 };
 pub use memory_gate::{
     MemoryWriteError, MemoryWriteRequest, enforce_memory_write, memory_recall_use, memory_write_use,
@@ -41,8 +48,8 @@ pub use pipeline::{
 };
 pub use project::{Message, Snapshot, derive_messages, snapshot, state_of};
 pub use session::{
-    CallContext, Session, SessionError, SessionId, SessionMeta, StateSnapshot, audit_dir,
-    discover_root, katu_dir,
+    CallContext, MAX_TAIL_BYTES, Session, SessionError, SessionId, SessionMeta, StateSnapshot,
+    audit_dir, discover_root, katu_dir,
 };
-pub use state::{CallStatus, Refusal, RefusalReason, State, can_transition, next_phase};
+pub use state::{Refusal, RefusalReason, State, can_transition, next_phase};
 pub use step::step;

@@ -1,0 +1,31 @@
+{
+  "dir": "/home/one/projects/katu/target/durability-bench",
+  "events_per_turn": 5,
+  "limits": [
+    "mede `Session::apply` no disco real (fsync incluído); o conteúdo do log é idêntico nos dois modos",
+    "o número depende do disco: um tmpfs ou um NVMe rápido mudam a razão"
+  ],
+  "machine": {
+    "arch": "x86_64",
+    "os": "linux"
+  },
+  "reps": 3,
+  "rows": [
+    {
+      "events": 100,
+      "log_bytes": 8462,
+      "median_nanos": 384773881,
+      "mode": "event",
+      "per_event_nanos": 3847738
+    },
+    {
+      "events": 100,
+      "log_bytes": 8462,
+      "median_nanos": 84329942,
+      "mode": "turn",
+      "per_event_nanos": 843299
+    }
+  ],
+  "schema": "katu.bench.durability.v1",
+  "turns": 20
+}

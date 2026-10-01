@@ -7,28 +7,10 @@ use serde::{Deserialize, Serialize};
 use super::control::ControlState;
 use super::event::CallId;
 use crate::diag::{Level, events};
-use crate::error::ToolOutcome;
 use crate::feedback::CommandStatus;
 use crate::plan::Plan;
 use crate::verify::VerificationReport;
 use katu_policy::{BudgetState, Capability, Phase, ResolvedPath, ToolName, ToolUse};
-
-/// Estado de um pedido de tool (pendente ou concluído).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case", tag = "state")]
-#[non_exhaustive]
-pub enum CallStatus {
-    /// Pedido aceite pela política, à espera de efeito.
-    Pending {
-        /// Uso de tool.
-        tool: ToolUse,
-    },
-    /// Efeito observado.
-    Done {
-        /// Efeito.
-        outcome: ToolOutcome,
-    },
-}
 
 /// Estado do agente. `Clone`/`Eq`/`Serialize`; mapas ordenados (`BTreeMap`), nunca `HashMap`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -39,8 +21,13 @@ pub struct State {
     pub turn: u32,
     /// `true` se há um turno aberto.
     pub turn_open: bool,
-    /// Chamadas de tool indexadas por identificador.
-    pub calls: BTreeMap<CallId, CallStatus>,
+    /// Chamadas de tool **pendentes** (pedido logado, efeito ainda não observado).
+    ///
+    /// Só o **intervalo** entre `ToolCall` e `ToolResult` vive aqui: o efeito observado fica no log
+    /// (a projeção do modelo vem de lá) e o nome concluído em `completed_tools`. Guardar as
+    /// concluídas tornava o estado O(chamadas) — cada `step` clona o estado — e recusava um
+    /// identificador repetido em turnos diferentes, que é legítimo (`call_0` por resposta).
+    pub pending: BTreeMap<CallId, ToolUse>,
     /// Tools efetivamente concluídas com sucesso (para `RequireAfter` da política).
     pub completed_tools: BTreeSet<ToolName>,
     /// Fases com pré-condição dispensada por um `waiver` explícito (E05-T02, §47).
@@ -76,7 +63,7 @@ impl State {
             phase: Phase::Task,
             turn: 0,
             turn_open: false,
-            calls: BTreeMap::new(),
+            pending: BTreeMap::new(),
             completed_tools: BTreeSet::new(),
             waivers: BTreeSet::new(),
             capabilities: Vec::new(),
@@ -200,6 +187,6 @@ mod tests {
         let state = State::initial();
         assert_eq!(state.phase, Phase::Task);
         assert!(!state.turn_open);
-        assert!(state.calls.is_empty());
+        assert!(state.pending.is_empty());
     }
 }

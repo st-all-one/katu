@@ -5,19 +5,98 @@
 
 use std::path::Path;
 
+use super::snapshot::MAX_TAIL_BYTES;
 use super::{Session, SessionError};
 use crate::context::{
     AssembleOptions, Assembly, Compaction, CompactionMode, Context, ContextBudget, PrimeMode,
     assemble_all, compact,
 };
+use crate::diag::{Level, events};
 use crate::feedback::CommandRecord;
 use crate::kernel::checkpoint::{self, Checkpoint, CheckpointError};
 use crate::kernel::log::{read_records, session_path};
 use crate::kernel::project::{Message, derive_messages, state_of};
-use crate::kernel::{CallId, Event};
+use crate::kernel::{CallId, Durability, Event, StateSnapshot};
 use crate::ports::FsError;
 
 impl Session<'_> {
+    /// Define a política de durabilidade do log (ADR 0024); default [`Durability::Event`].
+    ///
+    /// Um turno já escrito em modo `event` está durável; mudar para `turn` a meio só afeta os
+    /// eventos seguintes (e o `flush` do próximo `TurnEnd`).
+    pub fn set_durability(&mut self, durability: Durability) {
+        let _span = crate::fn_span!(
+            Level::Trace,
+            events::LOG_APPEND,
+            "kernel::session::set_durability"
+        );
+        self.durability = durability;
+        self.log.set_durability(durability);
+    }
+
+    /// Política de durabilidade em vigor.
+    #[must_use]
+    pub const fn durability(&self) -> Durability {
+        self.durability
+    }
+
+    /// `true` se há eventos escritos por sincronizar (modo `turn`).
+    #[must_use]
+    pub const fn is_dirty(&self) -> bool {
+        self.log.is_dirty()
+    }
+
+    /// Fecha a barreira pendente do log (no-op no modo `event`).
+    ///
+    /// # Errors
+    /// [`SessionError::Log`] se a barreira falhar.
+    pub fn flush(&mut self) -> Result<(), SessionError> {
+        let _span = crate::fn_span!(Level::Trace, events::LOG_APPEND, "kernel::session::flush");
+        self.log.flush()?;
+        Ok(())
+    }
+
+    /// Fronteira de snapshot: transição de fase (contrato) ou fim de turno com a cauda cheia (Q-15).
+    ///
+    /// O snapshot é uma **otimização reconstruível**: uma falha ao gravar não invalida o turno (o
+    /// log é a fonte da verdade), pelo que o erro só se regista no diagnóstico.
+    pub(super) fn maybe_snapshot(&mut self, event: &Event) {
+        let _span = crate::trace_fn!("kernel::session::maybe_snapshot");
+
+        let phase = matches!(event, Event::PhaseTransition { .. });
+        let full_tail =
+            matches!(event, Event::TurnEnd { .. }) && self.tail_bytes() >= MAX_TAIL_BYTES;
+        if !(phase || full_tail) {
+            return;
+        }
+        match self.snapshot_now() {
+            Ok(_) => crate::event!(
+                Level::Debug,
+                events::SESSION_SNAPSHOT,
+                "ok" => true,
+                "tail_bytes" => self.tail_bytes()
+            ),
+            Err(_) => crate::event!(Level::Warn, events::SESSION_SNAPSHOT, "ok" => false),
+        }
+    }
+
+    /// Bytes de log desde o último snapshot (o que a retomada teria de reler).
+    #[must_use]
+    pub fn tail_bytes(&self) -> u64 {
+        let _span = crate::trace_fn!("kernel::session::tail_bytes");
+
+        self.log.offset().saturating_sub(self.snapshot_offset)
+    }
+
+    /// Grava o snapshot e **regista** a fronteira (teto da cauda, Q-15).
+    pub(super) fn snapshot_now(&mut self) -> Result<StateSnapshot, SessionError> {
+        let _span = crate::trace_fn!("kernel::session::snapshot_now");
+
+        let snapshot = self.write_snapshot()?;
+        self.snapshot_offset = snapshot.offset;
+        Ok(snapshot)
+    }
+
     /// Escreve o checkpoint de fase (artefacto durável) a partir do estado corrente.
     ///
     /// # Errors

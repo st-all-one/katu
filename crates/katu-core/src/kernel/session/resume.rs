@@ -96,8 +96,8 @@ impl<'a> Session<'a> {
             per_tool: self.cost.per_tool_used().clone(),
             history: self.cost.history().collect(),
             state: self.state.clone(),
+            hash: 0,
         };
-        super::snapshot::save(self.fs, &self.dir, &snapshot)?;
-        Ok(snapshot)
+        Ok(super::snapshot::save(self.fs, &self.dir, snapshot)?)
     }
 }

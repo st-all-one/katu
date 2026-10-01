@@ -53,7 +53,7 @@ remoção de complexidade; senão reverter e escrever a rejeição). Nada muda b
 | **Q-16** contexto do projeto no log | ✔ feito | `ProjectContext` em `assemble`; teste `the_project_context_is_logged_for_replay` |
 | **Q-02a** corte por unidade (correção) | ✔ feito | sem resultado órfão; teste varre orçamentos `0..=80` (falhava com a política antiga) |
 | **Q-21** delta da tool ao modelo (correção) | ✔ feito | §18/G6: `ToolResult.delta` no log e no pedido; testes no loop e no wire |
-| **Q-08** erro que ensina | ✔ feito | `remedy` por regra (dado) + `policy:audit` falha sem ele; catálogo regenerado |
+| **Q-08** erro que ensina | ✔ feito | `remedy` por regra (dado) + `policy:audit` falha sem ele; `edit` devolve as **âncoras únicas mais próximas** (Q-07); catálogo regenerado |
 | **Q-05** catálogo de skills curto | ✔ feito | **−73,9 %** (4636 → 1211 B); `katu-core/src/skill.rs` |
 | **Q-18** tools por relevância (A4) | ✗ rejeitado | §1.5; ganho máximo seguro **14,0 %** < 20 % |
 | **Q-19** `AGENTS.md` condensado | ✔ feito | **−29,1 %** (1590 → 1128 B); cache **rejeitado** (25,8 ms vs. µs) |
@@ -64,6 +64,18 @@ remoção de complexidade; senão reverter e escrever a rejeição). Nada muda b
 | **Q-04** o modelo vê o estado | ✔ feito (**off**) | secção `estado` + evento `PromptState` (log/replay); ligada por `behavior.prompt_state` |
 | **P-02** emissor TOON de uma passagem | ✔ feito | `emit` **−62,0 %** dev / **−33,3 %** release; `to_toon` −39,9 %; `bench/e18/toon/` |
 | **Q-07** `edit` multi-bloco atómico | ✔ feito | 5 chamadas → 1 (**−80 %**), payload −19,9 %, atómico (0 B gravados em falha); `bench/e18/edit/` |
+| **Q-11** confiança por artefacto | ✔ feito | `Enforced` **medida** no log: prova-se a **n = 25** (LB 902); 1 violação em 20 ⇒ LB 804 + `contradiction`; `bench/e18/confidence/`; comando `policy:confidence` no `check` |
+| **P-01** *group commit* do log | ✔ feito | **−78,1 %** no caminho de anexação (384,8 → 84,3 ms/100 eventos, disco real); opt-in `behavior.durability`; ADR 0024; `bench/e18/durability/` |
+| **P-04** parser SSE sem alocação por delta | ✔ feito | **−28,5 %** no parser (37 924 → 27 099 ns, mínimo de 1 000 passagens); overhead de cliente p50 0,19 ms; `bench/e18/transport/` |
+| **P-03** caminho `memory.write`/gate | ✔ feito | release: gate com 1 000 notas **46 921 → 25 784 µs** (−45,1 %); a atribuição fecha em `Index::from_store` (22,6 ms); `bench/e18/memory/` |
+| **Q-15** retomada com cauda limitada | ✔ feito | 20 000 turnos: **321 µs** (−98,7 % vs replay, −85,2 % vs fronteira de fase); cauda ≤ 128 KiB; hash canónico do estado; `bench/e18/resume/` |
+| **Q-12** guard de loop/anomalia | ✔ feito | CUSUM + SPRT + assinatura: **0** falsos positivos em 200 turnos normais, alarme no **4.º** passo (teto 12); corte com `agent.loop` + turno fechado; `bench/e18/loop/` |
+
+**Nota de método (Q-07).** O `diag:coverage` conta qualquer `fn` de `crates/*/src` fora de
+`#[cfg(test)] mod` e fora de ficheiros `*tests*`/`/tests/`: um *bench* em `edit/bench.rs` fez a
+cobertura cair para 98,3 % (e cinco `fn` do **fixture** em string eram contados como funções). Movido
+para `edit/tests/bench.rs` — a convenção dos outros *benches* (`context/tests/`, `toon/tests/`) — a
+cobertura voltou a **99,3 %** sem instrumentar código de teste.
 
 **Lição de método (B-01).** O primeiro A/B deu −5 % e quase reverteu B-01: a causa era um
 *refactor* do `clippy::needless_collect`, que ao encadear `.map(spawn).map(join)` **entrelaça** o
@@ -292,7 +304,9 @@ o que ajuda é **encurtar** o texto nosso e **medir** o que sobra.
   falhar, a forma antiga deixava o ficheiro a meio (375 B) e a atómica **não escreve nada** (383 B =
   original). Artefacto `bench/e18/edit/raw.json`; 3 métricas `q07.edit.*`.
 - **Custo:** o wire das tools cresceu **+162 B / +45 tokens** (5 013 → 5 175 B; medido no
-  `gate:prompt`). Não é parâmetro novo, mas **é** custo de prompt.
+  `gate:prompt`, cujo teto subiu de 5 100 para 5 200 B — e que **passou a ser verificado**: até aqui
+  o teto das tools era impresso mas não travava nada). Não é parâmetro novo, mas **é** custo de
+  prompt.
 - **Adoção:** aceite (critério cumprido e a atomicidade é uma correção, não uma preferência). O A/B de
   **turnos** com o modelo continua a não ser executável localmente — o que se publica é o proxy de
   chamadas, com a limitação escrita.
@@ -326,19 +340,51 @@ o que ajuda é **encurtar** o texto nosso e **medir** o que sobra.
 
 ### Q-D. Segurança e guardrails
 
-#### Q-11 · Confiança por artefacto (F6)
+#### Q-11 · Confiança por artefacto (F6) — feito
 - **Problema:** `Enforced` é categoria declarada, não medida; providers só sinalizam.
-- **Proposta:** acumuladores **Beta–Bernoulli** + **LB de Wilson** por regra/tool/provider;
-  `Enforced` só com `LB ≥ θ` **e** `n ≥ n_min`; senão demove a `Advisory` com evidência.
-- **Teste:** regra só `Enforced` com `n`/limiar; **teste de demolição** quando `LB` cai; nenhum
-  auto-scale de modelo (DF8).
+- **Proposta (feita):** acumuladores **Beta–Bernoulli** (`Trials`) + **LB de Wilson** em
+  [`confidence.rs`](crates/katu-policy/src/confidence.rs); a observação vem do log
+  ([`kernel/confidence.rs`](crates/katu-core/src/kernel/confidence.rs)): o ensaio de uma regra é
+  *recusou ⇒ não correu* (a chamada recusada não aparece executada sob o mesmo `CallId`).
+  `Enforced` só com `LB ≥ θ` **e** `n ≥ n_min`; senão o veredicto demove a `Advisory` **com a
+  evidência** no motivo. A categoria declarada **não** é reescrita: o TOML continua a autoridade.
+- **Teste:** `the_wilson_bound_never_exceeds_the_mean` (varre 820 combinações), monotonia em
+  sucessos, **demolição** (`one_violation_demolishes_the_rule`), `n_min`, determinismo, e a
+  extração no log (recusa honrada/violada/aprovação/id próprio do retry). Operacional:
+  `xtask policy:confidence` (no `check`) e a fixture `bench/e18/confidence/fixture.v1.jsonl`, que
+  **falha** com a contradição medida.
+- **Resultado:** com registo perfeito a regra prova-se a **n = 25** (LB `902 ≥ 900`); a `n = 24`
+  fica em `899`; uma violação em 20 derruba o LB de `881` para `804` e marca `contradiction`. Nas 35
+  sessões reais: 8 regras `Enforced`, **0** recusas ⇒ 8 `unmeasured` (o modelo local não emite tool
+  calls nativas) — declarado, não escondido.
+- **Adoção:** é uma **correção** (categoria afirmada sem prova), não um ganho de latência: o critério
+  é ter veredicto medido com evidência + demolição + determinismo.
+- **Custos:** zero tokens de prompt (auditoria); uma passagem O(eventos) e dois mapas.
+- **Limites:** não mede sucesso de tarefa nem se o remédio ensina (isso é Q-12); LB unilateral a 95 %
+  sem controlo de múltiplas comparações (C5 fica em aberto); per-tool mede o contrato de conclusão
+  (timeouts), per-provider **não** foi feito (a base já é medida pelo `gate:provider`).
 - **Mapa:** E18-T06/F6 · DF3/DF5.
 
-#### Q-12 · Anomalia e loop (F7 ✂)
-- **Problema:** loop patológico só para no teto global; sem sinal cedo.
-- **Proposta:** **CUSUM** (média) + **SPRT** (binário) + novidade por assinatura das últimas tool
-  calls; ação = cortar (`kill switch`) ou `NeedsHuman`, **nunca** silencioso.
-- **Teste:** falso-positivo **medido**; alarme antes do teto; determinístico.
+#### Q-12 · Anomalia e loop (F7 ✂) — feito
+- **Problema:** loop patológico só para no teto global; sem sinal cedo (queima orçamento devagar).
+- **Proposta (feita):** **CUSUM** (média, fração de repetição) + **SPRT** (binário, passo
+  inteiramente repetido) + novidade por assinatura (FNV-1a de nome + argumentos canónicos) em
+  [`kernel/guard.rs`](crates/katu-core/src/kernel/guard.rs). Um passo com chamada **exclusiva** é
+  progresso e reinicia o detector (o *polling* legítimo de `bash` não é cortado). Ação = **cortar**
+  antes de executar as tools, com `agent.loop` no catálogo, erro `LoopDetected` (categoria
+  `conflict`, exit 5) e turno **fechado** — nunca silencioso.
+- **Teste:** falso positivo **medido** (`the_guard_has_no_false_positive_on_normal_turns`),
+  alarme antes do teto, determinismo, progresso reinicia, `min_steps`, passo vazio, e três testes de
+  integração do turno (corte no 4.º passo, turno fechado no corte, turno fechado no teto de passos).
+- **Resultado:** **0** falsos positivos em 200 turnos normais de 12 passos; ciclo puro alarme no
+  **4.º** passo (SPRT) — **8 passos** antes do teto de 12; o CUSUM, sozinho, precisaria de 5.
+- **Adoção:** critério cumprido (falso positivo zero e corte antes do teto).
+- **Custos:** zero tokens de prompt; por passo um `BTreeSet` de `u64`, um `String` temporário por
+  chamada e dois `ln`.
+- **Limites:** A/B sintético (o modelo local não emite tool calls nativas); sem *anytime-valid* (C1
+  em aberto); não distingue "repetição por falta de informação" de "prompt ambíguo".
+- **Efeito colateral corrigido:** o turno passa a fechar **sempre** (`TurnEnd`), também em
+  `TooManySteps` — antes o log ficava com um turno aberto.
 - **Mapa:** E18-T07/F7 (corta primeiro).
 
 ### Q-E. Estabilidade
@@ -438,14 +484,27 @@ travar**. Densificar prosa com TOON não entra: o ADR 0006 mede ganhos em regist
 
 ## 3. Eixo P — performance bruta (prioridade 2)
 
-#### P-01 · `group-commit` do log e dos snapshots (§42)
-- **Problema:** `log.append` faz `sync_data()` por evento e `fs.write` faz `sync_all()` por
-  escrita → ~44 ms/turno (escala com tools).
-- **Proposta:** `fsync` agrupado na fronteira do turno (opt-in, contrato de durabilidade
-  **explícito**), reutilizando `toon_bench`/`session_bench`.
-- **Teste:** crash-consistency (sem registo rasgado); `replay == estado`; A/B no overhead.
-- **Adoção:** ≥ 20 % no overhead do turno, ou reverter. **Se o contrato de durabilidade mudar →
-  ADR.**
+#### P-01 · `group-commit` do log e dos snapshots (§42) — feito
+- **Problema:** `log.append` faz `sync_data()` por evento e `fs.write` faz `sync_all()` por escrita →
+  ~44 ms/turno (escala com tools).
+- **Proposta (feita):** barreira agrupada na **fronteira do turno**, com o contrato de durabilidade
+  explícito em **ADR** ([0024](docs/adr/0024-durabilidade-do-log.md)) e opt-in por
+  `behavior.durability = event|turn` (default `event`: nada muda sem o pedir). A porta `Fs` ganha
+  `append_unsynced`/`sync` (default conservador) e o leitor recupera de uma **cauda rasgada**
+  (última linha sem `
+`), sem deixar de ser fail-closed para corrupção a meio.
+- **Teste:** os dois modos escrevem o **mesmo** log (byte a byte), a barreira fecha no `TurnEnd`
+  (`the_turn_boundary_closes_the_durability_barrier`), o `flush` é observável (`is_dirty`), a cauda
+  rasgada é recuperada e uma linha inválida terminada em `
+` continua a ser erro.
+- **Resultado (disco real, 100 eventos = 20 turnos × 5):** **384,8 → 84,3 ms** (**−78,1 %**);
+  19,2 → 4,2 ms por turno, a fechar com o `log.append` de 18,3 ms/turno do E18 (≈ 3,7 ms por
+  barreira).
+- **Adoção:** critério (≥ 20 % no overhead do turno) cumprido; artefacto `bench/e18/durability/`.
+- **Custos:** a janela de perda passa a ser o turno em curso (escrito na ADR e opt-in); as escritas
+  atómicas (notas, snapshots, transcrição) continuam com barreira por escrita.
+- **Limites:** o ganho depende do número de eventos por turno e do disco (`tmpfs`/NVMe reduzem a
+  diferença — o *bench* recusa `/tmp`).
 - **Mapa:** E18-T05 · §42.
 
 #### P-02 · Emissor TOON de uma passagem
@@ -471,18 +530,44 @@ travar**. Densificar prosa com TOON não entra: o ADR 0006 mede ganhos em regist
   para −6 %); o perfil dev exagera o ganho das alocações eliminadas.
 - **Mapa:** E15-T05/T10 (knudge O4) · [`toon_bench`](xtask/src/toon_bench.rs) · §1.2.
 
-#### P-03 · Caminho `memory.write` / gate
-- **Problema:** `memory_write` 347 µs + gate 221 µs (dev); em release 9,9 µs — falta atribuição
-  **release** para saber se é quente com muitas notas.
-- **Proposta:** peneira por postings no `pre_write` (knudge O2/O3) e reuso do resultado no gate;
-  medir em release (Q-09).
-- **Teste:** semântica de dedup (0,92) preservada; proptest.
+#### P-03 · Caminho `memory.write` / gate — feito
+- **Problema:** `memory_write` 347 µs + gate 221 µs (dev); em release 9,9 µs — faltava a atribuição
+  **release** para saber se o caminho é quente com muitas notas.
+- **Proposta (feita):** medir a atribuição em release e **reusar** no commit o índice que o
+  `pre_write` do mesmo gate construiu, em vez de o reconstruir (`Knudge::write_context()` →
+  `Index::from_store`, que lê e tokeniza todas as notas).
+- **Teste:** a escrita continua visível à decisão seguinte (`a_write_is_visible_to_the_next_decision`
+  — é a invalidação que torna o reuso seguro), a suíte de conformidade da porta corre contra o
+  adaptador, e o *bench* **falha** se a medição não correr o commit (o `decision` publicado é
+  `create`).
+- **Resultado (release, 1 000 notas):** gate **46 921 → 25 784 µs** (**−45,1 %**; −48,7 % a 100 notas,
+  −41,0 % a 500). Atribuição: `Index::from_store` 22,6 ms, `propose` 1,7 ms, escrita da nota 90 µs,
+  `open` 60 µs — o custo é reconstruir o índice, e o caminho antigo pagava-o **duas vezes** por gate.
+- **Adoção:** critério (≥ 20 %) cumprido; artefacto `bench/e18/memory/raw.json`.
+- **Custos:** zero tokens de prompt; o commit é o mesmo (mesma nota, mesmo evento) — muda de onde vem
+  o índice consultado, e o índice em cache é o mesmo que a decisão viu (o caminho fica coerente).
+- **Limites:** o que resta é `Index::from_store` (ler + tokenizar N notas); reduzi-lo exige índice
+  incremental/persistido **no knudge** (`crates/knudge` é submódulo: outro projeto) — registado como
+  próximo passo, não como promessa. Base sintética, adaptador in-process (via MCP o custo é do
+  servidor).
 - **Mapa:** E18-T06 · knudge O2.1/O3.
 
-#### P-04 · Transporte do provider (cliente)
+#### P-04 · Transporte do provider (cliente) — feito
 - **Problema:** overhead do cliente no gate ~2,3–3,6 ms p95; cauda.
-- **Proposta:** medido em Q-13; buffer/parse sem alocação por chunk (como `sse`/`retry`).
-- **Teste:** `gate:provider` p95 < orçamento.
+- **Proposta (feita):** o parser SSE deixou de alocar **duas `String` por delta** (a linha e o
+  payload): a linha é interpretada como fatia de `pending` e o payload é emprestado de `self.data`.
+- **Teste:** os dois parsers (produção e réplica congelada) entregam exatamente os mesmos eventos
+  (`both_parsers_see_the_same_events`, `the_ab_reports_the_same_events_for_both`) e `gate:provider`
+  trava o p95 contra o orçamento versionado.
+- **Resultado:** **−28,5 %** no parser (37 924 → 27 099 ns no mínimo de 1 000 passagens, ordem
+  alternada) para o corpus canónico de 46 912 B; overhead de cliente ponta a ponta p50 **189 689 ns**,
+  p95 236 763 ns (orçamento 5 ms).
+- **Adoção:** critério (≥ 20 %) cumprido; saída byte-idêntica.
+- **Nota de método:** o artefacto de referência do repositório (commit `020e6f3`) media p50 ≈ 1,93 ms
+  para o **mesmo** corpus; re-medido o código anterior nesta máquina, hoje, dá ≈ 0,20 ms — aquele
+  número foi tomado com a máquina carregada e não é comparável. O A/B é feito na mesma execução.
+- **Limites:** o `serde_json` por evento (~512 por turno) continua a dominar o que resta; evitá-lo
+  exigiria um decoder incremental (fora do escopo).
 - **Mapa:** E18-T04 · E12-T07.
 
 ---
@@ -520,9 +605,9 @@ W1 (método)      P-00→Q-09  harness + atribuição release  ── desbloquei
 W2 (correções)   Q-06, Q-10, S-01..S-05  (baixo risco, ganho imediato de qualidade)
 W2b (densidade)  Q-16 → Q-05 → Q-20 → Q-19 → Q-18        (frente F2b; §1.5)
 W3 (dados)       Q-01 → Q-02 → Q-03 → Q-04 → Q-05        (frente F2/F3/F9)
-W4 (superfície)  ~~Q-07~~, Q-08                            (menos turnos)
-W5 (segurança)   Q-11, Q-12                              (F6/F7)
-W6 (estabilidade)Q-13, Q-14, Q-15, P-01, ~~P-02~~, P-03, P-04
+W4 (superfície)  ~~Q-07~~, ~~Q-08~~                        (menos turnos)
+W5 (segurança)   ~~Q-11~~, ~~Q-12~~                        (F6/F7)
+W6 (estabilidade)~~Q-13~~, ~~Q-14~~, ~~Q-15~~, ~~P-01~~, ~~P-02~~, ~~P-03~~, ~~P-04~~
 ```
 
 **Regra:** W1 primeiro (sem medir, não se otimiza — a lição do E18 §0.3). W2 são correções que não

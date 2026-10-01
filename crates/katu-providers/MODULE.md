@@ -33,7 +33,9 @@ A camada de **providers**: o caminho built-in first-party é nosso; o resto é c
   no catálogo** estático; a borda regista a fonte. [`engine`](src/engine.rs)
   constrói o endpoint por dialeto (auth + afinidade: `x-opencode-session` e `affinity_headers`) e
   despacha.
-- **Streaming.** [`sse`](src/sse.rs) é um parser SSE incremental; [`wire`](src/wire.rs) é o driver
+- **Streaming.** [`sse`](src/sse.rs) é um parser SSE incremental **sem alocação por delta** (P-04: a
+  linha é uma fatia de `pending` e o payload é emprestado de `self.data`; **−28,5 %** no parser,
+  [`bench/e18/transport`](../../bench/e18/transport/PROTOCOL.md)); [`wire`](src/wire.rs) é o driver
   comum (retry só antes do primeiro evento, captura de erro, contagem de chunks).
   [`openai`](src/openai.rs) (`chat/completions`), [`responses`](src/responses.rs),
   [`anthropic`](src/anthropic.rs) (`messages`) e [`google`](src/google.rs)

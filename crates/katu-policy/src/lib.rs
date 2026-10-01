@@ -39,6 +39,7 @@
 mod approval;
 mod argv;
 mod audit;
+mod confidence;
 mod decision;
 mod engine;
 mod error;
@@ -51,6 +52,7 @@ mod rule;
 pub use approval::{capability_for, capability_for_request};
 pub use argv::{ArgvInspection, inspect};
 pub use audit::{Activity, AuditIssue, AuditReport, ExampleCoverage, RuleSummary, audit};
+pub use confidence::{Confidence, Threshold, Trials, Verdict, verdict};
 pub use decision::{ApprovalRequest, ControlId, Decision, Evidence, Reason};
 pub use error::PolicyError;
 pub use evaluate::evaluate;

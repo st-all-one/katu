@@ -9,6 +9,8 @@ use katu_core::provider::{ModelCapabilities, Thinking};
 
 use super::{Runtime, RuntimeError};
 
+mod durability;
+
 mod state;
 use crate::ports::StdFs;
 

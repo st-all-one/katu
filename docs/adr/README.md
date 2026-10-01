@@ -43,6 +43,7 @@
 | [0021](0021-layout-katu-e-versionamento.md) | Layout central do `.katu/` e versionamento | aceite |
 | [0022](0022-modo-plano-e-deny-write-outside.md) | Modo de planeamento (`/plan`) e `deny_write_outside` (vocabulário v3) | aceite |
 | [0023](0023-contexto-e-duas-ias.md) | Contexto do projeto (`AGENTS.md`/skills) e duas IAs (embedding + execução) | aceite |
+| [0024](0024-durabilidade-do-log.md) | Durabilidade do log: `fsync` por evento ou por turno (opt-in) | aceite |
 
 ## Template
 

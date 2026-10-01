@@ -1,7 +1,7 @@
 use super::step;
 use crate::error::ToolOutcome;
 use crate::kernel::event::{CallId, Event};
-use crate::kernel::state::{CallStatus, Refusal, RefusalReason, State};
+use crate::kernel::state::{Refusal, RefusalReason, State};
 use crate::plan::{Feature, FeatureStatus, Plan, ScopeContract};
 use crate::verify::{CheckStatus, VERIFICATION_SCHEMA_VERSION, VerificationReport};
 use katu_policy::{Evidence, Phase, ResolvedPath, RuleId, ToolArgs, ToolName, ToolUse};
@@ -129,6 +129,35 @@ fn duplicate_call_is_refused() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
+fn a_call_id_may_repeat_after_it_settles() -> Result<(), Box<dyn std::error::Error>> {
+    // O provider emite `call_{index}` quando não manda id: repetir o id num passo/turno seguinte é
+    // legítimo. O que não pode existir é dois pedidos **vivos** com o mesmo id.
+    let call = CallId::new("call_0");
+    let mut state = State::initial();
+    for turn in 1..=2 {
+        state = step(&state, &Event::TurnStart { turn })?;
+        state = step(
+            &state,
+            &Event::ToolCall {
+                call: call.clone(),
+                tool: tool()?,
+            },
+        )?;
+        state = step(
+            &state,
+            &Event::ToolResult {
+                call: call.clone(),
+                outcome: ToolOutcome::Ok,
+                delta: None,
+            },
+        )?;
+        state = step(&state, &Event::TurnEnd { turn })?;
+    }
+    assert!(state.pending.is_empty(), "o intervalo pendente fica vazio");
+    Ok(())
+}
+
+#[test]
 fn denied_result_does_not_complete_tool() -> Result<(), Box<dyn std::error::Error>> {
     let mut state = State::initial();
     state = step(&state, &Event::TurnStart { turn: 1 })?;
@@ -149,11 +178,9 @@ fn denied_result_does_not_complete_tool() -> Result<(), Box<dyn std::error::Erro
         },
     )?;
     assert!(state.completed_tools.is_empty());
-    assert!(matches!(
-        state.calls.get(&CallId::new("c1")),
-        Some(CallStatus::Done {
-            outcome: ToolOutcome::Denied { .. }
-        })
-    ));
+    assert!(
+        !state.pending.contains_key(&CallId::new("c1")),
+        "uma recusa fecha o intervalo pendente sem marcar a tool como concluída"
+    );
     Ok(())
 }

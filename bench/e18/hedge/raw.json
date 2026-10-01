@@ -1,0 +1,59 @@
+{
+  "schema": "katu.bench.hedge.v1",
+  "machine": {
+    "os": "linux",
+    "arch": "x86_64",
+    "cpu": "AMD Ryzen 5 5500U (6C/12T)"
+  },
+  "server": {
+    "runtime": "llama.cpp b11269",
+    "model": "qwen2.5-coder-1.5b-instruct-q4_k_m",
+    "n_ctx": 4096,
+    "unit": "katu-llama.service",
+    "command": "cargo run -q --release -p xtask -- provider-smoke --provider llama --model qwen --turns 8 --warm"
+  },
+  "live_ttft_ms": [
+    351.0,
+    54.0,
+    51.0,
+    57.0,
+    52.0,
+    59.0,
+    57.0,
+    51.0
+  ],
+  "live_total_ms": [
+    830.0,
+    580.0,
+    522.0,
+    545.0,
+    533.0,
+    548.0,
+    576.0,
+    518.0
+  ],
+  "prompt_tokens": 27,
+  "cache_hit_ratio_live": 0.963,
+  "prefix_tokens_canonical": 2774,
+  "hedge_feasibility": {
+    "max_concurrent_requests": 1,
+    "why": "um hedge exige dois pedidos em voo com o mesmo prompt: 2 x 2774 tokens > n_ctx 4096; o servidor recusa o segundo (ver bench/e18/prewarm/raw.json)",
+    "evidence": [
+      "decode: failed to find a memory slot for batch of size 1024",
+      "slot operator(): need to evaluate at least 1 token for each active slot (n_past = 2774, task.n_tokens() = 2774)"
+    ]
+  },
+  "backpressure": {
+    "lambda": 1,
+    "why": "o cliente é bloqueante e corre um turno de cada vez: pela lei de Little, rho = lambda x W com lambda = 1 não define um alvo de paralelismo; o pool de ligações já existe (max_idle_connections_per_host(4))"
+  },
+  "stream_buffer": {
+    "read_buffer_bytes": 4096,
+    "per_chunk_allocations": 0,
+    "why": "o buffer de leitura é reutilizado (stack) e, desde o P-04, o parser SSE não aloca por delta; o overhead de cliente medido é de ~0,2 ms p95 contra um orçamento de 5 ms"
+  },
+  "limits": [
+    "sem KATU_OPENCODE_KEY não há medição com provider remoto (onde o hedge faria sentido e custaria tokens duplicados)",
+    "o servidor local é o caso mais desfavorável para hedging (cache KV partilhada e curta)"
+  ]
+}

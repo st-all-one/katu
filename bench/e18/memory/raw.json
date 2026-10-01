@@ -1,0 +1,60 @@
+{
+  "limits": [
+    "base sintética: afirmações únicas de vocabulário parecido, escritas pelo adaptador",
+    "o commit inclui a escrita do ficheiro da nota e do evento (em /tmp, tmpfs)",
+    "o gate_legacy é uma réplica congelada do commit anterior, não uma segunda implementação"
+  ],
+  "machine": {
+    "arch": "x86_64",
+    "os": "linux"
+  },
+  "reps": 20,
+  "rows": [
+    {
+      "decision": "create",
+      "gain_ratio": 0.487,
+      "gate_legacy_us": 6600,
+      "gate_us": 3386,
+      "notes": 100,
+      "parts": {
+        "index_from_store_us": 3076,
+        "open_us": 58,
+        "propose_us": 156,
+        "store_write_us": 88
+      },
+      "pre_write_us": 124,
+      "record_us": 2555
+    },
+    {
+      "decision": "create",
+      "gain_ratio": 0.4098,
+      "gate_legacy_us": 23937,
+      "gate_us": 14128,
+      "notes": 500,
+      "parts": {
+        "index_from_store_us": 11268,
+        "open_us": 57,
+        "propose_us": 597,
+        "store_write_us": 90
+      },
+      "pre_write_us": 621,
+      "record_us": 11481
+    },
+    {
+      "decision": "create",
+      "gain_ratio": 0.4505,
+      "gate_legacy_us": 46921,
+      "gate_us": 25784,
+      "notes": 1000,
+      "parts": {
+        "index_from_store_us": 22585,
+        "open_us": 60,
+        "propose_us": 1741,
+        "store_write_us": 88
+      },
+      "pre_write_us": 1174,
+      "record_us": 23046
+    }
+  ],
+  "schema": "katu.bench.memory.v1"
+}

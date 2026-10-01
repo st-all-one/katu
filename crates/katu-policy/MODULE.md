@@ -15,6 +15,12 @@ O **motor de política** do katu: avalia factos tipados e devolve um veredicto d
   extraído; sem regex.
 - `audit(rules, now) -> AuditReport` — categorias (`Enforced`/`Advisory`), exemplos negativos,
   duplicados e enunciados vazios (E02-T04).
+- `verdict(id, Trials, Threshold) -> Verdict` (Q-11/F6) — confiança **medida**: posterior
+  Beta–Bernoulli (`Trials`) + limite inferior de Wilson; `Enforced` só com `LB ≥ θ` **e**
+  `n ≥ n_min`, senão demove a `Advisory` **com a evidência** no motivo. O limiar é dado
+  (`Threshold::DEFAULT`), nunca derivado dos dados (DF8). Com registo perfeito prova-se a regra a
+  **n = 25** (LB `902 ≥ 900`); uma violação em 20 derruba o LB para `804` e marca
+  `contradiction` (artefacto em [`bench/e18/confidence`](../../bench/e18/confidence/PROTOCOL.md)).
 - Vocabulário **fechado e versionado** (`POLICY_VOCAB_VERSION`, v3 desde o ADR 0022).
 
 ## Semântica de negação (OA15)
@@ -48,6 +54,7 @@ similaridade; as pré-condições semânticas (dedup ≥ 0.92, âncora, uma afir
 | `evaluate` | `evaluate` puro + seleção do veredicto de maior `rank` |
 | `approval` | `capability_for`/`capability_for_request` — capacidade **mínima** que satisfaz um `RequireApproval` (E07-T05, §33) |
 | `audit` | auditoria de regras (E02-T04) |
+| `confidence` | `Trials`/`Threshold`/`Confidence`/`Verdict`/`verdict` — confiança medida (Q-11/F6) |
 | `error` | `PolicyError` |
 
 ## Artefactos versionados (na raiz `policy/`)

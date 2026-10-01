@@ -14,6 +14,7 @@ use std::process::Command;
 use crate::bench::gate_bench;
 use crate::catalog::check_catalog;
 use crate::check_policy::check_policy;
+use crate::confidence::policy_confidence;
 use crate::coverage::check_rule_coverage;
 use crate::ledger::ledger_validate;
 use crate::memory_swap::check_memory_swap;
@@ -72,6 +73,7 @@ pub(crate) fn run_all() -> Result<(), String> {
     check_slices()?;
     check_memory_swap()?;
     policy_audit(&[])?;
+    policy_confidence(&[])?;
     ledger_validate(&[])?;
     gate_bench(&[])?;
     gate_prompt(&[])?;

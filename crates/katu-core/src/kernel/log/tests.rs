@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use super::{Log, LogErrorKind, read_records, session_path};
+use super::{Durability, Log, LogErrorKind, read_records, session_path};
 use crate::error::ToolOutcome;
 use crate::kernel::{CallId, Event, derive_messages, state_of};
 use crate::ports::{Fs, MemFs};
@@ -56,6 +56,51 @@ fn corrupt_line_is_detected() -> Result<(), Box<dyn std::error::Error>> {
     fs.write_atomic(&path, b"{nao e json}\n")?;
     let err = read_records(&fs, &path).err();
     assert!(err.is_some_and(|error| error.kind == LogErrorKind::Corrupt));
+    Ok(())
+}
+
+#[test]
+fn a_torn_tail_is_recovered_without_losing_the_prefix() -> Result<(), Box<dyn std::error::Error>> {
+    // ADR 0024: um crash pode deixar a última linha sem `\n`. O prefixo é recuperável; o que fica
+    // **não** é uma sessão irrecuperável.
+    let fs = MemFs::new();
+    let path = session_path(Path::new("/sessions"));
+    let line = b"{\"seq\":1,\"event\":{\"type\":\"turn_start\",\"turn\":1}}\n\
+                 {\"seq\":2,\"event\":{\"type\":\"user_message\",\"text\":\"cort";
+    fs.write_atomic(&path, line)?;
+    let records = read_records(&fs, &path)?;
+    assert_eq!(records.len(), 1, "só o prefixo íntegro");
+    assert_eq!(records.first().map(|record| record.seq), Some(1));
+    Ok(())
+}
+
+#[test]
+fn a_corrupt_line_that_ends_the_file_is_still_an_error() -> Result<(), Box<dyn std::error::Error>> {
+    // A marca do registo rasgado é **não** terminar em `\n`: com `\n` final, a linha está completa
+    // e uma linha inválida é corrupção (fail-closed).
+    let fs = MemFs::new();
+    let path = session_path(Path::new("/sessions"));
+    fs.write_atomic(
+        &path,
+        b"{\"seq\":1,\"event\":{\"type\":\"turn_start\",\"turn\":1}}\n{nao e json}\n",
+    )?;
+    let err = read_records(&fs, &path).err();
+    assert!(err.is_some_and(|error| error.kind == LogErrorKind::Corrupt));
+    Ok(())
+}
+
+#[test]
+fn durability_turn_defers_the_barrier_to_flush() -> Result<(), Box<dyn std::error::Error>> {
+    let fs = MemFs::new();
+    let dir = Path::new("/sessions");
+    let mut log = Log::open(&fs, dir)?;
+    log.set_durability(Durability::Turn);
+    log.append(&Event::TurnStart { turn: 1 })?;
+    assert!(log.is_dirty(), "modo `turn`: barreira pendente");
+    assert_eq!(read_records(&fs, &session_path(dir))?.len(), 1);
+    log.flush()?;
+    assert!(!log.is_dirty(), "o flush fecha a barreira");
+    assert_eq!(log.durability(), Durability::Turn);
     Ok(())
 }
 

@@ -3,11 +3,13 @@
 use std::path::PathBuf;
 
 use katu_core::memory::{
-    Memory, NoteRef, NoteType, PreEditOutcome, PreEditReq, PreWriteReq, QueryMode, QueryOutcome,
-    QueryReq, assert_contract,
+    Memory, NoteRef, NoteType, PreEditOutcome, PreEditReq, PreWriteOutcome, PreWriteReq, QueryMode,
+    QueryOutcome, QueryReq, assert_contract,
 };
 
 use super::KnudgeMemory;
+
+mod bench;
 
 /// Raiz temporária única por teste.
 fn root(label: &str) -> Result<PathBuf, std::io::Error> {
@@ -63,6 +65,32 @@ fn pre_edit_decides_update_or_supersede_in_dry_run() -> Result<(), Box<dyn std::
     assert!(
         matches!(changed, PreEditOutcome::Supersede { .. }),
         "afirmação nova tem de superseder para um id derivado"
+    );
+    std::fs::remove_dir_all(&root)?;
+    Ok(())
+}
+
+#[test]
+fn a_write_is_visible_to_the_next_decision() -> Result<(), Box<dyn std::error::Error>> {
+    // P-03: o commit reusa o índice que o `pre_write` construiu. A garantia que o torna seguro é a
+    // **invalidação**: a escrita seguinte tem de ver a nota nova (senão o dedup decidiria sobre um
+    // índice velho e aceitaria uma duplicata).
+    let root = root("invalidate")?;
+    let memory = KnudgeMemory::open(&root)?;
+    let req = PreWriteReq {
+        statement: "o indice de notas e invalidado apos cada escrita".to_string(),
+        note_type: NoteType::Fact,
+        anchor: None,
+        body: String::new(),
+    };
+    assert!(
+        matches!(memory.pre_write(&req)?, PreWriteOutcome::Create),
+        "primeira escrita: nota nova"
+    );
+    memory.record(&req)?;
+    assert!(
+        matches!(memory.pre_write(&req)?, PreWriteOutcome::Reject { .. }),
+        "a escrita tem de ser visível à decisão seguinte"
     );
     std::fs::remove_dir_all(&root)?;
     Ok(())

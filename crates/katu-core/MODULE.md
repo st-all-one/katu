@@ -17,7 +17,23 @@ função, o log é a fonte da verdade.
   - `kernel::step` — `step(State, Event) -> Result<State, Refusal>` (puro) + pré-condições de fase
     (`Verified` exige relatório não bloqueado, E09-T03).
   - `kernel::log` — `Log`/`LogRecord` append-only JSONL (`session.v1.jsonl`) sobre a porta `Fs`.
+    `Durability::{Event,Turn}` (ADR 0024/P-01): barreira por evento (default) ou por turno
+    (*group commit*, `behavior.durability = turn`) — **−78,1 %** no caminho de anexação
+    ([`bench/e18/durability`](../../bench/e18/durability/PROTOCOL.md)). Uma **cauda rasgada** (última
+    linha sem `\n`, marca de crash) é descartada com aviso; corrupção a meio e saltos de `seq`
+    continuam falha-fechado.
+  - `kernel::hash` — `fnv1a`/`canonical`: hash determinístico de 64 bits, um só sítio (assinatura de
+    chamada no guard Q-12 e integridade do estado no snapshot Q-15).
+  - `kernel::session::snapshot` (ADR 0008, Q-15) — `StateSnapshot` com `seq`/`offset`/estado/uso e o
+    **hash canónico** do estado (um snapshot que não casa é descartado: replay total, fail-closed).
+    Duas fronteiras: `PhaseTransition` e fim de turno com cauda ≥ `MAX_TAIL_BYTES` (128 KiB). O que a
+    retomada relê tem teto: 20 000 turnos retomam em **321 µs** contra 23 839 µs de replay total
+    ([`bench/e18/resume`](../../bench/e18/resume/PROTOCOL.md)).
   - `kernel::project` — `derive_messages`, `state_of`, `snapshot` (projeções puras).
+  - `State.pending` (Q-15) — o estado guarda **só** as chamadas pendentes: o efeito vive no log e o
+    nome concluído em `completed_tools`. Guardar as concluídas fazia o replay ser quadrático (cada
+    `step` clona o estado) e recusava `call_0` repetido entre turnos, que é legítimo quando o provider
+    não manda id.
   - `kernel::pipeline` — `Tool`, `facts_for`/`facts_from`, `dispatch`/`dispatch_with` (facto →
     política → efeito).
   - `kernel::memory_gate` — `enforce_memory_write` (E05-T01): `pre_write` → capacidade → política.
@@ -27,6 +43,18 @@ função, o log é a fonte da verdade.
     reconstrução `from_events`; teto por ferramenta antes do global. Ligado ao `Session`
     (`open_with_cost`/`apply_at` com o relógio de `CallContext`).
   - `kernel::bus` — `EventBus` (observadores + waterfall com a regra "tem de chamar `next`").
+  - `kernel::confidence` (Q-11/F6) — `rule_trials`/`tool_trials`/`enforced_verdicts`: a ponte entre
+    o log e a estatística de `katu-policy`. O ensaio de uma regra é *recusou ⇒ não correu* (a
+    chamada recusada não pode aparecer executada sob o mesmo `CallId`); por tool mede-se o contrato
+    de conclusão (uma chamada que expira conta contra a tool). Só regras **declaradas** `Enforced`
+    são verificadas: o TOML continua a ser a autoridade e o veredicto diz se o log a **sustenta**
+    (`bench/e18/confidence/`; o comando `xtask policy:confidence` corre no `check`).
+  - `kernel::guard` (Q-12/F7) — `Fingerprint`/`Call`/`Guard`: deteção de loop por assinatura
+    (FNV-1a de nome + argumentos canónicos) com **CUSUM** (fração de repetição, média) e **SPRT**
+    (passo inteiramente repetido, binário). Um passo com chamada **exclusiva** é progresso e
+    reinicia o detector — um *polling* legítimo de `bash` não é cortado. Medido em
+    [`bench/e18/loop`](../../bench/e18/loop/PROTOCOL.md): **0** falsos positivos em 200 turnos
+    normais e alarme no **4.º** passo de um ciclo puro (teto de referência: 12).
   - `kernel::checkpoint` — `Checkpoint` tipado (schema v1, validador zero-dep `validate`,
     `write_atomic`); erros agregados em `Issue { path, message }` (OA19/E09-T02).
   - `kernel::control` — `Control`/`ControlState` (E12-T10): modelo/pensamento do **utilizador** no

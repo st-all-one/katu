@@ -363,3 +363,186 @@ value = 0.0
 unit = "count"
 basis = "measured"
 artifact = { path = "bench/e18/edit/raw.json", note = "bytes gravados pela forma atómica quando a 3.ª substituição falha (a forma antiga gravava 2 de 5: 375 B)" }
+
+# --- Q-11: confiança medida por artefacto (OPTIMIZATION_PLAN.md §Q-D) ---
+[[metrics]]
+name = "q11.confidence.proves_at_n"
+value = 25.0
+unit = "count"
+basis = "measured"
+artifact = { path = "bench/e18/confidence/raw.json", note = "ensaios honrados necessários para LB ≥ θ = 0,90 (Wilson, z = 1,645)" }
+
+[[metrics]]
+name = "q11.confidence.perfect.lower_milli"
+value = 881.0
+unit = "ratio"
+basis = "measured"
+artifact = { path = "bench/e18/confidence/raw.json", note = "LB de Wilson em milésimos com 20 ensaios perfeitos (0,881)" }
+
+[[metrics]]
+name = "q11.confidence.violation.lower_milli"
+value = 804.0
+unit = "ratio"
+basis = "measured"
+artifact = { path = "bench/e18/confidence/raw.json", note = "LB de Wilson em milésimos com 20 ensaios e 1 violação (0,804): contradição medida, a regra é demovida a Advisory" }
+
+# --- Q-12: guard de loop/anomalia (OPTIMIZATION_PLAN.md §Q-D) ---
+[[metrics]]
+name = "q12.loop.false_positive.rate"
+value = 0.0
+unit = "ratio"
+basis = "measured"
+artifact = { path = "bench/e18/loop/raw.json", note = "0 falsos positivos em 200 turnos normais de 12 passos (o critério é zero: um falso positivo custa um turno)" }
+
+[[metrics]]
+name = "q12.loop.first_alarm.step"
+value = 4.0
+unit = "count"
+basis = "measured"
+artifact = { path = "bench/e18/loop/raw.json", note = "passo do alarme num ciclo puro (SPRT); teto global de referência: 12 passos" }
+
+[[metrics]]
+name = "q12.loop.steps_saved.count"
+value = 8.0
+unit = "count"
+basis = "inferred"
+artifact = { path = "bench/e18/loop/raw.json", note = "teto de 12 − alarme no passo 4 (cada passo poupado é um pedido ao provider inteiro); depende do teto configurado" }
+
+# --- Q-15: retomada com cauda limitada (OPTIMIZATION_PLAN.md §Q-15) ---
+[[metrics]]
+name = "q15.resume.bounded.micros"
+value = 321.0
+unit = "micros"
+basis = "measured"
+artifact = { path = "bench/e18/resume/raw.json", note = "retomada de 20 000 turnos (log de 4,0 MB) com teto de cauda de 128 KiB; mediana de 7" }
+
+[[metrics]]
+name = "q15.resume.gain_vs_replay.ratio"
+value = 0.9865
+unit = "ratio"
+basis = "inferred"
+artifact = { path = "bench/e18/resume/raw.json", note = "1 − 321/23839 µs: o replay total do mesmo log custa 23 839 µs" }
+
+[[metrics]]
+name = "q15.resume.gain_vs_phase.ratio"
+value = 0.8517
+unit = "ratio"
+basis = "inferred"
+artifact = { path = "bench/e18/resume/raw.json", note = "1 − 321/2165 µs: a política anterior (um só snapshot na fronteira de fase) deixava 404 000 B de cauda" }
+
+[[metrics]]
+name = "q15.resume.max_tail.bytes"
+value = 125244.0
+unit = "bytes"
+basis = "measured"
+artifact = { path = "bench/e18/resume/raw.json", note = "pior cauda observada (teto MAX_TAIL_BYTES = 131 072 B): o que a retomada relê" }
+
+# --- P-03: caminho memory.write / gate (OPTIMIZATION_PLAN.md §P-03) ---
+[[metrics]]
+name = "p03.memory.gate.gain.ratio"
+value = 0.451
+unit = "ratio"
+basis = "measured"
+artifact = { path = "bench/e18/memory/raw.json", note = "gate de escrita de memória com 1 000 notas: 46 921 → 25 784 µs (o commit reusa o índice que a pré-validação construiu)" }
+
+[[metrics]]
+name = "p03.memory.gate.micros"
+value = 25784.0
+unit = "micros"
+basis = "measured"
+artifact = { path = "bench/e18/memory/raw.json", note = "caminho completo (abrir + pre_write + política + commit) com 1 000 notas, mediana de 20, release" }
+
+[[metrics]]
+name = "p03.memory.index_rebuild.micros"
+value = 22585.0
+unit = "micros"
+basis = "measured"
+artifact = { path = "bench/e18/memory/raw.json", note = "Index::from_store com 1 000 notas: o custo dominante, agora pago uma vez por gate em vez de duas" }
+
+# --- P-04: parser SSE sem alocação por delta (OPTIMIZATION_PLAN.md §P-04) ---
+[[metrics]]
+name = "p04.sse.gain.ratio"
+value = 0.2854
+unit = "ratio"
+basis = "measured"
+artifact = { path = "bench/providers/latency.json", note = "parser de um corpus de 46 912 B (512 deltas): mínimo de 1 000 passagens, ordem alternada entre produção e réplica congelada" }
+
+[[metrics]]
+name = "p04.sse.production.min_nanos"
+value = 27099.0
+unit = "nanos"
+basis = "measured"
+artifact = { path = "bench/providers/latency.json", note = "parser de produção (P-04): payload emprestado de `self.data`, sem `String` por delta" }
+
+[[metrics]]
+name = "p04.sse.legacy.min_nanos"
+value = 37924.0
+unit = "nanos"
+basis = "measured"
+artifact = { path = "bench/providers/latency.json", note = "réplica congelada do parser anterior (duas alocações por delta)" }
+
+[[metrics]]
+name = "p04.provider.offline.p50_nanos"
+value = 189689.0
+unit = "nanos"
+basis = "measured"
+artifact = { path = "bench/providers/latency.json", note = "overhead de cliente ponta a ponta (encode + decode + eventos) do mesmo corpus; orçamento p95 = 5 000 000 ns" }
+
+# --- P-01: group commit do log (ADR 0024) ---
+[[metrics]]
+name = "p01.durability.gain.ratio"
+value = 0.7808
+unit = "ratio"
+basis = "measured"
+artifact = { path = "bench/e18/durability/raw.json", note = "100 eventos (20 turnos × 5) em disco real: 384,8 ms com barreira por evento → 84,3 ms com barreira por turno" }
+
+[[metrics]]
+name = "p01.durability.event.per_turn_nanos"
+value = 19238694.0
+unit = "nanos"
+basis = "measured"
+artifact = { path = "bench/e18/durability/raw.json", note = "modo `event` (default): 19,2 ms por turno só em barreiras, fecha com o `log.append` de 18,3 ms/turno do E18" }
+
+[[metrics]]
+name = "p01.durability.turn.per_turn_nanos"
+value = 4216497.0
+unit = "nanos"
+basis = "measured"
+artifact = { path = "bench/e18/durability/raw.json", note = "modo `turn` (P-01): uma barreira por turno; o log é byte-idêntico (log_bytes 8 462 nos dois modos)" }
+
+# --- Q-14: prewarm do prefixo (REVERTIDO, com o número) ---
+[[metrics]]
+name = "q14.prewarm.cold.prompt_eval_millis"
+value = 32383.0
+unit = "millis"
+basis = "measured"
+artifact = { path = "bench/e18/prewarm/raw.json", note = "avaliação de 2774 tokens a frio, reportada pelo próprio llama-server (11,67 ms/token)" }
+
+[[metrics]]
+name = "q14.prewarm.warm.prompt_eval_millis"
+value = 86.0
+unit = "millis"
+basis = "measured"
+artifact = { path = "bench/e18/prewarm/raw.json", note = "o mesmo prefixo na cache: 1 token avaliado (cached = 2773)" }
+
+[[metrics]]
+name = "q14.prewarm.concurrent.wall_millis"
+value = 92690.0
+unit = "millis"
+basis = "measured"
+artifact = { path = "bench/e18/prewarm/raw.json", note = "prewarm em voo com o turno: 2 × 2774 tokens > n_ctx 4096 — o servidor não serve os dois e o turno volta vazio; motivo da reversão" }
+
+# --- Q-13: hedging/backpressure (REJEITADO, com o número) ---
+[[metrics]]
+name = "q13.transport.ttft.p50_millis"
+value = 55.0
+unit = "millis"
+basis = "measured"
+artifact = { path = "bench/e18/hedge/raw.json", note = "8 turnos com ligação quente no llama-server local (prompt de 27 tokens); p95 = 59 ms" }
+
+[[metrics]]
+name = "q13.transport.max_concurrent_requests"
+value = 1.0
+unit = "count"
+basis = "measured"
+artifact = { path = "bench/e18/hedge/raw.json", note = "um hedge exigiria 2 × 2774 tokens contra n_ctx 4096: o servidor recusa o segundo pedido (evidência do log em bench/e18/prewarm/raw.json)" }

@@ -3,6 +3,11 @@
 //! Consome `text/event-stream` linha a linha, dispatchando cada evento de `data` completo ao
 //! callback. Suporta `\r\n`, comentários (`:`) e múltiplas linhas `data:` por evento. O estado
 //! incompleto fica em `pending` — o fragmento seguinte continua exatamente onde parou.
+//!
+//! **P-04 — zero alocação por delta.** O caminho quente é um `data:` por delta: a linha é
+//! interpretada como fatia do buffer (sem `String` intermédia) e o payload entregue ao callback é
+//! **emprestado** de `self.data`, não copiado. Antes alocavam-se duas `String` por delta (a linha e
+//! o payload), o que dominava o overhead de cliente por turno.
 
 use katu_core::diag::{Level, events};
 use katu_core::provider::Flow;
@@ -48,13 +53,10 @@ impl SseParser {
             let end = consumed.saturating_add(offset);
             let line = strip_cr(self.pending.get(consumed..end).unwrap_or(&[]));
             if matches!(classify(line), Line::Dispatch) {
-                let payload = self
-                    .data
-                    .strip_suffix('\n')
-                    .unwrap_or(&self.data)
-                    .to_string();
-                if !payload.is_empty() {
-                    flow = on_data(&payload);
+                // O payload é uma fatia de `self.data` (o `\n` separador fica de fora): sem cópia.
+                if !self.data.is_empty() {
+                    let payload = self.data.strip_suffix('\n').unwrap_or(&self.data);
+                    flow = on_data(payload);
                     self.data.clear();
                     if matches!(flow, Flow::Break) {
                         consumed = end.saturating_add(1);
@@ -62,7 +64,8 @@ impl SseParser {
                     }
                 }
             } else if let Some(value) = data_value(line) {
-                self.data.push_str(&value);
+                // `value` empresta `self.pending`; `self.data` é outro campo (sem cópia intermédia).
+                self.data.push_str(value);
                 self.data.push('\n');
             }
             consumed = end.saturating_add(1);
@@ -84,14 +87,13 @@ fn classify(line: &[u8]) -> Line {
     }
 }
 
-/// Extrai o valor de uma linha `data:` (remove um espaço inicial).
-fn data_value(line: &[u8]) -> Option<String> {
+/// Extrai o valor de uma linha `data:` (remove um espaço inicial), **sem alocar**.
+fn data_value(line: &[u8]) -> Option<&str> {
     let _span = katu_core::trace_fn!("sse::data_value");
 
     let text = std::str::from_utf8(line).ok()?;
     let value = text.strip_prefix("data:")?;
-    let value = value.strip_prefix(' ').unwrap_or(value);
-    Some(value.to_string())
+    Some(value.strip_prefix(' ').unwrap_or(value))
 }
 
 /// Remove o `\r` final, se existir.

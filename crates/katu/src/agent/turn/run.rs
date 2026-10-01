@@ -5,7 +5,7 @@
 //! nada disto entra no log. O cancelamento cooperativo fecha o turno de forma limpa.
 
 use katu_core::diag::{Level, events};
-use katu_core::kernel::CallId;
+use katu_core::kernel::{Call, CallId, Fingerprint, Guard};
 use katu_core::provider::{
     Flow, Provider, ProviderError, ProviderEvent, ProviderRequest, ProviderSink, TokenUsage,
 };
@@ -15,6 +15,7 @@ use super::request::build_request;
 use super::{Activity, ActivitySink, run_calls};
 use crate::agent::{AgentError, Ports, TurnOptions, TurnReport, TurnRequest, catalog};
 use crate::runtime::Runtime;
+use katu_tools::schema::concurrency_of;
 
 /// Sink que acumula o turno e reencaminha a atividade efémera.
 struct TurnSink<'a> {
@@ -96,8 +97,17 @@ pub(crate) fn run_turn_with(
     // Q-04: a secção `estado` do turno entra no log **antes** de qualquer pedido ao provider, pelo
     // que o prompt de sistema que o modelo vê é reconstruível do log (E04).
     runtime.record_prompt_state(options.max_steps)?;
-    let accum = drive(runtime, &ports, provider, options, activity)?;
-    finish(runtime, accum)
+    // Q-12: o turno fecha **sempre**, mesmo quando o loop guard corta a meio (ou o teto de passos
+    // estoura): um `TurnStart` sem `TurnEnd` deixaria o log inconsistente para a retomada.
+    let driven = drive(runtime, &ports, provider, options, activity);
+    match driven {
+        Ok(accum) => finish(runtime, accum),
+        Err(error) => {
+            let turn = runtime.turn();
+            runtime.record_turn_end(turn)?;
+            Err(error)
+        }
+    }
 }
 
 /// Corre o loop de passos até ao fim (natural ou cancelado) e devolve o acumulado.
@@ -111,6 +121,7 @@ fn drive(
     let _span = katu_core::trace_fn!("agent::turn::run::drive");
 
     let tools = catalog::tool_defs();
+    let mut guard = Guard::with_defaults();
     let mut accum = Accum {
         text: String::new(),
         calls: 0,
@@ -136,6 +147,8 @@ fn drive(
         if step.calls.is_empty() {
             return Ok(accum);
         }
+        // Q-12/F7: o guard observa as chamadas do passo **antes** de as executar (corta primeiro).
+        cut_if_looping(&mut guard, &step.calls)?;
         if !run_calls(runtime, ports, step.calls, activity)? {
             accum.cancelled = true;
             return Ok(accum);
@@ -152,6 +165,53 @@ fn drive(
             return Err(AgentError::TooManySteps { steps: accum.steps });
         }
     }
+}
+
+/// Observa o passo no guard e **corta** o turno em ciclo (Q-12/F7).
+///
+/// O corte é registrado (`agent.loop`) e devolvido como erro: nunca silencioso. As chamadas são
+/// observadas **antes** de correr, pelo que o ciclo não chega a gastar orçamento de tools.
+fn cut_if_looping(guard: &mut Guard, calls: &[(CallId, String, Value)]) -> Result<(), AgentError> {
+    let _span = katu_core::trace_fn!("agent::turn::run::cut_if_looping");
+
+    let Some(alarm) = guard.observe(&fingerprints(calls)) else {
+        return Ok(());
+    };
+    katu_core::event!(
+        Level::Warn,
+        events::AGENT_LOOP,
+        "step" => alarm.step,
+        "kind" => alarm.kind.as_str(),
+        "repeated" => alarm.repeated,
+        "novelty_milli" => alarm.novelty_milli,
+        "cusum_milli" => alarm.cusum_milli,
+        "sprt_milli" => alarm.sprt_milli
+    );
+    Err(AgentError::LoopDetected {
+        step: alarm.step,
+        kind: alarm.kind.as_str(),
+        reason: alarm.reason(),
+    })
+}
+
+/// Traduz as chamadas do passo em impressões para o guard (Q-12).
+///
+/// Uma chamada **exclusiva** (escreve, move, executa) marca o passo como **progresso**: o detector
+/// reinicia. É o que distingue um ciclo patológico de um *polling* legítimo.
+fn fingerprints(calls: &[(CallId, String, Value)]) -> Vec<Call> {
+    let _span = katu_core::trace_fn!("agent::turn::run::fingerprints");
+
+    calls
+        .iter()
+        .map(|(_, name, arguments)| {
+            let print = Fingerprint::of(name, arguments);
+            if concurrency_of(name).is_shared() {
+                Call::shared(print)
+            } else {
+                Call::exclusive(print)
+            }
+        })
+        .collect()
 }
 
 /// Resultado de um passo de streaming (texto e tool calls acumulados).

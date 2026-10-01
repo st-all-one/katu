@@ -42,6 +42,11 @@ todo o código impuro confinado.
   provedor; o worker de auto-drain (`--watch-service`) vive em `src/watch_service.rs` (+ script
   `scripts/katu-idle.sh`). Sem o adaptador, `katu memory` **falha fechado** (`unavailable`, exit 10)
   — a memória é invariante de produção (G4).
+- **Memória** (`src/memory/`, E03-T02, P-03): adaptador in-process da porta `Memory` sobre o
+  `knudge-core` — o **único** sítio do binário com o vocabulário do knudge (firewall `check-layers`).
+  O índice/grafo ficam em cache e são **invalidados** por cada escrita; o commit **reusa** o índice
+  que o `pre_write` do mesmo gate construiu (P-03: gate com 1 000 notas −45,1 %, o custo era
+  reconstruir `Index::from_store` duas vezes; [`bench/e18/memory`](../../bench/e18/memory/PROTOCOL.md)).
 - **Runtime** (`src/runtime.rs`, feature `memory-in-process`): ponto de composição do loop
   (E03-T03/T07) — descobre a raiz, abre o adaptador, **recusa arrancar** sem memória saudável
   (fail-closed) e expõe `recall`/`remember` pelo caminho §42 (`src/runtime/memory.rs`). O comando
@@ -63,6 +68,11 @@ todo o código impuro confinado.
   argumentos JSON do modelo num `ToolUse` resolvido (caminhos canonicalizados antes do veredicto,
   E07-T02) e no executor; a tool `memory` passa pelos caminhos de recall/escrita do gate de E05.
   O comando `katu run` exercita-o. Envelopes de `Dispatch`/memória vivem em `src/memory/commands.rs`.
+  **Guard de loop** (Q-12/F7): cada passo é observado **antes** de executar
+  (`kernel::guard`, CUSUM + SPRT sobre a assinatura das chamadas); um ciclo de leitura sem progresso
+  corta o turno no 4.º passo com `AgentError::LoopDetected` (categoria `conflict`, exit 5), emite
+  `agent.loop` e **fecha** o turno. O turno fecha também nos outros erros (`TooManySteps`): um
+  `TurnStart` sem `TurnEnd` deixaria a retomada inconsistente.
 - **UI de terminal** (`src/tui.rs`, feature `memory-in-process`, E10-T01/T02/T05): comando
   `katu tui`. A UI (`katu-tui`) é pura (estado central + keymap + render) e a borda implementa o
   `Handler` que corre o turno e injeta `Update`s; `Runtime::begin_turn` abre o próximo turno

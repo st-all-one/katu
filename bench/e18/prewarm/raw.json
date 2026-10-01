@@ -1,0 +1,52 @@
+{
+  "schema": "katu.bench.prewarm.v1",
+  "machine": {
+    "os": "linux",
+    "arch": "x86_64",
+    "cpu": "AMD Ryzen 5 5500U (6C/12T)"
+  },
+  "server": {
+    "runtime": "llama.cpp b11269",
+    "model": "qwen2.5-coder-1.5b-instruct-q4_k_m",
+    "n_ctx": 4096,
+    "total_slots": 4,
+    "unit": "katu-llama.service"
+  },
+  "prefix_tokens": 2774,
+  "cold": {
+    "prompt_eval_ms": 32383.0,
+    "prompt_eval_ms_second": 29255.0,
+    "tokens": 2774,
+    "ms_per_token": 11.67,
+    "cached": 0,
+    "run_wall_s": [
+      30.71,
+      80.21
+    ],
+    "note": "a avaliação do prefixo reportada pelo servidor é estável (~29-32 s); o wall do processo varia com a carga da máquina (a segunda amostra inclui o carregamento do modelo após restart)"
+  },
+  "warm": {
+    "prompt_eval_ms": 86.0,
+    "tokens": 1,
+    "cached": 2773,
+    "run_wall_s": [
+      1.03,
+      1.09
+    ],
+    "note": "mesmo prefixo já na cache: 1 token avaliado em vez de 2774"
+  },
+  "prewarm_concurrent": {
+    "wall_s": 92.69,
+    "chars": 0,
+    "usage": null,
+    "server_evidence": [
+      "decode: failed to find a memory slot for batch of size 1024",
+      "slot operator(): need to evaluate at least 1 token for each active slot (n_past = 2774, task.n_tokens() = 2774)"
+    ],
+    "note": "prewarm e turno em voo ao mesmo tempo: 2 x 2774 tokens > n_ctx 4096 — o servidor não consegue servir os dois"
+  },
+  "limits": [
+    "medição local (llama-server); um endpoint remoto não partilha a cache KV entre pedidos da mesma forma",
+    "o prewarm foi implementado, medido e **revertido** (Q-14): o caso imediato é pior e quebrou o turno"
+  ]
+}
