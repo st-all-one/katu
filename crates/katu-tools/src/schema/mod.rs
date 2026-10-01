@@ -5,11 +5,13 @@
 //! uma `String` solta): cada `Issue` aponta o campo exato e ensina a corrigir. As especificações
 //! reais vivem em [`specs`]; o gate do CI (`xtask check-schemas`) corre [`lint_all`].
 
+mod json;
 mod specs;
 
 #[cfg(test)]
 mod tests;
 
+pub use json::{tool_defs, wire_json};
 pub use specs::SCHEMAS;
 
 use std::collections::BTreeSet;

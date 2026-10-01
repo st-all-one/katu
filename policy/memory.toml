@@ -16,6 +16,7 @@ scope = { command = { tool = "memory_write" } }
 enforcement = { require_after = { tool = "memory_recall" } }
 severity = "critical"
 category = "enforced"
+remedy = "chame `memory_recall` no mesmo turno antes de `memory_write`"
 examples = { negative = ["memory_write sem memory_recall prévio"], positive = ["memory_recall → memory_write"] }
 
 # 2. Fecho por evidência: fechar tarefa exige um `memory_outcome` registado.
@@ -26,6 +27,7 @@ scope = { command = { tool = "memory_close" } }
 enforcement = { require_after = { tool = "memory_outcome" } }
 severity = "critical"
 category = "enforced"
+remedy = "registre `memory_outcome` antes de fechar a tarefa"
 examples = { negative = ["memory_close sem memory_outcome"], positive = ["memory_outcome → memory_close"] }
 
 # 3. Sem duplicata forte (≥ 0.92): `deny_command` falha fechado; a capacidade só é concedida se o
@@ -37,6 +39,7 @@ scope = { command = { tool = "memory_write" } }
 enforcement = { deny_command = { tool = "memory_write" } }
 severity = "critical"
 category = "enforced"
+remedy = "mude o facto ou a âncora da nota; se a nota já existe, atualize-a em vez de duplicar"
 examples = { negative = ["memory_write de duplicata a 0.95"], positive = ["memory_write de nota nova"] }
 
 # 4. Âncora obrigatória: nota sobre código exige `--anchor` (validado pelo adaptador).
@@ -47,6 +50,7 @@ scope = { command = { tool = "memory_write" } }
 enforcement = { deny_command = { tool = "memory_write" } }
 severity = "critical"
 category = "enforced"
+remedy = "acrescente `--anchor ficheiro:símbolo` à nota"
 examples = { negative = ["memory_write sobre src/x.rs sem âncora"], positive = ["memory_write com --anchor src/x.rs"] }
 
 # 5. Uma afirmação por nota.
@@ -57,4 +61,5 @@ scope = { command = { tool = "memory_write" } }
 enforcement = { deny_command = { tool = "memory_write" } }
 severity = "critical"
 category = "enforced"
+remedy = "divida em várias notas, uma afirmação por nota"
 examples = { negative = ["memory_write com duas afirmações"], positive = ["memory_write com uma afirmação"] }

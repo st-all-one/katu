@@ -5,7 +5,7 @@
 
 use std::path::{Path, PathBuf};
 
-use katu_core::kernel::{CallId, Message};
+use katu_core::kernel::{CallId, Event, Message, read_records};
 use katu_core::ports::{FixedClock, Timestamp};
 use katu_core::provider::{ModelSpec, Provider, ProviderEvent, StopReason};
 use katu_providers::{FakeProvider, Turn};
@@ -49,6 +49,15 @@ pub(super) fn write_call() -> ProviderEvent {
         call: CallId::new("c1"),
         name: "write".to_string(),
         arguments: json!({"path": "new.txt", "content": "olá"}),
+    }
+}
+
+/// Ferramenta de leitura que o modelo pede no guião.
+pub(super) fn read_call() -> ProviderEvent {
+    ProviderEvent::ToolCall {
+        call: CallId::new("c1"),
+        name: "read".to_string(),
+        arguments: json!({"path": "nota.txt", "view": "full"}),
     }
 }
 
@@ -114,6 +123,67 @@ fn loop_executes_a_tool_then_stops() -> Result<(), Box<dyn std::error::Error>> {
     runtime.session().verify()?;
 
     drop(runtime);
+    std::fs::remove_dir_all(&root)?;
+    Ok(())
+}
+
+/// §18/G6 — **o payload da tool chega ao modelo**. Antes desta correção, o resultado projetado era
+/// só o `ToolOutcome` (`{"Ok":null}`): o modelo ficava cego ao que a tool devolveu.
+#[test]
+fn the_tool_payload_reaches_the_model() -> Result<(), Box<dyn std::error::Error>> {
+    let root = root("delta-no-modelo")?;
+    std::fs::write(root.join("nota.txt"), "conteudo secreto da nota\n")?;
+    let fs = StdFs;
+    let clock = FixedClock::new(Timestamp::from_millis(1_000));
+    let mut runtime = Runtime::open(&fs, &clock, &root, "lê a nota")?;
+
+    let provider = FakeProvider::new(
+        "fake",
+        vec![
+            Turn {
+                events: vec![read_call()],
+                stop: StopReason::ToolCalls,
+            },
+            Turn::text("li"),
+        ],
+    );
+    let process = StdProcess;
+    let env = StdEnv;
+    let ports = Ports {
+        fs: &fs,
+        process: &process,
+        env: &env,
+    };
+    let report = run_turn(
+        &mut runtime,
+        request(&provider, ports, "lê a nota", &options(4)),
+    )?;
+    assert_eq!(report.calls, 1);
+
+    let messages = runtime.messages()?;
+    let delta = messages
+        .iter()
+        .find_map(|message| match message {
+            Message::ToolResult { delta, .. } => delta.clone(),
+            _ => None,
+        })
+        .ok_or("o resultado tem de trazer o delta (§18/G6)")?;
+    assert!(
+        delta.contains("conteudo secreto da nota"),
+        "o delta não traz o conteúdo lido: {delta}"
+    );
+
+    // O log é a fonte: o delta sobrevive ao replay (`Model-visible ⟺ logged`).
+    let path = runtime.session().log_path().to_path_buf();
+    drop(runtime);
+    let logged = read_records(&fs, &path)?
+        .into_iter()
+        .find_map(|record| match record.event {
+            Event::ToolResult { delta, .. } => delta,
+            _ => None,
+        });
+    assert_eq!(logged.as_deref(), Some(delta.as_str()));
+
     std::fs::remove_dir_all(&root)?;
     Ok(())
 }

@@ -8,6 +8,7 @@
 use serde::Serialize;
 
 use crate::diag::{Level, events};
+use crate::error::ToolOutcome;
 use crate::toon::{self, Aliases, Cell, RowTable, Section, Value};
 
 /// Paginação de um resultado (cursor opaco; `total` sempre presente).
@@ -43,6 +44,29 @@ pub struct Cost {
     pub ms: u64,
     /// Estimativa de tokens (base `inferred`; o modelo usa como heurística).
     pub tokens_est: u64,
+}
+
+/// Teto do **delta** que entra no log e no prompt (bytes).
+///
+/// O delta é o payload da tool renderizado em TOON — o que o modelo precisa para agir (§18/G6: "só
+/// o delta chega ao modelo"). Acima do teto corta-se em fronteira de linha e deixa-se um
+/// **ponteiro** (`kind`/`id`) para o modelo pedir uma página (`read` com `range`/`view`): o
+/// envelope já traz `trunc`/`cur`/`tot` quando a tool pagina, e este teto é a rede de segurança
+/// para as que não paginam.
+pub const MAX_DELTA_BYTES: usize = 8_192;
+
+/// Conteúdo que o modelo recebe por um resultado de tool: o **delta** (payload TOON, §18/G6) quando
+/// existe; caso contrário a serialização do efeito (recusa com evidência/remédio, indisponível).
+///
+/// É o ponto único dos dialetos: todos os providers entregam a mesma string ao modelo.
+#[must_use]
+pub fn tool_content(outcome: &ToolOutcome, delta: Option<&str>) -> String {
+    let _span = crate::trace_fn!("report::tool_content");
+
+    if let Some(delta) = delta {
+        return delta.to_string();
+    }
+    serde_json::to_string(outcome).unwrap_or_else(|_| String::from("{}"))
 }
 
 /// Envelope tipado da saída de uma tool.
@@ -137,6 +161,35 @@ impl ToolReport {
         sections.extend(toon::project(&self.data));
         self.push_next(&mut sections);
         toon::emit(&sections)
+    }
+
+    /// Delta **model-visible**: o TOON do envelope, cortado ao teto [`MAX_DELTA_BYTES`].
+    ///
+    /// É este texto que entra no log (evento `ToolResult.delta`) e no pedido ao provider — a
+    /// mesma string, para que `Model-visible ⟺ logged` seja exato (E04).
+    #[must_use]
+    pub fn to_delta(&self) -> String {
+        let _span = crate::fn_span!(Level::Debug, events::TOON_EMIT, "report::to_delta", "kind" => self.kind);
+
+        let text = self.to_toon();
+        if text.len() <= MAX_DELTA_BYTES {
+            return text;
+        }
+        let cut = text
+            .char_indices()
+            .map(|(index, ch)| index.saturating_add(ch.len_utf8()))
+            .take_while(|end| *end <= MAX_DELTA_BYTES)
+            .last()
+            .unwrap_or(0);
+        let prefix = text.get(..cut).unwrap_or("");
+        let prefix = prefix
+            .rfind('\n')
+            .map_or(prefix, |end| prefix.get(..end).unwrap_or(prefix));
+        format!(
+            "{prefix}\n# delta truncado em {MAX_DELTA_BYTES} B; kind={}; id={}\n",
+            self.kind,
+            self.id.as_deref().unwrap_or("-")
+        )
     }
 
     /// Renderiza com **aliases de sessão** (`#N`/`@N`) e a secção `sym` dos novos.

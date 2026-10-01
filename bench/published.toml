@@ -214,3 +214,67 @@ value = 0.763
 unit = "ratio"
 basis = "measured"
 artifact = { path = "bench/e18/batch/raw.json", note = "ganho do lote no alvo (wall-clock das N leituras); critério E18 ≥ 0.20" }
+
+# --- Q-05: catálogo de skills com descrição de uma linha (OPTIMIZATION_PLAN.md) ---
+# Protocolo em `bench/e18/prompt/PROTOCOL.md`; artefacto cru em `bench/e18/prompt/raw.json`.
+# `baseline` = a renderização anterior (nome + descrição completa + caminho), calculada da mesma
+# fonte pelo gate — o ganho é derivável do artefacto, não de memória (DF5).
+[[metrics]]
+name = "q05.skills.catalog.bytes"
+value = 1211.0
+unit = "bytes"
+basis = "measured"
+artifact = { path = "bench/e18/prompt/raw.json", note = "8 skills, descrição de uma linha + caminho relativo" }
+
+[[metrics]]
+name = "q05.skills.catalog.baseline_bytes"
+value = 4636.0
+unit = "bytes"
+basis = "measured"
+artifact = { path = "bench/e18/prompt/raw.json", note = "renderização anterior a Q-05 (descrição completa)" }
+
+[[metrics]]
+name = "q05.skills.catalog.gain_ratio"
+value = 0.7388
+unit = "ratio"
+basis = "measured"
+artifact = { path = "bench/e18/prompt/raw.json", note = "ganho do catálogo; critério E18 ≥ 0.20" }
+
+# --- Q-19: `AGENTS.md` condensado (OPTIMIZATION_PLAN.md) ---
+# Sonda de Q-19 medida pelo gate (o número que decidiu a adoção, ≥ 0.20);
+# a transformação vive em `katu_core::prompt::condense` (sem cache: ver `MODULE.md`).
+[[metrics]]
+name = "q19.agents.bytes"
+value = 1128.0
+unit = "bytes"
+basis = "measured"
+artifact = { path = "bench/e18/prompt/raw.json", note = "AGENTS.md condensado (o que o modelo vê)" }
+
+[[metrics]]
+name = "q19.agents.gain_ratio"
+value = 0.2906
+unit = "ratio"
+basis = "measured"
+artifact = { path = "bench/e18/prompt/raw.json", note = "ganho sobre o AGENTS.md cru; critério E18 ≥ 0.20" }
+
+# --- Q-20: composição do prompt medida e travada (OPTIMIZATION_PLAN.md §1.5) ---
+[[metrics]]
+name = "q20.prompt.system.tokens"
+value = 1014.0
+unit = "tokens"
+basis = "measured"
+artifact = { path = "bench/e18/prompt/raw.json", note = "AGENTS.md condensado + prime + catálogo, no rácio medido de Q-01" }
+
+[[metrics]]
+name = "q20.prompt.total.tokens"
+value = 2394.0
+unit = "tokens"
+basis = "measured"
+artifact = { path = "bench/e18/prompt/raw.json", note = "system + schemas JSON das 11 tools" }
+
+[[metrics]]
+name = "q20.prompt.system.gain_ratio"
+value = 0.5137
+unit = "ratio"
+basis = "measured"
+artifact = { path = "bench/e18/prompt/raw.json", note = "system vs baseline (AGENTS.md cru + descrição completa das skills)" }

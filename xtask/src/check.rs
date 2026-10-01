@@ -6,8 +6,8 @@
 //!
 //! Corre o mesmo conjunto que o `make check`: `fmt` + `clippy` + testes + limite de linhas +
 //! camadas + cobertura de crates + diag + schemas + docs + memória + política + gates de número
-//! (`gate:bench`/`gate:provider`/`gate:render`). Falha no primeiro gate vermelho, com a mensagem
-//! agregada — o CI e o programador veem o mesmo contrato.
+//! (`gate:bench`/`gate:prompt`/`gate:provider`/`gate:render`). Falha no primeiro gate vermelho, com
+//! a mensagem agregada — o CI e o programador veem o mesmo contrato.
 
 use std::process::Command;
 
@@ -18,6 +18,7 @@ use crate::coverage::check_rule_coverage;
 use crate::ledger::ledger_validate;
 use crate::memory_swap::check_memory_swap;
 use crate::policy::policy_audit;
+use crate::prompt::gate_prompt;
 use crate::schemas::check_schemas;
 use crate::slices::check_slices;
 use crate::surface::check_surface;
@@ -73,6 +74,7 @@ pub(crate) fn run_all() -> Result<(), String> {
     policy_audit(&[])?;
     ledger_validate(&[])?;
     gate_bench(&[])?;
+    gate_prompt(&[])?;
     provider_bench::gate(&[])?;
     render_bench::gate(&[])?;
     println!("check ok: todos os gates verdes");

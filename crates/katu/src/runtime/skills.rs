@@ -6,6 +6,7 @@
 use std::path::Path;
 
 use katu_core::ports::Fs;
+use katu_core::prompt::condense;
 use katu_core::skill::{Skill, catalog, discover};
 
 use super::Runtime;
@@ -14,12 +15,17 @@ use super::Runtime;
 pub(crate) const AGENTS_FILE: &str = "AGENTS.md";
 
 /// Lê o `AGENTS.md` da raiz (ausência ou bytes inválidos → `None`).
+///
+/// O texto é **condensado** (`katu_core::prompt::condense`, Q-19): a sintaxe redundante do router
+/// (link com texto igual ao alvo, negrito) sai; texto, alvos e estrutura ficam. Como a condensação
+/// acontece **aqui**, o `ProjectContext` loga exatamente o que o modelo vê (Q-16).
 pub(crate) fn read_instructions(fs: &dyn Fs, root: &Path) -> Option<String> {
     let _span = katu_core::trace_fn!("runtime::skills::read_instructions");
 
     let bytes = fs.read(&root.join(AGENTS_FILE)).ok()?;
     let text = String::from_utf8(bytes).ok()?;
-    let trimmed = text.trim();
+    let condensed = condense(text.trim());
+    let trimmed = condensed.trim();
     (!trimmed.is_empty()).then(|| trimmed.to_string())
 }
 
@@ -52,6 +58,6 @@ impl Runtime<'_> {
     pub(crate) fn skills_catalog(&self) -> String {
         let _span = katu_core::trace_fn!("runtime::skills::skills_catalog");
 
-        catalog(&self.skills)
+        catalog(&self.skills, &self.goal, self.session.root())
     }
 }

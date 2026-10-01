@@ -3,6 +3,7 @@
 use katu_core::diag::{Level, events};
 use katu_core::kernel::Message;
 use katu_core::provider::{ProviderError, ProviderRequest, Thinking, ToolDef};
+use katu_core::report::tool_content;
 use katu_policy::{SearchMode, ToolArgs, ToolName, ToolUse};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
@@ -142,7 +143,7 @@ pub(crate) fn encode_request(
         }));
     }
     for message in &request.messages {
-        if let Some(encoded) = encode_message(message)? {
+        if let Some(encoded) = encode_message(message) {
             messages.push(encoded);
         }
     }
@@ -189,7 +190,7 @@ fn encode_tool(tool: &ToolDef) -> ToolJson<'_> {
 }
 
 /// Codifica uma mensagem do histórico (ou ignora se desconhecida).
-fn encode_message(message: &Message) -> Result<Option<MessageJson<'_>>, ProviderError> {
+fn encode_message(message: &Message) -> Option<MessageJson<'_>> {
     let _span = katu_core::fn_span!(
         Level::Trace,
         events::PROVIDER_REQUEST,
@@ -216,15 +217,18 @@ fn encode_message(message: &Message) -> Result<Option<MessageJson<'_>>, Provider
                 },
             }],
         }),
-        Message::ToolResult { call, outcome } => MessageJson::ToolResult(ToolResultMessage {
+        Message::ToolResult {
+            call,
+            outcome,
+            delta,
+        } => MessageJson::ToolResult(ToolResultMessage {
             role: "tool",
             tool_call_id: call.as_str(),
-            content: serde_json::to_string(outcome)
-                .map_err(|error| ProviderError::Decode(error.to_string()))?,
+            content: tool_content(outcome, delta.as_deref()),
         }),
-        _ => return Ok(None),
+        _ => return None,
     };
-    Ok(Some(encoded))
+    Some(encoded)
 }
 
 /// Nome ao modelo de um uso de tool (registry: `exec`→`bash`, `search`→`grep|find|ls`).

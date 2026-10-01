@@ -109,6 +109,7 @@ fn shell_rule() -> Rule {
         },
         severity: Severity::Critical,
         category: RuleCategory::Enforced,
+        remedy: Some("saia do modo de planeamento para executar shell".to_string()),
         expires_at: None,
         waiver: None,
         examples: RuleExamples {
@@ -129,6 +130,7 @@ fn plan_rule(allowed: ResolvedPath, anywhere: ResolvedPath) -> Rule {
         enforcement: Enforcement::DenyWriteOutside { root: allowed },
         severity: Severity::Critical,
         category: RuleCategory::Enforced,
+        remedy: Some("no modo de planeamento escreva só sob `.katu/`, ou saia do modo".to_string()),
         expires_at: None,
         waiver: None,
         examples: RuleExamples {

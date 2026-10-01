@@ -193,6 +193,11 @@ pub struct Rule {
     pub severity: Severity,
     /// Categoria.
     pub category: RuleCategory,
+    /// O que **passaria** (Q-08): remédio acionável, em imperativo, que o modelo recebe na
+    /// evidência da negação. É **dado** como o resto da regra: a regra que nega declara como se
+    /// satisfaz — sem isto, o modelo tenta às cegas (a brecha (g) do `OPTIMIZATION_PLAN` §1.4).
+    #[serde(default)]
+    pub remedy: Option<String>,
     /// Expiração (revisão por default a 90 dias).
     #[serde(default)]
     pub expires_at: Option<Timestamp>,

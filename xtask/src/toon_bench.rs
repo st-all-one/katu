@@ -211,6 +211,7 @@ fn session() -> Result<Vec<Event>, String> {
     events.push(Event::ToolResult {
         call,
         outcome: denied(),
+        delta: None,
     });
     Ok(events)
 }

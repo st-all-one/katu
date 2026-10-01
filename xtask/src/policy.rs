@@ -1,10 +1,11 @@
 //! `policy:audit` (E02-T04) — lista `Enforced` vs `Advisory` e falha se uma regra `Enforced` não
-//! tiver exemplo negativo (ou souber a colisão de `id`/enunciado vazio).
+//! tiver exemplo negativo, não **ensinar o que passaria** (Q-08) ou souber a colisão de
+//! `id`/enunciado vazio.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use katu_policy::{RuleSet, audit};
+use katu_policy::{RuleCategory, RuleSet, audit};
 
 use crate::walk::collect_rule_files;
 
@@ -28,6 +29,18 @@ pub(crate) fn policy_audit(args: &[String]) -> Result<(), String> {
         let rules =
             RuleSet::from_toml(&text).map_err(|err| format!("{}: {err}", file.display()))?;
         let report = audit(&rules, 0);
+        // Q-08: uma regra que nega sem dizer o que passaria deixa o modelo a tentar às cegas.
+        for rule in &rules.rules {
+            if rule.category == RuleCategory::Enforced
+                && rule.remedy.as_deref().is_none_or(str::is_empty)
+            {
+                violations.push(format!(
+                    "{}: regra Enforced `{}` sem `remedy` (Q-08)",
+                    file.display(),
+                    rule.id.as_str()
+                ));
+            }
+        }
         enforced = enforced.saturating_add(report.enforced.len());
         advisory = advisory.saturating_add(report.advisory.len());
         for issue in &report.issues {

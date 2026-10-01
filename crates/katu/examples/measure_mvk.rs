@@ -118,6 +118,7 @@ fn run(scenario: Scenario) -> HarnessResult<Counts> {
         session.apply(&Event::ToolResult {
             call: CallId::new("r1"),
             outcome: ToolOutcome::Ok,
+            delta: None,
         })?;
     }
     if !scenario.writes() {

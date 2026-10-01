@@ -120,6 +120,49 @@ fn tool_call_message_has_null_content() -> Result<(), Box<dyn std::error::Error>
     Ok(())
 }
 
+/// Conteúdo da mensagem de resultado de tool no corpo codificado.
+fn tool_content(body: &serde_json::Value) -> Option<&str> {
+    body.get("messages")
+        .and_then(|value| value.as_array())
+        .and_then(|messages| {
+            messages
+                .iter()
+                .find(|message| message.get("role") == Some(&json!("tool")))
+        })
+        .and_then(|message| message.get("content"))
+        .and_then(serde_json::Value::as_str)
+}
+
+#[test]
+fn a_tool_result_carries_the_delta_to_the_wire() -> Result<(), Box<dyn std::error::Error>> {
+    use katu_core::error::ToolOutcome;
+    use katu_core::kernel::{CallId, Message};
+
+    // Com delta: o modelo recebe o payload em TOON (§18/G6), não o `ToolOutcome`.
+    let mut with_delta = request("m");
+    with_delta.messages = vec![Message::ToolResult {
+        call: CallId::new("c1"),
+        outcome: ToolOutcome::Ok,
+        delta: Some("r\nread.summary\nk\npath nota.txt".to_string()),
+    }];
+    let body = super::encode_request(&with_delta, &super::EncodeOptions::default())?;
+    let value: serde_json::Value = serde_json::from_str(&body)?;
+    let content = tool_content(&value);
+    assert_eq!(content, Some("r\nread.summary\nk\npath nota.txt"));
+
+    // Sem delta (recusa/erro): o efeito serializado, como antes.
+    let mut no_delta = request("m");
+    no_delta.messages = vec![Message::ToolResult {
+        call: CallId::new("c1"),
+        outcome: ToolOutcome::Timeout,
+        delta: None,
+    }];
+    let body = super::encode_request(&no_delta, &super::EncodeOptions::default())?;
+    let value: serde_json::Value = serde_json::from_str(&body)?;
+    assert_eq!(tool_content(&value), Some("\"timeout\""));
+    Ok(())
+}
+
 #[test]
 fn delta_reasoning_accepts_all_field_variants() -> Result<(), Box<dyn std::error::Error>> {
     for case in [

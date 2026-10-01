@@ -109,6 +109,7 @@ fn attempt_write(memory: &FakeMemory, recall: Recall) -> TestResult<Attempt> {
         session.apply(&Event::ToolResult {
             call: CallId::new("r1"),
             outcome: ToolOutcome::Ok,
+            delta: None,
         })?;
     }
     let req = request();

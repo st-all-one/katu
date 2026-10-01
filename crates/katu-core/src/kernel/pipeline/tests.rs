@@ -70,6 +70,7 @@ fn deny_secrets() -> Result<RuleSet, PolicyError> {
             enforcement: Enforcement::DenyWrite { root },
             severity: Severity::Critical,
             category: RuleCategory::Enforced,
+            remedy: None,
             expires_at: None,
             waiver: None,
             examples: RuleExamples {
@@ -156,6 +157,7 @@ fn workspace_capability_unlocks_write_under_the_root() -> Result<(), PolicyError
             enforcement: Enforcement::DenyWrite { root },
             severity: Severity::Critical,
             category: RuleCategory::Enforced,
+            remedy: None,
             expires_at: None,
             waiver: None,
             examples: RuleExamples::default(),

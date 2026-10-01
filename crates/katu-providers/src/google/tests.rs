@@ -180,6 +180,7 @@ fn tool_result_becomes_a_function_response() -> Result<(), Box<dyn std::error::E
             Message::ToolResult {
                 call: CallId::new("c1"),
                 outcome: ToolOutcome::Ok,
+                delta: Some("leitura ok".to_string()),
             },
         ],
         tools: Vec::new(),

@@ -17,6 +17,7 @@ pub(crate) fn sample_rules() -> Result<RuleSet, PolicyError> {
             enforcement: Enforcement::DenyWrite { root },
             severity: Severity::Critical,
             category: RuleCategory::Enforced,
+            remedy: None,
             expires_at: None,
             waiver: None,
             examples: RuleExamples {

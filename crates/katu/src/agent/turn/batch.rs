@@ -219,7 +219,7 @@ fn commit(
         let outcome = call.dispatch.outcome();
         runtime
             .session
-            .settle_call(call.call.clone(), outcome.clone())?;
+            .settle_call(call.call.clone(), outcome.clone(), call.dispatch.delta())?;
         emit_outcome(activity, &call.name, &outcome);
         let approval = match &call.dispatch.decision {
             Decision::RequireApproval { request } => Some(request.clone()),

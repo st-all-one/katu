@@ -25,3 +25,8 @@ _REF/
 
 # Runtime state — never committed (E14-T04).
 .katu/
+# katu — gerido (início)
+.katu/audit/
+.katu/trash/
+.katu/log/
+# katu — gerido (fim)

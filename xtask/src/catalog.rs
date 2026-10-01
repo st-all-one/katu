@@ -17,8 +17,8 @@ use crate::walk::collect_rule_files;
 /// Ficheiro gerado (versionado).
 const CATALOG_FILE: &str = "docs/catalog.md";
 
-/// Linha de regra: `(id, categoria, enunciado)`.
-type RuleRow = (String, String, String);
+/// Linha de regra: `(id, categoria, enunciado, remédio)`.
+type RuleRow = (String, String, String, String);
 
 /// Linha de ADR: `(ficheiro, título)`.
 type AdrRow = (String, String);
@@ -72,11 +72,15 @@ fn render() -> Result<String, String> {
 
     let rules = collect_rules()?;
     write(&mut out, format_args!("## Regras ({})\n\n", rules.len()))?;
-    out.push_str("| id | categoria | enunciado |\n| --- | --- | --- |\n");
-    for (id, category, statement) in &rules {
+    out.push_str("| id | categoria | enunciado | remédio (Q-08) |\n| --- | --- | --- | --- |\n");
+    for (id, category, statement, remedy) in &rules {
         write(
             &mut out,
-            format_args!("| `{id}` | {category} | {} |\n", escape_cell(statement)),
+            format_args!(
+                "| `{id}` | {category} | {} | {} |\n",
+                escape_cell(statement),
+                escape_cell(remedy)
+            ),
         )?;
     }
     out.push('\n');
@@ -118,6 +122,7 @@ fn collect_rules() -> Result<Vec<RuleRow>, String> {
                 rule.id.as_str().to_string(),
                 category_name(rule.category).to_string(),
                 rule.statement.clone(),
+                rule.remedy.clone().unwrap_or_default(),
             ));
         }
     }

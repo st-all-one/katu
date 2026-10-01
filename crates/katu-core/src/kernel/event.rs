@@ -67,6 +67,12 @@ pub enum Event {
         call: CallId,
         /// Efeito da operação.
         outcome: ToolOutcome,
+        /// **Delta model-visible** (§18/G6): o payload da tool renderizado em TOON, cortado ao teto
+        /// (`ToolReport::to_delta`). Entra no log para que `Model-visible ⟺ logged` seja exato: é a
+        /// **mesma** string que o provider recebe. Ausente nas recusas (a evidência vai na
+        /// `outcome`) e nas tools sem envelope.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        delta: Option<String>,
     },
     /// Transição de fase do caminho único.
     ///
@@ -123,6 +129,18 @@ pub enum Event {
         /// Controlo pedido (já validado pela borda contra o catálogo).
         control: Control,
     },
+    /// Contexto do projeto injetado no prompt de sistema (E20-T13): o `AGENTS.md` e o catálogo de
+    /// skills **tal como o modelo os vê**. Evento de controlo (não vai ao modelo), mas é o que
+    /// fecha o invariante `Model-visible ⟺ logged` (E04): sem ele, uma retomada releria o
+    /// `AGENTS.md` do disco e reproduziria um prompt de sistema diferente do que foi enviado.
+    ProjectContext {
+        /// `AGENTS.md` exatamente como entra no `system` (ausente se não existir).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        agents: Option<String>,
+        /// Catálogo de skills exatamente como entra no `system` (ausente se vazio).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        skills: Option<String>,
+    },
     /// Fim de um turno.
     TurnEnd {
         /// Número do turno.
@@ -148,6 +166,7 @@ impl Event {
             Self::ApprovalGranted { .. } => "approval_granted",
             Self::VerificationRecorded { .. } => "verification_recorded",
             Self::Control { .. } => "control",
+            Self::ProjectContext { .. } => "project_context",
             Self::TurnEnd { .. } => "turn_end",
         }
     }

@@ -169,6 +169,7 @@ fn soft_containment_does_not_confine_the_host() -> TestResult<()> {
             },
             severity: Severity::Critical,
             category: RuleCategory::Enforced,
+            remedy: None,
             expires_at: None,
             waiver: None,
             examples: RuleExamples::default(),

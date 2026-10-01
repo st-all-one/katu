@@ -18,6 +18,7 @@ pub mod memory;
 pub mod model;
 pub mod plan;
 pub mod ports;
+pub mod prompt;
 pub mod provider;
 pub mod report;
 pub mod skill;

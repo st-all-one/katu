@@ -1,0 +1,47 @@
+{
+  "baseline": {
+    "agents_bytes": 1590,
+    "skills_bytes": 4636,
+    "system_bytes": 7566,
+    "system_tokens": 2084,
+    "total_tokens": 3465
+  },
+  "bytes_per_token_milli": 3631,
+  "gains": {
+    "agents": 0.2906,
+    "skills": 0.7388,
+    "system": 0.5137,
+    "total": 0.309
+  },
+  "parts": [
+    {
+      "bytes": 1128,
+      "name": "AGENTS.md",
+      "tokens": 311
+    },
+    {
+      "bytes": 1211,
+      "name": "catálogo de skills",
+      "tokens": 334
+    },
+    {
+      "bytes": 1340,
+      "name": "prime",
+      "tokens": 370
+    },
+    {
+      "bytes": 5013,
+      "name": "tools (wire JSON)",
+      "tokens": 1381
+    }
+  ],
+  "probes": {
+    "tools_core_bytes": 4310,
+    "tools_core_gain": 0.1402
+  },
+  "protocol": "bench/e18/prompt/PROTOCOL.md",
+  "system_bytes": 3679,
+  "system_tokens": 1014,
+  "total_bytes": 8692,
+  "total_tokens": 2394
+}

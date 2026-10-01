@@ -230,7 +230,7 @@ impl<'a> Session<'a> {
             context.now_millis,
             context.tool,
         )?;
-        self.settle_call(call, outcome.outcome())?;
+        self.settle_call(call, outcome.outcome(), outcome.delta())?;
         Ok(outcome)
     }
 
@@ -265,16 +265,28 @@ impl<'a> Session<'a> {
 
     /// Loga o **resultado** de uma tool já executada (a segunda metade de §42).
     ///
+    /// `delta` é o payload model-visible (§18/G6): a mesma string que o provider vai receber,
+    /// guardada no log para o replay ser fiel (E04).
+    ///
     /// # Errors
     /// [`SessionError`] se o evento não puder ser logado.
-    pub fn settle_call(&mut self, call: CallId, outcome: ToolOutcome) -> Result<(), SessionError> {
+    pub fn settle_call(
+        &mut self,
+        call: CallId,
+        outcome: ToolOutcome,
+        delta: Option<String>,
+    ) -> Result<(), SessionError> {
         let _span = crate::fn_span!(
             Level::Trace,
             events::TOOL_CALL,
             "kernel::session::settle_call"
         );
         log_outcome(&outcome);
-        self.apply(&Event::ToolResult { call, outcome })
+        self.apply(&Event::ToolResult {
+            call,
+            outcome,
+            delta,
+        })
     }
 
     /// `true` se **todas** as calls indicadas cabem no cost governor, sem o alterar (B-01).
@@ -347,6 +359,7 @@ impl<'a> Session<'a> {
         self.apply(&Event::ToolResult {
             call,
             outcome: result,
+            delta: dispatch.delta(),
         })?;
         Ok(dispatch)
     }

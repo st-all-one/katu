@@ -40,6 +40,9 @@ pub enum Message {
         call: CallId,
         /// Efeito.
         outcome: ToolOutcome,
+        /// Delta model-visible (§18/G6): o **mesmo** texto que o provider recebe, vindo do log.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        delta: Option<String>,
     },
 }
 
@@ -65,9 +68,14 @@ fn project_event(event: &Event) -> Option<Message> {
             call: call.clone(),
             tool: tool.clone(),
         }),
-        Event::ToolResult { call, outcome } => Some(Message::ToolResult {
+        Event::ToolResult {
+            call,
+            outcome,
+            delta,
+        } => Some(Message::ToolResult {
             call: call.clone(),
             outcome: outcome.clone(),
+            delta: delta.clone(),
         }),
         _ => None,
     }

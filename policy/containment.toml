@@ -16,6 +16,7 @@ scope = { path = { root = "/" } }
 enforcement = { deny_sensitive_read = { globs = [".ssh", ".env", ".env.*", "id_rsa", "id_rsa.*", "id_ed25519", "*.pem", "*.key", ".aws", ".gnupg", ".netrc", ".npmrc", "credentials"] } }
 severity = "critical"
 category = "enforced"
+remedy = "use um caminho fora da lista sensível, ou peça autorização explícita (`--approve`) ao utilizador"
 examples = { negative = ["read ~/.ssh/id_rsa sem autorização"], positive = ["read src/main.rs"] }
 
 # 2. Escrita fora do workspace → aprovação (warn); dentro, a capacidade `Workspace` destranca.
@@ -26,6 +27,7 @@ scope = { path = { root = "/" } }
 enforcement = { deny_write = { root = "/" } }
 severity = "warn"
 category = "enforced"
+remedy = "escreva dentro do workspace, ou peça aprovação explícita (`--approve`) para este caminho"
 examples = { negative = ["write /etc/hosts fora do workspace"], positive = ["write src/x.rs dentro do workspace"] }
 
 # 3. Leitura fora do workspace → aprovação (warn); dentro, a capacidade `Workspace` destranca.
@@ -36,4 +38,5 @@ scope = { path = { root = "/" } }
 enforcement = { deny_read = { root = "/" } }
 severity = "warn"
 category = "enforced"
+remedy = "leia dentro do workspace, ou peça aprovação explícita (`--approve`) para este caminho"
 examples = { negative = ["read /etc/passwd fora do workspace"], positive = ["read src/x.rs dentro do workspace"] }

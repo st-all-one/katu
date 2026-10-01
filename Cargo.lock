@@ -674,6 +674,7 @@ version = "0.1.0"
 dependencies = [
  "katu-core",
  "katu-policy",
+ "serde_json",
 ]
 
 [[package]]

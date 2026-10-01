@@ -6,6 +6,7 @@
 use katu_core::diag::{Level, events};
 use katu_core::kernel::Message;
 use katu_core::provider::{ProviderError, ProviderRequest, ToolDef};
+use katu_core::report::tool_content;
 use serde_json::{Map, Value, json};
 
 use crate::openai::{EncodeOptions, model_tool_name, thinking_effort, tool_arguments};
@@ -28,7 +29,7 @@ pub(crate) fn encode_request(
     );
     let mut input = Vec::new();
     for message in &request.messages {
-        if let Some(encoded) = encode_message(message)? {
+        if let Some(encoded) = encode_message(message) {
             input.push(encoded);
         }
     }
@@ -80,7 +81,7 @@ fn encode_tool(tool: &ToolDef) -> Value {
 }
 
 /// Codifica uma mensagem do histórico (ou ignora se desconhecida).
-fn encode_message(message: &Message) -> Result<Option<Value>, ProviderError> {
+fn encode_message(message: &Message) -> Option<Value> {
     let _span = katu_core::trace_fn!("responses::encode::encode_message");
 
     let encoded = match message {
@@ -92,13 +93,16 @@ fn encode_message(message: &Message) -> Result<Option<Value>, ProviderError> {
             "name": model_tool_name(tool),
             "arguments": tool_arguments(tool).to_string(),
         }),
-        Message::ToolResult { call, outcome } => json!({
+        Message::ToolResult {
+            call,
+            outcome,
+            delta,
+        } => json!({
             "type": "function_call_output",
             "call_id": call.as_str(),
-            "output": serde_json::to_string(outcome)
-                .map_err(|error| ProviderError::Decode(error.to_string()))?,
+            "output": tool_content(outcome, delta.as_deref()),
         }),
-        _ => return Ok(None),
+        _ => return None,
     };
-    Ok(Some(encoded))
+    Some(encoded)
 }

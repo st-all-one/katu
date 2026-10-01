@@ -204,20 +204,60 @@ pub fn prime_for(mode: PrimeMode) -> String {
     }
 }
 
-/// Mantém o **sufixo mais recente** cujo peso cabe em `raw_min`.
+/// Mantém o **sufixo mais recente** cujo peso cabe em `raw_min`, cortando só em **fronteiras de
+/// unidade**.
+///
+/// Uma unidade é uma mensagem que não é de tool ou uma **corrida maximal** de mensagens de tool
+/// (`ToolCall`/`ToolResult`). O corte tem de as respeitar: o wire `OpenAI` exige que um
+/// `role: "tool"` responda a um `tool_calls` precedente, e um lote B-01 loga N pedidos seguidos de
+/// N resultados — cortar a meio produziria um resultado **órfão** (pedido inválido no endpoint).
 fn fit_raw(messages: &[Message], raw_min: usize) -> Vec<Message> {
     let _span = crate::fn_span!(Level::Trace, events::CONTEXT_TRIM, "context::fit_raw");
     let mut used = 0usize;
     let mut start = messages.len();
-    for (index, message) in messages.iter().enumerate().rev() {
-        let cost = message_weight(message);
+    let mut end = messages.len();
+    while end > 0 {
+        let unit_start = unit_start(messages, end);
+        let cost: usize = messages
+            .get(unit_start..end)
+            .unwrap_or_default()
+            .iter()
+            .map(message_weight)
+            .sum();
         if used.saturating_add(cost) > raw_min {
             break;
         }
         used = used.saturating_add(cost);
-        start = index;
+        start = unit_start;
+        end = unit_start;
     }
     messages.get(start..).unwrap_or_default().to_vec()
+}
+
+/// Início da unidade que termina (exclusivo) em `end`.
+///
+/// Se a última mensagem for de tool, recua até à primeira da corrida; caso contrário é a própria.
+fn unit_start(messages: &[Message], end: usize) -> usize {
+    let _span = crate::trace_fn!("context::unit_start");
+
+    let mut start = end.saturating_sub(1);
+    if !is_tool(messages.get(start)) {
+        return start;
+    }
+    while start > 0 && is_tool(messages.get(start.saturating_sub(1))) {
+        start = start.saturating_sub(1);
+    }
+    start
+}
+
+/// Mensagem de tool (`ToolCall`/`ToolResult`)?
+fn is_tool(message: Option<&Message>) -> bool {
+    let _span = crate::trace_fn!("context::is_tool");
+
+    matches!(
+        message,
+        Some(Message::ToolCall { .. } | Message::ToolResult { .. })
+    )
 }
 
 /// Estimativa determinística de tokens de uma mensagem (sem tokenizer).
@@ -227,7 +267,11 @@ fn message_weight(message: &Message) -> usize {
     let bytes = match message {
         Message::User { text } | Message::Assistant { text } => text.len(),
         Message::ToolCall { tool, .. } => tool_weight(tool),
-        Message::ToolResult { outcome, .. } => outcome_weight(outcome),
+        // O **delta** é o payload model-visible (§18/G6): conta para o orçamento como qualquer
+        // outra mensagem — se não contasse, o contexto excedia o teto em silêncio.
+        Message::ToolResult { outcome, delta, .. } => {
+            outcome_weight(outcome).saturating_add(delta.as_deref().map_or(0, str::len))
+        }
     };
     tokens_from_bytes(bytes)
 }
@@ -273,7 +317,11 @@ fn outcome_weight(outcome: &ToolOutcome) -> usize {
 pub const BYTES_PER_TOKEN_MILLI: u64 = 3_631;
 
 /// Estimativa determinística de tokens: `ceil(bytes · 1000 / rácio_medido)`.
-fn tokens_from_bytes(bytes: usize) -> usize {
+///
+/// Pública porque o gate `xtask gate:prompt` (Q-20) mede a composição do prompt com **o mesmo**
+/// rácio que o orçamento do kernel usa — uma segunda constante seria *drift* garantido.
+#[must_use]
+pub fn tokens_from_bytes(bytes: usize) -> usize {
     let _span = crate::fn_span!(
         Level::Trace,
         events::CONTEXT_BUILD,

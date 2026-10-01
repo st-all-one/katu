@@ -182,6 +182,7 @@ mod tests {
             enforcement,
             severity: Severity::Critical,
             category,
+            remedy: None,
             expires_at: None,
             waiver: None,
             examples: RuleExamples::default(),

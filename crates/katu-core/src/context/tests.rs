@@ -3,8 +3,9 @@ use super::{
     assemble_with_prime, compact, message_id, prime, prime_for, prime_long, prime_with_catalog,
     recover, tokens_from_bytes,
 };
+use crate::error::ToolOutcome;
 use crate::evidence::EvidenceBasis;
-use crate::kernel::{Event, derive_messages};
+use crate::kernel::{CallId, Event, Message, derive_messages};
 
 fn budget(raw_min: usize) -> ContextBudget {
     ContextBudget {
@@ -81,6 +82,79 @@ fn zero_budget_keeps_no_message() {
     assert!(context.messages.is_empty());
     assert_eq!(context.raw_tokens, 0);
     assert!(context.tokens > 0, "o prime continua presente");
+}
+
+/// Um `ToolUse` de leitura mínimo, para construir mensagens de tool nos testes.
+fn read_use() -> Result<katu_policy::ToolUse, katu_policy::PolicyError> {
+    let path = katu_policy::ResolvedPath::from_canonical("/work/src/main.rs")?;
+    Ok(katu_policy::ToolUse {
+        name: katu_policy::ToolName::Read,
+        args: katu_policy::ToolArgs::Read { path: path.clone() },
+        resolved_paths: vec![path.clone()],
+        argv: None,
+        cwd: path,
+    })
+}
+
+/// Lote B-01: N pedidos seguidos de N resultados (a ordem do log real).
+fn batched_tool_events() -> Result<Vec<Event>, katu_policy::PolicyError> {
+    let use_ = read_use()?;
+    let rule_id = katu_policy::RuleId::from("test");
+    let mut events = vec![Event::UserMessage {
+        text: "objetivo".into(),
+    }];
+    for call in ["c1", "c2"] {
+        events.push(Event::ToolCall {
+            call: CallId::new(call),
+            tool: use_.clone(),
+        });
+    }
+    for call in ["c1", "c2"] {
+        events.push(Event::ToolResult {
+            call: CallId::new(call),
+            outcome: ToolOutcome::Denied {
+                evidence: katu_policy::Evidence::new("facto", "argumento", rule_id.clone()),
+                rule_id: rule_id.clone(),
+            },
+            delta: None,
+        });
+    }
+    Ok(events)
+}
+
+/// Nenhum `ToolResult` sem o `ToolCall` que o originou (o wire exige o par).
+fn orphan_tool_result(messages: &[Message]) -> bool {
+    let calls: std::collections::BTreeSet<&str> = messages
+        .iter()
+        .filter_map(|message| match message {
+            Message::ToolCall { call, .. } => Some(call.as_str()),
+            _ => None,
+        })
+        .collect();
+    messages.iter().any(|message| {
+        matches!(message, Message::ToolResult { call, .. } if !calls.contains(call.as_str()))
+    })
+}
+
+#[test]
+fn the_cut_never_orphans_a_tool_call_or_result() -> Result<(), Box<dyn std::error::Error>> {
+    let events = batched_tool_events()?;
+    let total = assemble(&events, budget(10_000)).messages.len();
+    assert_eq!(total, 5, "com orçamento folgado cabe tudo");
+    for raw_min in 0..=80 {
+        let context = assemble(&events, budget(raw_min));
+        assert!(
+            !orphan_tool_result(&context.messages),
+            "orçamento {raw_min} produziu um resultado órfão: {:?}",
+            context.messages
+        );
+        assert!(
+            context.raw_tokens <= raw_min,
+            "orçamento {raw_min} excedido: {}",
+            context.raw_tokens
+        );
+    }
+    Ok(())
 }
 
 fn long_conversation() -> Vec<Event> {

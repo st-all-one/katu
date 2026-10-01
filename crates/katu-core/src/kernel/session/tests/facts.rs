@@ -37,6 +37,7 @@ fn changed_files_are_relative_and_keep_only_successful_writes()
     session.apply(&Event::ToolResult {
         call: CallId::new("w1"),
         outcome: ToolOutcome::Ok,
+        delta: None,
     })?;
     // Um pedido sem sucesso não alterou o disco: fica fora do diff.
     session.apply(&Event::ToolCall {
@@ -46,6 +47,7 @@ fn changed_files_are_relative_and_keep_only_successful_writes()
     session.apply(&Event::ToolResult {
         call: CallId::new("w2"),
         outcome: ToolOutcome::Timeout,
+        delta: None,
     })?;
     session.apply(&Event::CommandRecorded { record: record() })?;
 

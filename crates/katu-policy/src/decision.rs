@@ -59,6 +59,10 @@ pub struct Evidence {
     pub argument: String,
     /// Regra que decidiu.
     pub rule_id: RuleId,
+    /// O que **passaria** (Q-08), copiado da regra: remédio acionável que o modelo recebe junto da
+    /// negação. Ausente quando a regra não o declara (o `policy:audit` exige-o às `Enforced`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remedy: Option<String>,
 }
 
 impl Evidence {
@@ -70,7 +74,17 @@ impl Evidence {
             fact: fact.into(),
             argument: argument.into(),
             rule_id,
+            remedy: None,
         }
+    }
+
+    /// Acrescenta o remédio da regra (Q-08).
+    ///
+    /// Sem span: `katu-policy` é instrumentada pelo **chamador** (firewall LLM-free, S-03).
+    #[must_use]
+    pub fn with_remedy(mut self, remedy: Option<String>) -> Self {
+        self.remedy = remedy;
+        self
     }
 }
 

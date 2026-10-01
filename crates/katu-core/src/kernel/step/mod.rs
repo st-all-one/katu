@@ -20,12 +20,16 @@ pub fn step(state: &State, event: &Event) -> Result<State, Refusal> {
     let _span = crate::fn_span!(Level::Trace, events::KERNEL_STEP, "kernel::step::step", "event" => event.kind());
     match event {
         Event::TurnStart { turn } => turn_start(state, *turn),
-        Event::UserMessage { .. } | Event::AssistantMessage { .. } => {
+        // `ProjectContext` (E20-T13/Q-16) é um evento de controlo: não muda a forma do estado,
+        // mas exige turno aberto como as mensagens.
+        Event::UserMessage { .. }
+        | Event::AssistantMessage { .. }
+        | Event::ProjectContext { .. } => {
             require_open(state)?;
             Ok(state.clone())
         }
         Event::ToolCall { call, tool } => tool_call(state, call, tool),
-        Event::ToolResult { call, outcome } => tool_result(state, call, outcome),
+        Event::ToolResult { call, outcome, .. } => tool_result(state, call, outcome),
         Event::PhaseTransition { to, outcome } => phase_transition(state, *to, outcome.as_deref()),
         Event::Waiver { transition, .. } => Ok(waiver(state, *transition)),
         Event::PlanRecorded { plan } => Ok(plan_recorded(state, plan)),

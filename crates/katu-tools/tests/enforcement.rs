@@ -33,6 +33,7 @@ fn deny(tool: ToolName) -> RuleSet {
             enforcement: Enforcement::DenyCommand { tool },
             severity: Severity::Critical,
             category: RuleCategory::Enforced,
+            remedy: None,
             expires_at: None,
             waiver: None,
             examples: RuleExamples::default(),

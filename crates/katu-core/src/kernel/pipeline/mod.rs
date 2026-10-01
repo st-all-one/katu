@@ -104,6 +104,17 @@ impl Dispatch {
             Effect::Skipped => None,
         }
     }
+
+    /// Delta **model-visible** do efeito: o TOON do envelope, cortado ao teto (§18/G6).
+    ///
+    /// É o texto que entra no log (`ToolResult.delta`) e no pedido ao modelo — sem ele, o modelo
+    /// recebia apenas `{"Ok":null}` e ficava **cego** ao que a tool devolveu.
+    #[must_use]
+    pub fn delta(&self) -> Option<String> {
+        let _span = crate::trace_fn!("kernel::pipeline::delta");
+
+        self.report().map(ToolReport::to_delta)
+    }
 }
 
 /// Traduz um veredicto não-`Allow` num resultado de tool (recuperável).

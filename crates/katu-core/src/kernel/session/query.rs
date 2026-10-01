@@ -139,7 +139,7 @@ impl Session<'_> {
                         .collect();
                     pending.push((call, paths));
                 }
-                Event::ToolResult { call, outcome } => {
+                Event::ToolResult { call, outcome, .. } => {
                     if let Some(index) = pending.iter().position(|(id, _)| *id == call) {
                         let (_, paths) = pending.remove(index);
                         if outcome.is_success() {

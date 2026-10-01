@@ -14,7 +14,7 @@ use katu_core::kernel::{CallId, Event, Session, SessionError, SessionId, discove
 use katu_core::memory::Memory;
 use katu_core::plan::Plan;
 use katu_core::ports::{Clock, Fs};
-use katu_core::skill::Skill;
+use katu_core::skill::{Skill, catalog as skill_catalog};
 use katu_policy::{PolicyError, ResolvedPath, RuleSet};
 
 use crate::memory::KnudgeMemory;
@@ -183,6 +183,14 @@ impl<'a> Runtime<'a> {
         let goal = session
             .meta()
             .map_or_else(|| goal.to_string(), |meta| meta.goal.clone());
+        // O prompt de sistema tem de ser reconstruível do log (E04/Q-16): regista-se o **texto
+        // exato** do contexto do projeto, não a fonte crua nem um hash — uma retomada com o
+        // `AGENTS.md` alterado tem de reproduzir o prompt que foi enviado.
+        let skills_text = skill_catalog(&skills, &goal, &root);
+        session.apply(&Event::ProjectContext {
+            agents: instructions.clone(),
+            skills: (!skills_text.is_empty()).then_some(skills_text),
+        })?;
         Ok(Self {
             clock,
             session,

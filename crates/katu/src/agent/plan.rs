@@ -43,6 +43,8 @@ pub(super) fn execute(
     runtime.session.apply(&Event::ToolResult {
         call,
         outcome: outcome.clone(),
+        // O plano é um evento de controlo (`PlanRecorded`); não há envelope a devolver.
+        delta: None,
     })?;
     Ok(outcome)
 }

@@ -59,6 +59,7 @@ fn snapshot_offset_resumes_the_tail_and_cost() -> Result<(), Box<dyn std::error:
         session.apply(&Event::ToolResult {
             call,
             outcome: ToolOutcome::Ok,
+            delta: None,
         })?;
         session.apply(&Event::Waiver {
             transition: Phase::KnowledgeConsulted,

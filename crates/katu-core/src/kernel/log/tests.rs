@@ -76,6 +76,7 @@ fn replay_from_log_is_byte_stable() -> Result<(), Box<dyn std::error::Error>> {
         Event::ToolResult {
             call,
             outcome: ToolOutcome::Ok,
+            delta: None,
         },
         Event::Waiver {
             transition: Phase::KnowledgeConsulted,

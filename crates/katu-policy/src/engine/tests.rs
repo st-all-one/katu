@@ -13,6 +13,7 @@ fn deny_write_rule(root: ResolvedPath) -> Rule {
         enforcement: Enforcement::DenyWrite { root },
         severity: Severity::Critical,
         category: RuleCategory::Enforced,
+        remedy: None,
         expires_at: None,
         waiver: None,
         examples: RuleExamples::default(),
@@ -38,6 +39,26 @@ fn facts(path: &str) -> Result<Facts, PolicyError> {
         budget: BudgetState::default(),
         completed: BTreeSet::new(),
     })
+}
+
+#[test]
+fn a_denial_carries_the_remedy_that_teaches_the_fix() -> Result<(), PolicyError> {
+    let root = ResolvedPath::from_canonical("/work/secrets")?;
+    let mut rule = deny_write_rule(root);
+    rule.remedy = Some("escreva dentro do workspace".to_string());
+    let facts = facts("/work/secrets/token")?;
+    let Some(evidence) = rule.applies(&facts) else {
+        return Err(PolicyError::InvalidArgv(
+            "a regra devia aplicar-se".to_string(),
+        ));
+    };
+    assert_eq!(
+        evidence.remedy.as_deref(),
+        Some("escreva dentro do workspace"),
+        "Q-08: a negação tem de dizer o que passaria"
+    );
+    assert_eq!(evidence.rule_id.as_str(), "no-write-secrets");
+    Ok(())
 }
 
 #[test]

@@ -78,6 +78,7 @@ fn complete(state: &State, id: &str, tool: ToolUse) -> Result<State, Refusal> {
         &Event::ToolResult {
             call,
             outcome: ToolOutcome::Ok,
+            delta: None,
         },
     )
 }
@@ -144,6 +145,7 @@ fn denied_result_does_not_complete_tool() -> Result<(), Box<dyn std::error::Erro
         &Event::ToolResult {
             call,
             outcome: denied_outcome(),
+            delta: None,
         },
     )?;
     assert!(state.completed_tools.is_empty());

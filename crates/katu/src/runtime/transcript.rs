@@ -45,9 +45,16 @@ fn render(messages: &[Message]) -> Vec<String> {
                 ));
                 lines.push(tool_summary(tool));
             }
-            Message::ToolResult { call, outcome } => {
+            Message::ToolResult {
+                call,
+                outcome,
+                delta,
+            } => {
                 lines.push(format!("**resultado** ({})", call.as_str()));
                 lines.push(outcome_label(outcome));
+                if let Some(delta) = delta {
+                    lines.push(delta.clone());
+                }
             }
             _ => {}
         }

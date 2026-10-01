@@ -20,16 +20,16 @@
 
 ## Regras (8)
 
-| id | categoria | enunciado |
-| --- | --- | --- |
-| `contain-read-outside-workspace` | enforced | Ler fora do workspace exige aprovação |
-| `contain-sensitive-read` | enforced | Caminhos sensíveis (chaves/segredos) são negados por default e exigem autorização explícita |
-| `contain-write-outside-workspace` | enforced | Escrever fora do workspace exige aprovação |
-| `mem-anchor-required` | enforced | Memória: nota sobre código exige `--anchor` |
-| `mem-no-duplicate` | enforced | Memória: não gravar nota que seja duplicata forte (≥ 0.92) de nota existente |
-| `mem-outcome-before-close` | enforced | Memória: fechar tarefa exige `outcome` registado |
-| `mem-recall-before-write` | enforced | Memória: não gravar nota sem ter consultado o conhecimento (recall) na mesma fase |
-| `mem-single-claim` | enforced | Memória: uma afirmação por nota |
+| id | categoria | enunciado | remédio (Q-08) |
+| --- | --- | --- | --- |
+| `contain-read-outside-workspace` | enforced | Ler fora do workspace exige aprovação | leia dentro do workspace, ou peça aprovação explícita (`--approve`) para este caminho |
+| `contain-sensitive-read` | enforced | Caminhos sensíveis (chaves/segredos) são negados por default e exigem autorização explícita | use um caminho fora da lista sensível, ou peça autorização explícita (`--approve`) ao utilizador |
+| `contain-write-outside-workspace` | enforced | Escrever fora do workspace exige aprovação | escreva dentro do workspace, ou peça aprovação explícita (`--approve`) para este caminho |
+| `mem-anchor-required` | enforced | Memória: nota sobre código exige `--anchor` | acrescente `--anchor ficheiro:símbolo` à nota |
+| `mem-no-duplicate` | enforced | Memória: não gravar nota que seja duplicata forte (≥ 0.92) de nota existente | mude o facto ou a âncora da nota; se a nota já existe, atualize-a em vez de duplicar |
+| `mem-outcome-before-close` | enforced | Memória: fechar tarefa exige `outcome` registado | registre `memory_outcome` antes de fechar a tarefa |
+| `mem-recall-before-write` | enforced | Memória: não gravar nota sem ter consultado o conhecimento (recall) na mesma fase | chame `memory_recall` no mesmo turno antes de `memory_write` |
+| `mem-single-claim` | enforced | Memória: uma afirmação por nota | divida em várias notas, uma afirmação por nota |
 
 ## Eventos de diag (113)
 

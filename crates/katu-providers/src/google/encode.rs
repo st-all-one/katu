@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 use katu_core::diag::{Level, events};
 use katu_core::kernel::Message;
 use katu_core::provider::{ProviderError, ProviderRequest, Thinking, ToolDef};
+use katu_core::report::tool_content;
 use serde_json::{Map, Value, json};
 
 use crate::openai::{EncodeOptions, model_tool_name, tool_arguments};
@@ -41,7 +42,7 @@ pub(crate) fn encode_request(
     let mut names: BTreeMap<String, String> = BTreeMap::new();
     let mut contents = Vec::new();
     for message in &request.messages {
-        if let Some(encoded) = encode_message(message, &mut names)? {
+        if let Some(encoded) = encode_message(message, &mut names) {
             contents.push(encoded);
         }
     }
@@ -104,10 +105,7 @@ fn encode_tool(tool: &ToolDef) -> Value {
 }
 
 /// Codifica uma mensagem do histórico (ou ignora se desconhecida).
-fn encode_message(
-    message: &Message,
-    names: &mut BTreeMap<String, String>,
-) -> Result<Option<Value>, ProviderError> {
+fn encode_message(message: &Message, names: &mut BTreeMap<String, String>) -> Option<Value> {
     let _span = katu_core::fn_span!(
         Level::Trace,
         events::PROVIDER_REQUEST,
@@ -124,19 +122,22 @@ fn encode_message(
                 "parts": [{"functionCall": {"name": name, "args": tool_arguments(tool)}}],
             })
         }
-        Message::ToolResult { call, outcome } => {
+        Message::ToolResult {
+            call,
+            outcome,
+            delta,
+        } => {
             let name = names
                 .get(call.as_str())
                 .cloned()
                 .unwrap_or_else(|| call.as_str().to_string());
-            let result = serde_json::to_value(outcome)
-                .map_err(|error| ProviderError::Decode(error.to_string()))?;
+            let result = tool_content(outcome, delta.as_deref());
             json!({
                 "role": "user",
                 "parts": [{"functionResponse": {"name": name, "response": {"result": result}}}],
             })
         }
-        _ => return Ok(None),
+        _ => return None,
     };
-    Ok(Some(encoded))
+    Some(encoded)
 }

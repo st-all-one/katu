@@ -19,6 +19,7 @@
 //! - `check-memory-swap` — o knudge só acopla em `katu/src/memory/` (E03-T06);
 //! - `gate:bench` — nenhum número publicado sem base e artefacto (DF5/E15-T02);
 //! - `gate:provider`/`gate:render` — orçamentos de latência/render (E12-T07/E15-T01);
+//! - `gate:prompt` — composição do prompt medida e travada (Q-20);
 //! - `policy:audit` — regras `Enforced`/`Advisory` coerentes (E02-T04);
 //! - `ledger:validate` — ledger de cobertura consistente com `policy/` (E02-T06).
 //!
@@ -43,6 +44,7 @@ mod ledger;
 mod memory_swap;
 mod policy;
 mod postmortems;
+mod prompt;
 mod provider_bench;
 mod provider_smoke;
 mod render_bench;
@@ -134,6 +136,7 @@ fn dispatch(task: Option<&str>, rest: &[String]) -> Result<(), String> {
             Ok(())
         }
         Some("gate:provider") => provider_bench::gate(rest),
+        Some("gate:prompt") => prompt::gate_prompt(rest),
         Some("bench-render") => {
             render_bench::run(rest);
             Ok(())
@@ -148,7 +151,7 @@ fn dispatch(task: Option<&str>, rest: &[String]) -> Result<(), String> {
         Some("bench-toon") => toon_bench::run(),
         Some(other) => Err(format!("tarefa desconhecida: {other}")),
         None => Err(
-            "uso: xtask <check|check-layers|check-crate-coverage|check-diag|diag:coverage|check-schemas|check-docs|check-surface|check-policy|check-unsafe|check-catalog|check-rule-coverage|check-slices|check-memory-swap|gate:bench|gate:provider|gate:render|test:unit|test:integration|test:e2e|test:all|policy:audit|ledger:validate|bench-audit|bench-resume|bench-provider|bench-render|provider-smoke>"
+            "uso: xtask <check|check-layers|check-crate-coverage|check-diag|diag:coverage|check-schemas|check-docs|check-surface|check-policy|check-unsafe|check-catalog|check-rule-coverage|check-slices|check-memory-swap|gate:bench|gate:provider|gate:prompt|gate:render|test:unit|test:integration|test:e2e|test:all|policy:audit|ledger:validate|bench-audit|bench-resume|bench-provider|bench-render|provider-smoke>"
                 .to_string(),
         ),
     }

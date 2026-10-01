@@ -50,6 +50,14 @@ remoção de complexidade; senão reverter e escrever a rejeição). Nada muda b
 | **Q-01** orçamento de tokens calibrado | ✔ feito | rácio medido **3,631 B/token** (`bytes/4` errava 9,2 %); `bench/e18/tokens/`; `context.build{tokens}` |
 | **B-02** várias calls por passo | ✔ já existia | testes `calls.rs` (ordem do modelo, barreira) |
 | **B-01** lote concorrente `Shared` | ✔ feito | **+76,3 %** no alvo (472 → 112 ms, 8 leituras); `bench/e18/batch/` |
+| **Q-16** contexto do projeto no log | ✔ feito | `ProjectContext` em `assemble`; teste `the_project_context_is_logged_for_replay` |
+| **Q-02a** corte por unidade (correção) | ✔ feito | sem resultado órfão; teste varre orçamentos `0..=80` (falhava com a política antiga) |
+| **Q-21** delta da tool ao modelo (correção) | ✔ feito | §18/G6: `ToolResult.delta` no log e no pedido; testes no loop e no wire |
+| **Q-08** erro que ensina | ✔ feito | `remedy` por regra (dado) + `policy:audit` falha sem ele; catálogo regenerado |
+| **Q-05** catálogo de skills curto | ✔ feito | **−73,9 %** (4636 → 1211 B); `katu-core/src/skill.rs` |
+| **Q-18** tools por relevância (A4) | ✗ rejeitado | §1.5; ganho máximo seguro **14,0 %** < 20 % |
+| **Q-19** `AGENTS.md` condensado | ✔ feito | **−29,1 %** (1590 → 1128 B); cache **rejeitado** (25,8 ms vs. µs) |
+| **Q-20** `gate:prompt` | ✔ feito | `xtask gate:prompt`; `bench/e18/prompt/raw.json`; orçamentos travados |
 
 **Lição de método (B-01).** O primeiro A/B deu −5 % e quase reverteu B-01: a causa era um
 *refactor* do `clippy::needless_collect`, que ao encadear `.map(spawn).map(join)` **entrelaça** o
@@ -110,6 +118,32 @@ Em **release** (`bench/mvk`): `kernel.transition` 14,4 µs, `memory.write` 9,9 �
 | i | **`Enforced` não tem confiança medida** (F6) | [`rule.rs`](crates/katu-policy/src/rule.rs) | regra afirmada, não provada |
 | j | **A frio, o 1.º turno local custa ~40 s** | — | o pior cliff de UX, na rota crítica |
 | k | **Sem hedging/backpressure** no transporte (F4): TTFT remoto p95 4,1 s | [`wire.rs`](crates/katu-providers/src/wire.rs) | cauda lenta e imprevisível |
+| l | **O payload da tool não chegava ao modelo** — `Dispatch`/`ToolReport` era descartado em `batch::commit`/`execute_call`; o resultado projetado era só o `ToolOutcome` (`{"Ok":null}`) | [`agent/turn/batch.rs`](crates/katu/src/agent/turn/batch.rs), [`agent/mod.rs`](crates/katu/src/agent/mod.rs) | **o modelo ficava cego** ao que a tool devolveu (viola §18/G6) — a brecha mais grave; corrigida em Q-21 |
+
+### 1.5 A composição do prompt (medida, não estimada)
+
+O `bench/e18/REPORT.md` §121 admitia que a composição dos 3265 tokens **não** estava medida.
+Está agora, e é travada por um gate (artefacto: [`bench/e18/prompt/raw.json`](bench/e18/prompt/raw.json);
+protocolo: [`PROTOCOL.md`](bench/e18/prompt/PROTOCOL.md)):
+
+| parte | antes | depois | Δ |
+|---|---|---|---|
+| `tools` JSON Schema (wire) | 5013 B / 1381 tok | 5013 B / 1381 tok | — (contrato do endpoint) |
+| catálogo de skills (8) | 4828 B / 1330 tok | **1211 B / 334 tok** | **−73,9 %** (Q-05) |
+| `AGENTS.md` | 1591 B / 438 tok | **1128 B / 311 tok** | **−29,1 %** (Q-19) |
+| prime (`context::prime()`) | 1340 B / 369 tok | 1340 B / 370 tok | — |
+| **`system`** | 7759 B / 2137 tok | **3679 B / 1014 tok** | **−51,4 %** |
+| **prompt (system + tools)** | ~3518 tok | **~2394 tok** | **−30,9 %** |
+| *os mesmos tools em TOON colunar* | *288 B* | — | (17,4× menor, mas o endpoint exige JSON) |
+
+**Leitura:** o custo não estava no JSON por ser JSON. Estava (a) no **catálogo de skills**, que é
+texto nosso e pagava a descrição de parágrafo inteiro de cada skill, e (b) no `AGENTS.md`, que
+pagava a sintaxe redundante do router. Os **`tools` (38 %) não descem**: o contrato do endpoint
+obriga a JSON Schema e a única forma de cortar ≥ 20 % seria **omitir** tools que o prime instrui o
+modelo a usar (Q-18, rejeitado com o número: **14,0 %** omitindo só `move`/`trash`).
+
+**Aprendizagem:** densificar **prosa** com TOON não ajuda (o ADR 0006 mede ganhos em **registos**);
+o que ajuda é **encurtar** o texto nosso e **medir** o que sobra.
 
 ---
 
@@ -130,12 +164,42 @@ Em **release** (`bench/mvk`): `kernel.transition` 14,4 µs, `memory.write` 9,9 �
 #### Q-02 · Contexto por utilidade + fusão de canais (F2 + F9)
 - **Problema:** `fit_raw` mantém o **sufixo**, não o **útil**; canais (memória, diffs, ficheiros,
   âncoras) não se fundem.
-- **Proposta:** `assemble(state,budget)` com utilidade submodular + MMR (`λ`, `sim_max` como
-  **dados** versionados) e fusão **RRF** (`k=60`, pesos dados); desempate `(marginal desc, id asc)`.
+- **Correção (feita, Q-02a):** o corte era **mensagem a mensagem** e podia separar um `ToolCall` do
+  seu `ToolResult`. Um lote B-01 loga N pedidos seguidos de N resultados, e o wire OpenAI exige que
+  um `role: "tool"` responda a um `tool_calls` precedente — o pedido ficava **inválido**. Verificado:
+  com a política antiga, orçamento 4 deixa `ToolResult{c2}` sozinho. Agora o corte é por
+  **unidade** (corrida maximal de mensagens de tool, ou mensagem isolada); teste
+  `the_cut_never_orphans_a_tool_call_or_result` varre orçamentos `0..=80` e falha com a política
+  antiga.
+- **Proposta (por fazer):** `assemble(state,budget)` com utilidade submodular + MMR (`λ`,
+  `sim_max` como **dados** versionados) e fusão **RRF** (`k=60`, pesos dados); desempate
+  `(marginal desc, id asc)`. Fronteira: só ao **prefixo** (o turno corrente fica intacto) e
+  unificado com a compactação (Q-03/S-01) — não se constroem dois mecanismos a competir pelo mesmo
+  orçamento.
 - **Teste:** mesmo input → mesmo contexto (proptest); `U(greedy) ≥ U(baseline)`; nenhum par acima
   de `sim_max`; orçamento exato/+1; A/B de sucesso-de-tarefa com **menos** tokens.
-- **Adoção:** ≥ 20 % de redução de tokens com a mesma taxa de sucesso, ou reverter.
-- **Mapa:** E18-T02/F2 · E18-T09/F9 · risco R13.
+- **Adoção:** ≥ 20 % de redução de tokens com a mesma taxa de sucesso, ou reverter. **Bloqueio:**
+  o A/B de sucesso-de-tarefa não existe ainda — sem ele, a seleção não se adota (Q > P).
+- **Mapa:** E18-T02/F2 · E18-T09/F9 · risco R13 · Q-03/S-01.
+
+#### Q-21 · O delta da tool chega ao modelo (correção §18/G6)
+- **Problema (verificado no código e no log):** a execução de uma tool produzia um `Dispatch` com
+  `report`, mas o loop só cometia `outcome` (`batch::commit`, `execute_call`); a projeção
+  (`Message::ToolResult`) levava apenas o `ToolOutcome`, e o wire serializava-o — o modelo recebia
+  `{"Ok":null}` depois de um `read`. §18 e G6 exigem o contrário ("só o delta chega ao modelo"):
+  o agente estava **cego** ao que lia.
+- **Proposta:** o **delta** (o TOON do envelope, `ToolReport::to_delta`) entra no evento
+  `ToolResult` e é a **mesma** string que o provider recebe (`report::tool_content`) — `Model-visible
+  ⟺ logged` exato (E04). Teto `MAX_DELTA_BYTES = 8 KiB` com ponteiro (`kind`/`id`) para o modelo
+  pedir uma página; o delta conta para o orçamento de contexto e para o digest da compactação.
+- **Teste:** `the_tool_payload_reaches_the_model` (loop real com `FakeProvider`: o conteúdo lido
+  está no resultado projetado e no log) e `a_tool_result_carries_the_delta_to_the_wire` (o corpo do
+  pedido leva o delta; sem delta, o efeito serializado, como antes).
+- **Adoção:** correção — sem critério de reversão.
+- **Efeito colateral (S):** os 4 dialetos deixaram de precisar de `Result` em `encode_message`
+  (`tool_content` é infalível) — uma simplificação que veio de graça.
+- **Mapa:** §18 · G6 · E04-T03 · [`report.rs`](crates/katu-core/src/report.rs) ·
+  [`project.rs`](crates/katu-core/src/kernel/project.rs).
 
 #### Q-03 · Compactação guiada por informação (F3)
 - **Problema:** o digest retém tudo por igual (`kind`+excerto), sem entropia/surprisal.
@@ -157,10 +221,20 @@ Em **release** (`bench/mvk`): `kernel.transition` 14,4 µs, `memory.write` 9,9 �
 
 #### Q-05 · Skills e catálogo com relevância (F2/F9)
 - **Problema:** o catálogo de skills (8) e o AGENTS.md entram **inteiros**; sem gating por
-  relevância.
-- **Proposta:** ranquear skills por âncora/working set (mesma máquina de Q-02); incluir as top-k.
-- **Teste:** determinismo; nenhuma skill referida por tool/ficheiro fica de fora.
-- **Mapa:** E20-T13 · E18-T02.
+  relevância. Medido (§1.5): **4828 B / ~1330 tokens — 37 % do prompt**, porque o `catalog()`
+  emite a descrição **completa** do frontmatter (o `knudge` sozinho custa 1043 B).
+- **Proposta:** (a) **descrição de uma linha** no catálogo (primeira frase, teto de caracteres; a
+  descrição completa continua no `SKILL.md`, que o modelo lê com `read`); (b) **caminho relativo**
+  à raiz (sem o prefixo da máquina: menos bytes e prompt independente do *checkout*); (c)
+  **ordem determinística por relevância** face ao objetivo (sobreposição de termos; empate pelo
+  nome), **sem omitir** skills — a omissão (top-k) só entra acima de um limiar de catálogo
+  **medido**.
+- **Teste:** determinismo (mesmo objetivo → mesma ordem); a primeira frase nunca excede o teto;
+  uma skill referida pelo objetivo fica à frente; o `SKILL.md` fica intacto.
+- **Resultado:** **−73,9 %** (4636 → 1211 B; 1330 → 334 tok) — adotado. Artefacto
+  `bench/e18/prompt/raw.json`; o ganho é derivável do artefacto (baseline calculada da mesma
+  fonte). A omissão (top-k) fica por fazer: com 8 skills o catálogo já cabe no alvo.
+- **Mapa:** E20-T13 · E18-T02 · §1.5.
 
 ### Q-B. Superfície das ferramentas
 
@@ -249,6 +323,74 @@ Em **release** (`bench/mvk`): `kernel.transition` 14,4 µs, `memory.write` 9,9 �
 - **Teste:** snapshot O(1) medido; `state_of(replay) == state_at_end`; replay de deltas byte-a-byte.
 - **Mapa:** E18-T05/F5 · E04-T03.
 
+### Q-F. Densidade e reconstruibilidade do prompt (F2b)
+
+Nasce da medição de §1.5: o prompt é o gargalo do arranque a frio (~40 s) e o que o katu controla
+é texto nosso (skills, AGENTS.md) e a **apresentação** das tools. A ordem é **medir → encurtar →
+travar**. Densificar prosa com TOON não entra: o ADR 0006 mede ganhos em registos, não em prosa.
+
+#### Q-16 · Contexto do projeto reconstruível (correção do invariante E04)
+- **Problema:** o `AGENTS.md` e o catálogo de skills são lidos em `Runtime::assemble`, injetados
+  no `system` e **nunca registados no log**. O `SCOPE_LOAD` cobre o `scope_contract.json`, não o
+  `AGENTS.md`. Num `--resume` o log reproduz as mensagens mas o prompt de sistema é relido do
+  disco: se o `AGENTS.md` mudou, o replay **diverge** do que o modelo viu — `Model-visible ⟺
+  logged` (E04) violado. Um cache de versões densas (Q-19) tornaria a divergência invisível.
+- **Proposta:** evento de **controlo** `ProjectContext { agents, skills }` aplicado no `assemble`
+  com o **texto exato** que entra no prompt (não a fonte crua, não um hash); a projeção para o
+  modelo ignora-o (`project_event` já filtra `_ => None`).
+- **Teste:** o log contém o evento com o texto que `system_for` injeta; `derive_messages` não o
+  inclui; um replay com `AGENTS.md` alterado reproduz o prompt original.
+- **Adoção:** correção — sem critério de reversão (custa ~2 KB por sessão, uma vez).
+- **Mapa:** E04-T03 · E20-T13 · [`event.rs`](crates/katu-core/src/kernel/event.rs).
+
+#### Q-18 · Catálogo de tools por relevância (A4, top-k fail-open)
+- **Problema:** as 11 schemas JSON (**5013 B / ~1381 tokens — 38 %**) vão em todos os pedidos. O
+  contrato do endpoint obriga a JSON Schema, mas **não** obriga a mandar as 11.
+- **Proposta:** selecionar o subconjunto relevante ao passo (termos do objetivo + working set,
+  determinístico) com **conjunto mínimo sempre presente** e **fail-open** (sem sinal claro →
+  todas); a tool correta nunca pode ficar de fora. Base: Anexo A · A4.
+- **Teste:** num conjunto canônico de tarefas, a tool correta está sempre no subconjunto; ordem
+  canônica; desligar = as 11 (comportamento atual).
+- **Adoção:** ≥ 20 % de tokens do catálogo **sem** aumentar turnos nem a taxa de tool errada, ou
+  reverter.
+- **Resultado: ✗ rejeitado.** A sonda do gate mede o máximo corte **seguro**: omitir `move` e
+  `trash` poupa **14,0 %** (5013 → 4310 B) — abaixo do critério de 20 %. Chegar a 20 % exigiria
+  omitir também `plan`/`memory`, que o **prime instrui** o modelo a usar (omitir seria incoerente,
+  e a taxa de tool errada só se mede com um A/B de sucesso de tarefa, que não existe). O número
+  fica reproduzível em `bench/e18/prompt/raw.json` (`probes.tools_core_*`).
+- **Mapa:** Anexo A · A4 · [`agent/catalog.rs`](crates/katu/src/agent/catalog.rs) · §1.5.
+
+#### Q-19 · `AGENTS.md` denso + cache validado por *fingerprint*
+- **Problema:** o `AGENTS.md` (1591 B) é markdown de router (bullets `- **Label**: alvo — nota`,
+  com o alvo em sintaxe de link repetida no texto), e essa sintaxe custa bytes sem informação.
+- **Proposta:** transformação **determinística** markdown→compacto (sem IA), **pura** sobre os
+  bytes da fonte (`katu_core::prompt::condense`): link cujo texto repete o alvo fica só com o
+  texto; fora o negrito; linhas em branco colapsadas. **Sem cache**: ver a rejeição abaixo.
+- **Teste:** determinismo (mesma fonte → mesmos bytes); a condensação preserva **todos** os alvos
+  (`every_target_survives_the_condensation`); o texto condensado é o que o `ProjectContext` loga
+  (Q-16), logo `Model-visible ⟺ logged` mantém-se.
+- **Resultado:** **−29,1 %** (1590 → 1128 B) — adotado, aplicado em `read_instructions`.
+- **Rejeição do cache (com número):** a condensação é uma passagem linear sobre ~1,6 KB (classe do
+  `toon::colunar`: 89 µs em dev, `bench/e18/atomics`), enquanto `fs.write` com `sync_all` custa
+  **25,8 ms** (`bench/e18/raw.json`). Um artefacto derivado em `.katu/context/` com validação por
+  *fingerprint* pagaria ~300× o custo do cálculo para introduzir risco de *staleness*. O lar seria
+  `.katu/` de qualquer forma (`.knudge` não existe neste repo).
+- **Mapa:** E20-T13 · `AGENTS.md` (router ≤ 50 linhas) · Q-16 · §1.5.
+
+#### Q-20 · `gate:prompt` — a composição medida e travada
+- **Problema:** nada trava a composição do prompt; o §121 do `REPORT.md` mostrou que uma regressão
+  passa despercebida.
+- **Proposta:** comando `xtask gate:prompt` que reconstrói a composição (AGENTS.md + catálogo de
+  skills + prime + schemas JSON das tools) a partir das **funções de produção**, compara com
+  orçamentos declarados e publica o artefacto `bench/e18/prompt/raw.json`; a fonte única do JSON
+  Schema passa para `katu-tools::schema` (deixa de viver no binário).
+- **Teste:** exceder um orçamento falha o gate; o artefacto é reproduzível byte-a-byte.
+- **Resultado:** feito — `xtask gate:prompt` (corre no `check`), orçamentos por parte + `system`,
+  artefacto `bench/e18/prompt/raw.json`, 6 métricas em `bench/published.toml`, tetos de superfície
+  (`xtask_commands` 30, `bench_artifacts` 8). A construção do JSON Schema passou para
+  `katu_tools::schema::tool_defs` (o binário deixou de ter uma segunda implementação).
+- **Mapa:** E14-T05 (superfície) · E15-T02 (DF5) · §1.5.
+
 ---
 
 ## 3. Eixo P — performance bruta (prioridade 2)
@@ -309,6 +451,7 @@ Em **release** (`bench/mvk`): `kernel.transition` 14,4 µs, `memory.write` 9,9 �
 ```
 W1 (método)      P-00→Q-09  harness + atribuição release  ── desbloqueia P e mede Q
 W2 (correções)   Q-06, Q-10, S-01..S-05  (baixo risco, ganho imediato de qualidade)
+W2b (densidade)  Q-16 → Q-05 → Q-20 → Q-19 → Q-18        (frente F2b; §1.5)
 W3 (dados)       Q-01 → Q-02 → Q-03 → Q-04 → Q-05        (frente F2/F3/F9)
 W4 (superfície)  Q-07, Q-08                              (menos turnos)
 W5 (segurança)   Q-11, Q-12                              (F6/F7)
@@ -326,6 +469,11 @@ esperam. Só depois as frentes formais. Cada PR: A/B + `make check` verde.
 |---|---|---|---|
 | Turnos por tarefa canônica | medir (W1) | **−20 %** | `bench/e18/` |
 | Tokens de contexto (mesma tarefa) | 3265 | **−20 %** | `raw.json` |
+| Tokens do prompt (`system` + tools) | 3465 | **≤ 2800** | `bench/e18/prompt/raw.json` |
+| Catálogo de skills | 1330 tok | **≤ 400** ✔ 334 | idem |
+| `AGENTS.md` no prompt | 438 tok | **≤ 350** ✔ 311 | idem |
+| Schemas JSON das tools | 1381 tok | **≤ 1100** ✗ rejeitado (14,0 %) | idem |
+| Composição travada por gate | não existe | `gate:prompt` verde ✔ | idem |
 | Overhead fora do provider | 72,3 ms | **≤ 40 ms** | `raw.json` |
 | TTFT frio local | ~40 s | **≤ 8 s** (prewarm) | `raw.json` |
 | TTFT remoto p95 | 4,1 s | dentro do orçamento | `gate:provider` |
@@ -361,7 +509,11 @@ esperam. Só depois as frentes formais. Cada PR: A/B + `make check` verde.
 
 ## 9. Definition of Done
 
-- [ ] Q-01..Q-15 com fórmula, artefacto e teste que os trava; rejeições escritas.
+- [ ] Q-01..Q-20 com fórmula, artefacto e teste que os trava; rejeições escritas.
+- [ ] §18/G6 fechado: o **delta** da tool é o mesmo texto no log e no pedido (Q-21), e o corte do
+      contexto nunca parte um par `ToolCall`/`ToolResult` (Q-02a).
+- [ ] `Model-visible ⟺ logged` **fechado** também para o contexto do projeto (Q-16): o prompt de
+      sistema é reconstruível do log.
 - [ ] W1 instalado: atribuição por função em release + harness e gate de regressão.
 - [ ] Cada número publicado em `bench/published.toml` tem base tipada (DF5).
 - [ ] Zero alteração de bytes observáveis; `Model-visible ⟺ logged` intacto.

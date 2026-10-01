@@ -93,6 +93,12 @@ função, o log é a fonte da verdade.
 - Skills do projeto [`skill`](src/skill.rs) (E20-T13): `Skill` (nome/descrição/caminho),
   `discover`/`parse` (frontmatter `name`/`description`) e `catalog` (texto do prompt de sistema).
   Descoberta **fail-open**: sem `.agents/skill{,s}/` → lista vazia; sem descrição → não carregada.
+  O catálogo leva **nome, primeira frase da descrição e caminho relativo à raiz** (Q-05: −73,9 %
+  de bytes) e ordena por relevância face ao objetivo, sem omitir skills.
+- Condensação do contexto de projeto [`prompt`](src/prompt.rs) (Q-19): `condense` tira a sintaxe
+  redundante do markdown do router (`AGENTS.md`), sem perder texto nem alvos — **−29,1 %** de
+  bytes. É **pura** (mesma entrada → mesmas bytes) e **sem cache**: uma passagem linear sobre
+  ~1,6 KB não paga um `fs.write` com `sync_all` (25,8 ms, `bench/e18/raw.json`).
 - Porta `Provider` [`provider`](src/provider.rs) (E12-T01/T02/T03/T10): `Provider::{models, dynamic_models,
   capabilities, model_for_tier}` (`dynamic_models` descobre o catálogo do endpoint, com default =
   catálogo estático; `model_for_tier` escolhe a classe do catálogo, E12-T03),

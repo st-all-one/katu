@@ -12,13 +12,14 @@ mod names;
 use names::{phase_name, tool_name};
 
 impl Rule {
-    /// Constrói uma evidência a partir de uma regra.
+    /// Constrói uma evidência a partir de uma regra (com o remédio que ensina a corrigir, Q-08).
     fn evidence(&self, argument: &str, fact: &str) -> Evidence {
         Evidence {
             file_line: None,
             fact: fact.to_string(),
             argument: argument.to_string(),
             rule_id: self.id.clone(),
+            remedy: self.remedy.clone(),
         }
     }
 

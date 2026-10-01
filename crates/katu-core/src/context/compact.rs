@@ -224,7 +224,9 @@ fn excerpt(message: &Message) -> String {
     let text = match message {
         Message::User { text } | Message::Assistant { text } => text.clone(),
         Message::ToolCall { tool, .. } => tool_call_text(tool),
-        Message::ToolResult { outcome, .. } => outcome.summary(),
+        Message::ToolResult { outcome, delta, .. } => {
+            delta.clone().unwrap_or_else(|| outcome.summary())
+        }
     };
     truncate(&text, DIGEST_EXCERPT_BYTES)
 }

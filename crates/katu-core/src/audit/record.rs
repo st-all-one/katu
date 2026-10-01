@@ -139,6 +139,14 @@ impl AuditRecord {
                     }
                 };
             }
+            Event::ProjectContext { agents, skills } => {
+                record.kind = "context";
+                record.text = format!(
+                    "agents {} B; skills {} B",
+                    agents.as_deref().map_or(0, str::len),
+                    skills.as_deref().map_or(0, str::len)
+                );
+            }
         }
         record.text = truncate(&record.text, MAX_TEXT_BYTES);
         record

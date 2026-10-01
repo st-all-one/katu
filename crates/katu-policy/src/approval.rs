@@ -166,6 +166,7 @@ mod tests {
                 },
                 severity: Severity::Warn,
                 category: RuleCategory::Enforced,
+                remedy: None,
                 expires_at: None,
                 waiver: None,
                 examples: RuleExamples::default(),
