@@ -25,7 +25,7 @@ const SECTIONS: [&str; 6] = [
 /// # Erros
 /// Mensagem agregada; `Ok(())` se `docs/postmortems/` ainda não existir.
 pub(crate) fn check_postmortems() -> Result<(), String> {
-    let dir = Path::new("docs/postmortems");
+    let dir = Path::new("wiki/_ref/docs/postmortems");
     if !dir.exists() {
         return Ok(());
     }

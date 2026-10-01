@@ -655,3 +655,46 @@ value = 0.0
 unit = "ratio"
 basis = "unpriced"
 artifact = { path = "bench/e18/grammar/raw.json", note = "sem turnos reais com tool calls nativas: a taxa real de `Decode` é 0/0; o mecanismo fica opt-in até haver sinal" }
+
+# ---------------------------------------------------------------------------
+# Leituras pós-optimização (`bench/e18/pos/`), 2026-02.
+#
+# O baseline E18 (`bench/e18/`) é o retrato ANTES de optimizar; estes são os números de HOJE, nos
+# mesmos eixos, com um gerador reprodutível (`scripts/bench-pos.sh`). Só entram aqui as leituras
+# **estruturais** — tokens e contagens de eventos — porque não dependem do hardware. As latências
+# ficam de fora: a máquina é outra (Ryzen 7 7735HS vs. 5 5500U do baseline) e o ledger não tem
+# campo para qualificar essa diferença. O raciocínio completo em `bench/e18/pos/PROTOCOL.md`.
+[[metrics]]
+name = "pos.prompt.input_tokens"
+value = 2057.0
+unit = "count"
+basis = "measured"
+artifact = { path = "bench/e18/pos/raw.json", note = "tokens de entrada de um turno `katu run` de um passo (baseline E18: 3265)" }
+
+[[metrics]]
+name = "pos.prompt.gain_vs_baseline.ratio"
+value = 0.37
+unit = "ratio"
+basis = "measured"
+artifact = { path = "bench/e18/pos/raw.json", note = "3265 -> 2057 tokens: ledger (W-9.2) + prime (Q-20) + catálogo de skills (Q-05) + AGENTS.md (Q-19)" }
+
+[[metrics]]
+name = "pos.prompt.cache_hit_ratio"
+value = 0.9995
+unit = "ratio"
+basis = "provider_reported"
+artifact = { path = "bench/e18/pos/raw.json", note = "2056 de 2057 tokens servidos do prefix-cache no turno seguinte" }
+
+[[metrics]]
+name = "pos.turn.log_append_events"
+value = 7.0
+unit = "count"
+basis = "measured"
+artifact = { path = "bench/e18/pos/raw.json", note = "eventos de log por turno: 7 hoje contra 5 no baseline, e a soma desce de 18,3 ms para 0,14 ms (group commit de P-01, confirmado in situ)" }
+
+[[metrics]]
+name = "pos.turn.nonprovider_share_milli"
+value = 57.0
+unit = "ratio"
+basis = "inferred"
+artifact = { path = "bench/e18/pos/raw.json", note = "fracção do turno que é do projecto: 57‰ contra 201‰ no baseline — `inferred` por agregar dois spans medidos em máquinas diferentes" }

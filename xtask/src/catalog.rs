@@ -1,6 +1,6 @@
 //! `check-catalog` (E14-T06) — catálogos gerados do código e verificados.
 //!
-//! Gera `docs/catalog.md` (tools, regras, eventos de diag e ADRs) a partir das **fontes reais** e
+//! Gera `wiki/_ref/docs/catalog.md` (tools, regras, eventos de diag e ADRs) a partir das **fontes reais** e
 //! falha se o ficheiro commitado divergir (um catálogo reescrito à mão é detetado). Regenerar:
 //! `KATU_GEN_DOCS=1 cargo run -p xtask -- check-catalog`.
 
@@ -12,10 +12,11 @@ use katu_core::diag::events;
 use katu_policy::{RuleCategory, RuleSet};
 use katu_tools::schema::SCHEMAS;
 
+use crate::docs::ADR_DIR;
 use crate::walk::collect_rule_files;
 
 /// Ficheiro gerado (versionado).
-const CATALOG_FILE: &str = "docs/catalog.md";
+const CATALOG_FILE: &str = "wiki/_ref/docs/catalog.md";
 
 /// Linha de regra: `(id, categoria, enunciado, remédio)`.
 type RuleRow = (String, String, String, String);
@@ -97,7 +98,8 @@ fn render() -> Result<String, String> {
     let adrs = list_adrs()?;
     write(&mut out, format_args!("## ADRs ({})\n\n", adrs.len()))?;
     for (file, title) in &adrs {
-        write(&mut out, format_args!("- [{title}](adr/{file})\n"))?;
+        // O catálogo vive em `wiki/_ref/docs/`; o link é relativo a esse directório.
+        write(&mut out, format_args!("- [{title}](../adr/{file})\n"))?;
     }
     Ok(out)
 }
@@ -140,9 +142,9 @@ fn category_name(category: RuleCategory) -> &'static str {
     }
 }
 
-/// ADRs `docs/adr/NNNN-*.md` com o respetivo título (H1), ordenadas.
+/// ADRs `wiki/_ref/adr/NNNN-*.md` com o respetivo título (H1), ordenadas.
 fn list_adrs() -> Result<Vec<AdrRow>, String> {
-    let dir = Path::new("docs/adr");
+    let dir = Path::new(ADR_DIR);
     let entries = fs::read_dir(dir).map_err(|err| format!("lendo {}: {err}", dir.display()))?;
     let mut adrs: Vec<AdrRow> = Vec::new();
     for entry in entries {

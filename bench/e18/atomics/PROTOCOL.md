@@ -7,7 +7,7 @@ Como reproduzir e comparar [`REPORT.md`](REPORT.md) / [`raw.json`](raw.json).
 - `katu` compilado com a instrumentação: `cargo build -p katu --features profile`.
 - Modelo local (opcional, para a secção 3): `llama-server` em `127.0.0.1:8080/v1`.
 - Símbolos de depuração não são necessários aqui (a medição é por spans, não por amostragem; para
-  amostragem ver [`docs/profiling.md`](../../../docs/profiling.md)).
+  amostragem ver [`docs/profiling.md`](../../../wiki/_ref/docs/profiling.md)).
 
 ## 1. Cobertura (secção 1)
 

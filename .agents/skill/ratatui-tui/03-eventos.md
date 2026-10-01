@@ -163,7 +163,7 @@ fn handle_confirm(app: &mut App, key: KeyCode) {
 Por que esse padrão é estável:
 
 - **`take()` remove** o callback — não dá para confirmar a mesma ação duas vezes.
-- Confirmar **só enfileira** (`queue_action`); o I/O acontece no executor (ver [04](./04-integracao-async.md)). A UI nunca espera.
+- Confirmar **só enfileira** (`queue_action`); o I/O acontece no executor (ver [04](04-integracao-async.md)). A UI nunca espera.
 - Callbacks compostos (como `GerenciaLinkToIssue`) podem enfileirar **várias** ações em ordem — nota → tempo → status → anexos.
 - O popup de confirmação pode mostrar um resumo detalhado via `confirm_detail` (`build_link_confirm_detail`, `src/event/mod.rs:563`).
 
@@ -212,4 +212,4 @@ Padrões:
 
 ## Próximo passo
 
-Veja [04-integracao-async.md](./04-integracao-async.md) — como consumir APIs sem travar a UI.
+Veja [04-integracao-async.md](04-integracao-async.md) — como consumir APIs sem travar a UI.

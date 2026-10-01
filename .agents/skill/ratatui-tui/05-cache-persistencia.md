@@ -181,4 +181,4 @@ O `cache.rs` é o módulo mais testado do projeto (round-trips com `tempfile`, m
 
 ## Próximo passo
 
-Veja [06-estabilidade-seguranca.md](./06-estabilidade-seguranca.md) para lints e boas práticas de robustez.
+Veja [06-estabilidade-seguranca.md](06-estabilidade-seguranca.md) para lints e boas práticas de robustez.

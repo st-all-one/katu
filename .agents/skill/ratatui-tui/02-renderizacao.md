@@ -186,4 +186,4 @@ pub fn toggle_theme(&mut self) {
 
 ## Próximo passo
 
-Veja [03-eventos.md](./03-eventos.md) para o roteamento de teclado e o padrão de confirmação.
+Veja [03-eventos.md](03-eventos.md) para o roteamento de teclado e o padrão de confirmação.

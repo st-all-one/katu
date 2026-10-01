@@ -58,7 +58,7 @@ Princípio: **o cache nunca deve derrubar a UI por um valor estranho**. O contr�
 
 ## Confirmação em toda operação de escrita
 
-Nenhuma mutação remota acontece sem `y`. O padrão (detalhado no [03](./03-eventos.md)):
+Nenhuma mutação remota acontece sem `y`. O padrão (detalhado no [03](03-eventos.md)):
 
 1. Usuário dispara ação (`t`, `s`, `n`, `a`...).
 2. Validação local (dados obrigatórios, conflitos) **antes** de qualquer popup.
@@ -117,7 +117,7 @@ e as funções de API adicionam contexto:
 
 - **Nunca índices diretos**: `list_state.selected().and_then(|i| filtered_indices.get(i))` → `.get()` sempre.
 - **Listas vazias**: toda navegação checa `len == 0` antes (`next()`/`previous()` retornam cedo).
-- **Scroll clamp**: `min`/`saturating_sub` em todos os caminhos (ver [02](./02-renderizacao.md)).
+- **Scroll clamp**: `min`/`saturating_sub` em todos os caminhos (ver [02](02-renderizacao.md)).
 - **Take para liberar**: `std::mem::take(&mut app.pending_actions)` e `confirm_callback.take()` evitam duplicidade.
 
 ## Formatação tipada (menos bugs de display)
@@ -149,4 +149,4 @@ pub fn format_hours(hours: f64) -> String {
 
 ## Fim do guia
 
-Reveja o [00-introducao.md](./00-introducao.md) para o quadro geral, ou navegue pelo `SKILL.md` para os arquivos por tópico. O projeto de referência completo é o `redmine-tui`/`my-redmine`.
+Reveja o [00-introducao.md](00-introducao.md) para o quadro geral, ou navegue pelo `SKILL.md` para os arquivos por tópico. O projeto de referência completo é o `redmine-tui`/`my-redmine`.

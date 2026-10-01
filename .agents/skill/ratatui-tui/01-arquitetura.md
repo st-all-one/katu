@@ -56,7 +56,7 @@ Pontos-chave:
 
 - **Enums de navegação tipam o comportamento** (abaixo).
 - **`filtered_indices` separa a lista exibida da lista completa** — `ListState` navega sobre os índices filtrados; o resto da UI consulta `self.issues[i]`. Filtros nunca mutam os dados.
-- **`pending_actions` é o "buffer de saída"** — handlers de teclado enfileiram aqui; o loop drena e envia ao executor (ver [04](./04-integracao-async.md)).
+- **`pending_actions` é o "buffer de saída"** — handlers de teclado enfileiram aqui; o loop drena e envia ao executor (ver [04](04-integracao-async.md)).
 - **`confirm_*`** guardam a confirmação pendente (popup y/n) antes de qualquer escrita.
 
 ### Enums de estado: `Screen`, `Mode`, `InputTarget`
@@ -101,7 +101,7 @@ O projeto investe em **type safety** para o estado:
 
 - `RedmineId` — newtype com `Display`, `FromStr`, `Hash`, `Eq`, `Ord` (evita misturar id de issue com id de status).
 - Datas `Option<NaiveDate>` / `Option<DateTime<Utc>>` — nunca strings soltas no estado.
-- Deserialização defensiva com `#[serde(default, deserialize_with = ...)]` para campos ausentes/inválidos não quebrarem o cache (detalhes no [06](./06-estabilidade-seguranca.md)).
+- Deserialização defensiva com `#[serde(default, deserialize_with = ...)]` para campos ausentes/inválidos não quebrarem o cache (detalhes no [06](06-estabilidade-seguranca.md)).
 - Enums com serde (`Periodo` com `#[serde(rename_all = "snake_case")]`) para wire format controlado.
 
 ## Padrão de navegação: `ListState` + índices filtrados
@@ -126,4 +126,4 @@ Todo acesso ao item selecionado passa por `filtered_indices → issues`, sempre 
 
 ## Próximo passo
 
-Veja [02-renderizacao.md](./02-renderizacao.md) para Layout, List, scroll e popups.
+Veja [02-renderizacao.md](02-renderizacao.md) para Layout, List, scroll e popups.

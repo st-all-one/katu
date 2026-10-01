@@ -281,7 +281,7 @@ Regras:
 - Serviços podem ser `google.api.http` anotados (grpc-gateway) via custom
   options.
 
-Ver a skill irmã [`../grpc_guide/`](../grpc_guide/) para semântica de transporte (RPC).
+Ver a skill irmã [`../grpc_guide/`](../../../agents/skill/grpc_guide) para semântica de transporte (RPC).
 
 ## 7. Extensões e faixas
 

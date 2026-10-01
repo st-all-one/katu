@@ -3,7 +3,7 @@
 > Versão de referência: **gRPC Core 57 / C++ 1.85-dev** (main, 2026).
 > Guia denso em pt-BR, otimizado para consumo por IA, baseado no repositório
 > oficial `grpc/grpc`.
-> Skill irmã: [`../protobuf_guide/`](../protobuf_guide/) — contrato `.proto`,
+> Skill irmã: [`../protobuf_guide/`](../../../agents/skill/protobuf_guide) — contrato `.proto`,
 > wire format, editions e serialização.
 
 ## 1. O que é gRPC

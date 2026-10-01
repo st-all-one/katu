@@ -10,7 +10,7 @@
 ## 1. Protobuf e gRPC são independentes
 
 Esta skill cobre **protobuf puro**. gRPC é um transporte RPC opcional que usa o
-mesmo `.proto`; para ele, carregue a skill irmã [`../grpc_guide/`](../grpc_guide/).
+mesmo `.proto`; para ele, carregue a skill irmã [`../grpc_guide/`](../../../agents/skill/grpc_guide).
 
 ## 2. O que é Protocol Buffers
 
@@ -96,7 +96,7 @@ não alteram o wire format por si só.
 - **Buf**: CLI/registry moderno — `buf lint`, `buf breaking`, `buf generate`,
   Buf Schema Registry (BSR), ProtoJSON, `protovalidate`.
 - **gRPC (skill irmã)**: RPC sobre HTTP/2/3 usando protobuf; gera stubs
-  cliente/servidor. Ver [`../grpc_guide/`](../grpc_guide/).
+  cliente/servidor. Ver [`../grpc_guide/`](../../../agents/skill/grpc_guide).
 - **grpc-gateway / Connect / gRPC-Web**: expõem serviços gRPC a HTTP/JSON/web
   (ver a skill de gRPC).
 - **Well-Known Types**: tipos padronizados (`Timestamp`, `Duration`, `Any`,
@@ -151,7 +151,7 @@ streaming, status codes, metadata/deadlines, interceptors, reflection/health,
 compressão/keepalive, load balancing, service config, xDS, segurança,
 observabilidade e **implementação por stack** (Rust, Go, Dart/Flutter,
 TypeScript, web, PHP 7.2/Laravel 5.5, PHP 8.4/Laravel 12) — carregue
-[`../grpc_guide/`](../grpc_guide/).
+[`../grpc_guide/`](../../../agents/skill/grpc_guide).
 
 O mesmo `.proto` serve para ambos: a skill de protobuf define o contrato e a
 serialização; a de gRPC define o transporte e o serviço.

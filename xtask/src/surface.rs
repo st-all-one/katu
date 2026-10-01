@@ -17,6 +17,7 @@ use katu_policy::RuleSet;
 use katu_tools::schema::SCHEMAS;
 use serde::Deserialize;
 
+use crate::docs::ADR_DIR;
 use crate::walk::{collect_by_extension, collect_rule_files, is_foreign_root};
 
 /// Ficheiro do teto de superfície (versionado).
@@ -165,7 +166,7 @@ fn count_rules() -> Result<usize, String> {
 
 /// ADRs versionadas em `docs/adr/NNNN-*.md`.
 fn count_adrs() -> Result<usize, String> {
-    let entries = fs::read_dir("docs/adr").map_err(|err| format!("lendo docs/adr: {err}"))?;
+    let entries = fs::read_dir(ADR_DIR).map_err(|err| format!("lendo {ADR_DIR}: {err}"))?;
     let mut count: usize = 0;
     for entry in entries {
         let entry = entry.map_err(|err| format!("lendo entrada: {err}"))?;

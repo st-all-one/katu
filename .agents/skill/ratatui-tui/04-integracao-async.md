@@ -242,4 +242,4 @@ Loop: result_rx.try_recv → handle_result
 
 ## Próximo passo
 
-Veja [05-cache-persistencia.md](./05-cache-persistencia.md) para o cache offline com SQLite.
+Veja [05-cache-persistencia.md](05-cache-persistencia.md) para o cache offline com SQLite.

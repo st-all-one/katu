@@ -18,7 +18,7 @@ como base `measured`, não como limite rígido (E15).
 
 O limite vive em [`budget.toml`](budget.toml) e é versionado. `xtask gate:provider` falha se o
 `p95` offline exceder `client_overhead_p95_nanos`. A folga evita um portão de hardware; o alvo é
-**adotar-ou-reverter** (§0.3 do [`plan/19`](../../plan/19-otimizacao-profunda.md)).
+**adotar-ou-reverter** (§0.3 do [`plan/19`](../../wiki/_ref/plan/19-otimizacao-profunda.md)).
 
 ## Percentis
 

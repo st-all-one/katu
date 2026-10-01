@@ -25,7 +25,7 @@ Language-neutral, platform-neutral binary IDL + serialization. Contract =
 `syntax = "proto2|proto3"`.
 
 > Scope: **pure protobuf** (contract, wire format, codegen, serialization).
-> RPC/transport lives in the sibling skill [`../grpc_guide/`](../grpc_guide/),
+> RPC/transport lives in the sibling skill [`../grpc_guide/`](../../../agents/skill/grpc_guide),
 > which reuses the same `.proto` as IDL. To use protobuf without gRPC (e.g.
 > PHP 7.2 without `ext-grpc`), see `10-protobuf-sem-grpc.md`.
 

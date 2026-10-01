@@ -2,7 +2,7 @@
 
 > Documento de referência (E01-T05). A **fonte de verdade** do firewall de camadas é
 > [`layers.toml`](layers.toml), verificado por `xtask check-layers`. O plano vive em
-> [`plan/`](plan/README.md); os objetivos em [`plan/00b-objetivos.md`](plan/00b-objetivos.md).
+> [`plan/`](wiki/_ref/plan/README.md); os objetivos em [`plan/00b-objetivos.md`](wiki/_ref/plan/00b-objetivos.md).
 
 ## 1. Tese em uma linha
 
@@ -114,8 +114,8 @@ utilizador ─▶ katu (CLI/TUI) ─▶ katu-core (loop) ─▶ katu-policy.eval
 medição do MVK), `make deny/audit/machete/typos/miri`. CI: `.github/workflows/` (`pr-fast`,
 `pr-msrv` em Rust 1.97.0, `ci`).
 
-- **Decisões:** [`docs/adr/`](docs/adr/README.md) (ADRs com `## Alternatives considered`,
+- **Decisões:** [`docs/adr/`](wiki/_ref/adr/README.md) (ADRs com `## Alternatives considered`,
   verificadas por `xtask check-docs`); as fundacionais em
-  [`plan/01`](plan/01-decisoes-fundacionais.md). O gate do MVK foi assinado na
-  [ADR 0001](docs/adr/0001-mvk-gate-aprovado.md).
+  [`plan/01`](wiki/_ref/plan/01-decisoes-fundacionais.md). O gate do MVK foi assinado na
+  [ADR 0001](wiki/_ref/adr/0001-mvk-gate-aprovado.md).
 - **Números:** nenhum valor publicado sem base e artefacto (`xtask gate:bench`, DF5).

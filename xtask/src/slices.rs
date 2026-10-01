@@ -7,6 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::check_policy::git_ignored;
+use crate::docs;
 use crate::markdown_links;
 use crate::walk::{collect_by_extension, is_foreign_root};
 
@@ -27,7 +28,7 @@ pub(crate) fn check_slices() -> Result<(), String> {
         }
     }
     let mut plans: Vec<PathBuf> = Vec::new();
-    collect_by_extension(Path::new("plan"), "md", &mut plans)?;
+    collect_by_extension(Path::new(docs::PLAN_DIR), "md", &mut plans)?;
     for plan in &plans {
         let text =
             fs::read_to_string(plan).map_err(|err| format!("lendo {}: {err}", plan.display()))?;

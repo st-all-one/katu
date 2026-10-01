@@ -1,13 +1,13 @@
 {
-  "allocations_per_frame": 1139,
+  "allocations_per_frame": 1138,
   "budget_allocations": 1200,
   "budget_bytes": 175000,
-  "bytes_per_frame": 154495,
+  "bytes_per_frame": 154098,
   "caveat": "mede o render puro sobre um backend de teste; um terminal real acrescenta o flush do driver, que nao esta aqui",
   "criterion": "as alocacoes por quadro nao ultrapassam o orcamento versionado (a de zero alocacoes e FALSA)",
   "criterion_met": true,
-  "decision": "",
-  "method": "allocator de contagem (encaminhamento para System) com janela de medição; 8 quadros de aquecimento + 40 medidos; TestBackend 120x40; conversa no teto (200 entradas)",
+  "decision": "a afirmacao e falsa: o render aloca ~1,1k vezes por quadro. Travado: o orcamento de crescimento e o p95 do gate:render. Refazer o render com dados emprestados fica para uma decisao propria com A/B",
+  "method": "allocator de contagem com janela por thread; 8 quadros de aquecimento + 40 medidos; TestBackend 120x40; conversa no teto (200 entradas)",
   "question": "o render da TUI aloca zero por quadro?",
   "schema": "katu.bench.render_alloc.v1",
   "zero_allocations": false

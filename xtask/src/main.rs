@@ -13,7 +13,7 @@
 //! - `check-policy` — `policy/` versionado, `.katu/` ignorado, sem segredos (E14-T04);
 //! - `check-unsafe` — `forbid(unsafe_code)` em cada crate puro, sem escape hatch (E13-T04);
 //! - `check-paths` — nada é escrito fora do projecto, excepto a configuração global (§42);
-//! - `check-catalog` — catálogos gerados (`docs/catalog.md`) verificados (E14-T06);
+//! - `check-catalog` — catálogos gerados (`wiki/_ref/docs/catalog.md`) verificados (E14-T06);
 //! - `check-rule-coverage` — matriz regra `Enforced` ↔ teste total (E13-T02);
 //! - `check-slices` — `_REF/` fora do build/git, sem links (E14-T07);
 //! - `test:<level>` — camadas de teste (`unit`/`integration`/`e2e`/`all`, E13-T01);
@@ -86,10 +86,8 @@ struct Layers {
 const DOC_ROOTS: &[&str] = &[
     "README.md",
     "ARCHITECTURE.md",
-    "IMPLEMENTATION_PLAN.md",
     "AGENTS.md",
-    "SURFACE_IMPLEMENTATION.md",
-    "OPTIMIZATION_PLAN.md",
+    "agentes-de-ia.md",
 ];
 
 #[allow(clippy::print_stderr, reason = "xtask é a borda de linha de comando")]
@@ -219,8 +217,11 @@ fn check_docs() -> Result<(), String> {
     docs::check_agent_rules()?;
     postmortems::check_postmortems()?;
     let mut files: Vec<PathBuf> = DOC_ROOTS.iter().map(PathBuf::from).collect();
-    collect_by_extension(Path::new("plan"), "md", &mut files)?;
-    collect_by_extension(Path::new("docs"), "md", &mut files)?;
+    // O wiki entra **inteiro** (proposição + referência): os seus links são subjectos à mesma
+    // verificação de links quebrados que o resto da documentação.
+    collect_by_extension(Path::new(docs::WIKI_DIR), "md", &mut files)?;
+    collect_by_extension(Path::new(docs::PLAN_DIR), "md", &mut files)?;
+    collect_by_extension(Path::new(docs::DOCS_DIR), "md", &mut files)?;
     let mut violations: Vec<String> = Vec::new();
     for file in files {
         let source =

@@ -107,7 +107,7 @@ Todas as comunicações usam TCP sockets com protocolo length-prefixed JSON:
 answer = llm_query("Summarize this chunk: ...")
 
 # O que acontece:
-1. REPLEnv.globals['llm_query']("Summarize this chunk: ...")
+1. REPLEnv.globals['llm_query'](../../../agents/skill/rlm/"Summarize this chunk: ...")
 2. → LMRequest(prompt="Summarize...", model=None, depth=0)
 3. → socket_send(handler_address, request)
 4. → LMHandler.handle(request)

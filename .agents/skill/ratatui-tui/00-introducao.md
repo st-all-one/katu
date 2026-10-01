@@ -51,7 +51,7 @@ Regras de ouro do loop:
 
 1. **Nunca faça I/O (rede/arquivo) dentro do `draw`**. Renderização deve ser rápida e determinística.
 2. **Não bloqueie o loop esperando rede**. Use `try_recv` para ver se chegou resultado, e `event::poll(timeout)` para teclado.
-3. **Enfileire ações** em vez de executá-las: a UI seta `pending_actions`; o loop drena e envia para o executor (detalhes no [04-integracao-async.md](./04-integracao-async.md)).
+3. **Enfileire ações** em vez de executá-las: a UI seta `pending_actions`; o loop drena e envia para o executor (detalhes no [04-integracao-async.md](04-integracao-async.md)).
 4. **Centralize o estado** num único `App`; render e handlers só mutam esse struct.
 
 ## Stack recomendada (usada no caso real)
@@ -85,4 +85,4 @@ A renderização (`ui.rs`) e os handlers (`event/`) **só consomem** esses módu
 
 ## Próximo passo
 
-Veja [01-arquitetura.md](./01-arquitetura.md) para a organização de módulos e o estado central `App`.
+Veja [01-arquitetura.md](01-arquitetura.md) para a organização de módulos e o estado central `App`.

@@ -81,7 +81,7 @@ função, o log é a fonte da verdade.
   - `memory::error` — `MemoryError`/`MemoryErrorKind` (`retryable()` só em `Timeout`);
   - `memory::fake` — `FakeMemory` (cenários fixos, sem puxar `knudge-core`);
   - `memory::conformance` — `assert_contract` (E03-T05): suíte partilhada por backend.
-- Modelo de erro [`error`](src/error.rs) (E01-T06) e ports determinísticos
+- Modelo de erro [`error`](../katu-policy/src/error.rs) (E01-T06) e ports determinísticos
   [`ports`](src/ports/mod.rs) (`Clock`/`Rng`/`Fs`/`Env`/`Process` + fakes; `Fs::write_atomic_if` =
   CAS para `edit`, OA16; `Fs::remove` = remoção permanente de ficheiro, nunca de diretórios,
   E10-T07; `Process` = execução com timeout, E06-T04). `ToolOutcome::fix()` (B-03) devolve o

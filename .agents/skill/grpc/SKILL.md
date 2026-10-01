@@ -28,7 +28,7 @@ one HTTP/2 stream; status and metadata ride in headers and trailers.
 
 > Scope: **gRPC** (transport, RPC, operations). The `.proto` contract and
 > serialization live in the sibling skill
-> [`../protobuf_guide/`](../protobuf_guide/). The same `.proto` serves both.
+> [`../protobuf_guide/`](../../../agents/skill/protobuf_guide). The same `.proto` serves both.
 
 ## Use When
 - Define/consume RPC services (unary, server/client/bidi streaming).

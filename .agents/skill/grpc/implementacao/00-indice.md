@@ -6,7 +6,7 @@ de código, cliente/servidor, integração com o framework, segurança, logs,
 performance, testes e pegadinhas da versão.
 
 > Protobuf **puro** (serialização sem gRPC, HTTP/REST, filas) está na skill irmã
-> [`../../protobuf_guide/`](../../protobuf_guide/), em especial
+> [`../../protobuf_guide/`](../../../../agents/skill/protobuf_guide), em especial
 > `10-protobuf-sem-grpc.md`. O `.proto` abaixo é o mesmo usado nas duas skills.
 > Caso o ambiente não suporte gRPC (ex.: PHP 7.2 sem `ext-grpc`), veja o guia de
 > protobuf sem gRPC antes de optar por gRPC.

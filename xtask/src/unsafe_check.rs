@@ -130,13 +130,35 @@ fn crate_roots() -> Result<Vec<PathBuf>, String> {
 
 /// `true` se a linha contém o escape hatch.
 fn count_escapes(text: &str) -> usize {
-    let compact: String = text.chars().filter(|c| !c.is_whitespace()).collect();
-    compact.matches(ESCAPE).count()
+    // Um escape hatch é um **atributo**, não uma citação: primeiro descarta linhas de comentário
+    // (contar a documentação que *fala* do `allow` tornava o gate manipulável por prosa), e só
+    // depois compacta os espaços em branco, para que a forma partida em várias linhas
+    // (`#[allow(\n    unsafe_code,`…) conte como uma.
+    let code: String = text
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect();
+    code.matches(ESCAPE).count()
 }
 
 #[cfg(test)]
 mod tests {
     use super::{ESCAPE, FORBID, count_escapes, is_authorized};
+
+    #[test]
+    fn prose_about_an_escape_hatch_does_not_count() {
+        let text =
+            "//! registado em `#[allow(unsafe_code)]`\n#[allow(unsafe_code, reason = \"x\")]\n";
+        assert_eq!(
+            count_escapes(text),
+            1,
+            "um comentário contou como escape hatch"
+        );
+    }
 
     #[test]
     fn declaration_and_escape_are_detected() {

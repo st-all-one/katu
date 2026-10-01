@@ -21,16 +21,24 @@ pub(crate) const MAX_ROUTER_LINES: usize = 50;
 /// Router do agente.
 const ROUTER: &str = "AGENTS.md";
 /// Índice de regras do agente (1.º salto do router).
-const AGENT_RULES: &str = "docs/agent-rules.md";
+const AGENT_RULES: &str = "wiki/_ref/docs/agent-rules.md";
 /// Diretório de tópicos (2.º salto).
-const TOPICS_DIR: &str = "docs/topics";
+const TOPICS_DIR: &str = "wiki/_ref/docs/topics";
+/// Directório das ADRs (o lar das decisões registadas).
+pub(crate) const ADR_DIR: &str = "wiki/_ref/adr";
+/// Directório dos planos (épicos e planos-maior).
+pub(crate) const PLAN_DIR: &str = "wiki/_ref/plan";
+/// Directório do wiki novo (proposição, método).
+pub(crate) const WIKI_DIR: &str = "wiki";
+/// Directório da documentação de referência (regras, catálogo, CLI, tópicos, postmortems).
+pub(crate) const DOCS_DIR: &str = "wiki/_ref/docs";
 
 /// Verifica as secções obrigatórias de todas as ADRs.
 ///
 /// # Erros
 /// Mensagem agregada com todas as ADRs em falta; `Ok(())` se `docs/adr/` ainda não existir.
 pub(crate) fn check_adrs() -> Result<(), String> {
-    let dir = Path::new("docs/adr");
+    let dir = Path::new(ADR_DIR);
     if !dir.exists() {
         return Ok(());
     }
@@ -203,8 +211,8 @@ mod tests {
 
     #[test]
     fn index_is_skipped() {
-        assert!(is_index(Path::new("docs/adr/README.md")));
-        assert!(!is_index(Path::new("docs/adr/0001-x.md")));
+        assert!(is_index(Path::new("wiki/_ref/adr/README.md")));
+        assert!(!is_index(Path::new("wiki/_ref/adr/0001-x.md")));
     }
 
     #[test]
@@ -221,10 +229,10 @@ mod tests {
 
     #[test]
     fn duplicate_titles_are_rejected() {
-        let router = "# Router\n\n[regras](docs/agent-rules.md)\n";
+        let router = "# Router\n\n[regras](wiki/_ref/docs/agent-rules.md)\n";
         let rules = "# Regras\n\n- [x](topics/x.md)\n";
         let topics = vec![(
-            "docs/topics/x.md".to_string(),
+            "wiki/_ref/docs/topics/x.md".to_string(),
             "# Regras\n\ncorpo próprio\n".to_string(),
         )];
         let violations = surface_violations(router, rules, &topics);
@@ -233,18 +241,24 @@ mod tests {
 
     #[test]
     fn orphan_topic_is_rejected() {
-        let router = "# Router\n\n[regras](docs/agent-rules.md)\n";
+        let router = "# Router\n\n[regras](wiki/_ref/docs/agent-rules.md)\n";
         let rules = "# Regras\n\nsem links\n";
-        let topics = vec![("docs/topics/x.md".to_string(), "# X\n\ncorpo\n".to_string())];
+        let topics = vec![(
+            "wiki/_ref/docs/topics/x.md".to_string(),
+            "# X\n\ncorpo\n".to_string(),
+        )];
         let violations = surface_violations(router, rules, &topics);
         assert!(violations.iter().any(|v| v.contains("órfão")));
     }
 
     #[test]
     fn a_clean_surface_has_no_violations() {
-        let router = "# Router\n\n[regras](docs/agent-rules.md)\n";
+        let router = "# Router\n\n[regras](wiki/_ref/docs/agent-rules.md)\n";
         let rules = "# Regras\n\n- [x](topics/x.md)\n";
-        let topics = vec![("docs/topics/x.md".to_string(), "# X\n\ncorpo\n".to_string())];
+        let topics = vec![(
+            "wiki/_ref/docs/topics/x.md".to_string(),
+            "# X\n\ncorpo\n".to_string(),
+        )];
         assert!(surface_violations(router, rules, &topics).is_empty());
     }
 }

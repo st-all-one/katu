@@ -10,7 +10,7 @@
 >
 > **Alternativa sem gRPC (recomendada quando `ext-grpc`/HTTP-2 for obstáculo):**
 > use protobuf puro sobre HTTP/REST, filas ou cache, sem `ext-grpc` — ver
-> [`../../protobuf_guide/10-protobuf-sem-grpc.md`](../../protobuf_guide/10-protobuf-sem-grpc.md).
+> [`../../protobuf_guide/10-protobuf-sem-grpc.md`](../../protobuf/10-protobuf-sem-grpc.md).
 > O mesmo `.proto` e o mesmo rigor de contrato (`buf lint`/`buf breaking`) valem
 > nos dois casos.
 

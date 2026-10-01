@@ -1,7 +1,7 @@
 # Protocolo — baseline de arranque do E18 (otimização profunda)
 
 > Mede o **custo do projeto inteiro** no caminho real, para ancorar as frentes F2–F9 do
-> [`plan/19`](../../plan/19-otimizacao-profunda.md) antes de otimizar nada (§0.3: medir → A/B →
+> [`plan/19`](../../wiki/_ref/plan/19-otimizacao-profunda.md) antes de otimizar nada (§0.3: medir → A/B →
 > adotar-ou-reverter). Nenhum número sem base tipada e artefacto (DF5/E15-T02).
 >
 > Este é o **baseline** do método: fixa a linha de partida; as otimizações comparam-se contra ele.
@@ -48,6 +48,10 @@ cargo run -q -p xtask -- provider-smoke --provider llama --base http://127.0.0.1
 KATU_OPENCODE_KEY=<chave> cargo run -q -p xtask -- provider-smoke --provider opencode-go --turns 5 --warm
 KATU_INSTRUMENT=1 target/release/katu run "responda com uma palavra" --provider llama --log-level trace --json
 ```
+
+> **Este baseline é o retrato *antes* de optimizar.** As leituras de **hoje**, nos mesmos eixos,
+> com gerador reprodutível, estão em [`pos/`](pos/PROTOCOL.md) (`scripts/bench-pos.sh`) — e o
+> que é atribuível ao projecto face ao que é da máquina está lá escrito.
 
 O gerador do artefacto cru é descrito em [`REPORT.md`](REPORT.md) §Reprodução. O artefacto
 `raw.json` declara `os`/`arch`/`cpu`/`rustc`; os percentis variam por máquina, os spans são

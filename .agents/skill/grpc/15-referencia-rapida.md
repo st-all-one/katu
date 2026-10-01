@@ -181,4 +181,4 @@ xDS (`weighted_target`, `priority`, ...).
 `14` operação/troubleshooting · `implementacao/` por stack.
 
 Contrato `.proto` e serialização: skill irmã
-[`../protobuf_guide/`](../protobuf_guide/).
+[`../protobuf_guide/`](../../../agents/skill/protobuf_guide).
