@@ -1,6 +1,6 @@
 //! Materialização do worker (E20-T20): script, unidades systemd e lista de subscrições.
 //!
-//! Vive separado da orquestração para manter cada ficheiro sob o teto de 300 linhas.
+//! Vive separado da orquestração para manter cada ficheiro sob o teto de 400 linhas.
 
 use std::fs;
 use std::io::ErrorKind;

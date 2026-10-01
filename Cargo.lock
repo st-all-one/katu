@@ -626,6 +626,7 @@ dependencies = [
  "katu-tui",
  "knudge-core",
  "libc",
+ "ratatui",
  "serde",
  "serde_json",
  "thiserror",

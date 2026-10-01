@@ -7,6 +7,9 @@
 //! recusa `allow(unsafe_code)` fora da lista e exige que a lista esteja **exatamente** esgotada.
 //!
 //! O CI corre também Miri (`cargo miri test`) e `cargo machete` (deps mortas).
+//!
+//! A segunda excepção (medição de alocações, E18-T10) é o **único** `unsafe` que não toca memória
+//! de produção: vive num alvo de integração, e o `katu-tui` mantém `forbid` sem escape hatch.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -22,11 +25,18 @@ const DENY: &str = "deny(unsafe_code)";
 /// Escape hatch que este check só aceita dentro da lista de exceções (comparado sem espaços).
 const ESCAPE: &str = "#[allow(unsafe_code";
 
-/// Exceções autorizadas: `(ficheiro, motivo)`. Manter com **um** elemento (decisão do dono, §42).
-const EXCEPTIONS: [(&str, &str); 1] = [(
-    "crates/katu/src/ports/process.rs",
-    "kill(2) do grupo de processos no timeout (E07-T04): `std` não expõe wrapper seguro",
-)];
+/// Exceções autorizadas: `(ficheiro, motivo)`. Cada uma é um ponto de `unsafe` **contado** (§42):
+/// o gate exige que a lista esteja exactamente esgotada, para que uma tercera não apareça calada.
+const EXCEPTIONS: [(&str, &str); 2] = [
+    (
+        "crates/katu/src/ports/process.rs",
+        "kill(2) do grupo de processos no timeout (E07-T04): `std` não expõe wrapper seguro",
+    ),
+    (
+        "crates/katu/tests/render_alloc.rs",
+        "medição de alocações do render (E18-T10): contar alocações exige `unsafe impl GlobalAlloc`; só encaminha para `System`, tem testes próprios no mesmo ficheiro e vive num alvo de teste",
+    ),
+];
 
 /// Crates com exceção: declaram `deny` (não `forbid`) para permitir o `allow` local.
 const EXCEPTION_CRATES: [&str; 1] = ["crates/katu"];

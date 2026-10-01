@@ -61,7 +61,7 @@ Todos os entregáveis abaixo assumem e verificam:
   `undocumented_unsafe_blocks`, `as_conversions` = `deny`; `[profile.release]`
   (`lto = "fat"`, `codegen-units = 1`, `strip = "symbols"`, `overflow-checks = true`,
   `panic = "abort"`); `Cargo.lock` commitado; `publish = false`; `scripts/check_file_length.sh`
-  (≤ 300 linhas de produção); alvo `make check`; `cargo denial`/`cargo tree` sem runtime pesado.
+  (≤ 400 linhas de produção); alvo `make check`; `cargo denial`/`cargo tree` sem runtime pesado.
 - **Otimizações de build (skill Rust §15):** `[profile.dev.package."*"] opt-level = 2` +
   `[profile.dev.build-override] opt-level = 3` — o loop de teste corre com dependências
   otimizadas sem perder símbolos do código do katu (o `[profile.release]` mantém LTO *fat*),

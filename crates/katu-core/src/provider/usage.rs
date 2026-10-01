@@ -1,6 +1,6 @@
 //! Contabilização de tokens (E12-T03), com a base de evidência (DF5).
 //!
-//! Vive fora de `provider.rs` para respeitar o limite de 300 linhas por ficheiro; faz parte da
+//! Vive fora de `provider.rs` para respeitar o limite de 400 linhas por ficheiro; faz parte da
 //! **porta** (`Provider`) e é reexportado por ela.
 
 use serde::{Deserialize, Serialize};

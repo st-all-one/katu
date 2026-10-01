@@ -18,6 +18,7 @@ use crate::confidence::policy_confidence;
 use crate::coverage::check_rule_coverage;
 use crate::ledger::ledger_validate;
 use crate::memory_swap::check_memory_swap;
+use crate::paths::check_paths;
 use crate::policy::policy_audit;
 use crate::prompt::gate_prompt;
 use crate::schemas::check_schemas;
@@ -59,6 +60,7 @@ pub(crate) fn run_all() -> Result<(), String> {
     )?;
     run("test", "cargo", &["test", "--workspace"])?;
     run("file-length", "./scripts/check_file_length.sh", &[])?;
+    check_paths()?;
     check_layers()?;
     check_crate_coverage()?;
     check_diag()?;

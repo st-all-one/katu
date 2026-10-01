@@ -55,7 +55,7 @@ silenciosos; saltar uma fase é uma decisão declarada e registada.
 
 | # | Objetivo | Como se verifica |
 |---|---|---|
-| **G1** | **Kernel mínimo.** Núcleo pequeno, puro e possuído — a política é o kernel, não um acessório. | `xtask check-surface`; ficheiros ≤ 300 linhas; núcleo sem dependências de provider |
+| **G1** | **Kernel mínimo.** Núcleo pequeno, puro e possuído — a política é o kernel, não um acessório. | `xtask check-surface`; ficheiros ≤ 400 linhas (gate `file-length`); núcleo sem dependências de provider |
 | **G2** | **Foco em código.** Tudo serve o fluxo de editar, executar e verificar código. Sem features laterais. | Toda capacidade nova passa o filtro do §4 |
 | **G3** | **Conjunto mínimo de capacidades:** o **core** do §1.1 — ler/escrever/editar/mover/lixeira, executar, pesquisar, memória, planejar, compactar, modelo/pensamento. Nada mais. | A superfície de **tools** são as famílias fechadas do §1.1; memória/compaction/modelo são **controlos do kernel**; extras são `deferred` explícitos |
 | **G4** | **knudge integrado como memória.** O knudge **não** é plugin opcional: é a memória do agente, in-process. | E03 (porta + adaptador in-process); `Memory` nunca desligada em produção |

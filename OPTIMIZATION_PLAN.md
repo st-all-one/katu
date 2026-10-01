@@ -36,7 +36,7 @@ remoção de complexidade; senão reverter e escrever a rejeição). Nada muda b
 (`Model-visible ⟺ logged`, E04). Determinismo: sem RNG, ordem canônica, `total_cmp`, `clamp01`.
 
 **Restrições inflexíveis:** zero `unwrap/expect/panic`, um ponto de `unsafe` (ADR 0018), ficheiros
-`src/` ≤ 300 linhas, `make check` + `msrv` verdes, ids de `diag` no catálogo
+`src/` ≤ 400 linhas (gate `file-length`), `make check` + `msrv` verdes, ids de `diag` no catálogo
 ([`events.rs`](crates/katu-core/src/diag/events.rs)), superfície só cresce subindo o teto em PR.
 
 ---
@@ -388,8 +388,9 @@ o que ajuda é **encurtar** o texto nosso e **medir** o que sobra.
   é ter veredicto medido com evidência + demolição + determinismo.
 - **Custos:** zero tokens de prompt (auditoria); uma passagem O(eventos) e dois mapas.
 - **Limites:** não mede sucesso de tarefa nem se o remédio ensina (isso é Q-12); LB unilateral a 95 %
-  sem controlo de múltiplas comparações (C5 fica em aberto); per-tool mede o contrato de conclusão
-  (timeouts), per-provider **não** foi feito (a base já é medida pelo `gate:provider`).
+  múltiplas comparações tratadas depois em **C5** (Benjamini–Hochberg a `q = 5 ‰`, fail-closed);
+  per-tool mede o contrato de conclusão (timeouts), per-provider **não** foi feito (a base já é
+  medida pelo `gate:provider`).
 - **Mapa:** E18-T06/F6 · DF3/DF5.
 
 #### Q-12 · Anomalia e loop (F7 ✂) — feito
@@ -408,8 +409,9 @@ o que ajuda é **encurtar** o texto nosso e **medir** o que sobra.
 - **Adoção:** critério cumprido (falso positivo zero e corte antes do teto).
 - **Custos:** zero tokens de prompt; por passo um `BTreeSet` de `u64`, um `String` temporário por
   chamada e dois `ln`.
-- **Limites:** A/B sintético (o modelo local não emite tool calls nativas); sem *anytime-valid* (C1
-  em aberto); não distingue "repetição por falta de informação" de "prompt ambíguo".
+- **Limites:** A/B sintético (o modelo local não emite tool calls nativas); o *anytime-valid* veio
+  depois em **C1** (W8-3: e-value de Ville, `kernel::guard`); não distingue "repetição por falta de
+  informação" de "prompt ambíguo".
 - **Efeito colateral corrigido:** o turno passa a fechar **sempre** (`TurnEnd`), também em
   `TooManySteps` — antes o log ficava com um turno aberto.
 - **Mapa:** E18-T07/F7 (corta primeiro).
@@ -700,15 +702,27 @@ esperam. Só depois as frentes formais. Cada PR: A/B + `make check` verde.
 
 ## 9. Definition of Done
 
-- [ ] Q-01..Q-20 com fórmula, artefacto e teste que os trava; rejeições escritas.
-- [ ] S-01: uma só derivação/partição/teto por turno (Q-02b/Q-03 partilham a mesma máquina).
-- [ ] Q-02b/Q-03: critério cumprido no **proxy** (`I_ret`, com controlo negativo a 0 %) e *default*
-      histórico mantido até A/B com o modelo — a decisão está escrita, não implícita.
-- [ ] Q-04: secção `estado` reconstruível do log (`PromptState`) e **desligada** por omissão.
-- [ ] §18/G6 fechado: o **delta** da tool é o mesmo texto no log e no pedido (Q-21), e o corte do
-      contexto nunca parte um par `ToolCall`/`ToolResult` (Q-02a).
-- [ ] `Model-visible ⟺ logged` **fechado** também para o contexto do projeto (Q-16): o prompt de
+Verificado item a item em 2026-02; o que mudou desde a última revisão está assinalado.
+
+- [x] Q-01..Q-20 com fórmula, artefacto e teste que os trava; rejeições escritas.
+- [x] S-01: uma só derivação/partição/teto por turno (Q-02b/Q-03 partilham a mesma máquina).
+- [x] Q-02b/Q-03: critério cumprido no **proxy** (`I_ret`, com controlo negativo a 0 %) e *default*
+      histórico mantido até A/B com o modelo — a decisão está escrita, não implícita. *(A1: a
+      política de utilidade distorce 0 ‰ contra o piso histórico de 356 ‰.)*
+- [x] Q-04: secção `estado` reconstruível do log (`PromptState`) e **desligada** por omissão.
+- [x] §18/G6 fechado: o **delta** da tool é o mesmo texto no log e no pedido — há **uma** função
+      (`ToolReport::to_delta`), consumida em `kernel/pipeline` (evento) e em `report::tool_content`
+      (provider) — e o corte do contexto nunca parte um par `ToolCall`/`ToolResult`
+      (`the_cut_never_orphans_a_tool_call_or_result`).
+- [x] `Model-visible ⟺ logged` **fechado** também para o contexto do projeto (Q-16): o prompt de
       sistema é reconstruível do log.
+- [x] Cada número publicado em `bench/published.toml` tem base tipada (DF5) — `evidence::Metric`
+      com `basis`/`artefacto`, e o `gate:bench` falha se faltar um dos dois.
+- [x] Bytes observáveis alterados **apenas** pelo que foi medido: o envelope `<katu:untrusted>` do
+      D1 (71 B por resultado, 0,87 % num delta de 8 KiB, **teto total inalterado**). Fora isso, zero
+      alteração, e `Model-visible ⟺ logged` intacto. *(Reescrito: a versão anterior dizia «zero
+      alteração de bytes observáveis», o que passou a ser falso por desenho no D1.)*
+- [x] `make check` e `msrv` (1.97.0) verdes em cada PR; `OPTIMIZATION_PLAN.md` mantido como lar.
 - [x] W1 instalado: atribuição por função em release + harness e gate de regressão.
 - [x] W7 instalado: harness estatístico zero-dep (IC 95 % nos artefactos; gates pelo limite superior) +
       atribuição regerada (`bench/e18/atomics/`) + **0** ids órfãos travados pelo `check-diag`.
@@ -718,11 +732,10 @@ esperam. Só depois as frentes formais. Cada PR: A/B + `make check` verde.
       qualquer `n`, DP exata; `bench/e18/loop/` regenerado).
 - [x] W8-4 instalado (decisão escrita): gate de VOI em `agent::turn::voi` (opt-in
       `behavior.tool_voi`, default **off** até A/B; `bench/e18/voi/`).
-- [ ] Cada número publicado em `bench/published.toml` tem base tipada (DF5).
-- [ ] Zero alteração de bytes observáveis; `Model-visible ⟺ logged` intacto.
-- [ ] `make check` e `msrv` (1.97.0) verdes em cada PR; `OPTIMIZATION_PLAN.md` mantido como lar.
-
----
+- [x] W10 fechado, item a item com fórmula/artefacto/decisão: **adotados** D1 (taint), C5
+      (Benjamini–Hochberg), C7, A1, D2/D3; **medidos sem mudança** E1; **rejeitados com número**
+      A2/DPP, C2, E18-T05 (restante), E18-T08, E18-T09 — e nenhum rejeitado deixou código em
+      `src/`.
 
 ## 10. Próximos passos (W7–W10)
 

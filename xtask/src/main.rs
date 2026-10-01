@@ -12,6 +12,7 @@
 //! - `check-surface` — teto de superfície versionado (E14-T05);
 //! - `check-policy` — `policy/` versionado, `.katu/` ignorado, sem segredos (E14-T04);
 //! - `check-unsafe` — `forbid(unsafe_code)` em cada crate puro, sem escape hatch (E13-T04);
+//! - `check-paths` — nada é escrito fora do projecto, excepto a configuração global (§42);
 //! - `check-catalog` — catálogos gerados (`docs/catalog.md`) verificados (E14-T06);
 //! - `check-rule-coverage` — matriz regra `Enforced` ↔ teste total (E13-T02);
 //! - `check-slices` — `_REF/` fora do build/git, sem links (E14-T07);
@@ -45,6 +46,7 @@ mod docs;
 mod ledger;
 mod memory_swap;
 mod orphans;
+mod paths;
 mod policy;
 mod postmortems;
 mod prompt;
@@ -116,6 +118,7 @@ fn dispatch(task: Option<&str>, rest: &[String]) -> Result<(), String> {
         Some("check-surface") => surface::check_surface(rest),
         Some("check-policy") => check_policy::check_policy(),
         Some("check-unsafe") => unsafe_check::check_unsafe(),
+        Some("check-paths") => paths::check_paths(),
         Some("check-catalog") => catalog::check_catalog(),
         Some("check-rule-coverage") => coverage::check_rule_coverage(),
         Some("check-slices") => slices::check_slices(),
@@ -156,7 +159,7 @@ fn dispatch(task: Option<&str>, rest: &[String]) -> Result<(), String> {
         Some("bench-toon") => toon_bench::run(),
         Some(other) => Err(format!("tarefa desconhecida: {other}")),
         None => Err(
-            "uso: xtask <check|check-layers|check-crate-coverage|check-diag|diag:coverage|check-schemas|check-docs|check-surface|check-policy|check-unsafe|check-catalog|check-rule-coverage|check-slices|check-memory-swap|gate:bench|gate:provider|gate:prompt|gate:render|test:unit|test:integration|test:e2e|test:all|policy:audit|policy:confidence|ledger:validate|bench-audit|bench-resume|bench-provider|bench-render|provider-smoke>"
+            "uso: xtask <check|check-layers|check-crate-coverage|check-diag|diag:coverage|check-schemas|check-docs|check-surface|check-policy|check-unsafe|check-paths|check-catalog|check-rule-coverage|check-slices|check-memory-swap|gate:bench|gate:provider|gate:prompt|gate:render|test:unit|test:integration|test:e2e|test:all|policy:audit|policy:confidence|ledger:validate|bench-audit|bench-resume|bench-provider|bench-render|provider-smoke>"
                 .to_string(),
         ),
     }

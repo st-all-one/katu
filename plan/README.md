@@ -70,7 +70,10 @@ justifica (§53).
 - **Aceite:** critério **verificável** (teste, golden, propriedade, script, benchmark) — nunca prosa.
 - **Rastreabilidade:** cada tarefa cita as **decisões fundacionais** que implementa (`DFxx`, ver
   [`01-decisoes-fundacionais.md`](01-decisoes-fundacionais.md)) e a secção da brainstorm (`§nn`).
-- **Disciplina Rust 1.97.0+ (D92 do knudge):** ficheiros de produção ≤ 300 linhas; proibido
+- **Disciplina Rust 1.97.0+ (D92 do knudge):** ficheiros de produção ≤ **400** linhas — o teto
+  subiu de 300 em E19-T03 para acomodar a instrumentação transversal sem fragmentar módulos
+  coesos; medido por [`scripts/check_file_length.sh`](../scripts/check_file_length.sh), que exclui o
+  submódulo `crates/knudge` (o *knudge* mantém o D92 dele). Proibido
   `unwrap`/`expect`/`panic` em `src/`; `forbid(unsafe_code)` nas crates puras; `cargo fmt --check`
   + `clippy -D warnings` sempre verdes.
 - **Um facto, um lar** (§44): o plano descreve *passos*; as decisões vivem em `01`; os contratos
@@ -171,7 +174,8 @@ Um épico só fecha quando:
 - [ ] `cargo fmt --check` e `clippy --workspace --all-targets -- -D warnings` passam.
 - [ ] `cargo test --workspace` verde, incluindo as propriedades do épico.
 - [ ] O job **`msrv` (Rust 1.97.0 exato)** está verde.
-- [ ] Nenhum ficheiro de produção > 300 linhas; zero `unwrap`/`expect`/`panic` em `src/`.
+- [ ] Nenhum ficheiro de produção > 400 linhas (`scripts/check_file_length.sh`); zero
+      `unwrap`/`expect`/`panic` em `src/`.
 - [ ] `unsafe` só onde autorizado, com comentário `// SAFETY:` e `#[allow(unsafe_code)]` local.
 - [ ] As decisões citadas pelas tarefas têm teste/golden que as trava.
 - [ ] `ARCHITECTURE.md` / `MODULE.md` e `CHANGELOG.md` atualizados.

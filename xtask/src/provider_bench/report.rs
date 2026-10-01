@@ -1,6 +1,6 @@
 //! Corpus canónico, pedido de teste e agregados de percentis (E12-T07).
 //!
-//! Pura computação, sem I/O: mantém o instrumento ([`super`]) sob o limite de 300 linhas e torna
+//! Pura computação, sem I/O: mantém o instrumento ([`super`]) sob o limite de 400 linhas e torna
 //! o corpus e os percentis testáveis isoladamente.
 
 use std::time::Duration;

@@ -6,3 +6,14 @@
 
 [render]
 frame_p95_nanos = 3000000
+
+# Alocações por quadro (E18-T10). Medidas em `crates/katu/tests/render_alloc.rs` (allocator de
+# contagem, `unsafe` registado em `EXCEPTIONS`): **1137 alocações / 153 785 B** por quadro no pior
+# caso (120×40, conversa no teto de 200 entradas). A afirmação «o render não aloca» é **falsa**.
+# O que se trava é que **não cresça**: o teste falha se ultrapassar estes valores.
+[render_alloc]
+# As **contagens** são quase estáveis (1136–1137 em execuções repetidas, ±1 pela kolecção de
+# `TestBackend`); os **bytes** variam ~0,2 %. Por isso ambos os orçamentos têm folga: o que se
+# trava é o **crescimento**, não o dígito exacto.
+frame_allocations = 1200
+frame_alloc_bytes = 175000

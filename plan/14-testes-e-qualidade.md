@@ -85,11 +85,14 @@
 
 ## Definition of Done (permanente)
 
-- [ ] `cargo xtask check` + `test:all` verdes.
-- [ ] Matriz regra ↔ teste total; guards passam o teste invertido.
-- [ ] Miri/geiger/machete verdes.
-- [ ] Nenhum arquivo de produção > 300 linhas; zero `unwrap/expect/panic` em `src/`.
-- [ ] job `msrv` verde em Rust 1.97.0.
+- [x] `cargo xtask check` + `test:all` verdes.
+- [x] Matriz regra ↔ teste total (`check-rule-coverage` no `check`); guards passam o teste
+      invertido (`a_diverse_turn_never_alarms`, `a_short_turn_is_not_cut`).
+- [x] Miri/geiger/machete verdes (jobs `miri` e de auditoria em `.github/workflows/ci.yml`;
+      `make deny audit machete typos miri`).
+- [x] Nenhum arquivo de produção > 400 linhas (gate `file-length`; o teto subiu de 300 em
+      E19-T03); zero `unwrap/expect/panic` em `src/`.
+- [x] job `msrv` verde em Rust 1.97.0 (`pr-msrv.yml`; `cargo +1.97.0 build --workspace`).
 
 ## Anti-checklist (o que **não** fazer)
 

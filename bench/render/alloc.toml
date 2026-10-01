@@ -1,0 +1,13 @@
+# Sítios de alocação no caminho de render da TUI (E10-T03 / E18-T10).
+#
+# A afirmação «o render não aloca» é **falsa por construção**: o caminho formata cadeias e monta
+# `Vec<Line<'static>>` a cada quadro. Contar alocações *por quadro* em processo exigiria
+# `unsafe impl GlobalAlloc`, proibido por `#![forbid(unsafe_code)]` (ADR 0016). O que fica travado
+# é a **não crescimento**: um teste conta primitivas de alocação neste ficheiro-linha de base e
+# falha se o render ganhar sítios sem decisão escrita.
+#
+# Detalhe, método e porquê em [`PROTOCOL.md`](PROTOCOL.md); número corrido em `alloc.json`.
+
+[render_alloc]
+total_alloc_sites = 44
+ui_rs_sites = 21

@@ -5,8 +5,9 @@
 > substitui os épicos existentes: **consome** E01 (fundação), E03 (memória), E10 (TUI), E12
 > (providers) e E14 (governança) e mantém os gates deles.
 >
-> **Estado:** ◐ em implementação (S0 + S1 + S2 + pendentes: verbos, `prime`, body/stdin, config,
-> `--params`/`--batch` universais, bootstrap `.katu/`, `doctor --fix`, id+exit do `run`, defaults).
+> **Estado:** ✔ **concluído** — E20-T00 a E20-T20 estão todos ☑, incluindo o que a linha de estado
+> anterior dava como pendente (verbos, `prime`, body/stdin, config, `--params`/`--batch`,
+> bootstrap `.katu/`, `doctor --fix`, id+exit do `run`, defaults).
 > **Gate:** `make check` verde +
 > [`docs/CLI_TUI_SURFACE.md`](docs/CLI_TUI_SURFACE.md) atualizado + ADRs 0019–0023 aceites + teto
 > de superfície ajustado.
@@ -398,15 +399,16 @@ Chaves do `katu.toml` e nomes seguem o `kd`/knudge onde existirem. **Sem** `writ
 
 ## 6. Definition of Done (do épico)
 
-- [ ] `cargo fmt --check` + `clippy --workspace --all-targets -- -D warnings` verdes.
-- [ ] `cargo test --workspace` verde, com testes por verbo/flag/tecla nova.
-- [ ] `make check` verde (inclui `check-docs`, `check-surface`, `check-catalog`).
-- [ ] `docs/CLI_TUI_SURFACE.md` reescrito e ligado no router.
-- [ ] ADRs 0019–0023 aceites; nenhuma ADR editada para outra decisão.
-- [ ] `surface.toml` ajustado (verbos/diag/xtask) se a superfície crescer.
-- [ ] Ficheiros de produção ≤ 300 linhas; zero `unwrap`/`expect`/`panic` em `src/`.
-- [ ] `unsafe` continua a ser **um** ponto (ADR 0018).
-- [ ] Nenhum número/serviço afirmado sem artefacto (DF5).
+- [x] `cargo fmt --check` + `clippy --workspace --all-targets -- -D warnings` verdes.
+- [x] `cargo test --workspace` verde, com testes por verbo/flag/tecla nova.
+- [x] `make check` verde (inclui `check-docs`, `check-surface`, `check-catalog`).
+- [x] `docs/CLI_TUI_SURFACE.md` reescrito e ligado no router.
+- [x] ADRs 0019–0023 aceites; nenhuma ADR editada para outra decisão.
+- [x] `surface.toml` ajustado (verbos/diag/xtask) se a superfície crescer.
+- [x] Ficheiros de produção ≤ 400 linhas (gate `file-length`; subiu de 300 em E19-T03); zero
+      `unwrap`/`expect`/`panic` em `src/`.
+- [x] `unsafe` continua a ser **um** ponto (ADR 0018).
+- [x] Nenhum número/serviço afirmado sem artefacto (DF5).
 
 ## 7. Impacto na superfície existente
 

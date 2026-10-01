@@ -80,7 +80,8 @@ Futuro (só após valor provado): E08 MCP · E11 plugins WASM · E17 jail de SO
   `Alternatives considered`, `policy/` versionado, `check-docs`.
 - **E15-T01/T02** ([`16`](plan/16-performance-benchmarks.md)) — harness e **portão de publicação de
   números** (DF5). **Mede antes de otimizar.** T02 ☑ (`Metric` + `xtask gate:bench` + `bench/`);
-  T01 ◐ (falta `criterion` do hot path).
+  T01 ☑ **resolvido sem `criterion`** — o hot path é medido pelo harness zero-dep de E18-T10
+  (`gate:bench`/`gate:provider`/`gate:render`), que mantém o workspace sem dependências de medição.
 - **E19-T01/T02** ([`20`](plan/20-instrumentacao-transversal.md)) — **instrumentação transversal**
   (`katu-core::diag`): logs estruturados + métrica de tempo, custo zero por defeito (DF9); sink
   agregador de percentis (E19-T02 ☑).

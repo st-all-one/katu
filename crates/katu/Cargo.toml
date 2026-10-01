@@ -36,6 +36,11 @@ thiserror.workspace = true
 toml.workspace = true
 knudge-core = { path = "../knudge/crates/knudge-core", optional = true }
 
+[dev-dependencies]
+# Só para o alvo de medição `tests/render_alloc.rs` (allocator de contagem): `TestBackend` é a
+# forma de renderizar sem terminal real. Não entra no binário.
+ratatui.workspace = true
+
 # Único ponto `unsafe` do projeto (ADR 0016, E07-T04): matar o **grupo** de processos de um comando
 # no timeout (`kill(-pgid)`), para que netos não sobrevivam. `std` não expõe wrapper seguro.
 [target.'cfg(unix)'.dependencies]
