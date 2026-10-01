@@ -31,7 +31,7 @@ catalog! {
     (
         KATU_FN,
         "katu.fn",
-        "Span genérico de função (E19-T03): tempo atómico por função via `trace_fn!`."
+        "Span genérico de função (E19-T03): o rótulo real viaja em `Record.function` e o sink de `stderr` expõe-o (S-02/Q-09)."
     ),
 
     // -- Sistema de ficheiros (borda) ----------------------------------------

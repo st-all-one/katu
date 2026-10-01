@@ -28,18 +28,34 @@ const PRIME_GRAMMAR: &str = "saida: TOON colunar v3 (D39) SEM headers; o esquema
      - literal: `\\x1dNOME` e depois linhas cruas ate a proxima secao;\n\
      - vazio = celula ausente; `{a,b}` = dominio fechado; booleano 0/1; sem floats.\n";
 
+/// Linha de tools do prime compacto sem catálogo injetado.
+const TOOLS_LINE: &str = "tools: read/write/edit/move/trash/bash/grep/find/ls/plan/memory";
+
+/// Cabeçalho que substitui a linha de tools quando o catálogo é injetado.
+const CATALOG_HEADER: &str = "tools (tabela `tool`; `?` opcional, `{a,b}` dominio fechado):";
+
+/// Rodapé do prime compacto.
+const FOOTER: &str = "JSON com format=json; so o delta chega ao modelo.";
+
+/// Rodapé do prime completo (`--long`).
+const LONG_FOOTER: &str =
+    "JSON equivalente com `format=json`/`--json`; so o delta chega ao modelo.";
+
+/// Gramática completa (spec TOON colunar v3) — `--long`.
+const LONG_GRAMMAR: &str = "\
+saida: TOON colunar v3 (D39, ADR 0005). Sem headers no stream; o esquema segue.\n\
+- tabela: linha `\\x1eNOME`; linhas seguintes com celulas `\\x1f` na ordem das colunas;\n\
+- literal: linha `\\x1dNOME`; linhas cruas ate a proxima secao;\n\
+- envelope `r` = kind,id,hash,cur,tot,trunc,bytes,ms,tok; escadares da tool em `k` (k,v);\n\
+- ids/paths podem vir como `#N`/`@N` (aliases de sessao), mapeados na secao `sym`;\n\
+- vazio = celula ausente; dominio `{a,b}` fechado; booleano 0/1; sem floats.\n";
+
 /// Prime compacto (DF12): ensina a gramática do TOON colunar v3 **e o registo de esquema**.
 #[must_use]
 pub fn prime() -> String {
     let _span = crate::trace_fn!("context::prime");
 
-    format!(
-        "katu prime v{PRIME_VERSION}\n\
-         tools: read/write/edit/move/trash/bash/grep/find/ls/plan/memory\n\
-         {PRIME_GRAMMAR}{}\n\
-         JSON com format=json; so o delta chega ao modelo.\n",
-        registry_text()
-    )
+    render(PrimeMode::Compact, None)
 }
 
 /// Prime compacto com o **catálogo de tools** injetado (fonte: `katu_tools::schema::catalog`).
@@ -50,14 +66,7 @@ pub fn prime() -> String {
 pub fn prime_with_catalog(catalog: &str) -> String {
     let _span = crate::trace_fn!("context::prime_with_catalog");
 
-    format!(
-        "katu prime v{PRIME_VERSION}\n\
-         tools (tabela `tool`; `?` opcional, `{{a,b}}` dominio fechado):\n\
-         {catalog}\
-         {PRIME_GRAMMAR}{}\n\
-         JSON com format=json; so o delta chega ao modelo.\n",
-        registry_text()
-    )
+    render(PrimeMode::Compact, Some(catalog))
 }
 
 /// Prime completo (spec TOON colunar v3) — `--long` (E09-T01). Determinístico e versionado.
@@ -65,19 +74,46 @@ pub fn prime_with_catalog(catalog: &str) -> String {
 pub fn prime_long() -> String {
     let _span = crate::trace_fn!("context::prime_long");
 
-    format!(
-        "katu prime v{PRIME_VERSION} (long)\n\
-         tools: read/write/edit/move/trash/bash/grep/find/ls/plan/memory\n\
-         saida: TOON colunar v3 (D39, ADR 0005). Sem headers no stream; o esquema segue.\n\
-         - tabela: linha `\\x1eNOME`; linhas seguintes com celulas `\\x1f` na ordem das colunas;\n\
-         - literal: linha `\\x1dNOME`; linhas cruas ate a proxima secao;\n\
-         - envelope `r` = kind,id,hash,cur,tot,trunc,bytes,ms,tok; escadares da tool em `k` (k,v);\n\
-         - ids/paths podem vir como `#N`/`@N` (aliases de sessao), mapeados na secao `sym`;\n\
-         - vazio = celula ausente; dominio `{{a,b}}` fechado; booleano 0/1; sem floats.\n\
-         {}\n\
-         JSON equivalente com `format=json`/`--json`; so o delta chega ao modelo.\n",
-        registry_text()
-    )
+    render(PrimeMode::Long, None)
+}
+
+/// Gera o prime para um modo e, opcionalmente, com a tabela de tools injetada.
+///
+/// **Um só gerador** (S-05): `prime`/`prime_with_catalog`/`prime_long` são composições deste, com
+/// a gramática e o rodapé como dados. A saída é byte-a-byte a anterior.
+fn render(mode: PrimeMode, catalog: Option<&str>) -> String {
+    let _span = crate::trace_fn!("context::prime::render");
+
+    let mut out = match mode {
+        PrimeMode::Compact => format!("katu prime v{PRIME_VERSION}\n"),
+        PrimeMode::Long => format!("katu prime v{PRIME_VERSION} (long)\n"),
+    };
+    match mode {
+        PrimeMode::Compact => {
+            if let Some(catalog) = catalog {
+                out.push_str(CATALOG_HEADER);
+                out.push('\n');
+                out.push_str(catalog);
+            } else {
+                out.push_str(TOOLS_LINE);
+                out.push('\n');
+            }
+            out.push_str(PRIME_GRAMMAR);
+        }
+        PrimeMode::Long => {
+            out.push_str(TOOLS_LINE);
+            out.push('\n');
+            out.push_str(LONG_GRAMMAR);
+        }
+    }
+    out.push_str(&registry_text());
+    out.push('\n');
+    out.push_str(match mode {
+        PrimeMode::Compact => FOOTER,
+        PrimeMode::Long => LONG_FOOTER,
+    });
+    out.push('\n');
+    out
 }
 
 /// Uma linha por secção do registo: `nome R col...` ou `nome L`.

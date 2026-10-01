@@ -46,7 +46,7 @@ remoção de complexidade; senão reverter e escrever a rejeição). Nada muda b
 | Item | Estado | Evidência |
 |---|---|---|
 | **Q-06** descrições de parâmetro | ✔ feito | `agent/catalog.rs`; teste `every_parameter_carries_its_description` |
-| **Q-10** 3 ids órfãos | ✔ feito | catálogo 113 ids, 0 órfãos; `CATALOG_VERSION = 2` |
+| **Q-10** 3 ids órfãos | ✔ feito | catálogo 114 ids, 0 órfãos; `CATALOG_VERSION = 3` |
 | **Q-01** orçamento de tokens calibrado | ✔ feito | rácio medido **3,631 B/token** (`bytes/4` errava 9,2 %); `bench/e18/tokens/`; `context.build{tokens}` |
 | **B-02** várias calls por passo | ✔ já existia | testes `calls.rs` (ordem do modelo, barreira) |
 | **B-01** lote concorrente `Shared` | ✔ feito | **+76,3 %** no alvo (472 → 112 ms, 8 leituras); `bench/e18/batch/` |
@@ -70,12 +70,20 @@ remoção de complexidade; senão reverter e escrever a rejeição). Nada muda b
 | **P-03** caminho `memory.write`/gate | ✔ feito | release: gate com 1 000 notas **46 921 → 25 784 µs** (−45,1 %); a atribuição fecha em `Index::from_store` (22,6 ms); `bench/e18/memory/` |
 | **Q-15** retomada com cauda limitada | ✔ feito | 20 000 turnos: **321 µs** (−98,7 % vs replay, −85,2 % vs fronteira de fase); cauda ≤ 128 KiB; hash canónico do estado; `bench/e18/resume/` |
 | **Q-12** guard de loop/anomalia | ✔ feito | CUSUM + SPRT + assinatura: **0** falsos positivos em 200 turnos normais, alarme no **4.º** passo (teto 12); corte com `agent.loop` + turno fechado; `bench/e18/loop/` |
+| **Q-09** atribuição por função no `stderr` | ✔ feito | `StderrSink` imprime `function=…` (nível `trace`); `format_record` puro + 3 testes; `bench/e18/atomics/PROTOCOL.md` atualizado |
 
 **Nota de método (Q-07).** O `diag:coverage` conta qualquer `fn` de `crates/*/src` fora de
 `#[cfg(test)] mod` e fora de ficheiros `*tests*`/`/tests/`: um *bench* em `edit/bench.rs` fez a
 cobertura cair para 98,3 % (e cinco `fn` do **fixture** em string eram contados como funções). Movido
 para `edit/tests/bench.rs` — a convenção dos outros *benches* (`context/tests/`, `toon/tests/`) — a
 cobertura voltou a **99,3 %** sem instrumentar código de teste.
+
+**Nota de método (cobertura, W6).** O número que se lê a seguir ao parêntese (**com `const fn`**)
+deslizou para **89,6 %** com as `const fn` novas de Q-15/P-01. Duas correções: (a) o instrumento
+contava `crates/*/examples/` (e *benches*) como código de produção — cinco `fn` de exemplo entravam
+na conta; (b) faltavam spans em quatro funções de produção e três acessores só usados por testes
+passaram a `#[cfg(test)]`. O `check` passa a travar **as duas medidas** em 90 % (antes só a das
+instrumentáveis), para o deslize não voltar a passar despercebido.
 
 **Lição de método (B-01).** O primeiro A/B deu −5 % e quase reverteu B-01: a causa era um
 *refactor* do `clippy::needless_collect`, que ao encadear `.map(spawn).map(join)` **entrelaça** o
@@ -116,12 +124,15 @@ de memória (P-03) passa a ser o maior custo de CPU do dispatch.
 
 ### 1.3 A instrumentação está essencialmente fechada
 
-- Cobertura por função: **99,4 %** das instrumentáveis (**90,2 %** contando `const fn`).
-- Catálogo: **113 ids** (`CATALOG_VERSION = 2`), **0 órfãos** (Q-10: `memory.read`/`policy.audit`
+- Cobertura por função: **100 %** das instrumentáveis (**90,6 %** contando `const fn`); as duas
+  medidas são travadas em 90 % pelo `diag:coverage`.
+- Catálogo: **114 ids** (`CATALOG_VERSION = 3`), **0 órfãos** (Q-10: `memory.read`/`policy.audit`
   passaram a ser emitidos; `memory.compact` foi removido).
-- **Lacuna de método:** a atribuição por função **não** sai no `stderr` (só no
-  `AggregatingSink`); as secções por função são `dev` (com overhead do `diag`). Falta o harness
-  (`criterion`/`hyperfine`/`dhat`) — E18-T10.
+- Atribuição por função **no `stderr`** (Q-09): o `StderrSink` imprime `function=…` (nível
+  `trace`), pelo que os *scripts* de `bench/e18/atomics` atribuem o tempo por função também em
+  release. O harness `criterion`/`hyperfine`/`dhat` do E18-T10 fica **preterido** (zero-dep, ADR
+  0014/E15-T01): repetições e percentis vivem nos *benches* do `xtask` (`render`, `provider`,
+  `measure_mvk`, `toon`).
 
 ### 1.4 Brechas concretas de qualidade (verificadas no código)
 
@@ -322,13 +333,21 @@ o que ajuda é **encurtar** o texto nosso e **medir** o que sobra.
 
 ### Q-C. Transparência
 
-#### Q-09 · Atribuição por função visível (stderr) + harness (E18-T10)
+#### Q-09 · Atribuição por função visível (stderr) + harness (E18-T10) — feito
 - **Problema:** o `StderrSink` não imprime `Record.function`; a atribuição por função é `dev` e
   agregada. Sem isto, P não se prioriza.
-- **Proposta:** expor `function` no sink de `stderr` (nível `trace`) e instalar o harness do E18-T10
-  (`criterion` micro, `hyperfine` startup, `dhat` alocação; ≥ 3 repetições, IC 95 %), com gate.
-- **Teste:** regressão acima do limiar falha o job; todo número publicado tem artefacto (DF5).
-- **Mapa:** E18-T10 · E15-T01/T02.
+- **Proposta (feita):** expor `function` no sink de `stderr` (nível `trace`) — o formato passa a
+  `level=… kind=… [function=…] event=… dur_ns=… fields=…`, com o campo **só** quando o span traz o
+  rótulo (os eventos pontuais mantêm a linha antiga). A formatação foi isolada numa função **pura**
+  (`format_record`) com três testes. O harness do E18-T10 é o **zero-dep** já instalado
+  (`gate:render`/`gate:provider`/`measure_mvk`/`toon_bench`); `criterion`/`hyperfine`/`dhat` ficam
+  preteridos (ADR 0014, E15-T01).
+- **Teste:** `a_function_span_exposes_its_label`, `an_event_without_a_label_keeps_the_stable_format`
+  e `fields_are_redacted_before_printing` (`cargo test -p katu --features profile`).
+- **Efeito colateral (correção):** o build com `--features instrument` não compilava —
+  `context.compact` registava `js_milli` com um `f64` (o `Value` não tem `From<f64>`); passou a usar
+  `evidence::from_f64`.
+- **Mapa:** E18-T10 · E15-T01/T02 · `crates/katu/src/diag.rs`.
 
 #### Q-10 · Fechar os 3 ids órfãos e o *drift* de doc
 - **Problema:** `memory.read`, `memory.compact`, `policy.audit` no catálogo e nunca emitidos;
@@ -586,28 +605,34 @@ travar**. Densificar prosa com TOON não entra: o ADR 0006 mede ganhos em regist
   pertença ao escolhido é um **bitmap** (era procura linear na lista), o ranking usa valores
   pré-calculados com `sort_unstable`, os `Vec` têm capacidade pré-alocada e a contagem de caracteres
   de um termo só corre depois do teste barato em bytes.
-- **S-02 · `katu.fn` catch-all.** 522 spans com o mesmo id. Decidir: expor a função real (Q-09) ou
-  remover o ruído. Não deixar ambíguo.
-- **S-03 · Política visível pelo chamador.** `katu-policy` (120 fn) fica fora da cobertura por
-  firewall; adicionar spans no **chamador** (`evaluate`/`capability_for`/`audit`) para atribuir o
-  custo sem violar camadas.
+- **S-02 · `katu.fn` catch-all.** ✔ **decidido:** o id genérico fica e a função real é **exposta**
+  (Q-09) — o `StderrSink` imprime `function=…` e o `AggregatingSink` já agrupa por `(event, função)`;
+  o rótulo real consta do catálogo (`KATU_FN`) e da doc de `trace_fn!`. Não se adicionam 522 ids.
+- **S-03 · Política visível pelo chamador.** ✔ **feito:** spans no chamador com rótulo de função —
+  `policy::evaluate` (`kernel::pipeline`), `policy::audit` (`runtime::load_rules`) e
+  `policy::capability_for` (`agent::turn`); antes apareciam sem função (`None`) no agregado.
 - **S-04 · Fechar órfãos/drift** (Q-10) e remover nomes mortos (`store.load`/`store.save`, se
   aplicável).
-- **S-05 · Duplicação de prime.** Existem três textos (`prime()`, `prime_long()`,
-  `cli/prime.rs`); consolidar em **um** gerador versionado, com grupos.
+- **S-05 · Duplicação de prime.** ✔ **feito:** `context/prime::render` é o **único** gerador
+  (`prime`/`prime_with_catalog`/`prime_long` são composições; saída byte-a-byte igual) e o CLI gera
+  `name`/`base` da **mesma** lista de grupos (`macro_rules! groups`).
 
 ---
 
 ## 5. Sequência e dependências
 
 ```
-W1 (método)      P-00→Q-09  harness + atribuição release  ── desbloqueia P e mede Q
-W2 (correções)   Q-06, Q-10, S-01..S-05  (baixo risco, ganho imediato de qualidade)
+W1 (método)      ~~P-00~~→~~Q-09~~  harness + atribuição release  ── desbloqueia P e mede Q
+W2 (correções)   Q-06, Q-10, ~~S-01..S-05~~  (baixo risco, ganho imediato de qualidade)
 W2b (densidade)  Q-16 → Q-05 → Q-20 → Q-19 → Q-18        (frente F2b; §1.5)
 W3 (dados)       Q-01 → Q-02 → Q-03 → Q-04 → Q-05        (frente F2/F3/F9)
 W4 (superfície)  ~~Q-07~~, ~~Q-08~~                        (menos turnos)
 W5 (segurança)   ~~Q-11~~, ~~Q-12~~                        (F6/F7)
 W6 (estabilidade)~~Q-13~~, ~~Q-14~~, ~~Q-15~~, ~~P-01~~, ~~P-02~~, ~~P-03~~, ~~P-04~~
+W7 (método)      E18-T10 (harness zero-dep) + regerar atribuição + S-04
+W8 (Anexo A T1)  B1 gramática → C3 calibração → C1 e-values → A3 VOI
+W9 (Anexo B)     B-03 → B-04 → B-06 → B-07 (gated) → ADR B-08
+W10 (Anexo A T2/3) A1/A2 · D1 · C2/C7/C5 · E1 · D2/D3 · E18-T05/T08/T09
 ```
 
 **Regra:** W1 primeiro (sem medir, não se otimiza — a lição do E18 §0.3). W2 são correções que não
@@ -634,7 +659,7 @@ esperam. Só depois as frentes formais. Cada PR: A/B + `make check` verde.
 | TTFT frio local | ~40 s | **≤ 8 s** (prewarm) | `raw.json` |
 | TTFT remoto p95 | 4,1 s | dentro do orçamento | `gate:provider` |
 | Regras `Enforced` com `LB`/`n` | 0 | **8/8** | `bench/published.toml` |
-| Cobertura de instrumentação | 99,4 % | ≥ 99 % (manter) | `diag:coverage` |
+| Cobertura de instrumentação | 100 % (90,6 % com `const fn`) | ≥ 90 % nas duas medidas ✔ | `diag:coverage` |
 
 ---
 
@@ -674,10 +699,127 @@ esperam. Só depois as frentes formais. Cada PR: A/B + `make check` verde.
       contexto nunca parte um par `ToolCall`/`ToolResult` (Q-02a).
 - [ ] `Model-visible ⟺ logged` **fechado** também para o contexto do projeto (Q-16): o prompt de
       sistema é reconstruível do log.
-- [ ] W1 instalado: atribuição por função em release + harness e gate de regressão.
+- [x] W1 instalado: atribuição por função em release + harness e gate de regressão.
 - [ ] Cada número publicado em `bench/published.toml` tem base tipada (DF5).
 - [ ] Zero alteração de bytes observáveis; `Model-visible ⟺ logged` intacto.
 - [ ] `make check` e `msrv` (1.97.0) verdes em cada PR; `OPTIMIZATION_PLAN.md` mantido como lar.
+
+---
+
+## 10. Próximos passos (W7–W10)
+
+**Ponto de partida.** W1–W6 estão fechadas: Q-01..Q-21 e P-01..P-04 com artefacto em `bench/`, e
+S-01..S-05 fechados (S-04 é o único resíduo). O que falta vem de três sítios — o **harness** de
+E18-T10 (adiado em Q-09), o **Anexo A** (Tier 1–3) e o **Anexo B** (Camada 1 residual e as
+decisões de Camada 2). A ordem segue Q > P > S e o método do §0: cada item traz fórmula, artefacto
+cru e teste que o trava; adotar-ou-reverter.
+
+### W7 · Fecho de método (pré-requisito de W8)
+
+**W7-1 · Harness estatístico zero-dep (E18-T10).**
+- **Onde:** `xtask` (novo `stats.rs`), consumido por `render_bench`, `provider_bench` e `measure_mvk`.
+- **Problema:** os gates medem p95 sem IC 95 % nem repetições declaradas; Q-09 ficou sem harness.
+- **Proposta:** `Summary { n, p50, p95, mean, ci95_low, ci95_high }` com IC 95 % (normal sobre a
+  média para `n ≥ 30`; para `n` menor, *bootstrap* **determinístico** — índices derivados do próprio
+  `n`, sem RNG); artefactos ganham `"ci95"`; o gate compara o **limite superior** com o orçamento.
+  `criterion`/`hyperfine`/`dhat` continuam **preteridos** (ADR 0014); um contador de alocação próprio
+  só entra se um A/B o justificar.
+- **Medida/artefacto:** `bench/render/frame.json`, `bench/providers/latency.json`,
+  `bench/e18/atomics/raw.json` (campos novos; `gate:bench` valida).
+- **Teste:** `n < 5` ⇒ erro; o IC contém a mediana; determinismo (mesmo input → mesmo `Summary`);
+  regressão acima do orçamento falha.
+- **Adoção:** menos falsos alarmes sem esconder regressões.
+
+**W7-2 · Regerar a atribuição (fecha S-03/Q-09).** Regenerar `bench/e18/atomics/raw.json`/`REPORT.md`
+com a cobertura atual (**100 %** instrumentáveis / **90,7 %** com `const fn`) e os rótulos novos
+(`policy::evaluate`/`policy::audit`/`policy::capability_for`); o `git diff` do artefacto é a prova.
+Gate: `diag:coverage` + `gate:bench`.
+
+**W7-3 · S-04 (drift residual).** Varrer ids prometidos sem emissão e nomes mortos; qualquer teto de
+`surface.toml` sobe **em PR**.
+
+### W8 · Anexo A — Tier 1
+
+**W8-1 · B1 · Decodificação restrita por gramática (maior rácio ganho/risco).**
+- **Onde:** request do dialeto `chat/completions` em `katu-providers` (o `llama-server` aceita
+  `grammar`/`response_format: json_schema`; um endpoint remoto pode recusar).
+- **Proposta:** campo opcional no pedido, derivado de `katu_tools::schema`, **fail-open** (sem
+  suporte do endpoint ⇒ comportamento atual) e **opt-in** por provider. Não muda o plano de dados:
+  muda como o modelo *declara* a chamada.
+- **Medida:** turnos falhados por JSON inválido em `parse_arguments` (`ProviderError::Decode`) →
+  **0**; latência; artefacto `bench/e18/grammar/`.
+- **Teste:** fixture de argumentos malformados passa a válido; desligado = bytes atuais; ADR (a criar)
+  regista a capacidade por provider.
+- **Adoção:** ≥ 20 % dos turnos falhados evitados; senão reverter e escrever o número.
+
+**W8-2 · C3 · Calibração da confiança (ECE/Brier).**
+- **Onde:** `katu-policy::confidence` + `bench/e18/confidence/` (extensão de Q-11).
+- **Proposta:** além do LB de Wilson, publicar **ECE** e **Brier** do veredicto `Enforced` face ao
+  log; nenhuma confiança publicada sem calibração (base `inferred`).
+- **Teste:** ECE decresce com a evidência; determinismo; `policy:confidence` mantém-se no `check`.
+- **Adoção:** baixo risco (auditoria pura, zero tokens de prompt).
+
+**W8-3 · C1 · Parada opcional válida (e-values / anytime-valid).**
+- **Onde:** `kernel::guard` (F7); artefacto `bench/e18/loop/`.
+- **Proposta:** e-value que torna a rejeição válida a qualquer `n`, mantendo o CUSUM como sinal; o
+  corte continua `agent.loop`.
+- **Teste:** falso-positivo sob parada opcional; determinismo; alarme ≤ teto.
+- **Adoção:** zero falso positivo e cobertura a qualquer `n` (senão mantém-se o SPRT).
+
+**W8-4 · A3 · VOI para tool calls.**
+- **Onde:** gate de tool em `agent`.
+- **Proposta:** regra determinística "não chamar quando o valor esperado < custo", **nunca** saltando
+  o irreconstruível. Proxy: tool calls evitadas em cenários canónicos.
+- **Adoção:** só com A/B; sem modelo local que emita tool calls nativas, fica como **decisão
+  escrita** (precedente Q-02b/Q-03).
+
+**A4** mantém-se **rejeitado** (§Q-18, 14,0 %); não reabrir sem sinal novo.
+
+### W9 · Anexo B — Camada 1 residual e Camada 2
+
+- **W9-1 · B-03 · Erro tipado que ensina.** `ToolOutcome`/`error` com `fix` + `toolName` (consolida
+  Q-08); teste de "tentativas cegas" num cenário canónico. Baixo risco, sem superfície nova.
+- **W9-2 · B-04 · Output ledger unificado.** Um só mecanismo head/tail + *spill* em
+  `feedback`/`report` no lugar das truncagens ad-hoc, com ponteiro para a página; artefacto
+  `bench/e18/ledger/`; teste de recuperação e teto de bytes.
+- **W9-3 · B-06 · Escalação de sandbox one-shot.** Alargamento **estrito** com `justification` e
+  aprovação **não herdada** (E07, liga a D3/MAC); teste de falso-negativo e de não-reuso.
+- **W9-4 · B-07 · Contrato "só o delta" no prime.** Uma linha no `render` — **model-visible**, logo
+  exige bump de `PRIME_VERSION` e de `gate:prompt`; **só com A/B** do custo em tokens. Não fazer às
+  cegas.
+- **W9-5 · B-08 · Modo `batch` declarativo (ADR).** Decidir por ADR se compensa capturar ~80 % do PTC
+  sem motor JS (G3/G7/determinismo): passos sequenciais/paralelos, filtros, condicional simples;
+  proptest de determinismo; medir com o harness de W7. Sem decisão, mantém-se o loop nativo
+  B-01/B-02.
+- **B-05** (par de eventos de sub-chamada) só faz sentido **dentro** de B-08; não antecipar.
+- **B-09** (runtime real) e **B-10** (background jobs) mantêm-se rejeitados/adiados com o número —
+  B-09 contradiz o binário único/G7.
+
+### W10 · Anexo A — Tier 2/3 e resíduos do E18
+
+- **A1/A2 (Tier 2):** formalizar o proxy de Q-02b/Q-03 com distorção `D ≤ D0`; artefacto
+  `bench/e18/select/`.
+- **D1 (Tier 2):** *taint*/*spotlighting* do output de tool antes do modelo; suíte red-team; mede
+  injeção bloqueada.
+- **C2/C7/C5 (Tier 2/3):** conformal, estatística robusta (mediana/MAD) e Benjamini–Hochberg.
+- **E1 (Tier 3):** curva USL do pool de B-01 (wall-clock vs threads).
+- **D2/D3:** `audit.seal` já é emitido; falta **detetar** adulteração (teste de tamper) e assinar
+  aprovações (MAC, fail-closed sem chave).
+- **E18-T05/T08/T09:** decidir — T05 (partilha estrutural) mede-se contra o snapshot atual; T08
+  (PERT/CPM) e T09 (PPR; o RRF já existe em Q-02b) mantêm o `✂` até haver sinal.
+
+### Resumo W7–W10
+
+| Onda | Itens | Fonte | Depende de |
+|---|---|---|---|
+| **W7** método | harness zero-dep (E18-T10) · regerar atribuição · S-04 | Q-09 residual | — |
+| **W8** Anexo A T1 | B1 gramática · C3 calibração · C1 e-values · A3 VOI | Anexo A | W7 |
+| **W9** Anexo B | B-03 · B-04 · B-06 · B-07 (gated) · ADR B-08 | Anexo B C1/C2 | W7 |
+| **W10** Anexo A T2/T3 | A1/A2 · D1 · C2/C7/C5 · E1 · D2/D3 · E18-T05/T08/T09 | Anexo A + E18 | W8 |
+
+**Regra de entrada em W8:** nenhuma frente nova sem o harness de W7 (a lição de W1). Cada item fecha
+com artefacto cru, teste que o trava (`make check` + `msrv`) e a decisão adotar-ou-reverter escrita —
+adotado com o número, ou rejeitado **com** o número.
 
 ---
 
@@ -743,6 +885,10 @@ novos. Cada um exige **medida + artefacto + teste** (§0).
    (VOI evita tool calls inúteis), **C1** (avaliação contínua honesta), **C3** (confiança calibrada).
 2. **Tier 2:** **A1/A2** (formalizam F2/F3), **C2**, **D1**, **C7**.
 3. **Tier 3:** **B2**, **B4**, **C4**, **C5**, **E1**, **D2/D3**.
+
+**Estado (após W6):** **A4** rejeitado (§Q-18); **A1/A2** têm um proxy adotado em Q-02b/Q-03 (falta
+a formalização com `D ≤ D0`, W10); os restantes entram em **W8** (Tier 1) e **W10** (Tier 2/3)
+conforme o §10.
 
 **Nota de fronteira:** A1–A6 tocam o **contexto** (katu); A5/A6 são **consumo** do knudge (§0.1);
 nenhum reimplementa o motor de retrieval.
@@ -828,13 +974,16 @@ O que a própria nota **admite** (e devemos respeitar):
 
 | # | Elemento | Encaixe | Medida |
 |---|---|---|---|
-| B-01 | **Concorrência classificada por tool + pool limitado** | `agent/turn.rs` hoje corre `for ... in calls` **sequencial**; introduzir `is_concurrency_safe` fail-closed (default exclusivo) e pool | wall-clock de N leituras independentes; A/B |
-| B-02 | **Vários tool calls por passo, com ordem de commit determinística** (já recebemos `step.calls`) | idem | turnos/tarefa |
+| B-01 ✔ | **Concorrência classificada por tool + pool limitado** | `agent/turn.rs` hoje corre `for ... in calls` **sequencial**; introduzir `is_concurrency_safe` fail-closed (default exclusivo) e pool | wall-clock de N leituras independentes; A/B |
+| B-02 ✔ | **Vários tool calls por passo, com ordem de commit determinística** (já recebemos `step.calls`) | idem | turnos/tarefa |
 | B-03 | **Erro tipado que ensina**: `ToolCallError` ↔ enriquecer `ToolOutcome` com `fix`/`toolName` (liga a Q-08) | [`error/mod.rs`](crates/katu-core/src/error/mod.rs) | tentativas cegas ↓ |
 | B-04 | **Output ledger unificado** (head/tail + spill) em vez de truncagens ad-hoc | `feedback.rs` + TOON | bytes de output, recuperação |
 | B-05 | **Par de eventos de sub-chamada** no catálogo diag (`tool.dispatch.start`/`tool.dispatch.settle`) | `events.rs` | cobertura de instrumentação |
 | B-06 | **Escalação de sandbox com justificação + aprovação one-shot** (alargamento estrito) | `approval`/E07 | aprovações forjáveis ↓; falso-negativo |
 | B-07 | **Só o delta/devolução reentra no contexto** — tornar explícito no prime o contrato "extrai só o necessário" | `prime` (Q-04) | tokens de turno |
+
+**Estado:** **B-01/B-02 ✔** (lote `Shared` com pool limitado; `bench/e18/batch/`, **+76,3 %**); os
+restantes (B-03..B-07) entram em **W9** (§10).
 
 **Camada 2 — avaliar (arquitetural, ADR obrigatório):**
 
@@ -856,7 +1005,7 @@ O que a própria nota **admite** (e devemos respeitar):
 A lição mais valiosa do PTC não é o motor JavaScript — é o **contrato**: *a apresentação
 (como o modelo declara uma sequência de trabalho) é ortogonal à autoridade (o que pode
 fazer)*, e ambos passam pelo **mesmo pipeline** com **erros tipados** e **output curado**. O katu
-já tem o pipeline (`kernel/pipeline`, `tool.rs`) e a política fail-closed; falta-lhe (a) **executar
-as tool calls de um passo com concorrência classificada** (B-01/B-02, ganho imediato e sem
-superfície nova) e (b) decidir, por ADR, se quer um **modo `batch` declarativo** (B-08). A
-Camada 1 entra na W4 (superfície) e na W6 (estabilidade) sem alterar G3.
+já tem o pipeline (`kernel/pipeline`, `tool.rs`) e a política fail-closed; **já executou** as tool
+calls de um passo com concorrência classificada (**B-01/B-02 ✔**, `bench/e18/batch/`) e falta-lhe
+(a) os contratos tipados de **B-03..B-07** (W9) e (b) decidir, por ADR, se quer um **modo `batch`
+declarativo** (**B-08**, W9) — sempre sem alterar G3.

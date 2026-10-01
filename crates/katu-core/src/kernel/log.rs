@@ -54,6 +54,8 @@ impl Durability {
     /// Interpreta o valor da config; `None` para um valor desconhecido (fail-closed no chamador).
     #[must_use]
     pub fn parse(value: &str) -> Option<Self> {
+        let _span = crate::trace_fn!("kernel::log::Durability::parse");
+
         match value {
             "event" => Some(Self::Event),
             "turn" => Some(Self::Turn),
@@ -143,8 +145,10 @@ impl<'a> Log<'a> {
         self.durability = durability;
     }
 
-    /// Política em vigor.
+    /// Política em vigor. Só existe para os testes: em produção a decisão é a chave
+    /// `behavior.durability` (ADR 0024).
     #[must_use]
+    #[cfg(test)]
     pub const fn durability(&self) -> Durability {
         self.durability
     }

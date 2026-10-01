@@ -4,6 +4,7 @@
 //! excerto limitado (o corpo integral continua no log); a pesquisa indexa `text`/`path`/`tool`/
 //! `status`/`rule`/`kind`.
 
+use crate::diag::{Level, events};
 use crate::kernel::{Control, Event};
 use crate::toon::{Cell, RowTable};
 
@@ -37,6 +38,11 @@ impl AuditRecord {
         reason = "projeção exaustiva de todos os eventos num só sítio (tabela de equivalência)"
     )]
     pub fn from_event(seq: u64, event: &Event) -> Self {
+        let _span = crate::fn_span!(
+            Level::Trace,
+            events::LOG_APPEND,
+            "kernel::audit::record::from_event"
+        );
         let mut record = Self {
             seq,
             kind: "event",

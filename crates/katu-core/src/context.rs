@@ -230,7 +230,7 @@ fn compact_prefix(
         crate::event!(
             Level::Debug,
             events::CONTEXT_DIGEST,
-            "js_milli" => digest.divergence.value,
+            "js_milli" => crate::evidence::from_f64(digest.divergence.value),
             "tau_milli" => options.params.tau_js_milli,
             "applied" => 0,
         );

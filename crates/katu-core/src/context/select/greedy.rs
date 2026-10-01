@@ -179,6 +179,8 @@ struct Pick {
 impl Pick {
     /// Estado vazio para `n` candidatos.
     fn new(n: usize) -> Self {
+        let _span = crate::trace_fn!("context::select::greedy::Pick::new");
+
         Self {
             taken: vec![false; n],
             chosen: Vec::new(),

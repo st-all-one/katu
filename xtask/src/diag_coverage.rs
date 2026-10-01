@@ -1,8 +1,20 @@
 //! `diag:coverage` — cobertura de instrumentação por função (E19-T03).
 //!
 //! Mede a fração das funções **instrumentáveis** (não-`const`, fora de testes, com corpo, sem item
-//! no topo) que abrem um span (`trace_fn!`/`fn_span!`/`span!`) e falha abaixo de 90 %.
-//! `katu-policy` fica fora por desenho (firewall: é instrumentada **pelo chamador**).
+//! no topo) que abrem um span (`trace_fn!`/`fn_span!`/`span!`). `katu-policy` fica fora por desenho
+//! (firewall: é instrumentada **pelo chamador**), tal como `tests/`, `examples/` e `benches/` — não
+//! são código de produção.
+//!
+//! **Duas medidas, ambas travadas em 90 %:**
+//!
+//! - **instrumentáveis** — o alvo do trabalho (instrumentar o que se pode instrumentar);
+//! - **todas as funções** — a mesma conta com as `const fn` no denominador. Uma `const fn` não pode
+//!   abrir um span num build com a `feature = "instrument"` (o `Span::start_function` não é
+//!   `const`), pelo que a única forma de a contar é **deixar de ser `const`** (quando não é usada em
+//!   contexto `const`) ou não a ter.
+//!
+//! Sem a segunda trava, o número com `const fn` deslizava para baixo de 90 % a cada `const fn` nova
+//! (Q-15/P-01 acrescentaram várias) sem que nada falhasse.
 
 #![allow(
     clippy::print_stdout,
@@ -62,11 +74,7 @@ pub(crate) fn check_diag_coverage() -> Result<(), String> {
             continue;
         }
         let name = file.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        if name.contains("tests") || rel.contains("/tests/") {
-            continue;
-        }
-        // O próprio diag não se instrumenta (recursão no sink): fora da métrica.
-        if rel.contains("/diag/") || rel.ends_with("/diag.rs") {
+        if !is_production(&rel, name) {
             continue;
         }
         let source =
@@ -95,13 +103,35 @@ pub(crate) fn check_diag_coverage() -> Result<(), String> {
         "diag-coverage: {covered}/{total} instrumentáveis ({tenths}.{units}%); \
          com {consts} const fn: {covered}/{all} ({all_tenths}.{all_units}%)"
     );
-    if permille >= 900 {
-        Ok(())
-    } else {
-        Err(format!(
-            "diag-coverage falhou: {tenths}.{units}% < 90% ({covered}/{total})"
-        ))
+    if permille < 900 {
+        return Err(format!(
+            "diag-coverage falhou: {tenths}.{units}% das funções instrumentáveis < 90% \
+             ({covered}/{total}) — abra um span (`trace_fn!`) nas que faltam"
+        ));
     }
+    if permille_all < 900 {
+        return Err(format!(
+            "diag-coverage falhou: {all_tenths}.{all_units}% de todas as funções < 90% \
+             ({covered}/{all}, com {consts} `const fn`) — instrumente as que faltam ou tire o \
+             `const` às que não são usadas em contexto `const`"
+        ));
+    }
+    Ok(())
+}
+
+/// `true` se o caminho é **código de produção** (fora de testes, exemplos, *benches* e do diag).
+///
+/// Exemplos e *benches* não são instrumentados nem contados: não correm no produto. O próprio `diag`
+/// não se instrumenta (recursão no sink).
+#[must_use]
+fn is_production(rel: &str, name: &str) -> bool {
+    if name.contains("tests") || rel.contains("/tests/") {
+        return false;
+    }
+    if rel.contains("/examples/") || rel.contains("/benches/") {
+        return false;
+    }
+    !(rel.contains("/diag/") || rel.ends_with("/diag.rs"))
 }
 
 /// `true` se a linha é a assinatura de uma função (devolve se é `const fn`).
@@ -299,7 +329,29 @@ fn account_fn(lines: &[&str], index: usize) -> (usize, (usize, usize, usize)) {
 
 #[cfg(test)]
 mod tests {
-    use super::{coverage_in_source, starts_with_item};
+    use super::{coverage_in_source, is_production, starts_with_item};
+
+    #[test]
+    fn only_production_paths_are_measured() {
+        assert!(is_production(
+            "crates/katu-core/src/kernel/log.rs",
+            "log.rs"
+        ));
+        assert!(!is_production(
+            "crates/katu-core/src/kernel/log/tests.rs",
+            "tests.rs"
+        ));
+        assert!(!is_production(
+            "crates/katu/examples/measure_mvk.rs",
+            "measure_mvk.rs"
+        ));
+        assert!(!is_production(
+            "crates/katu/benches/throughput.rs",
+            "throughput.rs"
+        ));
+        assert!(!is_production("crates/katu-core/src/diag/mod.rs", "mod.rs"));
+        assert!(!is_production("crates/katu-core/src/diag.rs", "diag.rs"));
+    }
 
     #[test]
     fn coverage_counts_instrumentable_functions() {

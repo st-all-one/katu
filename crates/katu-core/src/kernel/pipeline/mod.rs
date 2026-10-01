@@ -245,7 +245,9 @@ pub fn dispatch_with(request: DispatchRequest<'_>) -> Result<Dispatch, PolicyErr
         request.capabilities,
     );
     let decision = {
-        let _span = crate::span!(Level::Trace, events::POLICY_EVALUATE);
+        // E02-T04/S-03: a política é instrumentada **pelo chamador** (firewall); o rótulo atribui
+        // o custo a `policy::evaluate` sem a `katu-policy` depender do `diag`.
+        let _span = crate::fn_span!(Level::Trace, events::POLICY_EVALUATE, "policy::evaluate");
         evaluate(&facts, request.rules)?
     };
     if decision.is_allow() {

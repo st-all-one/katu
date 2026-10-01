@@ -236,8 +236,17 @@ fn retry_with_approval(
     let Some(approval) = activity.approve(&prompt) else {
         return Ok(());
     };
-    let Some(capability) = katu_policy::capability_for_request(&use_, &runtime.rules, &request)
-    else {
+    // S-03: a política é instrumentada pelo chamador (firewall); o rótulo atribui o custo a
+    // `policy::capability_for` dentro do span de `retry_with_approval`.
+    let capability = {
+        let _span = katu_core::fn_span!(
+            Level::Trace,
+            events::POLICY_CAPABILITY,
+            "policy::capability_for"
+        );
+        katu_policy::capability_for_request(&use_, &runtime.rules, &request)
+    };
+    let Some(capability) = capability else {
         return Ok(());
     };
     runtime.session.approve(

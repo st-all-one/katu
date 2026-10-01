@@ -47,6 +47,16 @@ grep -h 'kind=span.end' /tmp/atomics-*.log \
 Percentis por *nearest-rank*; `katu.run`/`cli.run`/`kernel.turn`/`provider.request` são totais com
 filhos.
 
+A partir de Q-09, os spans de função trazem o rótulo real no campo `function=…` (o id `katu.fn` é
+propositalmente genérico, S-02). Para atribuir **por função**, agregar pelo rótulo:
+
+```bash
+# o `function=` só existe nos spans de função; os eventos pontuais mantêm a linha antiga
+grep -h 'kind=span.end' /tmp/atomics-*.log \
+  | sed -nE 's/.*function=([^ ]+).*dur_ns=Some\(([0-9]+)\).*/\1 \2/p' \
+  | sort -k1,1
+```
+
 ## 4. Baseline release (secção 4)
 
 Lido de [`bench/mvk/raw.json`](../../mvk/raw.json) (release, instrumentação **desligada**). Não é

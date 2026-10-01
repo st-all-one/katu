@@ -28,6 +28,7 @@ use handler::AgentHandler;
 
 /// Corre a UI de terminal ligada ao loop de turnos.
 pub(crate) fn run_tui(args: &RunArgs<'_>) -> Report {
+    let _span = katu_core::trace_fn!("tui::run_tui");
     let fs = StdFs;
     let clock = SystemClock;
     let env = StdEnv;
@@ -40,36 +41,22 @@ pub(crate) fn run_tui(args: &RunArgs<'_>) -> Report {
     if args.compact {
         runtime.set_compaction(CompactionMode::Enabled);
     }
-    let base = args
-        .base
-        .map_or_else(|| default_base(args.provider).to_string(), str::to_string);
-    let provider = match build_provider(args.provider, &base, &env, runtime.session_id()) {
-        Ok(provider) => provider,
-        Err(message) => return Report::failed("tui", &Error::invalid_input(message)),
+    let wiring = match wire(args, &runtime, &env) {
+        Ok(wiring) => wiring,
+        Err(report) => return report,
     };
-    let tiers = match TierPolicy::load() {
-        Ok(tiers) => tiers,
-        Err(message) => return Report::failed("tui", &Error::invalid_input(message)),
-    };
-    let prices = match pricing::price_table() {
-        Ok(prices) => prices,
-        Err(message) => return Report::failed("tui", &Error::invalid_input(message)),
-    };
-    let model = args.model.map_or_else(
-        || {
-            tiers.model_for(
-                provider.as_ref(),
-                runtime.phase(),
-                default_model(args.provider),
-            )
-        },
-        str::to_string,
-    );
-    let models = models_for(provider.as_ref(), &model);
-    let thinking = control::thinking_options(provider.as_ref(), &model);
+    let Wiring {
+        provider,
+        tiers,
+        prices,
+        model,
+    } = wiring;
     let mut app = App::new();
-    app.apply_update(Update::Models(models));
-    app.apply_update(Update::ThinkingOptions(thinking));
+    app.apply_update(Update::Models(models_for(provider.as_ref(), &model)));
+    app.apply_update(Update::ThinkingOptions(control::thinking_options(
+        provider.as_ref(),
+        &model,
+    )));
     apply_initial(&mut app, &runtime);
     let mut handler = AgentHandler {
         runtime,
@@ -89,6 +76,45 @@ pub(crate) fn run_tui(args: &RunArgs<'_>) -> Report {
         Ok(()) => Report::ok("tui", None),
         Err(error) => Report::failed("tui", &Error::io("<tui>", error)),
     }
+}
+
+/// Provider, *tiers*, preços e modelo resolvidos a partir das flags e do runtime.
+struct Wiring {
+    provider: Box<dyn Provider>,
+    tiers: TierPolicy,
+    prices: katu_providers::PriceTable,
+    model: String,
+}
+
+/// Resolve a cablagem do comando, devolvendo o relatório de falha pronto a devolver.
+fn wire(args: &RunArgs<'_>, runtime: &Runtime<'_>, env: &StdEnv) -> Result<Wiring, Report> {
+    let _span = katu_core::trace_fn!("tui::wire");
+
+    let base = args
+        .base
+        .map_or_else(|| default_base(args.provider).to_string(), str::to_string);
+    let provider = build_provider(args.provider, &base, env, runtime.session_id())
+        .map_err(|message| Report::failed("tui", &Error::invalid_input(message)))?;
+    let tiers = TierPolicy::load()
+        .map_err(|message| Report::failed("tui", &Error::invalid_input(message)))?;
+    let prices = pricing::price_table()
+        .map_err(|message| Report::failed("tui", &Error::invalid_input(message)))?;
+    let model = args.model.map_or_else(
+        || {
+            tiers.model_for(
+                provider.as_ref(),
+                runtime.phase(),
+                default_model(args.provider),
+            )
+        },
+        str::to_string,
+    );
+    Ok(Wiring {
+        provider,
+        tiers,
+        prices,
+        model,
+    })
 }
 
 /// Aplica o pensamento por omissão da config como controlo **logado** (E20-T17).

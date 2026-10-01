@@ -34,14 +34,16 @@ impl Session<'_> {
         self.log.set_durability(durability);
     }
 
-    /// Política de durabilidade em vigor.
+    /// Política de durabilidade em vigor. Só existe para os testes (ADR 0024).
     #[must_use]
+    #[cfg(test)]
     pub const fn durability(&self) -> Durability {
         self.durability
     }
 
-    /// `true` se há eventos escritos por sincronizar (modo `turn`).
+    /// `true` se há eventos escritos por sincronizar (modo `turn`). Só existe para os testes.
     #[must_use]
+    #[cfg(test)]
     pub const fn is_dirty(&self) -> bool {
         self.log.is_dirty()
     }

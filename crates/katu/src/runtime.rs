@@ -71,7 +71,10 @@ fn load_rules(now_millis: u64) -> Result<(RuleSet, Vec<String>), PolicyError> {
         .rules
         .extend(RuleSet::from_toml(CONTAINMENT_POLICY)?.rules);
     // E02-T04 instrumentado **pelo chamador** (firewall): o binário audita o conjunto carregado.
-    let report = katu_policy::audit(&rules, now_millis);
+    let report = {
+        let _span = katu_core::fn_span!(Level::Debug, events::POLICY_AUDIT, "policy::audit");
+        katu_policy::audit(&rules, now_millis)
+    };
     katu_core::event!(
         Level::Debug,
         events::POLICY_AUDIT,

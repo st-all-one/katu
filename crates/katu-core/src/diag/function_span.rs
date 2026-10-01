@@ -29,6 +29,8 @@ macro_rules! fn_span {
 ///
 /// Conveniência para cobrir funções **em massa** sem exigir imports no chamador: o rótulo
 /// (`"módulo::função"`) é o único argumento e o `Sink` agrupa o tempo atómico por `(evento, função)`.
+/// O identificador genérico é **deliberado** (S-02): não é ambíguo porque o rótulo real segue no
+/// `Record.function` e o sink de `stderr` o imprime (Q-09).
 /// `no-op` quando a `feature = "instrument"` está desligada (custo literalmente zero).
 ///
 /// ```

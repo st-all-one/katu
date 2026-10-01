@@ -130,16 +130,35 @@ pub(crate) fn report(group: Group, long: bool) -> Report {
     )
 }
 
-/// Nome estável do grupo (para o envelope).
-pub(crate) const fn name(group: Group) -> &'static str {
-    match group {
-        Group::Global => "global",
-        Group::Memo => "memo",
-        Group::Run => "run",
-        Group::Tui => "tui",
-        Group::Config => "config",
-        Group::Upgrade => "upgrade",
-    }
+/// Fonte única dos grupos do prime: `(variante, nome estável, texto)`.
+///
+/// Gera `name` e `base` da **mesma** lista, para que um grupo novo não possa divergir entre o
+/// envelope JSON e o texto (S-05).
+macro_rules! groups {
+    ($( ($variant:ident, $name:literal, $text:ident) ),* $(,)?) => {
+        /// Nome estável do grupo (para o envelope).
+        pub(crate) const fn name(group: Group) -> &'static str {
+            match group {
+                $( Group::$variant => $name, )*
+            }
+        }
+
+        /// Prime curto de cada grupo.
+        const fn base(group: Group) -> &'static str {
+            match group {
+                $( Group::$variant => $text, )*
+            }
+        }
+    };
+}
+
+groups! {
+    (Global, "global", GLOBAL),
+    (Memo, "memo", MEMO),
+    (Run, "run", RUN),
+    (Tui, "tui", TUI),
+    (Config, "config", CONFIG),
+    (Upgrade, "upgrade", UPGRADE),
 }
 
 /// Texto do prime: base estática por grupo e, com `long`, a gramática/escopo comuns.
@@ -155,18 +174,6 @@ pub(crate) fn text(group: Group, long: bool) -> String {
         text.push_str(GRAMMAR);
     }
     text
-}
-
-/// Prime curto de cada grupo.
-const fn base(group: Group) -> &'static str {
-    match group {
-        Group::Global => GLOBAL,
-        Group::Memo => MEMO,
-        Group::Run => RUN,
-        Group::Tui => TUI,
-        Group::Config => CONFIG,
-        Group::Upgrade => UPGRADE,
-    }
 }
 
 /// Gramática e escopo comuns (`--long`).
