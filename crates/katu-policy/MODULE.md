@@ -21,6 +21,10 @@ O **motor de política** do katu: avalia factos tipados e devolve um veredicto d
   (`Threshold::DEFAULT`), nunca derivado dos dados (DF8). Com registo perfeito prova-se a regra a
   **n = 25** (LB `902 ≥ 900`); uma violação em 20 derruba o LB para `804` e marca
   `contradiction` (artefacto em [`bench/e18/confidence`](../../bench/e18/confidence/PROTOCOL.md)).
+- `calibrate(&[Verdict]) -> Calibration` (C3/W8-2) — **calibração** do LB face à frequência
+  empírica do log (base `inferred`): ECE, Brier e diagrama de fiabilidade (10 baldes), determinístico.
+  No registo perfeito o ECE desce de `730‰` (n = 1) a `83‰` (n = 30); o `policy:confidence` publica
+  ECE/Brier. Mede o **conservadorismo** do limite (in-sample), não o acerto do modelo.
 - Vocabulário **fechado e versionado** (`POLICY_VOCAB_VERSION`, v3 desde o ADR 0022).
 
 ## Semântica de negação (OA15)

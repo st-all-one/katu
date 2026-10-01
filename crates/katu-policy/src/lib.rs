@@ -52,7 +52,10 @@ mod rule;
 pub use approval::{capability_for, capability_for_request};
 pub use argv::{ArgvInspection, inspect};
 pub use audit::{Activity, AuditIssue, AuditReport, ExampleCoverage, RuleSummary, audit};
-pub use confidence::{Confidence, Threshold, Trials, Verdict, verdict};
+pub use confidence::{
+    CALIBRATION_BINS, Calibration, CalibrationBin, Confidence, Threshold, Trials, Verdict,
+    calibrate, verdict,
+};
 pub use decision::{ApprovalRequest, ControlId, Decision, Evidence, Reason};
 pub use error::PolicyError;
 pub use evaluate::evaluate;

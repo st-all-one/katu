@@ -20,6 +20,8 @@ mod decode;
 mod encode;
 
 pub(crate) use decode::ChatDecoder;
+#[cfg(test)]
+pub(crate) use encode::tool_call_schema;
 pub(crate) use encode::{
     EncodeOptions, encode_request, model_tool_name, thinking_effort, tool_arguments,
 };
@@ -53,7 +55,29 @@ pub(crate) fn stream_chat<T: Transport>(
         body,
         call.endpoint.headers.clone(),
     );
-    wire::stream(transport, &http, call.retry, ChatDecoder::new, sink)
+    match wire::stream(transport, &http, call.retry, ChatDecoder::new, sink) {
+        Err(ProviderError::Http { status: 400, .. }) if call.options.structured_output => {
+            // Fail-open (B1/W8-1): o endpoint não aceita `response_format`; repete sem ele e o
+            // comportamento volta a ser o atual. O `wire` já só chega aqui antes de emitir eventos.
+            katu_core::event!(
+                Level::Debug,
+                events::PROVIDER_REQUEST,
+                "structured_output_fallback" => 1_u64,
+            );
+            let fallback = EncodeOptions {
+                structured_output: false,
+                ..call.options.clone()
+            };
+            let body = encode_request(call.request, &fallback)?;
+            let http = HttpRequest::post(
+                call.endpoint.url.clone(),
+                body,
+                call.endpoint.headers.clone(),
+            );
+            wire::stream(transport, &http, call.retry, ChatDecoder::new, sink)
+        }
+        other => other,
+    }
 }
 
 #[cfg(test)]

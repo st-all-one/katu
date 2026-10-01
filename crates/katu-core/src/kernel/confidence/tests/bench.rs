@@ -7,7 +7,7 @@
 
 use katu_policy::{
     Enforcement, Rule, RuleCategory, RuleExamples, RuleId, RuleScope, RuleSet, Severity, Threshold,
-    ToolName,
+    ToolName, calibrate,
 };
 use serde_json::json;
 
@@ -102,6 +102,49 @@ fn flip() -> (u32, u32) {
 
 /// Serializa o artefacto (JSON determinístico).
 ///
+/// Calibração C3/W8-2 (artefacto): o resumo com o diagrama e a curva do ECE com a evidência.
+fn calibration_json(rules: &RuleSet) -> (serde_json::Value, serde_json::Value) {
+    let mut verdicts = Vec::new();
+    for total in [5_u32, 10, 15, 20, 25, 40, 60] {
+        verdicts.extend(enforced_verdicts(
+            &honored(total),
+            rules,
+            &Threshold::DEFAULT,
+        ));
+    }
+    verdicts.extend(enforced_verdicts(&violated(20), rules, &Threshold::DEFAULT));
+    let calibration = calibrate(&verdicts);
+    let bins: Vec<serde_json::Value> = calibration
+        .bins
+        .iter()
+        .map(|bin| {
+            json!({
+                "lower_milli": bin.lower_milli,
+                "upper_milli": bin.upper_milli,
+                "trials": bin.trials,
+                "predicted_milli": bin.predicted_milli,
+                "observed_milli": bin.observed_milli,
+            })
+        })
+        .collect();
+    let summary = json!({
+        "basis": "inferred",
+        "predicted": "lower_milli (LB de Wilson)",
+        "outcome": "frequência empírica (sucessos/ensaios)",
+        "caveat": "in-sample: mede o conservadorismo do LB face à frequência do próprio log, não uma validação fora da amostra",
+        "trials": calibration.trials,
+        "brier_milli": calibration.brier_milli,
+        "ece_milli": calibration.ece_milli,
+        "bins": bins,
+    });
+    let mut by_n = Vec::new();
+    for total in 1..=30_u32 {
+        let verdicts = enforced_verdicts(&honored(total), rules, &Threshold::DEFAULT);
+        by_n.push(json!({"n": total, "ece_milli": calibrate(&verdicts).ece_milli}));
+    }
+    (summary, serde_json::Value::Array(by_n))
+}
+
 /// # Errors
 /// Se a construção das fixtures falhar.
 pub(super) fn measure() -> Result<String, Box<dyn std::error::Error>> {
@@ -114,6 +157,7 @@ pub(super) fn measure() -> Result<String, Box<dyn std::error::Error>> {
     let dirty_first = dirty.first().ok_or("sem veredicto")?;
     let empty_first = empty.first().ok_or("sem veredicto")?;
     let deterministic = rule_trials(&honored(7)) == rule_trials(&honored(7));
+    let (calibration, calibration_by_n) = calibration_json(&rules);
 
     let value = json!({
         "schema": "katu.bench.confidence.v1",
@@ -141,6 +185,8 @@ pub(super) fn measure() -> Result<String, Box<dyn std::error::Error>> {
             "contradiction": empty_first.contradiction,
         },
         "deterministic": deterministic,
+        "calibration": calibration,
+        "calibration_by_n": calibration_by_n,
         "criterion": "veredicto medido com evidência (n, sucessos, LB) + demolição com uma violação + determinismo (Q-11 não é um ganho de latência: é evidência)",
         "criterion_met": true,
         "caveat": "fixtures sintéticas sobre as funções de produção: mede a estatística (Wilson/Beta), não o modelo. As sessões locais não têm tool calls nativas, pelo que em dados reais o veredicto é `unmeasured` (ver PROTOCOL.md)",
@@ -188,5 +234,13 @@ fn ab_confidence_by_artifact() -> Result<(), Box<dyn std::error::Error>> {
         .get("perfect_record")
         .and_then(|record| record.get("proves_at_n"));
     assert_eq!(proves_at, Some(&json!(25)));
+    let ece = value
+        .get("calibration")
+        .and_then(|calibration| calibration.get("ece_milli"))
+        .and_then(serde_json::Value::as_u64);
+    assert!(
+        ece.is_some_and(|milli| milli <= 1_000),
+        "calibração em falta"
+    );
     Ok(())
 }

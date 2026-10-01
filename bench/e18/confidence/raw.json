@@ -1,4 +1,207 @@
 {
+  "calibration": {
+    "basis": "inferred",
+    "bins": [
+      {
+        "lower_milli": 0,
+        "observed_milli": 0,
+        "predicted_milli": 0,
+        "trials": 0,
+        "upper_milli": 10
+      },
+      {
+        "lower_milli": 10,
+        "observed_milli": 0,
+        "predicted_milli": 0,
+        "trials": 0,
+        "upper_milli": 20
+      },
+      {
+        "lower_milli": 20,
+        "observed_milli": 0,
+        "predicted_milli": 0,
+        "trials": 0,
+        "upper_milli": 30
+      },
+      {
+        "lower_milli": 30,
+        "observed_milli": 0,
+        "predicted_milli": 0,
+        "trials": 0,
+        "upper_milli": 40
+      },
+      {
+        "lower_milli": 40,
+        "observed_milli": 0,
+        "predicted_milli": 0,
+        "trials": 0,
+        "upper_milli": 50
+      },
+      {
+        "lower_milli": 50,
+        "observed_milli": 0,
+        "predicted_milli": 0,
+        "trials": 0,
+        "upper_milli": 60
+      },
+      {
+        "lower_milli": 60,
+        "observed_milli": 1000,
+        "predicted_milli": 649,
+        "trials": 5,
+        "upper_milli": 70
+      },
+      {
+        "lower_milli": 70,
+        "observed_milli": 1000,
+        "predicted_milli": 787,
+        "trials": 10,
+        "upper_milli": 80
+      },
+      {
+        "lower_milli": 80,
+        "observed_milli": 982,
+        "predicted_milli": 844,
+        "trials": 55,
+        "upper_milli": 90
+      },
+      {
+        "lower_milli": 90,
+        "observed_milli": 1000,
+        "predicted_milli": 940,
+        "trials": 125,
+        "upper_milli": 100
+      }
+    ],
+    "brier_milli": 18,
+    "caveat": "in-sample: mede o conservadorismo do LB face à frequência do próprio log, não uma validação fora da amostra",
+    "ece_milli": 98,
+    "outcome": "frequência empírica (sucessos/ensaios)",
+    "predicted": "lower_milli (LB de Wilson)",
+    "trials": 195
+  },
+  "calibration_by_n": [
+    {
+      "ece_milli": 730,
+      "n": 1
+    },
+    {
+      "ece_milli": 575,
+      "n": 2
+    },
+    {
+      "ece_milli": 474,
+      "n": 3
+    },
+    {
+      "ece_milli": 404,
+      "n": 4
+    },
+    {
+      "ece_milli": 351,
+      "n": 5
+    },
+    {
+      "ece_milli": 311,
+      "n": 6
+    },
+    {
+      "ece_milli": 279,
+      "n": 7
+    },
+    {
+      "ece_milli": 253,
+      "n": 8
+    },
+    {
+      "ece_milli": 231,
+      "n": 9
+    },
+    {
+      "ece_milli": 213,
+      "n": 10
+    },
+    {
+      "ece_milli": 197,
+      "n": 11
+    },
+    {
+      "ece_milli": 184,
+      "n": 12
+    },
+    {
+      "ece_milli": 172,
+      "n": 13
+    },
+    {
+      "ece_milli": 162,
+      "n": 14
+    },
+    {
+      "ece_milli": 153,
+      "n": 15
+    },
+    {
+      "ece_milli": 145,
+      "n": 16
+    },
+    {
+      "ece_milli": 137,
+      "n": 17
+    },
+    {
+      "ece_milli": 131,
+      "n": 18
+    },
+    {
+      "ece_milli": 125,
+      "n": 19
+    },
+    {
+      "ece_milli": 119,
+      "n": 20
+    },
+    {
+      "ece_milli": 114,
+      "n": 21
+    },
+    {
+      "ece_milli": 110,
+      "n": 22
+    },
+    {
+      "ece_milli": 105,
+      "n": 23
+    },
+    {
+      "ece_milli": 101,
+      "n": 24
+    },
+    {
+      "ece_milli": 98,
+      "n": 25
+    },
+    {
+      "ece_milli": 94,
+      "n": 26
+    },
+    {
+      "ece_milli": 91,
+      "n": 27
+    },
+    {
+      "ece_milli": 88,
+      "n": 28
+    },
+    {
+      "ece_milli": 85,
+      "n": 29
+    },
+    {
+      "ece_milli": 83,
+      "n": 30
+    }
+  ],
   "caveat": "fixtures sintéticas sobre as funções de produção: mede a estatística (Wilson/Beta), não o modelo. As sessões locais não têm tool calls nativas, pelo que em dados reais o veredicto é `unmeasured` (ver PROTOCOL.md)",
   "criterion": "veredicto medido com evidência (n, sucessos, LB) + demolição com uma violação + determinismo (Q-11 não é um ganho de latência: é evidência)",
   "criterion_met": true,

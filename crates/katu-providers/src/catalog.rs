@@ -67,7 +67,7 @@ impl MaxTokensField {
 /// Metadados de um modelo: roteamento e parametrização do wire.
 #[allow(
     clippy::struct_excessive_bools,
-    reason = "dois flags independentes de capacidade (cache e raciocínio); não há estado inválido"
+    reason = "três flags independentes de capacidade (cache, raciocínio e saída estruturada); não há estado inválido"
 )]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModelEntry {
@@ -89,6 +89,8 @@ pub struct ModelEntry {
     pub reasoning_format: Option<String>,
     /// Classe de custo/capacidade (E12-T03); por omissão [`Tier::Balanced`].
     pub tier: Tier,
+    /// Aceita o campo de **saída estruturada** (`response_format`, `json_schema`; B1/W8-1).
+    pub structured_output: bool,
 }
 
 impl ModelEntry {
@@ -107,6 +109,7 @@ impl ModelEntry {
             reasoning: false,
             reasoning_format: None,
             tier: Tier::Balanced,
+            structured_output: false,
         }
     }
 
@@ -161,6 +164,13 @@ impl ModelEntry {
     #[must_use]
     pub const fn with_tier(mut self, tier: Tier) -> Self {
         self.tier = tier;
+        self
+    }
+
+    /// Marca suporte a **saída estruturada** (`response_format`, `json_schema`; B1/W8-1).
+    #[must_use]
+    pub const fn with_structured_output(mut self) -> Self {
+        self.structured_output = true;
         self
     }
 }

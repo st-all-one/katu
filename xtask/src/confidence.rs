@@ -23,7 +23,7 @@ use katu_core::kernel::{
     Event, LOG_SCHEMA_VERSION, enforced_verdicts, read_records, rule_trials, tool_trials,
 };
 use katu_core::ports::{Fs as _, MemFs};
-use katu_policy::{RuleSet, Threshold, ToolName, Verdict};
+use katu_policy::{Calibration, RuleSet, Threshold, ToolName, Verdict, calibrate};
 
 use crate::walk::collect_rule_files;
 
@@ -58,6 +58,7 @@ pub(crate) fn policy_confidence(args: &[String]) -> Result<(), String> {
     let trials = rule_trials(&events);
     let contradictions = print_rules(&verdicts);
     print_summary(&files, &events, &trials, &verdicts, &events_tools(&events));
+    print_calibration(&calibrate(&verdicts));
     if contradictions.is_empty() {
         Ok(())
     } else {
@@ -114,6 +115,14 @@ fn print_summary(
     for (name, calls, ok) in tools {
         println!("  tool {:24} n = {calls:>4}  ok = {ok:>4}", name.as_str());
     }
+}
+
+/// Imprime a calibração do LB face à frequência empírica (C3/W8-2; base `inferred`).
+fn print_calibration(calibration: &Calibration) {
+    println!(
+        "  calibração (in-sample, previsto = LB de Wilson): ECE = {}‰, Brier = {}‰, n = {}",
+        calibration.ece_milli, calibration.brier_milli, calibration.trials
+    );
 }
 
 /// As tools mais chamadas (ordem determinística: por chamadas e depois por nome).

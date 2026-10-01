@@ -165,6 +165,7 @@ fn collect_live(
                 max_tokens: Some(64),
                 temperature: Some(0.0),
                 reasoning_format: None,
+                structured_output: false,
             };
             let provider = Llama::new(transport, config);
             for _ in 0..reps {

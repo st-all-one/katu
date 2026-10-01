@@ -11,6 +11,7 @@ use serde_json::{Value, json};
 use std::path::Path;
 
 use super::{Ports, TurnOptions, TurnRequest, run_turn};
+use crate::defaults;
 use crate::ports::{StdEnv, StdFs, StdProcess, SystemClock};
 use crate::report::Report;
 use crate::runtime::{Runtime, RuntimeError};
@@ -168,6 +169,8 @@ pub(crate) fn build_provider(
     use std::time::Duration;
 
     let transport = UreqTransport::new(Duration::from_secs(5), Duration::from_secs(120));
+    // B1/W8-1: opt-in por projeto/global (`provider.structured_output`); o local aceita-o.
+    let structured_output = defaults::current().structured_output.unwrap_or(false);
     match name {
         "llama" => Ok(Box::new(Llama::new(
             transport,
@@ -180,6 +183,7 @@ pub(crate) fn build_provider(
                 max_tokens: None,
                 temperature: None,
                 reasoning_format: None,
+                structured_output,
             },
         ))),
         "opencode-go" | "opencode-zen" => {

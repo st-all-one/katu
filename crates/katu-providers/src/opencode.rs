@@ -160,6 +160,7 @@ impl OpenCodeConfig {
             reasoning_format: None,
             max_tokens: self.max_tokens,
             temperature: self.temperature,
+            structured_output: false,
         }
     }
 }

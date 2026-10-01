@@ -199,6 +199,12 @@ fn default_config() -> toml::Table {
         "provider",
         toml::Value::String("llama".to_owned()),
     );
+    // B1/W8-1: saída estruturada desligada por omissão (opt-in explícito).
+    config::set_key(
+        &mut table,
+        "provider.structured_output",
+        toml::Value::Boolean(false),
+    );
     config::set_key(&mut table, "git.versioned", toml::Value::Boolean(true));
     config::set_key(
         &mut table,

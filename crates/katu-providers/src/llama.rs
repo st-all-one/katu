@@ -30,6 +30,8 @@ pub struct LlamaConfig {
     pub temperature: Option<f32>,
     /// `reasoning_format` opcional (ex.: `"parsed"`).
     pub reasoning_format: Option<String>,
+    /// Pede saída estruturada (`response_format`, `json_schema`; B1/W8-1). **Opt-in.**
+    pub structured_output: bool,
 }
 
 impl LlamaConfig {
@@ -44,6 +46,7 @@ impl LlamaConfig {
             max_tokens: None,
             temperature: None,
             reasoning_format: None,
+            structured_output: false,
         }
     }
 
@@ -53,6 +56,13 @@ impl LlamaConfig {
         let _span = katu_core::trace_fn!("llama::with_reasoning_format");
 
         self.reasoning_format = Some(format.into());
+        self
+    }
+
+    /// Liga a **saída estruturada** (`response_format`, `json_schema`; B1/W8-1).
+    #[must_use]
+    pub const fn with_structured_output(mut self) -> Self {
+        self.structured_output = true;
         self
     }
 }
@@ -168,6 +178,7 @@ impl<T: Transport> Provider for Llama<T> {
                 reasoning_format: self.config.reasoning_format.as_deref(),
                 max_tokens: self.config.max_tokens,
                 temperature: self.config.temperature,
+                structured_output: self.config.structured_output,
             },
             dialect: Dialect::ChatCompletions,
             request,

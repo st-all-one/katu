@@ -30,6 +30,8 @@ pub(crate) struct Defaults {
     pub(crate) context_selection: Option<String>,
     /// Durabilidade do log (ADR 0024/P-01): `event`/`turn`.
     pub(crate) durability: Option<String>,
+    /// Saída estruturada do provider (B1/W8-1).
+    pub(crate) structured_output: Option<bool>,
     /// Limite de recall por omissão.
     pub(crate) recall_limit: Option<usize>,
     /// Embeddings (E20-T17): a **segunda IA**, externa e plugável.
@@ -75,6 +77,7 @@ pub(crate) fn from_root(root: &Path) -> Defaults {
         prompt_state: boolean(&table, "behavior.prompt_state"),
         context_selection: text(&table, "behavior.context_selection"),
         durability: text(&table, "behavior.durability"),
+        structured_output: boolean(&table, "provider.structured_output"),
         recall_limit: integer(&table, "recall.default_limit")
             .and_then(|value| usize::try_from(value).ok()),
         embeddings: EmbeddingDefaults {

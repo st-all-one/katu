@@ -1,6 +1,6 @@
 //! Testes da confiança medida (Q-11): limites do posterior, limiar, demolição e determinismo.
 
-use super::{Confidence, Threshold, Trials, verdict};
+use super::{CALIBRATION_BINS, Confidence, Threshold, Trials, calibrate, verdict};
 use crate::rule::RuleId;
 
 fn trials(successes: u32, total: u32) -> Trials {
@@ -60,7 +60,10 @@ fn a_perfect_record_proves_enforced_at_twenty_five_observations() {
     assert_eq!(before.lower_milli, 899);
     assert_eq!(after.confidence, Confidence::Enforced);
     assert_eq!(after.lower_milli, 902);
-    assert!(!after.contradiction, "um registo perfeito não contradiz nada");
+    assert!(
+        !after.contradiction,
+        "um registo perfeito não contradiz nada"
+    );
     assert!(after.is_proven());
 }
 
@@ -133,4 +136,81 @@ fn merging_accumulators_sums_the_trials() {
     assert_eq!(Confidence::Enforced.as_str(), "enforced");
     assert_eq!(Confidence::Advisory.as_str(), "advisory");
     assert_eq!(Confidence::Unmeasured.as_str(), "unmeasured");
+}
+
+#[test]
+fn an_empty_calibration_has_no_bins() {
+    let calibration = calibrate(&[]);
+    assert_eq!(calibration.trials, 0);
+    assert_eq!(calibration.brier_milli, 0);
+    assert_eq!(calibration.ece_milli, 0);
+    assert!(calibration.bins.is_empty());
+    // `unmeasured` (n = 0) não calibra nada.
+    let unmeasured = verdict(&RuleId::from("r-vazia"), Trials::new(), &Threshold::DEFAULT);
+    assert_eq!(calibrate(&[unmeasured]).trials, 0);
+}
+
+#[test]
+fn the_ece_decreases_as_the_evidence_accumulates() {
+    let id = RuleId::from("r-calibrada");
+    let mut previous = u32::MAX;
+    for total in 1..=25_u32 {
+        let one = verdict(&id, trials(total, total), &Threshold::DEFAULT);
+        let calibration = calibrate(&[one]);
+        assert!(
+            calibration.ece_milli <= previous,
+            "ECE subiu em n = {total}: {} > {previous}",
+            calibration.ece_milli
+        );
+        previous = calibration.ece_milli;
+    }
+    assert!(previous < 100, "o LB a n = 25 já está perto da frequência");
+}
+
+#[test]
+fn a_violation_worsens_the_calibration() {
+    let id = RuleId::from("r-calibrada");
+    let clean = calibrate(&[verdict(&id, trials(20, 20), &Threshold::DEFAULT)]);
+    let dirty = calibrate(&[verdict(&id, trials(19, 20), &Threshold::DEFAULT)]);
+    assert!(
+        dirty.ece_milli > clean.ece_milli,
+        "a violação devia afastar o LB da frequência"
+    );
+    assert!(dirty.brier_milli > clean.brier_milli);
+}
+
+#[test]
+fn the_calibration_is_a_pure_function_of_the_verdicts() {
+    let id = RuleId::from("r-calibrada");
+    let verdicts = [
+        verdict(&id, trials(25, 25), &Threshold::DEFAULT),
+        verdict(&id, trials(19, 20), &Threshold::DEFAULT),
+    ];
+    let first = calibrate(&verdicts);
+    let second = calibrate(&verdicts);
+    assert_eq!(first, second);
+    assert!(first.brier_milli <= 1_000);
+    assert!(first.ece_milli <= 1_000);
+}
+
+#[test]
+fn the_reliability_bins_partition_the_trials() {
+    let id = RuleId::from("r-calibrada");
+    let verdicts = [
+        verdict(&id, trials(25, 25), &Threshold::DEFAULT),
+        verdict(&id, trials(19, 20), &Threshold::DEFAULT),
+        verdict(&id, trials(4, 5), &Threshold::DEFAULT),
+    ];
+    let calibration = calibrate(&verdicts);
+    assert_eq!(
+        calibration.bins.len(),
+        usize::try_from(CALIBRATION_BINS).unwrap_or(0)
+    );
+    let sum: u32 = calibration.bins.iter().map(|bin| bin.trials).sum();
+    assert_eq!(sum, calibration.trials);
+    for bin in &calibration.bins {
+        assert!(bin.upper_milli > bin.lower_milli);
+        assert!(bin.predicted_milli <= 1_000);
+        assert!(bin.observed_milli <= 1_000);
+    }
 }

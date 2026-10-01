@@ -98,6 +98,7 @@ impl<T: Transport> Declarative<T> {
             reasoning_format: None,
             max_tokens: None,
             temperature: None,
+            structured_output: self.spec.structured_output,
         }
     }
 }

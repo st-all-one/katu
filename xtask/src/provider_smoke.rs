@@ -99,6 +99,7 @@ fn dispatch(provider: &str, transport: UreqTransport, ctx: &Ctx<'_>) {
                 max_tokens: Some(ctx.max_tokens),
                 temperature: Some(0.0),
                 reasoning_format: None,
+                structured_output: false,
             };
             let llama = Llama::new(transport, config);
             if ctx.warm {

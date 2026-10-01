@@ -11,7 +11,9 @@ use crate::llama::{Llama, LlamaConfig};
 use crate::opencode::{Dialect, OpenCode, OpenCodeConfig};
 use crate::transport::MockTransport;
 
+mod grammar;
 mod retry;
+mod structured;
 
 /// Stream de texto do dialeto Google (`streamGenerateContent`).
 const GOOGLE_STREAM: &str = concat!(

@@ -44,6 +44,7 @@ fn llama_server_smoke() -> Result<(), Box<dyn std::error::Error>> {
         max_tokens: Some(32),
         temperature: Some(0.0),
         reasoning_format: None,
+        structured_output: false,
     };
     let provider = Llama::new(transport(), config);
     assert_eq!(provider.health()?, 200);

@@ -52,6 +52,11 @@ pub(crate) const KEYS: &[KeySpec] = &[
         doc: "Base URL do provider por omissão.",
     },
     KeySpec {
+        key: "provider.structured_output",
+        kind: Kind::Bool,
+        doc: "Pede saída estruturada (json_schema) ao provider local (B1/W8-1; default `false`).",
+    },
+    KeySpec {
         key: "log_level",
         kind: Kind::Text,
         doc: "Nível de log por omissão.",

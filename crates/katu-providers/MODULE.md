@@ -25,14 +25,19 @@ A camada de **providers**: o caminho built-in first-party é nosso; o resto é c
   **pedido** é opt-in (`with_request_compression`) e fica **desligado**: os endpoints built-in
   rejeitam-no (opencode `401`, llama `415`; ADR 0013). `warm()` pré-aquece a ligação.
 - **Catálogo e despacho.** [`catalog`](src/catalog.rs) mapeia `model → {dialect, context_limit,
-  max_tokens_field, prompt_cache, prompt_cache_retention, reasoning, tier}`; `Catalog::models()` expõe
+  max_tokens_field, prompt_cache, prompt_cache_retention, reasoning, structured_output, tier}`;
+  `Catalog::models()` expõe
   os ids em ordem determinística, `Catalog::select_tier()` (E12-T03) o primeiro modelo de uma classe,
   e `Provider::{models, capabilities, model_for_tier}` (E12-T10/T03) alimentam a lista da TUI e a
   validação do controlo. `Provider::dynamic_models()` lê o catálogo **do endpoint**
   ([`models`](src/models.rs): leitura defensiva de `data[]`/`models[]`, determinística), com **queda
   no catálogo** estático; a borda regista a fonte. [`engine`](src/engine.rs)
   constrói o endpoint por dialeto (auth + afinidade: `x-opencode-session` e `affinity_headers`) e
-  despacha.
+  despacha. A **decodificação estruturada** (B1/W8-1, ADR 0025) é opt-in (`structured_output` no
+  catálogo/`ProviderSpec`/`LlamaConfig`, ligada por `provider.structured_output`): o dialeto
+  `chat/completions` acrescenta um `response_format` `json_schema` derivado dos `ToolDef` do pedido
+  e **fail-open** (um `400` repete o pedido sem o campo). Artefacto em
+  [`bench/e18/grammar`](../../bench/e18/grammar/PROTOCOL.md).
 - **Streaming.** [`sse`](src/sse.rs) é um parser SSE incremental **sem alocação por delta** (P-04: a
   linha é uma fatia de `pending` e o payload é emprestado de `self.data`; **−28,5 %** no parser,
   [`bench/e18/transport`](../../bench/e18/transport/PROTOCOL.md)); [`wire`](src/wire.rs) é o driver

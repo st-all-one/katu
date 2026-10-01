@@ -29,6 +29,21 @@ nunca derivado dos dados (DF8).
 Uma **contradição medida** é `n ≥ n_min` e `LB < θ` com ≥ 1 falha: há evidência suficiente e ela
 **não** sustenta a categoria. Poucas observações (`n < n_min`) são *não provado*, não contradição.
 
+## Calibração (C3/W8-2)
+
+Além do LB, publica-se **ECE** e **Brier** do LB face à frequência empírica do próprio log (base
+`inferred`; medida *in-sample* — mede o **conservadorismo** do limite, não o acerto do modelo):
+
+```
+previsto_i = LB_i (limite inferior de Wilson, milésimos)
+desfecho_i = sucessos_i / ensaios_i
+Brier      = Σ [ s_i·(1−p_i)² + (n_i−s_i)·p_i² ] / Σ n_i
+ECE        = Σ_baldes (n_b / N) · |previsto_b − desfecho_b|      (10 baldes de 100 milésimos)
+```
+
+`calibrate` ignora veredictos sem observações (`n = 0`) e é determinístico (sem RNG; a ordem não
+altera o resultado). O diagrama de fiabilidade (`bins`) acompanha o artefacto.
+
 ## Como correr
 
 ```sh
@@ -53,6 +68,8 @@ cargo run -q -p xtask -- policy:confidence bench/e18/confidence/fixture.v1.jsonl
 | 20 ensaios com **1** violação | LB `804`, `contradiction = true` |
 | sem observações | `unmeasured`, `contradiction = false` |
 | determinismo (mesma entrada ⇒ mesmo resultado) | `true` |
+| ECE do registo perfeito, n = 1 → 30 | `730‰` → `83‰` (**decresce**) |
+| amostra mista (perfeito n ∈ {5,10,15,20,25,40,60} + 1 violação a n = 20) | `ECE = 98‰`, `Brier = 18‰` (195 ensaios) |
 
 A fixture (`fixture.v1.jsonl`, 20 recusas + 1 execução sob o mesmo `CallId`) faz o comando
 operacional **falhar**, com a evidência:

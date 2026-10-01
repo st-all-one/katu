@@ -386,6 +386,28 @@ unit = "ratio"
 basis = "measured"
 artifact = { path = "bench/e18/confidence/raw.json", note = "LB de Wilson em milésimos com 20 ensaios e 1 violação (0,804): contradição medida, a regra é demovida a Advisory" }
 
+# --- W8-2: calibração ECE/Brier (C3; base `inferred`) ---
+[[metrics]]
+name = "w82.confidence.calibration.ece"
+value = 0.098
+unit = "ratio"
+basis = "inferred"
+artifact = { path = "bench/e18/confidence/raw.json", note = "ECE do LB face à frequência empírica (in-sample), amostra mista de 195 ensaios (98‰)" }
+
+[[metrics]]
+name = "w82.confidence.calibration.brier"
+value = 0.018
+unit = "ratio"
+basis = "inferred"
+artifact = { path = "bench/e18/confidence/raw.json", note = "Brier do LB face à frequência empírica (in-sample) (18‰)" }
+
+[[metrics]]
+name = "w82.confidence.calibration.ece_at_n1"
+value = 0.73
+unit = "ratio"
+basis = "inferred"
+artifact = { path = "bench/e18/confidence/raw.json", note = "ECE do registo perfeito a n = 1 (0,730); decresce até 0,083 a n = 30 — o LB converge com a evidência" }
+
 # --- Q-12: guard de loop/anomalia (OPTIMIZATION_PLAN.md §Q-D) ---
 [[metrics]]
 name = "q12.loop.false_positive.rate"
@@ -546,3 +568,36 @@ value = 1.0
 unit = "count"
 basis = "measured"
 artifact = { path = "bench/e18/hedge/raw.json", note = "um hedge exigiria 2 × 2774 tokens contra n_ctx 4096: o servidor recusa o segundo pedido (evidência do log em bench/e18/prewarm/raw.json)" }
+
+# --- W8-1: decodificação estruturada por JSON Schema (B1) ---
+# Protocolo em `bench/e18/grammar/PROTOCOL.md`; artefacto cru em `bench/e18/grammar/raw.json`.
+# O schema fecha a classe `JSON inválido` por construção; ligar é opt-in (o pedido cresce).
+[[metrics]]
+name = "w81.grammar.schema_variants"
+value = 3.0
+unit = "count"
+basis = "measured"
+artifact = { path = "bench/e18/grammar/raw.json", note = "variantes `oneOf` (uma por tool) para 3 tools representativas" }
+
+[[metrics]]
+name = "w81.grammar.delta_bytes"
+value = 962.0
+unit = "bytes"
+basis = "measured"
+artifact = { path = "bench/e18/grammar/raw.json", note = "corpo passa de 970 para 1 932 bytes com o `response_format` ligado (3 tools)" }
+
+[[metrics]]
+name = "w81.grammar.encode.p50_nanos"
+value = 152606.0
+unit = "nanos"
+basis = "measured"
+artifact = { path = "bench/e18/grammar/raw.json", note = "p50 da codificação com o schema (200 repetições; IC 95 % do harness de W7); desligado = 34 921 ns" }
+
+# Negativo (método §0.3): a adoção por omissão exige ≥ 20 % dos turnos falhados evitados em turnos
+# reais. O modelo local não emite tool calls nativas ⇒ 0/0; fica `unpriced` (zero), não inventado.
+[[metrics]]
+name = "w81.grammar.invalid_json_turns_avoided_ratio"
+value = 0.0
+unit = "ratio"
+basis = "unpriced"
+artifact = { path = "bench/e18/grammar/raw.json", note = "sem turnos reais com tool calls nativas: a taxa real de `Decode` é 0/0; o mecanismo fica opt-in até haver sinal" }

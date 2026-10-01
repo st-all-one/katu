@@ -74,6 +74,8 @@ remoção de complexidade; senão reverter e escrever a rejeição). Nada muda b
 | **W7-1** harness estatístico zero-dep | ✔ feito | `katu_core::stats` (`Summary` + IC 95 %: normal para `n ≥ 30`, *bootstrap* determinístico abaixo); `ci95` em `frame.json`/`latency.json`/`atomics`; os gates comparam o **limite superior**; testes `n < 5`/IC contém a mediana/determinismo/orçamento |
 | **W7-2** atribuição regerada | ✔ feito | cobertura **1322/1322 (100,0 %)** / **1322/1458 (90,6 %)** com `const fn`; rótulo `policy::evaluate`; `bench/e18/atomics/{raw.json,REPORT.md}` regenerados (`git diff` é a prova) |
 | **W7-3** S-04 órfãos | ✔ feito | `context.compact` passou a ser emitido; `check-diag` trava órfãos (`xtask/src/orphans.rs`); **0** órfãos em 114 ids |
+| **W8-1** B1 · gramática/schema | ✔ feito | `response_format` `json_schema` derivado das tools do pedido, **opt-in** (`provider.structured_output`) e **fail-open** (400 ⇒ repetição sem o campo); ADR 0025; artefacto `bench/e18/grammar/` (+962 B, p50 153 µs); 4 testes |
+| **W8-2** C3 · calibração ECE/Brier | ✔ feito | `katu_policy::calibrate` (10 baldes, base `inferred`); o ECE do registo perfeito desce **730‰ → 83‰** com a evidência; `policy:confidence` publica ECE/Brier; artefacto `bench/e18/confidence/` |
 
 **Nota de método (Q-07).** O `diag:coverage` conta qualquer `fn` de `crates/*/src` fora de
 `#[cfg(test)] mod` e fora de ficheiros `*tests*`/`/tests/`: um *bench* em `edit/bench.rs` fez a
@@ -127,7 +129,8 @@ de memória (P-03) passa a ser o maior custo de CPU do dispatch.
 
 ### 1.3 A instrumentação está essencialmente fechada
 
-- Cobertura por função: **100 %** das instrumentáveis (**90,6 %** contando `const fn`); as duas
+- Cobertura por função: **100 %** das instrumentáveis (**90,5 %** contando `const fn`; o artefacto
+  de W7 fixa 90,6 % no seu snapshot); as duas
   medidas são travadas em 90 % pelo `diag:coverage`.
 - Catálogo: **114 ids** (`CATALOG_VERSION = 3`), **0 órfãos** (Q-10: `memory.read`/`policy.audit`
   passaram a ser emitidos; `memory.compact` foi removido).
@@ -633,7 +636,7 @@ W4 (superfície)  ~~Q-07~~, ~~Q-08~~                        (menos turnos)
 W5 (segurança)   ~~Q-11~~, ~~Q-12~~                        (F6/F7)
 W6 (estabilidade)~~Q-13~~, ~~Q-14~~, ~~Q-15~~, ~~P-01~~, ~~P-02~~, ~~P-03~~, ~~P-04~~
 W7 (método)      ~~E18-T10 (harness zero-dep) + regerar atribuição + S-04~~  ✔
-W8 (Anexo A T1)  B1 gramática → C3 calibração → C1 e-values → A3 VOI
+W8 (Anexo A T1)  ~~B1 gramática + C3 calibração~~ ✔ → C1 e-values → A3 VOI
 W9 (Anexo B)     B-03 → B-04 → B-06 → B-07 (gated) → ADR B-08
 W10 (Anexo A T2/3) A1/A2 · D1 · C2/C7/C5 · E1 · D2/D3 · E18-T05/T08/T09
 ```
@@ -662,7 +665,7 @@ esperam. Só depois as frentes formais. Cada PR: A/B + `make check` verde.
 | TTFT frio local | ~40 s | **≤ 8 s** (prewarm) | `raw.json` |
 | TTFT remoto p95 | 4,1 s | dentro do orçamento | `gate:provider` |
 | Regras `Enforced` com `LB`/`n` | 0 | **8/8** | `bench/published.toml` |
-| Cobertura de instrumentação | 100 % (90,6 % com `const fn`) | ≥ 90 % nas duas medidas ✔ | `diag:coverage` |
+| Cobertura de instrumentação | 100 % (90,5 % com `const fn`) | ≥ 90 % nas duas medidas ✔ | `diag:coverage` |
 
 ---
 
@@ -705,6 +708,8 @@ esperam. Só depois as frentes formais. Cada PR: A/B + `make check` verde.
 - [x] W1 instalado: atribuição por função em release + harness e gate de regressão.
 - [x] W7 instalado: harness estatístico zero-dep (IC 95 % nos artefactos; gates pelo limite superior) +
       atribuição regerada (`bench/e18/atomics/`) + **0** ids órfãos travados pelo `check-diag`.
+- [x] W8-1/W8-2 instalados: decodificação estruturada por JSON Schema (opt-in, fail-open, ADR 0025;
+      `bench/e18/grammar/`) e calibração ECE/Brier publicada (`bench/e18/confidence/`).
 - [ ] Cada número publicado em `bench/published.toml` tem base tipada (DF5).
 - [ ] Zero alteração de bytes observáveis; `Model-visible ⟺ logged` intacto.
 - [ ] `make check` e `msrv` (1.97.0) verdes em cada PR; `OPTIMIZATION_PLAN.md` mantido como lar.
@@ -713,10 +718,11 @@ esperam. Só depois as frentes formais. Cada PR: A/B + `make check` verde.
 
 ## 10. Próximos passos (W7–W10)
 
-**Ponto de partida.** W1–W7 estão fechadas: Q-01..Q-21 e P-01..P-04 com artefacto em `bench/`,
-S-01..S-05 fechados (o resíduo S-04 — o id órfão `context.compact` — fechou em W7-3) e o harness
-estatístico zero-dep de E18-T10 instalado (W7-1). O que falta vem de dois sítios — o **Anexo A**
-(Tier 1–3) e o **Anexo B** (Camada 1 residual e as decisões de Camada 2). A ordem segue Q > P > S e
+**Ponto de partida.** W1–W7 estão fechadas e W8-1/W8-2 instalados: Q-01..Q-21 e P-01..P-04 com
+artefacto em `bench/`, S-01..S-05 fechados (o resíduo S-04 — o id órfão `context.compact` — fechou
+em W7-3), o harness estatístico zero-dep de E18-T10 instalado (W7-1), a decodificação estruturada
+(B1) e a calibração ECE/Brier (C3) publicadas. O que falta vem do **Anexo A** (W8-3/W8-4 + Tier
+2–3) e do **Anexo B** (Camada 1 residual e as decisões de Camada 2). A ordem segue Q > P > S e
 o método do §0: cada item traz fórmula, artefacto cru e teste que o trava; adotar-ou-reverter.
 
 ### W7 · Fecho de método (pré-requisito de W8)
@@ -749,7 +755,7 @@ vivos. Nenhum teto de `surface.toml` subiu.
 
 ### W8 · Anexo A — Tier 1
 
-**W8-1 · B1 · Decodificação restrita por gramática (maior rácio ganho/risco).**
+**W8-1 · B1 · Decodificação restrita por gramática (maior rácio ganho/risco).** ✔ feito
 - **Onde:** request do dialeto `chat/completions` em `katu-providers` (o `llama-server` aceita
   `grammar`/`response_format: json_schema`; um endpoint remoto pode recusar).
 - **Proposta:** campo opcional no pedido, derivado de `katu_tools::schema`, **fail-open** (sem
@@ -760,13 +766,29 @@ vivos. Nenhum teto de `surface.toml` subiu.
 - **Teste:** fixture de argumentos malformados passa a válido; desligado = bytes atuais; ADR (a criar)
   regista a capacidade por provider.
 - **Adoção:** ≥ 20 % dos turnos falhados evitados; senão reverter e escrever o número.
+- **Resultado ✔:** `response_format: {json_schema: {oneOf: […]}}` derivado dos `ToolDef` do pedido
+  (`tool_call_schema`), `strict: true`; **opt-in** (`provider.structured_output` / TOML declarativo /
+  `ModelEntry`/`LlamaConfig`) e **fail-open** (um `400` repete o pedido sem o campo). Desligado é
+  byte a byte o atual. ADR **0025**. Artefacto `bench/e18/grammar/raw.json` (3 tools): corpo
+  `970 → 1 932 B` (+962), p50 de codificação `35 → 153 µs` (IC 95 % do harness de W7). Testes:
+  `structured_output_is_off_by_default`, `structured_output_adds_a_schema_derived_from_the_tools`,
+  `the_schema_excludes_malformed_arguments` e `a_rejected_structured_request_falls_back_to_the_current_bytes`.
+  A adoção por omissão exige turnos reais com `Decode` (o modelo local não emite tool calls
+  nativas): fica **`unpriced`**, escrita no artefacto — não se inventa.
 
-**W8-2 · C3 · Calibração da confiança (ECE/Brier).**
+**W8-2 · C3 · Calibração da confiança (ECE/Brier).** ✔ feito
 - **Onde:** `katu-policy::confidence` + `bench/e18/confidence/` (extensão de Q-11).
 - **Proposta:** além do LB de Wilson, publicar **ECE** e **Brier** do veredicto `Enforced` face ao
   log; nenhuma confiança publicada sem calibração (base `inferred`).
 - **Teste:** ECE decresce com a evidência; determinismo; `policy:confidence` mantém-se no `check`.
 - **Adoção:** baixo risco (auditoria pura, zero tokens de prompt).
+- **Resultado ✔:** `katu_policy::calibrate` (previsto = LB, desfecho = frequência empírica; 10 baldes
+  de 100 milésimos; determinístico, sem RNG) + `Calibration`/`CalibrationBin`; o `policy:confidence`
+  passa a imprimir `ECE`/`Brier`. No registo perfeito o ECE desce **730‰ (n = 1) → 83‰ (n = 30)**;
+  na amostra mista `ECE = 98‰`, `Brier = 18‰` (195 ensaios). `bench/e18/confidence/raw.json` ganhou
+  `calibration` + `calibration_by_n`; `bench/published.toml` publica-os com base `inferred`. Testes:
+  `the_ece_decreases_as_the_evidence_accumulates`, `a_violation_worsens_the_calibration`,
+  `the_calibration_is_a_pure_function_of_the_verdicts`, `the_reliability_bins_partition_the_trials`.
 
 **W8-3 · C1 · Parada opcional válida (e-values / anytime-valid).**
 - **Onde:** `kernel::guard` (F7); artefacto `bench/e18/loop/`.

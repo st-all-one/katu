@@ -228,3 +228,123 @@ pub fn verdict(id: &RuleId, trials: Trials, threshold: &Threshold) -> Verdict {
         reason,
     }
 }
+
+/// Número de baldes do diagrama de fiabilidade (largura fixa: `1 000 / N` milésimos).
+pub const CALIBRATION_BINS: u32 = 10;
+
+/// Balde do diagrama de fiabilidade (C3/W8-2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CalibrationBin {
+    /// Limite inferior do balde (milésimos).
+    pub lower_milli: u32,
+    /// Limite superior do balde (milésimos; exclusivo).
+    pub upper_milli: u32,
+    /// Ensaios no balde.
+    pub trials: u32,
+    /// Probabilidade prevista média (milésimos): `Σ LB·n / Σ n`.
+    pub predicted_milli: u32,
+    /// Frequência empírica (milésimos): `Σ sucessos / Σ n`.
+    pub observed_milli: u32,
+}
+
+/// Calibração do veredicto face ao log (C3/W8-2): ECE, Brier e diagrama de fiabilidade.
+///
+/// A confiança **prevista** é o limite inferior de Wilson (`lower_milli`) — o número que o
+/// projeto publica; o **desfecho** é a frequência empírica (`sucessos/ensaios`). É uma medida
+/// *in-sample* do próprio log (não uma validação fora da amostra): mede o **conservadorismo** do
+/// limite, não o acerto do modelo. Base tipada: `inferred`.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Calibration {
+    /// Ensaios calibrados (`Σ trials`; `0` ⇒ sem dados).
+    pub trials: u32,
+    /// Brier score em milésimos (`0` perfeito, `1 000` pior).
+    pub brier_milli: u32,
+    /// Expected Calibration Error em milésimos (`0` perfeito).
+    pub ece_milli: u32,
+    /// Diagrama de fiabilidade (`CALIBRATION_BINS` baldes; vazio sem dados).
+    pub bins: Vec<CalibrationBin>,
+}
+
+/// Acumulador de um balde durante a calibração.
+#[derive(Clone, Copy, Default)]
+struct BinAccumulator {
+    predicted_sum: f64,
+    successes: u32,
+    trials: u32,
+}
+
+/// Índice do balde de uma confiança (largura fixa; satura no último).
+fn bin_index(lower_milli: u32, width: u32) -> usize {
+    let divisor = 1_000_u32.saturating_div(width).max(1);
+    usize::try_from(
+        lower_milli
+            .checked_div(divisor)
+            .unwrap_or(0)
+            .min(width.saturating_sub(1)),
+    )
+    .unwrap_or(0)
+}
+
+/// Calibra os veredictos face aos ensaios que os sustentam (pura, determinística).
+///
+/// Veredictos sem observações (`trials = 0`) são ignorados: nada a calibrar. A ordem de entrada
+/// não muda o resultado (os baldes agregam).
+#[must_use]
+pub fn calibrate(verdicts: &[Verdict]) -> Calibration {
+    let width = CALIBRATION_BINS.max(1);
+    let mut bins = vec![BinAccumulator::default(); usize::try_from(width).unwrap_or(1)];
+    let mut total = 0_u32;
+    let mut brier = 0.0_f64;
+    for verdict in verdicts {
+        if verdict.trials == 0 {
+            continue;
+        }
+        let n = verdict.trials;
+        let p = f64::from(verdict.lower_milli) / 1_000.0;
+        let miss = 1.0 - p;
+        total = total.saturating_add(n);
+        brier = f64::from(verdict.successes).mul_add(miss * miss, brier);
+        brier = f64::from(n.saturating_sub(verdict.successes)).mul_add(p * p, brier);
+        if let Some(entry) = bins.get_mut(bin_index(verdict.lower_milli, width)) {
+            entry.predicted_sum =
+                f64::from(verdict.lower_milli).mul_add(f64::from(n), entry.predicted_sum);
+            entry.successes = entry.successes.saturating_add(verdict.successes);
+            entry.trials = entry.trials.saturating_add(n);
+        }
+    }
+    if total == 0 {
+        return Calibration::default();
+    }
+    let total_f = f64::from(total);
+    let mut ece = 0.0_f64;
+    let mut out = Vec::with_capacity(bins.len());
+    for (index, accumulator) in bins.into_iter().enumerate() {
+        let lower = u32::try_from(index).unwrap_or(0).saturating_mul(width);
+        let upper = lower.saturating_add(width);
+        let (predicted_milli, observed_milli) = if accumulator.trials == 0 {
+            (0, 0)
+        } else {
+            let predicted = accumulator.predicted_sum / f64::from(accumulator.trials) / 1_000.0;
+            let observed = f64::from(accumulator.successes) / f64::from(accumulator.trials);
+            ece = (f64::from(accumulator.trials) / total_f)
+                .mul_add((predicted - observed).abs(), ece);
+            (to_milli(predicted), to_milli(observed))
+        };
+        out.push(CalibrationBin {
+            lower_milli: lower,
+            upper_milli: upper,
+            trials: accumulator.trials,
+            predicted_milli,
+            observed_milli,
+        });
+    }
+    Calibration {
+        trials: total,
+        brier_milli: to_milli(brier / total_f),
+        ece_milli: to_milli(ece),
+        bins: out,
+    }
+}
+
+#[cfg(test)]
+mod tests;

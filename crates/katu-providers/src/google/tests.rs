@@ -78,6 +78,7 @@ fn endpoint_has_the_model_and_api_key() {
         reasoning_format: None,
         max_tokens: None,
         temperature: None,
+        structured_output: false,
     };
     let endpoint = endpoint_for(&wire, Dialect::Google, "gemini-2.5-pro");
     assert_eq!(

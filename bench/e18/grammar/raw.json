@@ -1,0 +1,40 @@
+{
+  "adoption": "opt-in (`provider.structured_output` / TOML declarativo), fail-open: desligado é byte a byte o atual e um 400 do endpoint volta ao pedido sem o campo. A adoção por omissão exige ≥ 20 % dos turnos falhados evitados em turnos reais — o modelo local não emite tool calls nativas, pelo que esse número ainda não é medível aqui (fica escrito).",
+  "caveat": "mede o pedido e o que o schema garante por construção; não mede o modelo nem os turnos reais (a falha real acumula-se em `ProviderError::Decode`)",
+  "criterion_met": true,
+  "delta_bytes": 962,
+  "disabled": {
+    "bytes": 970,
+    "encode_ci95_nanos": [
+      34921,
+      44781
+    ],
+    "encode_p50_nanos": 34921,
+    "encode_p95_nanos": 80807,
+    "response_format": false
+  },
+  "enabled": {
+    "bytes": 1932,
+    "encode_ci95_nanos": [
+      149278,
+      153635
+    ],
+    "encode_p50_nanos": 152606,
+    "encode_p95_nanos": 178237,
+    "response_format": true,
+    "schema_name": "katu_tool_call"
+  },
+  "malformed": {
+    "criterion": "com o schema, o argumento sem `path` não é gerável: a classe de falha fecha por construção",
+    "decode_error_off": true,
+    "fixture": "{\"path\": }",
+    "schema_requires": [
+      "name",
+      "arguments"
+    ]
+  },
+  "question": "a decodificação estruturada elimina a classe `JSON inválido` sem mudar o comportamento quando desligada?",
+  "schema": "katu.bench.grammar.v1",
+  "tools": 3,
+  "variants": 3
+}

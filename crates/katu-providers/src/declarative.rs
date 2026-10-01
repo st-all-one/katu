@@ -74,6 +74,9 @@ pub struct ModelEntrySpec {
     /// `reasoning_format` específico do gateway.
     #[serde(default)]
     pub reasoning_format: Option<String>,
+    /// Aceita saída estruturada (B1/W8-1); por omissão, o do provider.
+    #[serde(default)]
+    pub structured_output: Option<bool>,
     /// Classe de custo/capacidade (E12-T03); por omissão, o do modelo sem tier.
     #[serde(default)]
     pub tier: Option<Tier>,
@@ -114,6 +117,9 @@ pub struct ProviderSpec {
     /// `prompt_cache_retention` por omissão (ex.: `"24h"`), quando o cache está ligado.
     #[serde(default)]
     pub default_prompt_cache_retention: Option<String>,
+    /// Aceita saída estruturada por omissão (B1/W8-1). **Opt-in.**
+    #[serde(default)]
+    pub structured_output: bool,
     /// Catálogo de modelos.
     #[serde(default)]
     pub models: Vec<ModelEntrySpec>,
@@ -161,6 +167,7 @@ impl ProviderSpec {
             entry.prompt_cache |= entry.prompt_cache_retention.is_some();
             entry.reasoning = model.reasoning.unwrap_or(self.default_reasoning);
             entry.reasoning_format.clone_from(&model.reasoning_format);
+            entry.structured_output = model.structured_output.unwrap_or(self.structured_output);
             entry.tier = model.tier.unwrap_or_default();
             catalog.insert(entry);
         }

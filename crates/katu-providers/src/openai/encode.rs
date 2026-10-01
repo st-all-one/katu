@@ -25,6 +25,8 @@ pub(crate) struct EncodeOptions {
     pub default_max_tokens: Option<u32>,
     /// Temperatura por omissão do provider (usada se o pedido não trouxer).
     pub default_temperature: Option<f32>,
+    /// Pede **saída estruturada** (`response_format`, `json_schema` derivado das tools; B1/W8-1).
+    pub structured_output: bool,
 }
 
 /// Corpo do pedido `chat/completions` (serialização direta, sem árvore `Value` intermédia).
@@ -50,6 +52,8 @@ struct ChatRequest<'a> {
     reasoning_format: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     reasoning_effort: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    response_format: Option<Value>,
 }
 
 /// `stream_options` do pedido.
@@ -167,6 +171,12 @@ pub(crate) fn encode_request(
         prompt_cache_retention: options.prompt_cache_retention.as_deref(),
         reasoning_format: options.reasoning_format.as_deref(),
         reasoning_effort: thinking_effort(request.model.thinking),
+        response_format: (options.structured_output && !request.tools.is_empty()).then(|| {
+            json!({
+                "type": "json_schema",
+                "json_schema": tool_call_schema(&request.tools),
+            })
+        }),
     };
     match options.max_tokens_field {
         MaxTokensField::MaxTokens => body.max_tokens = max_tokens,
@@ -187,6 +197,37 @@ fn encode_tool(tool: &ToolDef) -> ToolJson<'_> {
             parameters: &tool.parameters,
         },
     }
+}
+
+/// JSON Schema que restringe a **declaração** de uma tool call (nome + argumentos; B1/W8-1).
+///
+/// Deriva dos `ToolDef` do próprio pedido: um `oneOf` com uma variante por tool, ligando o nome
+/// (`const`) aos seus `parameters` (já validados por `katu_tools::schema`). É o que impede, por
+/// construção, argumentos que não validem — a classe de falha de `wire::parse_arguments`
+/// (`ProviderError::Decode`). Determinístico: a ordem das tools é a do pedido.
+#[must_use]
+pub(crate) fn tool_call_schema(tools: &[ToolDef]) -> Value {
+    let _span = katu_core::trace_fn!("openai::encode::tool_call_schema");
+
+    let variants: Vec<Value> = tools
+        .iter()
+        .map(|tool| {
+            let mut properties = Map::new();
+            properties.insert("name".to_string(), json!({ "const": tool.name }));
+            properties.insert("arguments".to_string(), tool.parameters.clone());
+            json!({
+                "type": "object",
+                "properties": Value::Object(properties),
+                "required": ["name", "arguments"],
+                "additionalProperties": false,
+            })
+        })
+        .collect();
+    json!({
+        "name": "katu_tool_call",
+        "strict": true,
+        "schema": { "oneOf": variants },
+    })
 }
 
 /// Codifica uma mensagem do histórico (ou ignora se desconhecida).

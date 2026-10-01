@@ -10,7 +10,7 @@
 crates = 6
 tools = 11
 rules = 8
-adrs = 24
+adrs = 25
 diag_events = 114
 xtask_commands = 31
-bench_artifacts = 19
+bench_artifacts = 20

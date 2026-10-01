@@ -35,6 +35,8 @@ pub(crate) struct WireConfig<'a> {
     pub max_tokens: Option<u32>,
     /// Temperatura por omissão do provider (usada se o pedido não trouxer).
     pub temperature: Option<f32>,
+    /// Pede saída estruturada por omissão (B1/W8-1; o modelo pode sobrepor).
+    pub structured_output: bool,
 }
 
 /// Um turno já materializado (endpoint + opções + pedido + retry).
@@ -166,6 +168,8 @@ pub(crate) fn options(wire: &WireConfig<'_>) -> EncodeOptions {
         reasoning_format,
         default_max_tokens: wire.max_tokens,
         default_temperature: wire.temperature,
+        structured_output: wire.structured_output
+            || wire.entry.is_some_and(|entry| entry.structured_output),
     }
 }
 
@@ -223,6 +227,7 @@ mod tests {
             reasoning_format: Some("parsed"),
             max_tokens: Some(64),
             temperature: Some(0.2),
+            structured_output: false,
         };
         let options = options(&wire);
         assert_eq!(
@@ -248,6 +253,7 @@ mod tests {
             reasoning_format: None,
             max_tokens: None,
             temperature: None,
+            structured_output: false,
         };
         let request = models_request(&wire);
         assert_eq!(request.method, Method::Get);
@@ -279,6 +285,7 @@ mod tests {
             reasoning_format: None,
             max_tokens: None,
             temperature: None,
+            structured_output: false,
         };
         let endpoint = super::endpoint(&wire, Dialect::ChatCompletions);
         assert_eq!(endpoint.url, "https://gateway.invalid/v1/chat/completions");
