@@ -147,12 +147,12 @@ impl Aliases {
 
     /// Secção `sym` com todos os aliases da sessão (para o prime).
     #[must_use]
-    pub fn symbol_section(&self) -> Section {
+    pub fn symbol_section(&self) -> Section<'_> {
         let _span = crate::trace_fn!("toon::aliases::symbol_section");
 
         let mut table = RowTable::new("sym");
         for (alias, value) in self.ids.iter().chain(self.paths.iter()) {
-            table.push(vec![Cell::text(alias.clone()), Cell::text(value.clone())]);
+            table.push(vec![Cell::text(alias.as_str()), Cell::text(value.as_str())]);
         }
         Section::Rows(table)
     }

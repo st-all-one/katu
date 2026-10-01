@@ -78,6 +78,16 @@ pub(crate) enum RouteError {
     /// Argumento com forma inválida.
     #[error("argumento inválido: {0}")]
     InvalidArg(&'static str),
+    /// Listas de comprimento diferente (Q-07: `old` e `new` são pares).
+    #[error(
+        "`old` e `new` têm de ter o mesmo comprimento: {old} trecho(s) a substituir vs. {new} substituto(s)"
+    )]
+    LengthMismatch {
+        /// Trechos a substituir.
+        old: usize,
+        /// Substitutos.
+        new: usize,
+    },
     /// Caminho que não resolve.
     #[error("caminho inválido: {0}")]
     Path(String),
@@ -216,6 +226,33 @@ pub(super) fn optional_usize(args: &Value, key: &str) -> Option<usize> {
 }
 
 /// `argv` obrigatório (lista de strings não vazia).
+/// Lista de textos obrigatória: aceita um texto único (forma histórica) ou uma lista (Q-07).
+///
+/// A forma única é aceite **de propósito**: um modelo que já aprendeu `"old": "…"` continua a
+/// funcionar, e a lista é o mesmo contrato com um elemento. Uma lista vazia é recusada (não é uma
+/// edição) e um item que não seja texto também.
+pub(super) fn required_text_list(
+    args: &Value,
+    key: &'static str,
+) -> Result<Vec<String>, RouteError> {
+    let _span = katu_core::trace_fn!("agent::router::required_text_list");
+
+    match args.get(key) {
+        Some(Value::String(text)) => Ok(vec![text.clone()]),
+        Some(Value::Array(items)) if !items.is_empty() => items
+            .iter()
+            .map(|item| {
+                item.as_str()
+                    .map(str::to_string)
+                    .ok_or(RouteError::InvalidArg(key))
+            })
+            .collect(),
+        Some(Value::Array(_)) => Err(RouteError::InvalidArg(key)),
+        _ => Err(RouteError::MissingArg(key)),
+    }
+}
+
+/// Argumento `argv` obrigatório (lista de textos, sem shell).
 pub(super) fn required_argv(args: &Value, key: &'static str) -> Result<ResolvedArgv, RouteError> {
     let _span = katu_core::trace_fn!("agent::router::required_argv");
 

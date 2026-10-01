@@ -17,6 +17,7 @@ use katu_core::ports::{Clock, Fs};
 use katu_core::skill::{Skill, catalog as skill_catalog};
 use katu_policy::{PolicyError, ResolvedPath, RuleSet};
 
+use crate::defaults;
 use crate::memory::KnudgeMemory;
 use crate::scope;
 
@@ -61,7 +62,7 @@ pub(crate) struct VerifyRequest {
         reason = "o macro no-op ignora os campos (custo zero); o audit é barato e determinístico"
     )
 )]
-fn load_rules(now_millis: u64) -> Result<RuleSet, PolicyError> {
+fn load_rules(now_millis: u64) -> Result<(RuleSet, Vec<String>), PolicyError> {
     let _span = katu_core::fn_span!(Level::Debug, events::POLICY_LOAD, "runtime::load_rules");
     let mut rules = RuleSet::from_toml(MEMORY_POLICY)?;
     rules
@@ -76,7 +77,14 @@ fn load_rules(now_millis: u64) -> Result<RuleSet, PolicyError> {
         "advisory" => report.advisory.len(),
         "issues" => report.issues.len(),
     );
-    Ok(rules)
+    // A secção `estado` (Q-04) mostra as regras que **travam** de facto: as ativas no arranque.
+    let enforced = report
+        .enforced
+        .iter()
+        .filter(|summary| summary.activity == katu_policy::Activity::Active)
+        .map(|summary| summary.id.as_str().to_string())
+        .collect();
+    Ok((rules, enforced))
 }
 
 /// Id da sessão mais recente do projeto (ordem temporal `(created_ms, id)`).
@@ -107,6 +115,14 @@ pub(crate) struct Runtime<'a> {
     goal: String,
     budget: ContextBudget,
     compaction: CompactionMode,
+    /// Política do contexto do turno (Q-02b/Q-03/Q-04): seleção, parâmetros e secção de estado.
+    policy: context::ContextPolicy,
+    /// Teto de passos do turno corrente (entra na secção `estado`).
+    max_steps: u32,
+    /// Secção `estado` já registada no log e usada no prime deste turno.
+    state_text: Option<String>,
+    /// Ids das regras `Enforced` ativas (para a secção `estado`).
+    enforced: Vec<String>,
 }
 
 impl<'a> Runtime<'a> {
@@ -168,7 +184,9 @@ impl<'a> Runtime<'a> {
         let memory = KnudgeMemory::open(&root)?;
         memory.status()?;
         let cwd = ResolvedPath::from_canonical(&root)?;
-        let rules = load_rules(clock.now().as_millis())?;
+        let (rules, enforced) = load_rules(clock.now().as_millis())?;
+        // Q-04/Q-02b: as duas opções são **dados** do projeto (config fechada), lidas uma vez.
+        let defaults = defaults::from_root(&root);
         let instructions = skills::read_instructions(fs, &root);
         let skills = skills::load_skills(fs, &root);
         // O runtime é um agente a atuar: define o workspace (destranca o normal dentro da raiz e
@@ -205,6 +223,13 @@ impl<'a> Runtime<'a> {
             goal,
             budget: DEFAULT_CONTEXT_BUDGET,
             compaction: CompactionMode::Disabled,
+            policy: context::ContextPolicy::from_config(
+                defaults.context_selection.as_deref(),
+                defaults.prompt_state,
+            ),
+            max_steps: 0,
+            state_text: None,
+            enforced,
         })
     }
 

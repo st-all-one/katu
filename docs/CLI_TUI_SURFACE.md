@@ -112,9 +112,17 @@ existir** no topo → `invalid_input` (exit 2), sem retrocompatibilidade.
 flags explícitas; `-` = stdin) existe em `prime`/`run`/`tui`/`memo ask`; `--batch <ficheiro|->`
 (JSONL; valida tudo antes de executar) em `prime`/`run`/`memo ask`.
 
-**Defaults da config (E20-T17):** `provider`, `model`, `base`, `behavior.auto_compact` e
-`recall.default_limit` da config efetiva (projeto > global) são o default de `run`/`tui`/`memo ask`
-(flags > `--params` > config > default do comando).
+**Defaults da config (E20-T17):** `provider`, `model`, `base`, `behavior.auto_compact`,
+`behavior.context_selection` (`suffix`/`utility`), `behavior.prompt_state` e `recall.default_limit` da
+config efetiva (projeto > global) são o default de `run`/`tui`/`memo ask` (flags > `--params` >
+config > default do comando).
+
+**Contexto do turno (Q-02b/Q-03/Q-04, só por config):** `behavior.context_selection` escolhe a
+política de seleção do contexto (`suffix` é o default histórico; `utility` liga utilidade + MMR + RRF)
+e `behavior.prompt_state` liga a secção `estado` no prime. Ambas ficam **desligadas** por omissão: os
+números publicados são um *proxy* de informação (`bench/e18/select/`) e a adoção do default exige A/B
+com o modelo. O envelope de `run --json` publica o que correu (`context_selection`, `state`) para que
+a medição não dependa do que se supõe.
 
 ### 2.3 Defaults de provider/modelo/base
 

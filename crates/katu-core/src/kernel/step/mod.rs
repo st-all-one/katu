@@ -24,7 +24,8 @@ pub fn step(state: &State, event: &Event) -> Result<State, Refusal> {
         // mas exige turno aberto como as mensagens.
         Event::UserMessage { .. }
         | Event::AssistantMessage { .. }
-        | Event::ProjectContext { .. } => {
+        | Event::ProjectContext { .. }
+        | Event::PromptState { .. } => {
             require_open(state)?;
             Ok(state.clone())
         }

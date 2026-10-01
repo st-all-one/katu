@@ -139,6 +139,10 @@ impl AuditRecord {
                     }
                 };
             }
+            Event::PromptState { turn, text } => {
+                record.kind = "state";
+                record.text = format!("turno {turn}: {text}");
+            }
             Event::ProjectContext { agents, skills } => {
                 record.kind = "context";
                 record.text = format!(
@@ -169,17 +173,17 @@ impl AuditRecord {
 
     /// Linha da tabela `a`.
     #[must_use]
-    pub fn cells(&self) -> Vec<Cell> {
+    pub fn cells(&self) -> Vec<Cell<'_>> {
         let _span = crate::trace_fn!("audit::record::cells");
 
         vec![
             Cell::int(i64::try_from(self.seq).unwrap_or(i64::MAX)),
             Cell::text(self.kind),
-            Cell::text(self.tool.clone()),
-            Cell::text(self.path.clone()),
-            Cell::text(self.status.clone()),
-            Cell::text(self.rule.clone()),
-            Cell::text(self.text.clone()),
+            Cell::text(self.tool.as_str()),
+            Cell::text(self.path.as_str()),
+            Cell::text(self.status.as_str()),
+            Cell::text(self.rule.as_str()),
+            Cell::text(self.text.as_str()),
         ]
     }
 }
@@ -199,7 +203,7 @@ fn truncate(text: &str, max_bytes: usize) -> String {
 }
 
 /// Constrói a tabela `a` a partir de linhas de auditoria.
-pub(super) fn table(records: &[AuditRecord]) -> RowTable {
+pub(super) fn table(records: &[AuditRecord]) -> RowTable<'_> {
     let _span = crate::trace_fn!("audit::record::table");
 
     let mut table = RowTable::new("a");

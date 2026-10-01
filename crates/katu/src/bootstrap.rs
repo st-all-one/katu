@@ -210,6 +210,16 @@ fn default_config() -> toml::Table {
         "behavior.auto_compact",
         toml::Value::Boolean(false),
     );
+    config::set_key(
+        &mut table,
+        "behavior.prompt_state",
+        toml::Value::Boolean(false),
+    );
+    config::set_key(
+        &mut table,
+        "behavior.context_selection",
+        toml::Value::String("suffix".to_owned()),
+    );
     config::set_key(&mut table, "recall.default_limit", toml::Value::Integer(5));
     table
 }

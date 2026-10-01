@@ -1,0 +1,31 @@
+{
+  "caveat": "custo de CPU (relógio); a densidade em tokens mede-se com o tokenizer real (xtask bench-toon); a projeção antes de P-02 foi medida em 137,8 µs dev, logo o ganho ponta a ponta real é maior que o `to_toon_gain_pct` (que usa a projeção já otimizada com o emissor antigo)",
+  "derived": {
+    "criterion_met": true,
+    "criterion_pct": 20.0,
+    "emit_gain_pct": 62.046551735401145,
+    "emit_share_pct": 41.723281099636615,
+    "emit_speedup_milli": 2634,
+    "project_share_pct": 60.347155394050816,
+    "to_toon_gain_pct": 39.92061095051128,
+    "to_toon_speedup_milli": 1664
+  },
+  "iterations": 2000,
+  "payload": {
+    "bytes": 5551,
+    "identical_to_legacy": true,
+    "rows": 60,
+    "sections": 4
+  },
+  "phases_ns": {
+    "emit": 58098,
+    "emit_legacy": 153077,
+    "json": 637258,
+    "project": 84031,
+    "to_toon": 139246,
+    "to_toon_legacy": 231770
+  },
+  "profile": "dev",
+  "question": "toon_emitter_single_pass",
+  "schema": "katu.bench.toon.v1"
+}

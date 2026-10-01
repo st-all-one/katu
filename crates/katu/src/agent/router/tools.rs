@@ -7,7 +7,7 @@ use katu_core::error::ToolOutcome;
 use katu_core::kernel::{Tool, ToolOutput};
 use katu_core::plan::Plan;
 use katu_policy::{ControlId, ResolvedPath, SearchMode, ToolArgs, ToolName, ToolUse};
-use katu_tools::edit::EditFileTool;
+use katu_tools::edit::{EditFileTool, Replacement};
 use katu_tools::exec::{DEFAULT_TIMEOUT_MS, ExecTool};
 use katu_tools::move_file::MoveFileTool;
 use katu_tools::read::{ReadBudget, ReadTool, View};
@@ -18,7 +18,7 @@ use serde_json::Value;
 
 use super::{
     Ports, RouteError, Routed, optional_bool, optional_str, optional_usize, parse_range,
-    required_argv, required_str, resolve, use_of,
+    required_argv, required_str, required_text_list, resolve, use_of,
 };
 
 /// Tool `read` com view/range/símbolo.
@@ -89,7 +89,7 @@ pub(super) fn write<'a>(
     })
 }
 
-/// Tool `edit` (patch otimista).
+/// Tool `edit` (patch otimista, uma ou várias substituições atómicas — Q-07).
 pub(super) fn edit<'a>(
     ports: &Ports<'a>,
     cwd: &ResolvedPath,
@@ -98,6 +98,19 @@ pub(super) fn edit<'a>(
     let _span = katu_core::trace_fn!("agent::router::tools::edit");
 
     let path = resolve(ports.fs, cwd, &required_str(args, "path")?)?;
+    let old = required_text_list(args, "old")?;
+    let new = required_text_list(args, "new")?;
+    if old.len() != new.len() {
+        return Err(RouteError::LengthMismatch {
+            old: old.len(),
+            new: new.len(),
+        });
+    }
+    let replacements: Vec<Replacement> = old
+        .into_iter()
+        .zip(new)
+        .map(|(old, new)| Replacement::new(old, new))
+        .collect();
     let use_ = use_of(
         ToolName::Edit,
         ToolArgs::Edit { path: path.clone() },
@@ -107,8 +120,7 @@ pub(super) fn edit<'a>(
     );
     let tool = EditFileTool {
         fs: ports.fs,
-        old: required_str(args, "old")?,
-        new: required_str(args, "new")?,
+        replacements,
         dry_run: optional_bool(args, "dry_run"),
     };
     Ok(Routed::Plain {

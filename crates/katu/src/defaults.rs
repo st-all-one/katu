@@ -24,6 +24,10 @@ pub(crate) struct Defaults {
     pub(crate) thinking: Option<String>,
     /// Compactação automática do histórico.
     pub(crate) auto_compact: Option<bool>,
+    /// Secção `estado` no prime (Q-04).
+    pub(crate) prompt_state: Option<bool>,
+    /// Política de seleção do contexto (Q-02b/Q-03): `suffix`/`utility`.
+    pub(crate) context_selection: Option<String>,
     /// Limite de recall por omissão.
     pub(crate) recall_limit: Option<usize>,
     /// Embeddings (E20-T17): a **segunda IA**, externa e plugável.
@@ -66,6 +70,8 @@ pub(crate) fn from_root(root: &Path) -> Defaults {
         base: text(&table, "base"),
         thinking: text(&table, "thinking"),
         auto_compact: boolean(&table, "behavior.auto_compact"),
+        prompt_state: boolean(&table, "behavior.prompt_state"),
+        context_selection: text(&table, "behavior.context_selection"),
         recall_limit: integer(&table, "recall.default_limit")
             .and_then(|value| usize::try_from(value).ok()),
         embeddings: EmbeddingDefaults {

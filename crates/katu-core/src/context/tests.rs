@@ -3,6 +3,10 @@ use super::{
     assemble_with_prime, compact, message_id, prime, prime_for, prime_long, prime_with_catalog,
     recover, tokens_from_bytes,
 };
+
+mod bench;
+mod selection;
+
 use crate::error::ToolOutcome;
 use crate::evidence::EvidenceBasis;
 use crate::kernel::{CallId, Event, Message, derive_messages};

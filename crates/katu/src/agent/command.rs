@@ -113,12 +113,23 @@ pub(crate) fn run(args: &RunArgs<'_>) -> Report {
             options: &options,
         },
     ) {
-        Ok(turn) => {
-            let value = turn_value(&model, &turn, runtime.session_id());
-            Report::ok("run", Some(value))
-        }
+        Ok(turn) => Report::ok("run", Some(turn_value(&runtime, &model, &turn))),
         Err(error) => Report::failed("run", &error.into()),
     }
+}
+
+/// Envelope de máquina de um turno concluído: o que o modelo viu (estado, política) e o que gastou.
+fn turn_value(runtime: &Runtime<'_>, model: &str, turn: &super::TurnReport) -> Value {
+    let _span = katu_core::trace_fn!("agent::command::turn_value");
+
+    let state = runtime.state_text().map(str::to_string);
+    envelope(
+        model,
+        turn,
+        runtime.session_id(),
+        state.as_deref(),
+        runtime.selection().as_str(),
+    )
 }
 
 /// Opções do turno (modelo + pensamento resolvidos, E20-T17).
@@ -194,8 +205,14 @@ pub(crate) fn build_provider(
 }
 
 /// Envelope do resultado de um turno (id da sessão + exit da rodada).
-fn turn_value(model: &str, turn: &super::TurnReport, session: Option<&str>) -> Value {
-    let _span = katu_core::trace_fn!("agent::command::turn_value");
+fn envelope(
+    model: &str,
+    turn: &super::TurnReport,
+    session: Option<&str>,
+    state: Option<&str>,
+    selection: &str,
+) -> Value {
+    let _span = katu_core::trace_fn!("agent::command::envelope");
 
     let usage = turn.usage.as_ref().map(|usage| {
         json!({
@@ -214,6 +231,8 @@ fn turn_value(model: &str, turn: &super::TurnReport, session: Option<&str>) -> V
         "calls": turn.calls,
         "cancelled": turn.cancelled,
         "usage": usage,
+        "state": state,
+        "context_selection": selection,
     })
 }
 

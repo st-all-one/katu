@@ -1,0 +1,49 @@
+{
+  "caveat": "I_ret (idf) é proxy de informação, não sucesso de tarefa: adotar o default exige A/B com o modelo",
+  "compact_applied": true,
+  "control_uniform": {
+    "gain_pct": 0.0,
+    "suffix_efficiency_milli_per_token": 2043644,
+    "utility_efficiency_milli_per_token": 2043644
+  },
+  "criterion_met_on_proxy": true,
+  "criterion_pct": 20.0,
+  "digest": {
+    "chronological": {
+      "information_milli": 18665.0,
+      "js_milli": 319.0,
+      "rows": 18,
+      "tokens": 219
+    },
+    "information_gain_pct": 338.0,
+    "prefix_messages": 90,
+    "utility": {
+      "information_milli": 18665.0,
+      "js_milli": 319.0,
+      "rows": 4,
+      "tokens": 50
+    }
+  },
+  "goal": "reconstruir o pipeline sem perder o que importa",
+  "messages": 101,
+  "question": "context_by_information",
+  "raw_min": 900,
+  "schema": "katu.bench.select.v1",
+  "selection_gain_pct": 1037.92,
+  "suffix": {
+    "dropped_messages": 22,
+    "efficiency_milli_per_token": 93997,
+    "information_milli": 81214,
+    "tokens": 864,
+    "units": 70
+  },
+  "summary_max": 220,
+  "units": 89,
+  "utility": {
+    "dropped_messages": 90,
+    "efficiency_milli_per_token": 1069610,
+    "information_milli": 126214,
+    "tokens": 118,
+    "units": 8
+  }
+}

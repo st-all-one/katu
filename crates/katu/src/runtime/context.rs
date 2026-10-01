@@ -1,9 +1,42 @@
 //! Contexto efetivo do turno e compactação (E09-T01/T07).
 
-use katu_core::context::{Compaction, CompactionMode, Context};
-use katu_core::kernel::SessionError;
+use katu_core::context::{
+    AssembleOptions, Assembly, Compaction, CompactionMode, Context, PrimeMode, SelectionParams,
+    SelectionPolicy, StateView, state_section,
+};
+use katu_core::kernel::{Event, SessionError};
 
 use super::Runtime;
+
+/// Política do contexto do turno (Q-02b/Q-03/Q-04) — **dados** do projeto, não interruptores soltos.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ContextPolicy {
+    /// Política de seleção do contexto; `suffix` é o default histórico.
+    pub(crate) selection: SelectionPolicy,
+    /// Parâmetros da seleção (dados versionados).
+    pub(crate) params: SelectionParams,
+    /// Incluir a secção `estado` no prime (Q-04) — **desligado** por omissão (A/B pendente).
+    pub(crate) prompt_state: bool,
+}
+
+impl ContextPolicy {
+    /// Lê a política da config fechada do projeto (valor inválido ⇒ default, nunca invenção).
+    ///
+    /// O `prompt_state` chega como `Option<bool>` da config: ausente ⇒ **desligado**, que é o default
+    /// do projeto (a adoção de Q-04 depende de A/B com o modelo).
+    #[must_use]
+    pub(crate) fn from_config(selection: Option<&str>, prompt_state: Option<bool>) -> Self {
+        let _span = katu_core::trace_fn!("runtime::context::policy_from_config");
+
+        Self {
+            selection: selection
+                .and_then(SelectionPolicy::parse)
+                .unwrap_or_default(),
+            params: SelectionParams::default(),
+            prompt_state: prompt_state.unwrap_or(false),
+        }
+    }
+}
 
 impl Runtime<'_> {
     /// Pré-visualiza a compactação do histórico (E09-T07): determinística, sem I/O.
@@ -24,7 +57,99 @@ impl Runtime<'_> {
     pub(crate) fn context(&self) -> Result<Context, SessionError> {
         let _span = katu_core::trace_fn!("runtime::context::context");
 
-        self.session.context(self.budget, self.compaction)
+        Ok(self.options()?.context)
+    }
+
+    /// Opções de montagem do turno (S-01): orçamento, política de seleção, objetivo e estado.
+    fn options(&self) -> Result<Assembly, SessionError> {
+        let _span = katu_core::trace_fn!("runtime::context::options");
+
+        self.session.assemble(self.budget, self.assemble_options())
+    }
+
+    /// As opções tal como o kernel as consome (a secção de estado é a **já registada**).
+    pub(crate) fn assemble_options(&self) -> AssembleOptions<'_> {
+        let _span = katu_core::trace_fn!("runtime::context::assemble_options");
+
+        AssembleOptions {
+            prime: PrimeMode::Compact,
+            compaction: self.compaction,
+            selection: self.policy.selection,
+            params: self.policy.params,
+            goal: &self.goal,
+            state: self.state_text.as_deref(),
+        }
+    }
+
+    /// Política de seleção do contexto (Q-02b/Q-03).
+    pub(crate) const fn selection(&self) -> SelectionPolicy {
+        self.policy.selection
+    }
+
+    /// Fixa a política de seleção (explícito, como a compactação).
+    ///
+    /// Só existe para os testes e para um interruptor futuro: em produção a política vem da config
+    /// do projeto (fechada), lida no arranque.
+    #[cfg(test)]
+    pub(crate) const fn set_selection(&mut self, selection: SelectionPolicy) {
+        self.policy.selection = selection;
+    }
+
+    /// A secção `estado` está ligada (Q-04)?
+    #[cfg(test)]
+    pub(crate) const fn prompt_state(&self) -> bool {
+        self.policy.prompt_state
+    }
+
+    /// Liga/desliga a secção `estado` no prime (Q-04) — explícito do utilizador.
+    ///
+    /// Só existe para os testes: em produção a decisão é a chave `behavior.prompt_state`.
+    #[cfg(test)]
+    #[allow(
+        clippy::fn_params_excessive_bools,
+        reason = "toggle explícito (`enabled`), mais legível que um enum de dois valores"
+    )]
+    pub(crate) const fn set_prompt_state(&mut self, enabled: bool) {
+        self.policy.prompt_state = enabled;
+    }
+
+    /// Secção `estado` já registada neste turno (para o envelope/`--json`).
+    pub(crate) fn state_text(&self) -> Option<&str> {
+        let _span = katu_core::trace_fn!("runtime::context::state_text");
+
+        self.state_text.as_deref()
+    }
+
+    /// Regista no log a secção `estado` do turno (Q-04) e passa a usá-la no prime.
+    ///
+    /// É um evento de **controlo** ([`Event::PromptState`]) com o texto exato: sem ele, uma retomada
+    /// reconstruiria um prompt de sistema diferente do que foi enviado (E04,
+    /// `Model-visible ⟺ logged`). Desligada, não se regista nada e o prime volta a ser estático.
+    ///
+    /// # Errors
+    /// [`SessionError`] se o turno não estiver aberto ou o log recusar o evento.
+    pub(crate) fn record_prompt_state(&mut self, max_steps: u32) -> Result<(), SessionError> {
+        let _span = katu_core::trace_fn!("runtime::context::record_prompt_state");
+
+        self.max_steps = max_steps;
+        if !self.policy.prompt_state {
+            self.state_text = None;
+            return Ok(());
+        }
+        let view = StateView {
+            mode: if self.plan_mode { "plano" } else { "execucao" },
+            rules: &self.enforced,
+            steps_max: Some(self.max_steps),
+            compaction: self.compaction == CompactionMode::Enabled,
+            working_set: &self.session.changed_files()?,
+        };
+        let text = state_section(&view);
+        self.session.apply(&Event::PromptState {
+            turn: self.session.state().turn,
+            text: text.clone(),
+        })?;
+        self.state_text = Some(text);
+        Ok(())
     }
 
     /// Modo de compactação corrente (E09-T07).

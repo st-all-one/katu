@@ -223,7 +223,7 @@ impl ToolReport {
         toon::emit(&sections)
     }
 
-    fn push_next(&self, sections: &mut Vec<Section>) {
+    fn push_next(&self, sections: &mut Vec<Section<'_>>) {
         let _span = crate::trace_fn!("report::push_next");
 
         if self.next.is_empty() {
@@ -237,7 +237,7 @@ impl ToolReport {
     }
 
     /// Envelope universal `r` (colunas fixas; ausente = célula vazia).
-    fn envelope(&self, id: &str) -> Section {
+    fn envelope<'a>(&'a self, id: &'a str) -> Section<'a> {
         let _span = crate::trace_fn!("report::envelope");
 
         let (cursor, total, truncated) = self.page.map_or((None, 0, false), |page| {
@@ -249,7 +249,7 @@ impl ToolReport {
         let row = vec![
             Cell::text(self.kind),
             Cell::text(id),
-            Cell::optional(self.hash.clone()),
+            Cell::optional(self.hash.as_deref()),
             cursor.map_or_else(|| Cell::text(""), Cell::int),
             Cell::int(total),
             Cell::bool(truncated),

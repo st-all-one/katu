@@ -6,7 +6,10 @@
 use std::path::Path;
 
 use super::{Session, SessionError};
-use crate::context::{Compaction, CompactionMode, Context, ContextBudget, assemble, compact};
+use crate::context::{
+    AssembleOptions, Assembly, Compaction, CompactionMode, Context, ContextBudget, PrimeMode,
+    assemble_all, compact,
+};
 use crate::feedback::CommandRecord;
 use crate::kernel::checkpoint::{self, Checkpoint, CheckpointError};
 use crate::kernel::log::{read_records, session_path};
@@ -111,11 +114,24 @@ impl Session<'_> {
     ) -> Result<Context, SessionError> {
         let _span = crate::trace_fn!("kernel::session::query::context");
 
-        let events = self.log_events()?;
-        Ok(match compact(&events, budget, mode) {
-            Some(compaction) if !compaction.replacements.is_empty() => compaction.context,
-            _ => assemble(&events, budget),
-        })
+        Ok(self
+            .assemble(budget, AssembleOptions::new(PrimeMode::Compact, mode))?
+            .context)
+    }
+
+    /// Monta contexto **e** compactação numa só passagem (S-01), com as opções do chamador
+    /// (Q-02b/Q-03/Q-04): política de seleção, objetivo e secção de estado.
+    ///
+    /// # Errors
+    /// [`SessionError::Log`] se o log estiver corrompido.
+    pub fn assemble(
+        &self,
+        budget: ContextBudget,
+        options: AssembleOptions<'_>,
+    ) -> Result<Assembly, SessionError> {
+        let _span = crate::trace_fn!("kernel::session::query::assemble");
+
+        Ok(assemble_all(&self.log_events()?, budget, options))
     }
 
     /// Ficheiros alterados (do *diff*) registados no log, **relativos à raiz** do workspace

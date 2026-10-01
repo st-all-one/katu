@@ -278,3 +278,66 @@ value = 0.5137
 unit = "ratio"
 basis = "measured"
 artifact = { path = "bench/e18/prompt/raw.json", note = "system vs baseline (AGENTS.md cru + descrição completa das skills)" }
+
+[[metrics]]
+name = "q02b.selection.utility.gain_ratio"
+value = 10.3792
+unit = "ratio"
+basis = "inferred"
+artifact = { path = "bench/e18/select/raw.json", note = "eficiência I_ret/token: utilidade vs sufixo (proxy, não sucesso de tarefa)" }
+
+[[metrics]]
+name = "q02b.selection.utility.tokens"
+value = 118.0
+unit = "tokens"
+basis = "inferred"
+artifact = { path = "bench/e18/select/raw.json", note = "tokens retidos com raw_min=900 (sufixo: 864)" }
+
+[[metrics]]
+name = "q02b.selection.control.gain_ratio"
+value = 0.0
+unit = "ratio"
+basis = "inferred"
+artifact = { path = "bench/e18/select/raw.json", note = "controlo negativo: log uniforme, redundância nula → 0 %" }
+
+[[metrics]]
+name = "q03.digest.utility.information_gain_ratio"
+value = 3.38
+unit = "ratio"
+basis = "inferred"
+artifact = { path = "bench/e18/select/raw.json", note = "I_ret do digest por utilidade vs cronológico, mesmo teto" }
+
+[[metrics]]
+name = "q03.digest.utility.tokens"
+value = 50.0
+unit = "tokens"
+basis = "inferred"
+artifact = { path = "bench/e18/select/raw.json", note = "summary_max=220 (cronológico usou 219 tokens para 4,4× menos informação)" }
+
+[[metrics]]
+name = "p02.toon.emit.gain_ratio"
+value = 0.6205
+unit = "ratio"
+basis = "measured"
+artifact = { path = "bench/e18/toon/raw.json", note = "emissor TOON: réplica congelada do anterior vs. escrita direta (dev, 153.1 → 58.1 µs/op)" }
+
+[[metrics]]
+name = "p02.toon.emit_release.gain_ratio"
+value = 0.3335
+unit = "ratio"
+basis = "measured"
+artifact = { path = "bench/e18/toon/raw-release.json", note = "o mesmo A/B em release (5.44 → 3.63 µs/op); corridas repetidas dão 25–41 %" }
+
+[[metrics]]
+name = "p02.toon.to_toon.nanos"
+value = 139246.0
+unit = "nanos"
+basis = "measured"
+artifact = { path = "bench/e18/toon/raw.json", note = "envelope + projeção + emissão, 5551 B de TOON (antes de P-02: 275 782 ns, medidos na árvore anterior)" }
+
+[[metrics]]
+name = "p02.toon.to_toon.gain_ratio"
+value = 0.3992
+unit = "ratio"
+basis = "measured"
+artifact = { path = "bench/e18/toon/raw.json", note = "conservador: usa a projeção já otimizada com o emissor antigo; o ganho real é ≈ −49 % (275,8 → 139.2 µs)" }

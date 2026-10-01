@@ -93,6 +93,9 @@ pub(crate) fn run_turn_with(
         runtime.begin_turn()?;
     }
     runtime.record_user(goal)?;
+    // Q-04: a secção `estado` do turno entra no log **antes** de qualquer pedido ao provider, pelo
+    // que o prompt de sistema que o modelo vê é reconstruível do log (E04).
+    runtime.record_prompt_state(options.max_steps)?;
     let accum = drive(runtime, &ports, provider, options, activity)?;
     finish(runtime, accum)
 }

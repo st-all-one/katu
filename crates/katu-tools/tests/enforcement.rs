@@ -14,7 +14,7 @@ use katu_policy::{
     Enforcement, PolicyError, ResolvedArgv, ResolvedPath, Rule, RuleCategory, RuleExamples, RuleId,
     RuleScope, RuleSet, Severity, ToolArgs, ToolName, ToolUse,
 };
-use katu_tools::edit::EditFileTool;
+use katu_tools::edit::{EditFileTool, Replacement};
 use katu_tools::exec::ExecTool;
 use katu_tools::move_file::MoveFileTool;
 use katu_tools::plan::PlanTool;
@@ -189,8 +189,7 @@ fn deny_edit_does_not_patch() -> TestResult<()> {
     fs.write_atomic(Path::new("/work/a.rs"), b"let x = 1;\n")?;
     let tool = EditFileTool {
         fs: &fs,
-        old: "let x = 1;".to_string(),
-        new: "let x = 2;".to_string(),
+        replacements: vec![Replacement::new("let x = 1;", "let x = 2;")],
         dry_run: false,
     };
     let dispatch = dispatch(

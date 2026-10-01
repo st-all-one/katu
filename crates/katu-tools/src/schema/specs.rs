@@ -66,7 +66,7 @@ const WRITE: ToolSchema<'static> = ToolSchema {
 /// Especificação de edição.
 const EDIT: ToolSchema<'static> = ToolSchema {
     name: "edit",
-    description: "Use when changing an existing file with a unique anchor. Do not use for new files (use write).",
+    description: "Use when changing an existing file. Do not use for new files (use write). One call may carry several replacements, applied in order and all-or-nothing.",
     params: &[
         ParamSpec {
             name: "path",
@@ -76,15 +76,15 @@ const EDIT: ToolSchema<'static> = ToolSchema {
         },
         ParamSpec {
             name: "old",
-            kind: ParamKind::Text,
+            kind: ParamKind::ListText,
             required: true,
-            description: "trecho único a substituir (tem de aparecer exatamente uma vez)",
+            description: "trecho(s) único(s) a substituir, na ordem de `new` (um só trecho: lista de um)",
         },
         ParamSpec {
             name: "new",
-            kind: ParamKind::Text,
+            kind: ParamKind::ListText,
             required: true,
-            description: "trecho que substitui `old`",
+            description: "trecho(s) que substituem `old`, um por trecho e pela mesma ordem",
         },
         ParamSpec {
             name: "dry_run",

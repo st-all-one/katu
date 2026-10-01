@@ -253,5 +253,22 @@ pub fn to_f64(value: u64) -> f64 {
     value as f64
 }
 
+/// Converte um `f64` (finito, não negativo) em `u64` arredondado — para métricas inteiras.
+///
+/// A conversão satura (negativo → `0`, `NaN`/`inf` → `0`/`u64::MAX`) e os chamadores só a usam
+/// depois de verificar `is_finite() && > 0.0`.
+#[allow(
+    clippy::as_conversions,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "métrica inteira a partir de um `f64` já validado; o arredondamento é o pretendido"
+)]
+#[must_use]
+pub fn from_f64(value: f64) -> u64 {
+    let _span = crate::trace_fn!("evidence::from_f64");
+
+    value.round() as u64
+}
+
 #[cfg(test)]
 mod tests;

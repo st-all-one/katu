@@ -8,6 +8,8 @@ use katu_core::ports::{FixedClock, Timestamp};
 use katu_core::provider::{ModelCapabilities, Thinking};
 
 use super::{Runtime, RuntimeError};
+
+mod state;
 use crate::ports::StdFs;
 
 /// Raiz temporária única por teste.

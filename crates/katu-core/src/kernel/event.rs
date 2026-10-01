@@ -141,6 +141,16 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         skills: Option<String>,
     },
+    /// Secção de **estado** que entrou no prime deste turno (Q-04): modo, regras que travam,
+    /// orçamento de passos, *working set*. Evento de controlo, mas é o que fecha
+    /// `Model-visible ⟺ logged` para a parte **dinâmica** do prompt de sistema — a estática vive no
+    /// [`Event::ProjectContext`].
+    PromptState {
+        /// Turno a que a secção pertence.
+        turn: u32,
+        /// Secção exatamente como entrou no `system`.
+        text: String,
+    },
     /// Fim de um turno.
     TurnEnd {
         /// Número do turno.
@@ -167,6 +177,7 @@ impl Event {
             Self::VerificationRecorded { .. } => "verification_recorded",
             Self::Control { .. } => "control",
             Self::ProjectContext { .. } => "project_context",
+            Self::PromptState { .. } => "prompt_state",
             Self::TurnEnd { .. } => "turn_end",
         }
     }

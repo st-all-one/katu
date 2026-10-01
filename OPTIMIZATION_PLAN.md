@@ -58,6 +58,11 @@ remoção de complexidade; senão reverter e escrever a rejeição). Nada muda b
 | **Q-18** tools por relevância (A4) | ✗ rejeitado | §1.5; ganho máximo seguro **14,0 %** < 20 % |
 | **Q-19** `AGENTS.md` condensado | ✔ feito | **−29,1 %** (1590 → 1128 B); cache **rejeitado** (25,8 ms vs. µs) |
 | **Q-20** `gate:prompt` | ✔ feito | `xtask gate:prompt`; `bench/e18/prompt/raw.json`; orçamentos travados |
+| **S-01** um só caminho de orçamento | ✔ feito | `assemble_all` (1 derivação, 1 partição, 1 teto); testes de invariante em `context/tests/` |
+| **Q-02b** contexto por utilidade + MMR + RRF | ✔ feito (**proxy**) | **+1037,9 %** de `I_ret`/token; controlo negativo **0,0 %**; `bench/e18/select/` — *default* fica `suffix` até A/B com o modelo |
+| **Q-03** compactação por informação | ✔ feito (**proxy**) | digest por utilidade: **+338,0 %** de `I_ret` com 219 → 50 tokens; gatilho `τ_JS` |
+| **Q-04** o modelo vê o estado | ✔ feito (**off**) | secção `estado` + evento `PromptState` (log/replay); ligada por `behavior.prompt_state` |
+| **P-02** emissor TOON de uma passagem | ✔ feito | `emit` **−62,0 %** dev / **−33,3 %** release; `to_toon` −39,9 %; `bench/e18/toon/` |
 
 **Lição de método (B-01).** O primeiro A/B deu −5 % e quase reverteu B-01: a causa era um
 *refactor* do `clippy::needless_collect`, que ao encadear `.map(spawn).map(join)` **entrelaça** o
@@ -93,6 +98,8 @@ Em **release** (`bench/mvk`): `kernel.transition` 14,4 µs, `memory.write` 9,9 �
 
 **Leitura:** o caminho de **emissão TOON** (`report::to_toon` + `colunar::emit` + `project` ≈
 270 µs dev) e o **gate de memória** são os maiores custos de CPU do caminho; a política é barata.
+Depois de **P-02** o caminho de emissão ficou em ≈ 139 µs dev (o `emit` sozinho, 153 → 58 µs): o gate
+de memória (P-03) passa a ser o maior custo de CPU do dispatch.
 
 ### 1.3 A instrumentação está essencialmente fechada
 
@@ -171,15 +178,20 @@ o que ajuda é **encurtar** o texto nosso e **medir** o que sobra.
   **unidade** (corrida maximal de mensagens de tool, ou mensagem isolada); teste
   `the_cut_never_orphans_a_tool_call_or_result` varre orçamentos `0..=80` e falha com a política
   antiga.
-- **Proposta (por fazer):** `assemble(state,budget)` com utilidade submodular + MMR (`λ`,
-  `sim_max` como **dados** versionados) e fusão **RRF** (`k=60`, pesos dados); desempate
-  `(marginal desc, id asc)`. Fronteira: só ao **prefixo** (o turno corrente fica intacto) e
-  unificado com a compactação (Q-03/S-01) — não se constroem dois mecanismos a competir pelo mesmo
-  orçamento.
-- **Teste:** mesmo input → mesmo contexto (proptest); `U(greedy) ≥ U(baseline)`; nenhum par acima
-  de `sim_max`; orçamento exato/+1; A/B de sucesso-de-tarefa com **menos** tokens.
-- **Adoção:** ≥ 20 % de redução de tokens com a mesma taxa de sucesso, ou reverter. **Bloqueio:**
-  o A/B de sucesso-de-tarefa não existe ainda — sem ele, a seleção não se adota (Q > P).
+- **Proposta (feita, Q-02b):** `select::chosen_units` com utilidade **submodular** (massa IDF sobre
+  termos ainda não cobertos) + diversidade **MMR** (`λ`, `sim_max`) + fusão **RRF** (`k=60`, 4 canais:
+  recência, massa, objetivo, evidência) — parâmetros como **dados** versionados
+  (`SELECTION_SCHEMA_VERSION`), desempate `(marginal desc, índice asc)`. Fronteira: só ao **prefixo**
+  (a última unidade fica intacta) e partilhada com a compactação (Q-03/S-01) — um só mecanismo para o
+  mesmo orçamento.
+- **Teste:** determinismo (mesmo input → mesma escolha), orçamento exato em todos os valores,
+  `U(utilidade) ≥ U(sufixo)`, nenhum par acima de `sim_max`, e o invariante de não-órfão varrido.
+- **Resultado (proxy):** **+1037,9 %** de `I_ret`/token no cenário com enchimento repetitivo
+  (864 → 118 tokens) e **0,0 %** no controlo negativo uniforme. Artefacto `bench/e18/select/raw.json`;
+  métricas `q02b.selection.*`.
+- **Adoção:** o critério de 20 % está **cumprido no proxy**, mas `I_ret` não é sucesso de tarefa: o
+  *default* continua `SelectionPolicy::Suffix` até haver A/B com o modelo (`behavior.context_selection`
+  permite ligar). Custos declarados: o greedy é `O(n²·termos)` e pode largar o meio da conversa.
 - **Mapa:** E18-T02/F2 · E18-T09/F9 · risco R13 · Q-03/S-01.
 
 #### Q-21 · O delta da tool chega ao modelo (correção §18/G6)
@@ -202,22 +214,40 @@ o que ajuda é **encurtar** o texto nosso e **medir** o que sobra.
   [`project.rs`](crates/katu-core/src/kernel/project.rs).
 
 #### Q-03 · Compactação guiada por informação (F3)
-- **Problema:** o digest retém tudo por igual (`kind`+excerto), sem entropia/surprisal.
-- **Proposta:** `H(P)`, `KL`/`JS(P‖Q)` com gatilho `τ_JS` e orçamento de informação; fica o de maior
-  **surprisal**; medir `I_ret/token` (base `inferred`).
-- **Teste:** original reconstruível (já existe `recover`); mesmo resumo para o mesmo input;
-  desligar = comportamento original (já é o default).
-- **Mapa:** E18-T03/F3 · E09-T07.
+- **Problema:** o digest retém tudo por igual (`kind`+excerto), sem entropia/surprisal; e a truncagem
+  é **cronológica**, pelo que perde a cauda do prefixo (a parte mais próxima do sufixo cru).
+- **Proposta (feita):** as linhas do digest são escolhidas pela **mesma** máquina da seleção
+  (submodular + MMR + RRF) sob o mesmo teto `summary_max`, e a compactação só se aplica se o prefixo
+  disser algo que o sufixo não diz — gatilho `JS(P_prefixo ‖ P_sufixo) ≥ τ_JS` (com `τ_JS` como
+  dado). Métricas publicadas: `I_ret` e `JS`, ambas base `inferred`.
+- **Teste:** digest por utilidade retém ≥ informação que o cronológico no mesmo teto (com o termo
+  raro no **fim** do prefixo, que é o que a cronologia corta); prefixo redundante **não** gasta o
+  resumo; determinismo; `recover` continua a recuperar o original.
+- **Resultado (proxy):** **+338,0 %** de `I_ret` (219 → 50 tokens). Artefacto
+  `bench/e18/select/raw.json`; métricas `q03.digest.*`.
+- **Adoção:** igual a Q-02b — critério cumprido no proxy, *default* histórico mantido até A/B com o
+  modelo.
+- **Mapa:** E18-T03/F3 · E09-T07 · §1.2.
 
 #### Q-04 · O modelo vê o seu estado e o seu orçamento (transparência)
 - **Problema:** `prime()` é estático (gramática + catálogo); o modelo não sabe o modo (plano/
-  execução), as regras `Enforced` ativas, o orçamento restante (writes/bytes/execs) nem o
-  working set.
-- **Proposta:** secção `estado` **compacta e determinística** no prime (sobe `PRIME_VERSION`);
-  registar `tokens` em `context.build` e `prompt_tokens` em `provider.request`.
-- **Teste:** prime com orçamento de bytes; determinismo; `Model-visible ⟺ logged`.
-- **Adoção:** manter só se reduzir turnos de auto-correção (A/B).
-- **Mapa:** G6 · E09-T01 · E19.
+  execução), as regras `Enforced` ativas, o teto de passos nem o *working set*.
+- **Proposta (feita):** secção `estado` **compacta e determinística** (`context/state.rs`, teto
+  `MAX_SECTION_BYTES`, `working set` limitado a 8 caminhos, sem duplicados) acrescentada **no fim** do
+  prime — o resto do prompt continua prefixo estável dentro do turno. Regista-se no log como
+  `Event::PromptState { turn, text }` com o texto **exato** (`Model-visible ⟺ logged`, E04), pelo que
+  uma retomada reproduz o prompt enviado. `context.build` já publica `tokens` e `provider.request`
+  `input_tokens` (Q-01/Q-20).
+- **Teste:** determinismo, teto de bytes, `-`/`?` quando não há facto, o texto entra no fim do prime,
+  o evento está no log, orçamento exato (+bytes da secção), e **desligado por omissão**.
+- **Adoção:** a secção está **desligada** (`behavior.prompt_state = false`): a adoção exige A/B de
+  turnos de auto-correção com o modelo, que não existe. Custo **medido em execução real**
+  (`katu run … --json`, ligada vs. desligada): **+69 tokens de input** (2724 → 2793), com o cache de
+  prefixo a funcionar (`cached=812`) e as 8 regras `Enforced` visíveis. O ganho fica por medir.
+- **Decisão de desenho:** o estado é **estável dentro do turno** (teto de passos, não o que resta).
+  Um valor que muda a cada passo faria o prompt de sistema mudar dentro do turno e destruiria o cache
+  de prefixo do provider (§1) — o preço seria maior que a informação acrescentada.
+- **Mapa:** G6 · E09-T01 · E19 · §1.1.
 
 #### Q-05 · Skills e catálogo com relevância (F2/F9)
 - **Problema:** o catálogo de skills (8) e o AGENTS.md entram **inteiros**; sem gating por
@@ -406,13 +436,27 @@ travar**. Densificar prosa com TOON não entra: o ADR 0006 mede ganhos em regist
 - **Mapa:** E18-T05 · §42.
 
 #### P-02 · Emissor TOON de uma passagem
-- **Problema:** `report::to_toon`+`colunar::emit`+`project` ≈ 270 µs dev; várias passagens e
-  `format!`/`join` em laço.
-- **Proposta:** escrever **direto** no buffer (`push_str`/`write!`), `Cow` no `project`/`colunar`,
-  capacidade pré-alocada, hoisting de `is_scalar` — o análogo katu do O4.5/O4.6 do knudge.
-- **Teste:** TOON **byte-idêntico** (goldens/proptest).
-- **Adoção:** ≥ 20 % no `toon.emit`, ou reverter.
-- **Mapa:** E15-T05/T10 (knudge O4) · [`toon_bench`](xtask/src/toon_bench.rs).
+- **Problema:** `report::to_toon`+`colunar::emit`+`project` ≈ 270 µs dev; a projeção clonava cada
+  string e cada lista aninhada, o buffer crescia por realocação e a sanitização descodificava UTF-8
+  `char` a `char` (duas passagens).
+- **Proposta (feita):** reserva **exata** do buffer (`byte_len`), guarda **SWAR** de 8 bytes para
+  "existe byte de controlo" com passagem lenta exata, `Cow<'a, str>` nas células/secções, listas
+  aninhadas emprestadas (`&'a [Value]`), `flatten_into` direto no buffer e nomes emprestados nas
+  secções-filho.
+- **Teste:** **byte-idêntico** ao emissor anterior (réplica congelada no próprio *bench*, afirmada no
+  teste), capacidade reservada **exata** (`byte_len == emitido`), varredura SWAR exaustiva sobre todos
+  os pares de bytes + delimitador em cada fronteira de carácter, `int_len` contra `to_string()`.
+- **Resultado:** `emit` **−62,0 %** em dev (153,1 → 58,1 µs) e **−33,3 %** em release (5,44 →
+  3,63 µs); ponta a ponta `to_toon` **−39,9 %** (conservador; o ganho real em dev é ≈ −49 %).
+  Artefacto `bench/e18/toon/{raw.json,raw-release.json}`; 4 métricas `p02.toon.*`.
+- **Rejeitado (com o número):** `push_int` manual (dígitos em buffer de pilha em vez de `write!`) —
+  parecia poupar o `fmt::Arguments` de ~180 células, mas mediu **+7 %** em `emit` (109,6 → 120,3 µs
+  dev). Revertido.
+- **Adoção:** critério (≥ 20 % em `toon.emit`) cumprido em dev e em release; a saída é byte-idêntica,
+  logo não há risco de prompt.
+- **Limite:** em release a projeção é dominada pela **alocação das linhas** (o ganho ponta a ponta cai
+  para −6 %); o perfil dev exagera o ganho das alocações eliminadas.
+- **Mapa:** E15-T05/T10 (knudge O4) · [`toon_bench`](xtask/src/toon_bench.rs) · §1.2.
 
 #### P-03 · Caminho `memory.write` / gate
 - **Problema:** `memory_write` 347 µs + gate 221 µs (dev); em release 9,9 µs — falta atribuição
@@ -432,8 +476,18 @@ travar**. Densificar prosa com TOON não entra: o ADR 0006 mede ganhos em regist
 
 ## 4. Eixo S — simplificação (prioridade 3)
 
-- **S-01 · Um só caminho de orçamento.** `fit_raw`, `compact`, `project` e `prime` repetem a
-  lógica de tokens; unificar em `assemble` com modos (Q-01/Q-02/Q-03).
+- **S-01 · Um só caminho de orçamento.** ✔ **feito.** `fit_raw`/`compact`/`needs_compaction`
+  derivavam o log e contavam tokens cada um por si (até **três** derivações por turno); agora há
+  **uma** derivação, **uma** partição em unidades e **um** teto (`context::assemble_all`, com
+  `AssembleOptions`), e a compactação é o que sobra dessa decisão. O sufixo histórico continua a ser
+  a política por omissão (byte a byte, com teste que o fixa).
+- **S-01b · Micro-otimizações do caminho quente (`.agents/skill/rust`).** ✔ feito, cobertas pelo
+  mesmo A/B: o texto *model-visible* sai como `Cow` (nada se clona só para tokenizar — um *delta* de
+  vários KiB era copiado a cada turno), o `idf` é pré-calculado (a consulta era um `ln` por termo e o
+  greedy consulta a massa `O(n²)` vezes), o ganho marginal não constrói conjuntos temporários, a
+  pertença ao escolhido é um **bitmap** (era procura linear na lista), o ranking usa valores
+  pré-calculados com `sort_unstable`, os `Vec` têm capacidade pré-alocada e a contagem de caracteres
+  de um termo só corre depois do teste barato em bytes.
 - **S-02 · `katu.fn` catch-all.** 522 spans com o mesmo id. Decidir: expor a função real (Q-09) ou
   remover o ruído. Não deixar ambíguo.
 - **S-03 · Política visível pelo chamador.** `katu-policy` (120 fn) fica fora da cobertura por
@@ -455,7 +509,7 @@ W2b (densidade)  Q-16 → Q-05 → Q-20 → Q-19 → Q-18        (frente F2b; §
 W3 (dados)       Q-01 → Q-02 → Q-03 → Q-04 → Q-05        (frente F2/F3/F9)
 W4 (superfície)  Q-07, Q-08                              (menos turnos)
 W5 (segurança)   Q-11, Q-12                              (F6/F7)
-W6 (estabilidade)Q-13, Q-14, Q-15, P-01, P-02, P-03, P-04
+W6 (estabilidade)Q-13, Q-14, Q-15, P-01, ~~P-02~~, P-03, P-04
 ```
 
 **Regra:** W1 primeiro (sem medir, não se otimiza — a lição do E18 §0.3). W2 são correções que não
@@ -469,6 +523,10 @@ esperam. Só depois as frentes formais. Cada PR: A/B + `make check` verde.
 |---|---|---|---|
 | Turnos por tarefa canônica | medir (W1) | **−20 %** | `bench/e18/` |
 | Tokens de contexto (mesma tarefa) | 3265 | **−20 %** | `raw.json` |
+| Seleção por utilidade (`I_ret`/token) | — | **+20 %** no proxy ✔ +1037,9 % | `bench/e18/select/raw.json` |
+| Controlo negativo da seleção | — | **0 %** (métrica não é trivial) ✔ | idem |
+| Digest por informação (`I_ret`) | — | **+20 %** no proxy ✔ +338,0 % | idem |
+| Secção `estado` no prime | — | custo medido ✔ / ganho por medir (off) | idem |
 | Tokens do prompt (`system` + tools) | 3465 | **≤ 2800** | `bench/e18/prompt/raw.json` |
 | Catálogo de skills | 1330 tok | **≤ 400** ✔ 334 | idem |
 | `AGENTS.md` no prompt | 438 tok | **≤ 350** ✔ 311 | idem |
@@ -510,6 +568,10 @@ esperam. Só depois as frentes formais. Cada PR: A/B + `make check` verde.
 ## 9. Definition of Done
 
 - [ ] Q-01..Q-20 com fórmula, artefacto e teste que os trava; rejeições escritas.
+- [ ] S-01: uma só derivação/partição/teto por turno (Q-02b/Q-03 partilham a mesma máquina).
+- [ ] Q-02b/Q-03: critério cumprido no **proxy** (`I_ret`, com controlo negativo a 0 %) e *default*
+      histórico mantido até A/B com o modelo — a decisão está escrita, não implícita.
+- [ ] Q-04: secção `estado` reconstruível do log (`PromptState`) e **desligada** por omissão.
 - [ ] §18/G6 fechado: o **delta** da tool é o mesmo texto no log e no pedido (Q-21), e o corte do
       contexto nunca parte um par `ToolCall`/`ToolResult` (Q-02a).
 - [ ] `Model-visible ⟺ logged` **fechado** também para o contexto do projeto (Q-16): o prompt de

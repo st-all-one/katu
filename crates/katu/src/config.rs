@@ -72,6 +72,16 @@ pub(crate) const KEYS: &[KeySpec] = &[
         doc: "Compactar o histórico automaticamente.",
     },
     KeySpec {
+        key: "behavior.prompt_state",
+        kind: Kind::Bool,
+        doc: "Incluir a secção `estado` no prime (Q-04; default `false`).",
+    },
+    KeySpec {
+        key: "behavior.context_selection",
+        kind: Kind::Text,
+        doc: "Política de seleção do contexto: `suffix` (default) ou `utility` (Q-02b/Q-03).",
+    },
+    KeySpec {
         key: "recall.default_limit",
         kind: Kind::Integer,
         doc: "Máximo de resultados por omissão no `memo ask`.",

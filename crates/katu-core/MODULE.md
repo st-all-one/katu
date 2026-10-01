@@ -63,14 +63,30 @@ função, o log é a fonte da verdade.
   `Jail`/`NoJail` (jail futura E17; `Full`/`Partial` ⇒ `Unavailable`).
 - Evidência tipada [`evidence`](src/evidence.rs) (DF5/E09-T05): `Metric`/`EvidenceBasis`/
   `ArtifactRef`; um número sem artefacto não fundamenta decisão; a base não muda numa agregação.
-- Contexto com orçamento [`context`](src/context.rs) (E09-T01/T07): `ContextBudget`/`Context`/
-  `assemble` (prime determinístico + sufixo de mensagens do log; `Model-visible ⟺ logged`) e
-  `prime()` (`PRIME_VERSION = 3`); tokens por estimativa determinística com o rácio **medido**
-  `BYTES_PER_TOKEN_MILLI` (Q-01; `bench/e18/tokens/`). A compactação
-  [`context/compact`](src/context/compact.rs) (E09-T07) é determinística e opt-in
-  (`CompactionMode`, default `Disabled`): digest do prefixo + mapeamento original→substituto,
-  `recover` pelo log, ganho como `Metric` `inferred`. `Session::context(budget, mode)` é o **único**
-  ponto que monta o contexto efetivo do turno (com ou sem digest), consumido pelo loop.
+- Contexto com orçamento [`context`](src/context.rs) (E09-T01/T07, S-01): `ContextBudget`/
+  `Context`/`AssembleOptions`/`assemble_all` — **uma** derivação do log, **uma** partição em
+  unidades e **um** teto por turno (antes derivava-se o log até três vezes). `prime()`
+  (`PRIME_VERSION = 3`) vive em [`context/prime`](src/context/prime.rs); tokens por estimativa
+  determinística com o rácio **medido** `BYTES_PER_TOKEN_MILLI` (Q-01; `bench/e18/tokens/`).
+  [`context/select`](src/context/select.rs) (Q-02b/Q-03) é a máquina **partilhada** pelo corte cru e
+  pelo digest: unidades (corrida maximal de tool ou mensagem isolada), estatística IDF do próprio
+  conjunto, escolha greedy submodular com diversidade **MMR** e fusão **RRF**
+  ([`context/select/greedy`](src/context/select/greedy.rs)), informação e divergência **JS**
+  ([`context/select/info`](src/context/select/info.rs)). Política por omissão: `Suffix` (histórica,
+  byte a byte); `Utility` mede-se em `bench/e18/select/` (**+1037,9 %** de `I_ret`/token, controlo
+  negativo 0,0 %) mas só se adota com A/B de tarefa.
+- Compactação [`context/compact`](src/context/compact.rs) (E09-T07, Q-03): determinística e opt-in
+  (`CompactionMode`, default `Disabled`); digest do prefixo + mapeamento original→substituto,
+  `recover` pelo log, ganho como `Metric` `inferred`. Com a política de utilidade as linhas do digest
+  são escolhidas pela mesma máquina e o gatilho `JS(prefixo ‖ sufixo) ≥ τ_JS` evita gastar o resumo
+  quando o prefixo é redundante (`I_ret` **+338,0 %** no proxy). `Session::assemble(budget, options)`
+  é o **único** ponto que monta contexto e compactação, consumido pelo loop.
+- Estado do turno no prompt [`context/state`](src/context/state.rs) (Q-04): secção `estado` compacta e
+  determinística (modo, regras que travam, teto de passos, *working set*), com teto de bytes e sem
+  duplicados, acrescentada **no fim** do prime. Registada como `Event::PromptState` com o texto exato
+  (`Model-visible ⟺ logged`); **desligada** por omissão (`behavior.prompt_state`) até haver A/B de
+  turnos de auto-correção. Estável **dentro** do turno, de propósito: um valor que mudasse a cada
+  passo destruiria o cache de prefixo do provider.
 - Gate de verificação [`verify`](src/verify/mod.rs) (E09-T03): `verify` **puro** (escopo/feedback/
   cobertura, zero LLM), `VerificationReport`/`Check`/`CheckStatus`, `--strict` promove warns a
   blocks; o `diff` são ficheiros **relativos à raiz** derivados do log (`changed_files`, só escritas
@@ -88,6 +104,13 @@ função, o log é a fonte da verdade.
   `tail` (cauda determinística) e `redact` (segredos); `exit_code: null` bloqueia avançar (§31).
 - Formato AI-first [`toon`](src/toon.rs) (DF12/E06-T12): emissor **TOON** canónico (zero deps) para a
   saída das tools ao modelo — sem `null`, vazios omitidos, ordem canónica; JSON é a alternativa.
+  [`toon/colunar`](src/toon/colunar.rs) emite **numa só alocação**: `byte_len` calcula o tamanho exato
+  (teste `the_reserved_capacity_is_exact`), a sanitização usa uma guarda **SWAR** de 8 bytes (o caso
+  comum — sem delimitadores — é uma cópia) e os inteiros vão por `write!` (um `push_int` manual mediu
+  **pior**: +7 %). [`toon/project`](src/toon/project.rs) **empresta** o payload: `Cell<'a>`/
+  `Section<'a>` usam `Cow<'a, str>` e as listas aninhadas são `&'a [Value]` (a projeção antiga clonava
+  cada string e cada lista). Medido em [`bench/e18/toon`](../../bench/e18/toon/PROTOCOL.md): `emit`
+  **−62,0 %** em dev e **−33,3 %** em release (P-02).
 - Envelope [`report`](src/report.rs) (DF12/E06-T12): `ToolReport`/`Page`/`Cost`, ids
   content-addressed e hash; renderiza em TOON ou JSON. Transportado por `ToolOutput`.
 - Skills do projeto [`skill`](src/skill.rs) (E20-T13): `Skill` (nome/descrição/caminho),

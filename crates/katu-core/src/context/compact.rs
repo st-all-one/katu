@@ -1,4 +1,4 @@
-//! Compactação determinística do histórico antigo (E09-T07).
+//! Compactação determinística do histórico antigo (E09-T07) — guiada por **informação** (Q-03).
 //!
 //! **Controlo do core, nunca inline no hot path.** O prefixo que não cabe no orçamento é
 //! substituído por um **digest determinístico** (sem LLM): para o mesmo input, o mesmo resumo e o
@@ -7,16 +7,23 @@
 //!
 //! O digest é uma tabela `m` (ADR 0006): `kind`, `id` e um `text` de uma linha por mensagem. Não
 //! há `Debug` no caminho — o texto é estruturado (outcome → `ToolOutcome::summary`).
+//!
+//! **Q-03:** com [`SelectionPolicy::Utility`] as linhas são escolhidas pela **mesma** máquina da
+//! seleção de unidades (utilidade submodular + MMR + RRF, [`super::select`]) e a compactação só se
+//! aplica se o prefixo disser algo que o sufixo não diz — `JS(prefixo ‖ sufixo) ≥ τ_JS`. A política
+//! histórica (`Suffix`) mantém a truncagem cronológica, byte a byte.
+
+use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
-use super::{Context, ContextBudget, fit_raw, message_weight, prime, tokens_from_bytes};
+use super::select::{self, Candidate, SelectionParams, SelectionPolicy};
+use super::{AssembleOptions, Context, ContextBudget, PrimeMode, assemble_all, tokens_from_bytes};
 use crate::diag::{Level, events};
-use crate::evidence::{EvidenceBasis, Metric, Unit, to_f64};
+use crate::evidence::{EvidenceBasis, EvidenceError, Metric, Unit, to_f64};
 use crate::kernel::{Event, Message, derive_messages};
 use crate::report::content_id;
 use crate::toon::{Cell, RowTable, Section, emit};
-use katu_policy::ToolUse;
 
 /// Versão do esquema da compactação.
 pub const COMPACTION_SCHEMA_VERSION: u32 = 1;
@@ -61,6 +68,23 @@ pub struct Compaction {
     pub gain: Metric,
 }
 
+/// Digest do prefixo (parte pura da compactação) e as métricas que o justificam.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Digest {
+    /// Tabela `m` emitida (TOON colunar).
+    pub summary: String,
+    /// Mapeamento original→substituto (determinístico).
+    pub replacements: Vec<Replacement>,
+    /// `I_ret`: massa de informação retida (milésimos de nat; base `inferred`).
+    pub information: Metric,
+    /// `JS(prefixo ‖ sufixo)`: quanto o prefixo diz que o sufixo já não diz (gatilho `τ_JS`).
+    pub divergence: Metric,
+    /// Linhas retidas.
+    pub kept_rows: usize,
+    /// Linhas do prefixo.
+    pub total_rows: usize,
+}
+
 /// Uma linha do digest: tipo estável e texto estruturado.
 struct DigestRow {
     /// Tipo estável da mensagem.
@@ -71,7 +95,11 @@ struct DigestRow {
 
 /// Compacta o histórico antigo (determinístico; **nunca** inline no hot path).
 ///
-/// Devolve `None` quando a compactação está desligada. O original continua endereçável no log
+/// Delega no **caminho único** de orçamento ([`assemble_all`], S-01): o prefixo é exatamente o que
+/// não coube em `raw_min`, e a compactação é o que sobra dessa decisão.
+///
+/// Devolve `None` quando a compactação está desligada, quando não há prefixo ou quando o resumo não
+/// se paga (política de utilidade e `JS < τ_JS`). O original continua endereçável no log
 /// ([`recover`]).
 #[must_use]
 pub fn compact(
@@ -84,55 +112,138 @@ pub fn compact(
     if mode == CompactionMode::Disabled {
         return None;
     }
+    let assembly = assemble_all(
+        events,
+        budget,
+        AssembleOptions::new(PrimeMode::Compact, mode),
+    );
+    match assembly.compaction {
+        Some(compaction) => Some(compaction),
+        // Contrato histórico: com a compactação ligada e **nada** fora do orçamento, devolve-se a
+        // pré-visualização vazia (o gatilho olha para as substituições, não para o `Option`).
+        None if assembly.dropped == 0 => empty_preview(assembly.context).ok(),
+        None => None,
+    }
+}
+
+/// Pré-visualização vazia (nada a compactar) — mantém o contrato de `compact`.
+fn empty_preview(context: Context) -> Result<Compaction, EvidenceError> {
+    let _span = crate::trace_fn!("context::compact::empty_preview");
+
+    let original_tokens = context.raw_tokens;
+    Ok(Compaction {
+        schema_version: COMPACTION_SCHEMA_VERSION,
+        context,
+        replacements: Vec::new(),
+        original_tokens,
+        gain: Metric::new(
+            "context.gain_tokens",
+            0.0,
+            Unit::Tokens,
+            EvidenceBasis::Inferred,
+            None,
+        )?,
+    })
+}
+
+/// Digest do prefixo: linhas, mapeamentos e as duas métricas (Q-03).
+///
+/// # Erros
+/// [`EvidenceError`] se uma métrica não for construível (não acontece com base `inferred`).
+pub fn digest(
+    prefix: &[Message],
+    kept: &[Message],
+    summary_max: usize,
+    policy: SelectionPolicy,
+    params: SelectionParams,
+) -> Result<Digest, EvidenceError> {
     let _span = crate::fn_span!(
         Level::Debug,
-        events::CONTEXT_COMPACT,
-        "context::compact::compact",
-        "raw_min" => budget.raw_min,
-        "summary_max" => budget.summary_max,
+        events::CONTEXT_DIGEST,
+        "context::compact::digest",
+        "prefix" => prefix.len(),
+        "summary_max" => summary_max,
+        "policy" => policy.as_str(),
     );
-    let all = derive_messages(events);
-    let kept = fit_raw(&all, budget.raw_min);
-    let prefix_len = all.len().saturating_sub(kept.len());
-    let prefix = all.get(..prefix_len).unwrap_or_default();
+
     let (replacements, rows) = digest_rows(prefix);
-    let summary = fit_digest(&rows, budget.summary_max);
+    let candidates: Vec<Candidate> = rows.iter().map(row_candidate).collect();
+    let chosen = match policy {
+        SelectionPolicy::Suffix => chronological_fit(&candidates, summary_max),
+        SelectionPolicy::Utility => {
+            let budget = summary_max.saturating_sub(tokens_from_bytes(DIGEST_HEADER_BYTES));
+            select::greedy(&candidates, budget, None, &BTreeSet::new(), params)
+        }
+    };
+    let summary = emit_rows(&rows, &chosen);
+    let stats = select::Stats::of(&candidates);
+    let retained: BTreeSet<String> = chosen
+        .iter()
+        .filter_map(|index| candidates.get(*index))
+        .flat_map(|candidate| candidate.terms.iter().cloned())
+        .collect();
+    let divergence = select::js_milli(&term_counts(prefix), &term_counts(kept));
     crate::event!(
         Level::Debug,
         events::CONTEXT_DIGEST,
         "rows" => rows.len(),
+        "kept_rows" => chosen.len(),
         "bytes" => summary.len(),
         "tokens" => tokens_from_bytes(summary.len()),
+        "information_milli" => stats.mass_milli(&retained),
+        "js_milli" => divergence,
     );
-    let kept_tokens = kept.iter().map(message_weight).sum();
-    let summary_tokens = tokens_from_bytes(summary.len());
-    let compacted_tokens = summary_tokens.saturating_add(kept_tokens);
-    let original_tokens = prefix
-        .iter()
-        .map(message_weight)
-        .fold(kept_tokens, usize::saturating_add);
-    let saved = original_tokens.saturating_sub(compacted_tokens);
-    let gain = Metric::new(
-        "context.gain_tokens",
-        to_f64(u64::try_from(saved).unwrap_or(u64::MAX)),
-        Unit::Tokens,
-        EvidenceBasis::Inferred,
-        None,
-    )
-    .ok()?;
-    Some(Compaction {
-        schema_version: COMPACTION_SCHEMA_VERSION,
-        context: Context {
-            prime: prime(),
-            summary: Some(summary),
-            messages: kept,
-            raw_tokens: kept_tokens,
-            tokens: tokens_from_bytes(prime().len()).saturating_add(compacted_tokens),
-        },
+    Ok(Digest {
+        summary,
         replacements,
-        original_tokens,
-        gain,
+        information: Metric::new(
+            "context.information_milli",
+            to_f64(stats.mass_milli(&retained)),
+            Unit::Unspecified,
+            EvidenceBasis::Inferred,
+            None,
+        )?,
+        divergence: Metric::new(
+            "context.divergence_milli",
+            to_f64(divergence),
+            Unit::Unspecified,
+            EvidenceBasis::Inferred,
+            None,
+        )?,
+        kept_rows: chosen.len(),
+        total_rows: rows.len(),
     })
+}
+
+/// Candidato de uma linha do digest.
+///
+/// Os termos vêm do **texto emitido** (é o que o modelo vê) e os bytes contam o separador e o fim de
+/// linha que a tabela acrescenta — o mesmo número que [`chronological_fit`] sempre somou.
+fn row_candidate(row: &DigestRow) -> Candidate {
+    let _span = crate::trace_fn!("context::compact::row_candidate");
+
+    let bytes = row
+        .kind
+        .len()
+        .saturating_add(row.text.len())
+        .saturating_add(2);
+    Candidate {
+        terms: select::terms(&row.text),
+        bytes,
+        tokens: tokens_from_bytes(bytes),
+        evidence: 0,
+    }
+}
+
+/// Contagem de termos de um conjunto de mensagens (distribuição empírica).
+fn term_counts(messages: &[Message]) -> std::collections::BTreeMap<String, u32> {
+    let _span = crate::trace_fn!("context::compact::term_counts");
+
+    select::term_counts(
+        messages
+            .iter()
+            .map(|message| select::terms(&select::message_text(message))),
+    )
 }
 
 /// Recupera a mensagem original pelo seu id de conteúdo (o log é a fonte).
@@ -176,30 +287,43 @@ fn digest_rows(prefix: &[Message]) -> (Vec<Replacement>, Vec<DigestRow>) {
     (replacements, rows)
 }
 
-/// Emite a tabela `m` com as linhas que cabem no teto de tokens.
+/// Índices das primeiras linhas cujo custo cabe em `summary_max` (truncagem cronológica).
 ///
 /// O comprimento emitido é exato: a sanitização de células preserva bytes, pelo que o orçamento é
 /// respeitado sem re-renderizar.
-fn fit_digest(rows: &[DigestRow], summary_max: usize) -> String {
+fn chronological_fit(candidates: &[Candidate], summary_max: usize) -> Vec<usize> {
     let _span = crate::fn_span!(
         Level::Trace,
         events::CONTEXT_DIGEST,
-        "context::compact::fit_digest",
-        "rows" => rows.len(),
+        "context::compact::chronological_fit",
+        "rows" => candidates.len(),
         "max" => summary_max,
     );
-    let mut table = RowTable::new("m");
     let mut bytes = DIGEST_HEADER_BYTES;
-    for row in rows {
-        let row_bytes = row
-            .kind
-            .len()
-            .saturating_add(row.text.len())
-            .saturating_add(2); // `US` + `\n`
-        if tokens_from_bytes(bytes.saturating_add(row_bytes)) > summary_max {
+    let mut chosen = Vec::new();
+    for (index, candidate) in candidates.iter().enumerate() {
+        if tokens_from_bytes(bytes.saturating_add(candidate.bytes)) > summary_max {
             break;
         }
-        bytes = bytes.saturating_add(row_bytes);
+        bytes = bytes.saturating_add(candidate.bytes);
+        chosen.push(index);
+    }
+    chosen
+}
+
+/// Emite a tabela `m` com as linhas escolhidas, **na ordem do log**.
+fn emit_rows(rows: &[DigestRow], chosen: &[usize]) -> String {
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::CONTEXT_DIGEST,
+        "context::compact::emit_rows",
+        "rows" => chosen.len(),
+    );
+    let mut table = RowTable::new("m");
+    for index in chosen {
+        let Some(row) = rows.get(*index) else {
+            continue;
+        };
         table.push(vec![Cell::text(row.kind), Cell::text(row.text.clone())]);
     }
     emit(&[Section::Rows(table)])
@@ -221,25 +345,7 @@ fn message_kind(message: &Message) -> &'static str {
 fn excerpt(message: &Message) -> String {
     let _span = crate::trace_fn!("context::compact::excerpt");
 
-    let text = match message {
-        Message::User { text } | Message::Assistant { text } => text.clone(),
-        Message::ToolCall { tool, .. } => tool_call_text(tool),
-        Message::ToolResult { outcome, delta, .. } => {
-            delta.clone().unwrap_or_else(|| outcome.summary())
-        }
-    };
-    truncate(&text, DIGEST_EXCERPT_BYTES)
-}
-
-/// Texto de um pedido de tool: nome estável + primeiro caminho resolvido.
-fn tool_call_text(tool: &ToolUse) -> String {
-    let _span = crate::trace_fn!("context::compact::tool_call_text");
-
-    let name = tool.name.as_str();
-    match tool.resolved_paths.first() {
-        Some(path) => format!("{name} {}", path.as_str()),
-        None => name.to_string(),
-    }
+    truncate(&select::message_text(message), DIGEST_EXCERPT_BYTES)
 }
 
 /// Corta em fronteira de caractere e marca a elipse.
