@@ -151,9 +151,11 @@ buffer adaptativo (E18-T04).
   no interior, `context.build{tokens}` e `provider.request{prompt_tokens}`.
 - **Otimização (Q/P/S)**: plano em [`OPTIMIZATION_PLAN.md`](OPTIMIZATION_PLAN.md) (Anexo A —
   formalismos de ponta; Anexo B — DeepSeek Harness/PTC). Feito: **Q-06** (as descrições de
-  parâmetro deixam de ser descartadas e chegam ao endpoint) e **Q-10** (instrumentação acima).
-  Próximos: **B-01/B-02** (concorrência classificada no loop) e **Q-01/Q-02** (orçamento de
-  contexto exato + seleção por utilidade).
+  parâmetro deixam de ser descartadas e chegam ao endpoint), **Q-10** (instrumentação acima),
+  **Q-01** (orçamento de contexto calibrado com o tokenizer real: **3,631 B/token**;
+  `bench/e18/tokens/`) e **B-01/B-02** (lote concorrente de tool calls `Shared`, classificação
+  fail-closed: **+76,3 %** em 8 leituras, 472 → 112 ms; `bench/e18/batch/`). Próximos:
+  **Q-02** (seleção por utilidade + RRF) e **Q-04** (o modelo vê estado e orçamento).
 
 ---
 

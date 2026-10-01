@@ -1,0 +1,52 @@
+{
+  "batched_p50_ms": 112.03,
+  "effect": {
+    "files": 8,
+    "gain_pct": 76.5,
+    "parallel_p50_ms": 110.058,
+    "question": "read_effect",
+    "reps": 5,
+    "schema": "katu.bench.batch.v1",
+    "sequential_p50_ms": 467.465
+  },
+  "fixed_p50_ms": 0.31,
+  "gain_pct": 76.3,
+  "protocol": "bench/e18/batch/PROTOCOL.md",
+  "question": "lote concorrente de tool calls `Shared` (B-01) vs caminho sequencial",
+  "reads": 8,
+  "reps": 5,
+  "runs": [
+    {
+      "batched_p50_ms": 112.03,
+      "fixed_p50_ms": 0.31,
+      "gain_pct": 76.3,
+      "question": "end_to_end",
+      "reads": 8,
+      "reps": 5,
+      "schema": "katu.bench.batch.v1",
+      "sequential_p50_ms": 472.255
+    },
+    {
+      "batched_p50_ms": 117.851,
+      "fixed_p50_ms": 0.28,
+      "gain_pct": 75.1,
+      "question": "end_to_end",
+      "reads": 8,
+      "reps": 5,
+      "schema": "katu.bench.batch.v1",
+      "sequential_p50_ms": 473.254
+    },
+    {
+      "batched_p50_ms": 113.528,
+      "fixed_p50_ms": 0.286,
+      "gain_pct": 75.9,
+      "question": "end_to_end",
+      "reads": 8,
+      "reps": 5,
+      "schema": "katu.bench.batch.v1",
+      "sequential_p50_ms": 470.88
+    }
+  ],
+  "schema": "katu.bench.batch.v1",
+  "sequential_p50_ms": 472.255
+}

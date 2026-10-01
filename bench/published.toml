@@ -166,3 +166,51 @@ value = 8.468
 unit = "millis"
 basis = "measured"
 artifact = { path = "bench/e18/raw.json", note = "5× turno; memory.open+identity+log (interno por instrumentar)" }
+
+# --- Q-01: orçamento de tokens calibrado (OPTIMIZATION_PLAN.md) ---
+# Protocolo em `bench/e18/tokens/PROTOCOL.md`; artefacto cru em `bench/e18/tokens/raw.json`.
+# O rácio é do tokenizer do modelo local; o desvio de `bytes/4` é a razão da mudança.
+[[metrics]]
+name = "q01.tokens.bytes_per_token"
+value = 3.631
+unit = "ratio"
+basis = "measured"
+artifact = { path = "bench/e18/tokens/raw.json", note = "corpus fixo 2124 B / 585 tokens (qwen2.5-coder-1.5b, /tokenize)" }
+
+[[metrics]]
+name = "q01.tokens.bytes4_deviation"
+value = 0.0923
+unit = "ratio"
+basis = "measured"
+artifact = { path = "bench/e18/tokens/raw.json", note = "desvio de `bytes/4` face ao tokenizer real (o orçamento admitia +10% de texto)" }
+
+# --- B-01: lote concorrente de tool calls `Shared` (OPTIMIZATION_PLAN.md) ---
+# Protocolo em `bench/e18/batch/PROTOCOL.md`; artefacto cru em `bench/e18/batch/raw.json`.
+# 8 leituras (view `summary`, ~1,2 MiB) num passo vs 8 passos; 5 repetições, mediana.
+[[metrics]]
+name = "e18.batch.fixed.p50_ms"
+value = 0.31
+unit = "millis"
+basis = "measured"
+artifact = { path = "bench/e18/batch/raw.json", note = "1 passo sem tool calls (custo fixo do turno)" }
+
+[[metrics]]
+name = "e18.batch.end_to_end.batched.p50_ms"
+value = 112.03
+unit = "millis"
+basis = "measured"
+artifact = { path = "bench/e18/batch/raw.json", note = "8 reads num passo (lote paralelo, pool ≤ 8)" }
+
+[[metrics]]
+name = "e18.batch.end_to_end.sequential.p50_ms"
+value = 472.255
+unit = "millis"
+basis = "measured"
+artifact = { path = "bench/e18/batch/raw.json", note = "8 reads em 8 passos (caminho sequencial)" }
+
+[[metrics]]
+name = "e18.batch.end_to_end.gain_ratio"
+value = 0.763
+unit = "ratio"
+basis = "measured"
+artifact = { path = "bench/e18/batch/raw.json", note = "ganho do lote no alvo (wall-clock das N leituras); critério E18 ≥ 0.20" }

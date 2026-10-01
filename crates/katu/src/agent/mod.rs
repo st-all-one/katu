@@ -109,6 +109,9 @@ pub(crate) enum AgentError {
         /// Teto atingido.
         steps: u32,
     },
+    /// Um worker paralelo de tool call terminou abruptamente (panic vindo de uma porta).
+    #[error("tool call paralela terminou abruptamente")]
+    Worker,
 }
 
 impl From<AgentError> for Error {
@@ -124,6 +127,9 @@ impl From<AgentError> for Error {
             AgentError::Session(source) => Self::internal(source.to_string()),
             AgentError::TooManySteps { steps } => {
                 Self::internal(format!("turno excedeu {steps} passos sem terminar"))
+            }
+            AgentError::Worker => {
+                Self::internal("tool call paralela terminou abruptamente".to_string())
             }
         }
     }

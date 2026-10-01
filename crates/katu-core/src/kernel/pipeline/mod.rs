@@ -135,7 +135,11 @@ fn skipped_outcome(decision: &Decision) -> ToolOutcome {
 }
 
 /// Tool executável (implementações em `katu-tools`, E06; fakes nos testes).
-pub trait Tool {
+///
+/// `Send + Sync`: uma tool classificada `Shared` executa num worker paralelo (B-01) e o efeito
+/// tem de poder atravessar threads. Todas as implementações só seguram portas (`Fs`/`Process`/
+/// `Env`/`Clock`/`Memory`, todas `Send + Sync`) e dados próprios.
+pub trait Tool: Send + Sync {
     /// Nome estável da tool.
     fn name(&self) -> ToolName;
 

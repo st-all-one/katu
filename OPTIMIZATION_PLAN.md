@@ -41,6 +41,23 @@ remoção de complexidade; senão reverter e escrever a rejeição). Nada muda b
 
 ---
 
+## 0bis. Estado de execução (o que já foi feito, com artefacto)
+
+| Item | Estado | Evidência |
+|---|---|---|
+| **Q-06** descrições de parâmetro | ✔ feito | `agent/catalog.rs`; teste `every_parameter_carries_its_description` |
+| **Q-10** 3 ids órfãos | ✔ feito | catálogo 113 ids, 0 órfãos; `CATALOG_VERSION = 2` |
+| **Q-01** orçamento de tokens calibrado | ✔ feito | rácio medido **3,631 B/token** (`bytes/4` errava 9,2 %); `bench/e18/tokens/`; `context.build{tokens}` |
+| **B-02** várias calls por passo | ✔ já existia | testes `calls.rs` (ordem do modelo, barreira) |
+| **B-01** lote concorrente `Shared` | ✔ feito | **+76,3 %** no alvo (472 → 112 ms, 8 leituras); `bench/e18/batch/` |
+
+**Lição de método (B-01).** O primeiro A/B deu −5 % e quase reverteu B-01: a causa era um
+*refactor* do `clippy::needless_collect`, que ao encadear `.map(spawn).map(join)` **entrelaça** o
+`spawn` e o `join` por call e serializa o lote. O `collect` intermédio é semanticamente necessário.
+Um lint de estilo não substitui uma medição.
+
+---
+
 ## 1. Diagnóstico (o que o baseline e a auditoria dizem)
 
 ### 1.1 O turno é dominado por dois custos
@@ -72,7 +89,8 @@ Em **release** (`bench/mvk`): `kernel.transition` 14,4 µs, `memory.write` 9,9 �
 ### 1.3 A instrumentação está essencialmente fechada
 
 - Cobertura por função: **99,4 %** das instrumentáveis (**90,2 %** contando `const fn`).
-- Catálogo: **114 ids**; só **3 nunca emitidos** (`memory.read`, `memory.compact`, `policy.audit`).
+- Catálogo: **113 ids** (`CATALOG_VERSION = 2`), **0 órfãos** (Q-10: `memory.read`/`policy.audit`
+  passaram a ser emitidos; `memory.compact` foi removido).
 - **Lacuna de método:** a atribuição por função **não** sai no `stderr` (só no
   `AggregatingSink`); as secções por função são `dev` (com overhead do `diag`). Falta o harness
   (`criterion`/`hyperfine`/`dhat`) — E18-T10.

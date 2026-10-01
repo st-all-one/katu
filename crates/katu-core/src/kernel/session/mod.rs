@@ -7,7 +7,7 @@
 use std::path::{Path, PathBuf};
 
 use super::budget::{Budget, BudgetCap, BudgetGate};
-use super::cost::{CostCaps, CostGovernor, cost_charge_for};
+use super::cost::{CostCaps, CostCharge, CostGovernor, cost_charge_for};
 use super::event::{CallId, Event};
 use super::log::{Log, read_records_from, read_records_with_len, session_path};
 use super::memory_gate::{MemoryWriteRequest, enforce_memory_write, memory_write_use};
@@ -15,9 +15,10 @@ use super::pipeline::{Dispatch, dispatch};
 use super::state::State;
 use super::step::step;
 use crate::diag::{Level, events};
+use crate::error::ToolOutcome;
 use crate::ports::Fs;
 use crate::verify::VerificationReport;
-use katu_policy::{ResolvedPath, ToolUse};
+use katu_policy::{ResolvedPath, ToolName, ToolUse};
 
 mod approval;
 mod context;
@@ -221,13 +222,7 @@ impl<'a> Session<'a> {
             events::TOOL_CALL,
             "kernel::session::tool_call"
         );
-        self.apply_at(
-            &Event::ToolCall {
-                call: call.clone(),
-                tool: use_.clone(),
-            },
-            Some(context.now_millis),
-        )?;
+        self.begin_call(call.clone(), use_, context.now_millis)?;
         let outcome = dispatch(
             &self.state,
             use_,
@@ -235,13 +230,71 @@ impl<'a> Session<'a> {
             context.now_millis,
             context.tool,
         )?;
-        let result = outcome.outcome();
-        log_outcome(&result);
-        self.apply(&Event::ToolResult {
-            call,
-            outcome: result,
-        })?;
+        self.settle_call(call, outcome.outcome())?;
         Ok(outcome)
+    }
+
+    /// Loga o **pedido** de uma tool (ordem §42: antes do efeito) e debita o orçamento.
+    ///
+    /// Não avalia a política nem executa: é a metade "preparar" de [`Session::tool_call`],
+    /// exposta para o loop poder preparar um lote de calls `Shared`, executá-las em paralelo e só
+    /// então as cometer (B-01). Um lote que não caiba no governor **não** deve ser preparado
+    /// (deixaria calls pendentes no log): ver [`Session::can_afford_tool_calls`].
+    ///
+    /// # Errors
+    /// [`SessionError`] se o débito de orçamento for recusado ou o evento não puder ser logado.
+    pub fn begin_call(
+        &mut self,
+        call: CallId,
+        use_: &ToolUse,
+        now_millis: u64,
+    ) -> Result<(), SessionError> {
+        let _span = crate::fn_span!(
+            Level::Trace,
+            events::TOOL_CALL,
+            "kernel::session::begin_call"
+        );
+        self.apply_at(
+            &Event::ToolCall {
+                call,
+                tool: use_.clone(),
+            },
+            Some(now_millis),
+        )
+    }
+
+    /// Loga o **resultado** de uma tool já executada (a segunda metade de §42).
+    ///
+    /// # Errors
+    /// [`SessionError`] se o evento não puder ser logado.
+    pub fn settle_call(&mut self, call: CallId, outcome: ToolOutcome) -> Result<(), SessionError> {
+        let _span = crate::fn_span!(
+            Level::Trace,
+            events::TOOL_CALL,
+            "kernel::session::settle_call"
+        );
+        log_outcome(&outcome);
+        self.apply(&Event::ToolResult { call, outcome })
+    }
+
+    /// `true` se **todas** as calls indicadas cabem no cost governor, sem o alterar (B-01).
+    ///
+    /// Sonda determinística: o lote paralelo prepara todas as calls antes de executar qualquer
+    /// efeito, e um débito recusado a meio deixaria `ToolCall` sem `ToolResult` no log. Se a sonda
+    /// falhar, o loop executa o lote sequencialmente (semântica original, fail-closed).
+    #[must_use]
+    pub fn can_afford_tool_calls(&self, tools: &[ToolName], now_millis: u64) -> bool {
+        let _span = crate::trace_fn!("kernel::session::can_afford_tool_calls");
+
+        let mut probe = self.cost.clone();
+        for tool in tools {
+            let charge = CostCharge::tool_call(*tool).at(now_millis);
+            if probe.check(&charge).is_err() {
+                return false;
+            }
+            probe.commit(&charge);
+        }
+        true
     }
 
     /// Define a raiz do workspace (E07-T05): a partir daqui a política concede ler/escrever sob a

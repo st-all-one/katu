@@ -1,7 +1,7 @@
 use super::{
     COMPACTION_SCHEMA_VERSION, CompactionMode, ContextBudget, PRIME_VERSION, PrimeMode, assemble,
     assemble_with_prime, compact, message_id, prime, prime_for, prime_long, prime_with_catalog,
-    recover,
+    recover, tokens_from_bytes,
 };
 use crate::evidence::EvidenceBasis;
 use crate::kernel::{Event, derive_messages};
@@ -70,7 +70,7 @@ fn exact_limit_keeps_and_limit_minus_one_drops() {
     let events = vec![Event::UserMessage {
         text: "12345678".into(),
     }];
-    let weight = 2; // 8 bytes / 4
+    let weight = tokens_from_bytes(8);
     assert_eq!(assemble(&events, budget(weight)).messages.len(), 1);
     assert_eq!(assemble(&events, budget(weight - 1)).messages.len(), 0);
 }
@@ -160,7 +160,7 @@ fn summary_respects_the_tokens_ceiling() -> Result<(), Box<dyn std::error::Error
         .ok_or("compactação devia estar ligada")?;
     let summary = compaction.context.summary.as_deref().unwrap_or_default();
     assert!(
-        summary.len().div_ceil(4) <= 8,
+        tokens_from_bytes(summary.len()) <= 8,
         "o resumo respeita summary_max"
     );
     Ok(())

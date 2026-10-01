@@ -65,7 +65,8 @@ função, o log é a fonte da verdade.
   `ArtifactRef`; um número sem artefacto não fundamenta decisão; a base não muda numa agregação.
 - Contexto com orçamento [`context`](src/context.rs) (E09-T01/T07): `ContextBudget`/`Context`/
   `assemble` (prime determinístico + sufixo de mensagens do log; `Model-visible ⟺ logged`) e
-  `prime()` (`PRIME_VERSION = 3`); tokens por estimativa determinística (`bytes/4`). A compactação
+  `prime()` (`PRIME_VERSION = 3`); tokens por estimativa determinística com o rácio **medido**
+  `BYTES_PER_TOKEN_MILLI` (Q-01; `bench/e18/tokens/`). A compactação
   [`context/compact`](src/context/compact.rs) (E09-T07) é determinística e opt-in
   (`CompactionMode`, default `Disabled`): digest do prefixo + mapeamento original→substituto,
   `recover` pelo log, ganho como `Metric` `inferred`. `Session::context(budget, mode)` é o **único**

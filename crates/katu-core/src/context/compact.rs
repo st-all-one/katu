@@ -102,6 +102,7 @@ pub fn compact(
         events::CONTEXT_DIGEST,
         "rows" => rows.len(),
         "bytes" => summary.len(),
+        "tokens" => tokens_from_bytes(summary.len()),
     );
     let kept_tokens = kept.iter().map(message_weight).sum();
     let summary_tokens = tokens_from_bytes(summary.len());

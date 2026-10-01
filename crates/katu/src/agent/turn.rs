@@ -4,14 +4,18 @@ use katu_core::diag::{Level, events};
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::CallId;
 use katu_policy::ApprovalRequest;
+use katu_tools::schema::concurrency_of;
 use serde_json::Value;
 
 use super::{AgentError, CallOutcome, Ports, TurnReport, TurnRequest, execute_call};
 use crate::runtime::Runtime;
 
+mod batch;
 mod request;
 mod run;
 
+#[cfg(test)]
+pub(crate) use batch::PARALLEL_BATCHES;
 pub(crate) use run::run_turn_with;
 
 /// Evento **efémero** do turno (E10-T05): observação ao vivo, fora do log e do contexto.
@@ -124,6 +128,10 @@ pub(crate) fn run_turn(
 
 /// Executa as tool calls de um passo pela ordem §42, com o caminho de aprovação (E07-T05).
 ///
+/// As calls **consecutivas** classificadas `Shared` (só-leitura) formam um lote: são preparadas
+/// pela ordem do modelo, executadas num pool limitado e cometidas nessa ordem (B-01/B-02). Uma
+/// call exclusiva **esvazia** o lote antes de correr — é uma barreira, como no contrato do PTC.
+///
 /// Devolve `false` se o utilizador cancelou a meio (o chamador fecha o turno).
 fn run_calls(
     runtime: &mut Runtime<'_>,
@@ -133,9 +141,26 @@ fn run_calls(
 ) -> Result<bool, AgentError> {
     let _span = katu_core::trace_fn!("agent::turn::run_calls");
 
+    let mut batch: Vec<(CallId, String, Value)> = Vec::new();
     for (call, name, arguments) in calls {
         if activity.cancelled() {
             return Ok(false);
+        }
+        if concurrency_of(&name).is_shared() {
+            batch.push((call, name, arguments));
+            if batch.len() >= batch::MAX_PARALLEL_CALLS {
+                batch::run_shared(runtime, ports, std::mem::take(&mut batch), activity)?;
+                if activity.cancelled() {
+                    return Ok(false);
+                }
+            }
+            continue;
+        }
+        if !batch.is_empty() {
+            batch::run_shared(runtime, ports, std::mem::take(&mut batch), activity)?;
+            if activity.cancelled() {
+                return Ok(false);
+            }
         }
         let mut outcome = execute_call(runtime, ports, call.clone(), &name, &arguments)?;
         emit_outcome(activity, &name, &outcome.outcome);
@@ -148,6 +173,9 @@ fn run_calls(
             &arguments,
             activity,
         )?;
+    }
+    if !batch.is_empty() {
+        batch::run_shared(runtime, ports, batch, activity)?;
     }
     Ok(true)
 }

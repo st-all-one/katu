@@ -1,0 +1,43 @@
+{
+  "baseline_bytes_per_token": 4.0,
+  "baseline_deviation_pct": -9.23,
+  "bytes_per_token": 3.631,
+  "corpus": "bench/e18/tokens/measure.sh (heredoc CORPUS, fixo)",
+  "corpus_bytes": 2124,
+  "corpus_tokens": 585,
+  "model": "qwen2.5-coder-1.5b",
+  "protocol": "bench/e18/tokens/PROTOCOL.md",
+  "runs": [
+    {
+      "baseline_bytes_per_token": 4.0,
+      "bytes": 2124,
+      "bytes_per_token": 3.631,
+      "corpus": "bench/e18/tokens/measure.sh (heredoc CORPUS, fixo)",
+      "deviation_pct": -9.23,
+      "model": "qwen2.5-coder-1.5b",
+      "schema": "katu.bench.tokens.v1",
+      "tokens": 585
+    },
+    {
+      "baseline_bytes_per_token": 4.0,
+      "bytes": 2124,
+      "bytes_per_token": 3.631,
+      "corpus": "bench/e18/tokens/measure.sh (heredoc CORPUS, fixo)",
+      "deviation_pct": -9.23,
+      "model": "qwen2.5-coder-1.5b",
+      "schema": "katu.bench.tokens.v1",
+      "tokens": 585
+    },
+    {
+      "baseline_bytes_per_token": 4.0,
+      "bytes": 2124,
+      "bytes_per_token": 3.631,
+      "corpus": "bench/e18/tokens/measure.sh (heredoc CORPUS, fixo)",
+      "deviation_pct": -9.23,
+      "model": "qwen2.5-coder-1.5b",
+      "schema": "katu.bench.tokens.v1",
+      "tokens": 585
+    }
+  ],
+  "schema": "katu.bench.tokens.v1"
+}

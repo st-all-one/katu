@@ -1,7 +1,8 @@
 //! Testes do linter de schema (E06-T02).
 
 use super::{
-    MAX_DESCRIPTION_CHARS, ParamKind, ParamSpec, SCHEMAS, ToolSchema, catalog, lint, lint_all,
+    Concurrency, MAX_DESCRIPTION_CHARS, ParamKind, ParamSpec, SCHEMAS, ToolSchema, catalog,
+    concurrency_of, lint, lint_all,
 };
 
 fn param<'a>(name: &'a str, kind: ParamKind<'a>) -> ParamSpec<'a> {
@@ -201,4 +202,22 @@ fn lint_paths_name_the_offending_field() {
             .iter()
             .all(|issue| issue.path == "name" || issue.path.starts_with("bogus"))
     );
+}
+
+#[test]
+fn concurrency_is_fail_closed_and_known() {
+    // A lista de tools `Shared` não pode divergir do registry (fail-closed por desenho).
+    for name in ["read", "grep", "find", "ls"] {
+        assert!(
+            SCHEMAS.iter().any(|schema| schema.name == name),
+            "{name} classificado como `Shared` mas ausente do registry"
+        );
+        assert_eq!(concurrency_of(name), Concurrency::Shared);
+    }
+    // Escritas, execução, memória e nomes desconhecidos são **sempre** exclusivos.
+    for name in ["write", "edit", "move", "trash", "bash", "plan", "memory"] {
+        assert_eq!(concurrency_of(name), Concurrency::Exclusive, "{name}");
+    }
+    assert_eq!(concurrency_of("inexistente"), Concurrency::Exclusive);
+    assert_eq!(Concurrency::default(), Concurrency::Exclusive);
 }

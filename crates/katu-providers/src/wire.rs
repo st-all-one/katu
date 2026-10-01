@@ -65,7 +65,18 @@ where
     let mut attempt = 0_u32;
     loop {
         match run_attempt(transport, http, make(), sink) {
-            Ok(outcome) => return Ok(outcome),
+            Ok(outcome) => {
+                // Q-01: os tokens de entrada **reais** (provider) ficam no diagnóstico, para o
+                // rácio medido de `context` ser auditável em qualquer execução.
+                katu_core::event!(
+                    Level::Debug,
+                    events::PROVIDER_REQUEST,
+                    "input_tokens" => outcome.usage.as_ref().and_then(|usage| usage.input).unwrap_or(0),
+                    "cached_input_tokens" => outcome.usage.as_ref().and_then(|usage| usage.cached_input).unwrap_or(0),
+                    "output_tokens" => outcome.usage.as_ref().and_then(|usage| usage.output).unwrap_or(0),
+                );
+                return Ok(outcome);
+            }
             Err(failure) => {
                 if failure.retriable && attempt < retry.max_retries {
                     katu_core::event!(Level::Warn, events::PROVIDER_RETRY, "attempt" => u64::from(attempt));

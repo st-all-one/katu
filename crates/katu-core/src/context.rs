@@ -2,8 +2,9 @@
 //!
 //! Invariante: nenhuma mensagem entra sem **origem no log** (`Model-visible ⟺ logged`). A montagem
 //! é pura (sem I/O): recebe os eventos, projeta-os com [`derive_messages`] e mantém o **sufixo mais
-//! recente** que cabe no orçamento. A contagem de tokens é uma **estimativa determinística**
-//! (`bytes/4`), não um tokenizer de provider — a base fica `inferred` quando publicada (DF5).
+//! recente** que cabe no orçamento. A contagem de tokens usa o rácio **medido**
+//! [`BYTES_PER_TOKEN_MILLI`] (Q-01; tokenizer do modelo local, `bench/e18/tokens/`), publicado com
+//! base `measured` (DF5).
 
 use serde::{Deserialize, Serialize};
 
@@ -70,6 +71,13 @@ pub fn assemble_with_prime(events: &[Event], budget: ContextBudget, mode: PrimeM
     let raw_tokens = messages.iter().map(message_weight).sum();
     let prime = prime_for(mode);
     let tokens = tokens_from_bytes(prime.len()).saturating_add(raw_tokens);
+    crate::event!(
+        Level::Debug,
+        events::CONTEXT_BUILD,
+        "messages" => messages.len(),
+        "raw_tokens" => raw_tokens,
+        "tokens" => tokens,
+    );
     Context {
         prime,
         summary: None,
@@ -255,11 +263,28 @@ fn outcome_weight(outcome: &ToolOutcome) -> usize {
     }
 }
 
-/// Estimativa `bytes/4` (arredondada para cima).
-fn tokens_from_bytes(bytes: usize) -> usize {
-    let _span = crate::trace_fn!("context::tokens_from_bytes");
+/// Rácio **medido** bytes/token (Q-01), em milésimos (`3.631`).
+///
+/// Medido com o tokenizer do modelo local (`qwen2.5-coder-1.5b`, llama.cpp) sobre um corpus fixo e
+/// misto (prosa PT, código Rust, TOON, JSON Schema, caminhos) — protocolo e artefacto em
+/// `bench/e18/tokens/` (base `measured`, DF5). Substitui a estimativa `bytes/4` do E09-T01, que
+/// **subestimava** os tokens ~9 % (orçamento admitia mais texto do que julgava). Outro modelo ⇒
+/// outro rácio: o desvio fica observável em `provider.request` (`input_tokens`).
+pub const BYTES_PER_TOKEN_MILLI: u64 = 3_631;
 
-    bytes.div_ceil(4)
+/// Estimativa determinística de tokens: `ceil(bytes · 1000 / rácio_medido)`.
+fn tokens_from_bytes(bytes: usize) -> usize {
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::CONTEXT_BUILD,
+        "context::tokens_from_bytes",
+        "bytes" => bytes,
+    );
+    let scaled = u64::try_from(bytes)
+        .unwrap_or(u64::MAX)
+        .saturating_mul(1_000)
+        .div_ceil(BYTES_PER_TOKEN_MILLI);
+    usize::try_from(scaled).unwrap_or(usize::MAX)
 }
 
 #[cfg(test)]

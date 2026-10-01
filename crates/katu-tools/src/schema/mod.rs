@@ -83,6 +83,46 @@ pub struct ToolSchema<'a> {
     pub params: &'a [ParamSpec<'a>],
 }
 
+/// Classe de concorrência de uma tool (B-01, absorvido do contrato do PTC).
+///
+/// O contrato do PTC separa **apresentação** (como o modelo declara trabalho) de **autoridade**
+/// (o que pode fazer). A classificação é a peça que falta ao loop nativo: só tools que
+/// provadamente não mudam estado nem autoridade podem correr em paralelo.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Concurrency {
+    /// Corre sozinha: escreve estado, muda autoridade, ou é opaca. **Fail-closed (default).**
+    #[default]
+    Exclusive,
+    /// Só lê: pode correr em paralelo com outras `Shared` do mesmo passo.
+    Shared,
+}
+
+impl Concurrency {
+    /// `true` se pode correr em paralelo com outras calls do mesmo passo.
+    #[must_use]
+    pub const fn is_shared(self) -> bool {
+        matches!(self, Self::Shared)
+    }
+}
+
+/// Tools declaradas **só de leitura** (B-01). Fora desta lista, tudo é exclusivo.
+///
+/// Um nome aqui tem de existir no registry (`concurrency_is_fail_closed_and_known` impede o
+/// *drift*): a classificação é **dado**, não uma convenção enterrada no loop.
+const SHARED_TOOLS: &[&str] = &["read", "grep", "find", "ls"];
+
+/// Classe de concorrência da tool pelo nome **ao modelo** (fail-closed: desconhecida ⇒ exclusiva).
+#[must_use]
+pub fn concurrency_of(name: &str) -> Concurrency {
+    let _span = katu_core::trace_fn!("schema::concurrency_of");
+
+    if SHARED_TOOLS.contains(&name) {
+        Concurrency::Shared
+    } else {
+        Concurrency::Exclusive
+    }
+}
+
 /// Valida um esquema e devolve todos os problemas (agregados, com o caminho exato).
 #[must_use]
 pub fn lint(schema: &ToolSchema<'_>) -> Issues {
