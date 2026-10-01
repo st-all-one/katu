@@ -32,8 +32,12 @@ pub fn message_text(message: &Message) -> Cow<'_, str> {
         Message::ToolResult {
             outcome,
             delta: None,
+            tool_name,
             ..
-        } => Cow::Owned(outcome.summary()),
+        } => Cow::Owned(match tool_name {
+            Some(name) => format!("{}: {}", name.as_str(), outcome.summary()),
+            None => outcome.summary(),
+        }),
     }
 }
 

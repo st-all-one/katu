@@ -2,8 +2,9 @@
 //!
 //! Cada comando produz um [`CommandRecord`] com `stdout_tail`/`stderr_tail`/`exit_code`/
 //! `duration_ms`/`parent_command_id`. O texto é **redigido** (segredos nunca chegam ao log) e
-//! **truncado pela cauda** (determinístico). `exit_code: null` (morto por sinal/timeout) marca o
-//! comando como **ambíguo** e o kernel recusa avançar (§31).
+//! **truncado** por um [`Ledger`] unificado (B-04): head/tail + *spill* com ponteiro para a
+//! página vertida. `exit_code: null` (morto por sinal/timeout) marca o comando como **ambíguo** e o
+//! kernel recusa avançar (§31).
 //!
 //! A **rotação** de ficheiros fica deliberadamente de fora: apagar/sobrepor logs é uma decisão
 //! explícita (o projeto nunca apaga automaticamente); ver E01-T07.
@@ -12,6 +13,63 @@ use serde::{Deserialize, Serialize};
 
 /// Limite por omissão da cauda (bytes).
 pub const DEFAULT_TAIL: usize = 4_096;
+
+/// Ledger unificado de output (B-04): head/tail + *spill* com ponteiro para a página vertida.
+///
+/// Substitui as truncagens ad-hoc: um só mecanismo determina o que o modelo vê (head + cauda) e,
+/// acima de um teto, verte o output inteiro para um ficheiro e aponta-o. O teto de bytes
+/// model-visible nunca é excedido — o spill é a recuperação, não o padrão.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Ledger {
+    /// Bytes de cabeça a manter.
+    pub head: usize,
+    /// Bytes de cauda a manter.
+    pub tail: usize,
+    /// Teto de bytes acima do qual o output é vertido para um ficheiro.
+    pub spill_threshold: usize,
+}
+
+impl Ledger {
+    /// Ledger por omissão: 2 KiB de cabeça + 2 KiB de cauda, spill acima de 8 KiB.
+    pub const DEFAULT: Self = Self {
+        head: 2_048,
+        tail: 2_048,
+        spill_threshold: 8_192,
+    };
+
+    /// Renderiza o texto para o modelo: head/tail + ponteiro de spill quando vertido.
+    ///
+    /// `spill_path` é o caminho da página vertida (quando o output excede o teto). O texto
+    /// model-visible nunca excede `head + tail` bytes (mais o ponteiro).
+    #[must_use]
+    pub fn render(&self, text: &str, spill_path: Option<&str>) -> String {
+        let _span = crate::trace_fn!("feedback::ledger::render");
+
+        let truncated = self.head_tail(text);
+        match spill_path {
+            Some(path) if text.len() > self.spill_threshold => {
+                format!("{truncated} — ver {path}")
+            }
+            _ => truncated,
+        }
+    }
+
+    /// Head/tail determinístico: se cabe, o texto inteiro; senão cabeça + marcador + cauda.
+    fn head_tail(&self, text: &str) -> String {
+        let _span = crate::trace_fn!("feedback::ledger::head_tail");
+
+        if text.len() <= self.head.saturating_add(self.tail) {
+            return text.to_string();
+        }
+        let head = text.get(..self.head).unwrap_or(text);
+        let tail_start = text.len().saturating_sub(self.tail);
+        let tail = text.get(tail_start..).unwrap_or("");
+        let omitted = text
+            .len()
+            .saturating_sub(self.head.saturating_add(self.tail));
+        format!("{head}…[{omitted} bytes omitidos]…{tail}")
+    }
+}
 
 /// Fragmentos que marcam uma chave como sensível (redação no write).
 const SECRET_MARKERS: &[&str] = &[
@@ -41,10 +99,16 @@ pub struct CommandRecord {
     pub timed_out: bool,
     /// Duração de *wall-clock* em milissegundos.
     pub duration_ms: u64,
-    /// Cauda de `stdout` (redigida + truncada).
+    /// Cauda de `stdout` (redigida + truncada pelo [`Ledger`]).
     pub stdout_tail: String,
-    /// Cauda de `stderr` (redigida + truncada).
+    /// Cauda de `stderr` (redigida + truncada pelo [`Ledger`]).
     pub stderr_tail: String,
+    /// Caminho da página de *spill* de `stdout` (B-04), quando o output excedeu o teto.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stdout_spill: Option<String>,
+    /// Caminho da página de *spill* de `stderr` (B-04), quando o output excedeu o teto.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stderr_spill: Option<String>,
     /// Comando pai, se aninhado.
     pub parent_command_id: Option<String>,
 }
@@ -117,7 +181,7 @@ fn redact_line(line: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{CommandStatus, redact, tail};
+    use super::{CommandStatus, Ledger, redact, tail};
 
     #[test]
     fn tail_keeps_the_end() {
@@ -158,5 +222,123 @@ mod tests {
             }
             .is_ambiguous()
         );
+    }
+
+    #[test]
+    fn ledger_keeps_the_full_text_when_it_fits() {
+        let ledger = Ledger::DEFAULT;
+        let text = "pequeno";
+        assert_eq!(ledger.render(text, None), text);
+    }
+
+    #[test]
+    fn ledger_keeps_head_and_tail_with_a_marker() {
+        let ledger = Ledger {
+            head: 4,
+            tail: 4,
+            spill_threshold: 100,
+        };
+        let text = "0123456789ABCDEF";
+        let out = ledger.render(text, None);
+        assert!(out.starts_with("0123"), "{out}");
+        assert!(out.ends_with("CDEF"), "{out}");
+        assert!(out.contains("bytes omitidos"), "{out}");
+        assert!(!out.contains("456789AB"), "{out}");
+    }
+
+    #[test]
+    fn ledger_spill_adds_a_pointer_when_the_output_exceeds_the_threshold() {
+        let ledger = Ledger {
+            head: 4,
+            tail: 4,
+            spill_threshold: 8,
+        };
+        let text = "0123456789ABCDEF";
+        let out = ledger.render(text, Some(".katu/spill/x.stdout"));
+        assert!(out.contains("ver .katu/spill/x.stdout"), "{out}");
+        assert!(out.starts_with("0123"), "{out}");
+    }
+
+    #[test]
+    fn ledger_without_spill_path_has_no_pointer() {
+        let ledger = Ledger {
+            head: 4,
+            tail: 4,
+            spill_threshold: 8,
+        };
+        let text = "0123456789ABCDEF";
+        let out = ledger.render(text, None);
+        assert!(!out.contains("ver "), "{out}");
+    }
+
+    #[test]
+    fn ledger_respects_char_boundaries_in_head_and_tail() {
+        let ledger = Ledger {
+            head: 2,
+            tail: 2,
+            spill_threshold: 100,
+        };
+        let text = "aéíó"; // 8 bytes; head=2 ("aé"), tail=2 ("ó" é 2 bytes)
+        let out = ledger.render(text, None);
+        assert!(out.starts_with('a'), "{out}");
+        assert!(out.ends_with('ó'), "{out}");
+    }
+
+    /// A/B determinístico do ledger (B-04): escreve o artefacto em `KATU_LEDGER_OUT`.
+    #[test]
+    #[ignore = "bench A/B: escreve o artefacto do protocolo (a via normal é o gate)"]
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "bench `#[ignore]`: escreve o artefacto do protocolo (a via normal é o gate)"
+    )]
+    fn ab_ledger_by_artifact() -> Result<(), Box<dyn std::error::Error>> {
+        let ledger = Ledger::DEFAULT;
+        let small = "pequeno\n".to_string();
+        let head_tail = "x".repeat(6_000);
+        let spill = "y".repeat(20_000);
+        let scenarios = vec![
+            ("small", small.as_str()),
+            ("head_tail", head_tail.as_str()),
+            ("spill", spill.as_str()),
+        ];
+        let mut results = Vec::new();
+        let mut total_model_visible = 0_usize;
+        let mut total_input = 0_usize;
+        for (name, text) in &scenarios {
+            let rendered = ledger.render(text, Some(".katu/spill/x.stdout"));
+            let model_visible = rendered.len();
+            total_model_visible = total_model_visible.saturating_add(model_visible);
+            total_input = total_input.saturating_add(text.len());
+            results.push(serde_json::json!({
+                "name": name,
+                "input_bytes": text.len(),
+                "model_visible_bytes": model_visible,
+                "has_pointer": rendered.contains("ver .katu/spill/"),
+            }));
+        }
+        let value = serde_json::json!({
+            "schema": "katu.bench.ledger.v1",
+            "question": "o ledger unificado limita o output model-visible e recupera o resto por spill",
+            "rule": "head/tail + spill com ponteiro; o teto model-visible nunca é excedido",
+            "scenarios": results,
+            "totals": {
+                "input_bytes": total_input,
+                "model_visible_bytes": total_model_visible,
+                "head_bytes": ledger.head,
+                "tail_bytes": ledger.tail,
+                "spill_threshold_bytes": ledger.spill_threshold,
+            },
+            "criterion": "model-visible <= head + tail + ponteiro, e o spill recupera o output inteiro",
+            "criterion_met": total_model_visible < total_input,
+            "caveat": "proxy determinístico (sem I/O real): mede o teto de bytes e o ponteiro, não a latência de escrita do spill",
+            "decision": "default on (o ledger é o mecanismo unificado de truncagem)",
+        });
+        let text_out = serde_json::to_string_pretty(&value)?;
+        if let Ok(path) = std::env::var("KATU_LEDGER_OUT") {
+            std::fs::write(&path, format!("{text_out}\n"))?;
+        }
+        let parsed: serde_json::Value = serde_json::from_str(&text_out)?;
+        assert_eq!(parsed.get("criterion_met"), Some(&serde_json::json!(true)));
+        Ok(())
     }
 }

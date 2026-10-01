@@ -97,6 +97,7 @@ fn encode_message(message: &Message) -> Option<Value> {
             call,
             outcome,
             delta,
+            ..
         } => json!({
             "type": "function_call_output",
             "call_id": call.as_str(),

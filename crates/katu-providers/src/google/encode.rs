@@ -126,6 +126,7 @@ fn encode_message(message: &Message, names: &mut BTreeMap<String, String>) -> Op
             call,
             outcome,
             delta,
+            ..
         } => {
             let name = names
                 .get(call.as_str())

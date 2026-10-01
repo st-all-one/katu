@@ -639,7 +639,7 @@ W5 (segurança)   ~~Q-11~~, ~~Q-12~~                        (F6/F7)
 W6 (estabilidade)~~Q-13~~, ~~Q-14~~, ~~Q-15~~, ~~P-01~~, ~~P-02~~, ~~P-03~~, ~~P-04~~
 W7 (método)      ~~E18-T10 (harness zero-dep) + regerar atribuição + S-04~~  ✔
 W8 (Anexo A T1)  ~~B1 gramática + C3 calibração + C1 e-values + A3 VOI~~ ✔
-W9 (Anexo B)     B-03 → B-04 → B-06 → B-07 (gated) → ADR B-08
+W9 (Anexo B)     ~~B-03~~ → ~~B-04~~ → ~~B-06~~ → B-07 (gated) → ADR B-08
 W10 (Anexo A T2/3) A1/A2 · D1 · C2/C7/C5 · E1 · D2/D3 · E18-T05/T08/T09
 ```
 
@@ -724,13 +724,14 @@ esperam. Só depois as frentes formais. Cada PR: A/B + `make check` verde.
 
 ## 10. Próximos passos (W7–W10)
 
-**Ponto de partida.** W1–W7 estão fechadas e W8-1/W8-2/W8-3/W8-4 instalados: Q-01..Q-21 e P-01..P-04 com
-artefacto em `bench/`, S-01..S-05 fechados (o resíduo S-04 — o id órfão `context.compact` — fechou
-em W7-3), o harness estatístico zero-dep de E18-T10 instalado (W7-1), a decodificação estruturada
-(B1), a calibração ECE/Brier (C3), a e-value *anytime-valid* (C1) e o gate de VOI (A3, *default*
-off) publicados. O que falta vem do **Anexo A** (Tier 2–3) e do **Anexo B** (Camada 1 residual e as
-decisões de Camada 2). A ordem segue Q > P > S e o método do §0: cada item traz fórmula, artefacto
-cru e teste que o trava; adotar-ou-reverter.
+**Ponto de partida.** W1–W7 estão fechadas e W8-1/W8-2/W8-3/W8-4 + W9-1/W9-2 instalados: Q-01..Q-21 e
+P-01..P-04 com artefacto em `bench/`, S-01..S-05 fechados (o resíduo S-04 — o id órfão
+`context.compact` — fechou em W7-3), o harness estatístico zero-dep de E18-T10 instalado (W7-1), a
+decodificação estruturada (B1), a calibração ECE/Brier (C3), a e-value *anytime-valid* (C1), o gate
+de VOI (A3, *default* off), o erro tipado que ensina (B-03) e o output ledger unificado (B-04)
+publicados. O que falta vem do **Anexo A** (Tier 2–3) e do **Anexo B** (B-06 → B-07 → ADR B-08). A
+ordem segue Q > P > S e o método do §0: cada item traz fórmula, artefacto cru e teste que o trava;
+adotar-ou-reverter.
 
 ### W7 · Fecho de método (pré-requisito de W8)
 
@@ -835,15 +836,57 @@ vivos. Nenhum teto de `surface.toml` subiu.
 
 **A4** mantém-se **rejeitado** (§Q-18, 14,0 %); não reabrir sem sinal novo.
 
+**W9-1 · B-03 · Erro tipado que ensina.** ✔ feito
+- **Onde:** `error`/`model` (projeções model-facing).
+- **Proposta:** `ToolOutcome` com `fix` + `toolName`; teste de "tentativas cegas".
+- **Resultado ✔:** `ToolOutcome::fix()` devolve o remédio — para `Denied` é o `evidence.remedy`
+  (Q-08), para `Unavailable` é derivado do controlo (`approval` → "forneça uma aprovação humana…",
+  `budget` → "o orçamento esgotou…"). O `summary()` inclui o `fix` (`"denied <regra> <arg> —
+  fix: <remédio>"`), e o `Message::ToolResult` carrega o `tool_name` (projetado do `ToolCall`
+  correlacionado) para o erro ser **auto-contido**. O `to_value()` TOON também inclui o `fix`.
+  Testes: `denied_fix_comes_from_the_evidence_remedy`, `denied_fix_is_absent_when_the_rule_declares_no_remedy`,
+  `unavailable_fix_teaches_the_control_path`, `success_outcomes_have_no_fix`,
+  `denied_summary_includes_the_fix`, `denied_summary_without_remedy_has_no_fix_suffix`,
+  `tool_result_summary_includes_the_tool_name`, `tool_result_without_tool_name_falls_back_to_the_summary`,
+  `tool_result_carries_the_tool_name_from_the_call`, `a_blind_retry_gets_a_fix_that_points_elsewhere`.
+
+**W9-2 · B-04 · Output ledger unificado.** ✔ feito
+- **Onde:** `feedback` (Ledger) + `exec` (spill).
+- **Proposta:** um só mecanismo head/tail + *spill* com ponteiro; artefacto `bench/e18/ledger/`.
+- **Resultado ✔:** `feedback::Ledger` (H=2048, T=2048, S=8192) substitui a truncagem ad-hoc
+  (`tail()`) no `exec`: o texto model-visible é head + marcador + cauda, e acima de S o output
+  inteiro é vertido para `.katu/spill/<id>.<stream>` com um ponteiro. O `CommandRecord` ganhou
+  `stdout_spill`/`stderr_spill`; o `report()` inclui os ponteiros. Artefacto `bench/e18/ledger/raw.json`:
+  3 cenários, 26 008 → 8 284 B model-visible (31,8 %), teto ~4 153 B independentemente do input.
+  Testes: `ledger_keeps_the_full_text_when_it_fits`, `ledger_keeps_head_and_tail_with_a_marker`,
+  `ledger_spill_adds_a_pointer_when_the_output_exceeds_the_threshold`,
+  `ledger_without_spill_path_has_no_pointer`, `ledger_respects_char_boundaries_in_head_and_tail`,
+  `large_output_is_spilled_with_a_pointer`, `small_output_is_not_spilled`.
+
 ### W9 · Anexo B — Camada 1 residual e Camada 2
 
-- **W9-1 · B-03 · Erro tipado que ensina.** `ToolOutcome`/`error` com `fix` + `toolName` (consolida
-  Q-08); teste de "tentativas cegas" num cenário canónico. Baixo risco, sem superfície nova.
-- **W9-2 · B-04 · Output ledger unificado.** Um só mecanismo head/tail + *spill* em
-  `feedback`/`report` no lugar das truncagens ad-hoc, com ponteiro para a página; artefacto
-  `bench/e18/ledger/`; teste de recuperação e teto de bytes.
-- **W9-3 · B-06 · Escalação de sandbox one-shot.** Alargamento **estrito** com `justification` e
-  aprovação **não herdada** (E07, liga a D3/MAC); teste de falso-negativo e de não-reuso.
+- **W9-1 · B-03 · Erro tipado que ensina.** ✔ feito. `ToolOutcome::fix()` (remédio da evidência
+  ou do controlo) + `tool_name` no `Message::ToolResult`; o `summary()` inclui o `fix` — a negação
+  ensina a corrigir-se. Testes: `denied_fix_comes_from_the_evidence_remedy`,
+  `unavailable_fix_teaches_the_control_path`, `denied_summary_includes_the_fix`,
+  `tool_result_summary_includes_the_tool_name`, `a_blind_retry_gets_a_fix_that_points_elsewhere`.
+- **W9-2 · B-04 · Output ledger unificado.** ✔ feito. `feedback::Ledger` (head/tail + spill com
+  ponteiro); `exec` spill para `.katu/spill/`; artefacto `bench/e18/ledger/` (26 008 → 8 284 B,
+  31,8 %). Testes: `ledger_keeps_head_and_tail_with_a_marker`,
+  `ledger_spill_adds_a_pointer_when_the_output_exceeds_the_threshold`,
+  `large_output_is_spilled_with_a_pointer`, `small_output_is_not_spilled`.
+
+**W9-3 · B-06 · Escalação de sandbox one-shot.** ✔ feito
+- **Onde:** `kernel::session::approval` + `kernel::step` + `agent::turn::retry_with_approval`.
+- **Proposta:** alargamento estrito com justificação e aprovação não herdada; teste de
+  falso-negativo e de não-reuso.
+- **Resultado ✔:** o par de eventos `ApprovalGranted`/`ApprovalRevoked` (B-06) torna a
+  aprovação de escalação de sandbox **one-shot**: `session.approve()` concede a capacidade mínima
+  (com justificação obrigatória), e `session.revoke_approval()` remove-a depois de usada. Ligado
+  em `retry_with_approval` — depois do retry, a capacidade é revogada. A revogação é **persistente**
+  (sobrevive ao replay). Artefacto `bench/e18/approval/raw.json`: 2 cenários, 2 critérios cumpridos.
+  Testes: `one_shot_approval_is_revoked_after_use`, `one_shot_approval_does_not_survive_replay`,
+  `a_second_escalation_requires_a_new_approval`, `approval_revoked_removes_the_capability`.
 - **W9-4 · B-07 · Contrato "só o delta" no prime.** Uma linha no `render` — **model-visible**, logo
   exige bump de `PRIME_VERSION` e de `gate:prompt`; **só com A/B** do custo em tokens. Não fazer às
   cegas.

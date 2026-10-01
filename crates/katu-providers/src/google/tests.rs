@@ -182,6 +182,7 @@ fn tool_result_becomes_a_function_response() -> Result<(), Box<dyn std::error::E
                 call: CallId::new("c1"),
                 outcome: ToolOutcome::Ok,
                 delta: Some("leitura ok".to_string()),
+                tool_name: None,
             },
         ],
         tools: Vec::new(),

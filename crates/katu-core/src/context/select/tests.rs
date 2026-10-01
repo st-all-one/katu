@@ -241,6 +241,7 @@ fn message_text_borrows_when_it_can() -> Result<(), Box<dyn std::error::Error>> 
         call: CallId::new("c1"),
         outcome: ToolOutcome::Ok,
         delta: Some("payload grande".into()),
+        tool_name: None,
     };
     assert!(matches!(
         message_text(&delta),
@@ -259,6 +260,48 @@ fn message_text_borrows_when_it_can() -> Result<(), Box<dyn std::error::Error>> 
     };
     assert!(matches!(message_text(&call), std::borrow::Cow::Owned(_)));
     Ok(())
+}
+
+#[test]
+fn tool_result_summary_includes_the_tool_name() {
+    let denied = Message::ToolResult {
+        call: CallId::new("c1"),
+        outcome: ToolOutcome::Denied {
+            rule_id: katu_policy::RuleId::from("contain-read-outside-workspace"),
+            evidence: katu_policy::Evidence::new(
+                "fora da raiz",
+                "/etc/passwd",
+                katu_policy::RuleId::from("contain-read-outside-workspace"),
+            )
+            .with_remedy(Some("leia só sob a raiz do workspace".to_string())),
+        },
+        delta: None,
+        tool_name: Some(katu_policy::ToolName::Read),
+    };
+    let text = message_text(&denied);
+    assert!(text.starts_with("read: "), "{text}");
+    assert!(
+        text.contains("fix: leia só sob a raiz do workspace"),
+        "{text}"
+    );
+}
+
+#[test]
+fn tool_result_without_tool_name_falls_back_to_the_summary() {
+    let denied = Message::ToolResult {
+        call: CallId::new("c1"),
+        outcome: ToolOutcome::Denied {
+            rule_id: katu_policy::RuleId::from("r"),
+            evidence: katu_policy::Evidence::new(
+                "facto",
+                "argumento",
+                katu_policy::RuleId::from("r"),
+            ),
+        },
+        delta: None,
+        tool_name: None,
+    };
+    assert_eq!(message_text(&denied), "denied r argumento");
 }
 
 #[test]

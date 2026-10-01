@@ -208,6 +208,8 @@ pub(super) fn bash<'a>(
     let tool = ExecTool {
         process: ports.process,
         env: ports.env,
+        fs: ports.fs,
+        root: ports.root,
         timeout_ms: DEFAULT_TIMEOUT_MS,
         parent: None,
     };

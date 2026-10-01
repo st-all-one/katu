@@ -65,7 +65,8 @@ função, o log é a fonte da verdade.
     derivadas do catálogo pela borda.
   - `kernel::session` — `Session`/`CallContext` (loop mínimo: valida transição + orçamento antes de
     gravar; `tool_call` e `memory_write` pela ordem §42; `set_workspace`/`record_verification`;
-    `approve` (aprovação humana, E07-T05); `context` (contexto efetivo, E09-T01/T07);
+    `approve` (aprovação humana, E07-T05) + `revoke_approval` (aprovação **one-shot**, B-06:
+    a capacidade é revogada depois de usada e a próxima escalação exige nova aprovação); `context` (contexto efetivo, E09-T01/T07);
     `verify`/`changed_files`/`recorded_commands` (factos do gate, E09-T03); `messages`/`fork`).
 - `derive_messages`/`snapshot` — projeções puras.
 - Porta [`memory::Memory`](src/memory.rs) (tipos do katu, DF6), com submódulos:
@@ -82,7 +83,8 @@ função, o log é a fonte da verdade.
 - Modelo de erro [`error`](src/error.rs) (E01-T06) e ports determinísticos
   [`ports`](src/ports/mod.rs) (`Clock`/`Rng`/`Fs`/`Env`/`Process` + fakes; `Fs::write_atomic_if` =
   CAS para `edit`, OA16; `Fs::remove` = remoção permanente de ficheiro, nunca de diretórios,
-  E10-T07; `Process` = execução com timeout, E06-T04).
+  E10-T07; `Process` = execução com timeout, E06-T04). `ToolOutcome::fix()` (B-03) devolve o
+  remédio acionável — a negação ensina o modelo a corrigir-se.
 - Diagnóstico transversal [`diag`](src/diag/mod.rs) (DF9/E19): log estruturado + métrica de tempo,
   custo zero por defeito; catálogo de eventos em [`diag::events`](src/diag/events.rs); sink
   agregador de percentis em `diag::aggregate` (E19-T02).
@@ -136,7 +138,8 @@ função, o log é a fonte da verdade.
   message }` + `Issues` agregado (ordem determinística), partilhado pelo validador de checkpoint e
   pelo linter de schema de tools (E06-T02).
 - Feedback de comando [`feedback`](src/feedback.rs) (E06-T07): `CommandRecord`/`CommandStatus`,
-  `tail` (cauda determinística) e `redact` (segredos); `exit_code: null` bloqueia avançar (§31).
+  `Ledger` (head/tail + *spill* com ponteiro, B-04), `tail` (cauda determinística) e `redact`
+  (segredos); `exit_code: null` bloqueia avançar (§31).
 - Formato AI-first [`toon`](src/toon.rs) (DF12/E06-T12): emissor **TOON** canónico (zero deps) para a
   saída das tools ao modelo — sem `null`, vazios omitidos, ordem canónica; JSON é a alternativa.
   [`toon/colunar`](src/toon/colunar.rs) emite **numa só alocação**: `byte_len` calcula o tamanho exato

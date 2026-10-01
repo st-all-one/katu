@@ -42,6 +42,7 @@ pub fn step(state: &State, event: &Event) -> Result<State, Refusal> {
             granted_by,
             ..
         } => approval_granted(state, capability, reason, granted_by),
+        Event::ApprovalRevoked { capability } => Ok(capability_revoked(state, capability)),
         Event::VerificationRecorded { report } => Ok(verification_recorded(state, report)),
         Event::Control { control } => Ok(control_applied(state, control)),
         Event::TurnEnd { turn } => turn_end(state, *turn),
@@ -160,6 +161,18 @@ fn approval_granted(
         next.capabilities.push(capability.clone());
     }
     Ok(next)
+}
+
+/// Revoga uma capacidade **one-shot** (B-06): a aprovação de escalação de sandbox não é herdada.
+///
+/// Remove a capacidade do estado — a próxima escalação exige nova aprovação. É o mecanismo que
+/// torna a aprovação **não reutilizável**: depois de usada, a capacidade desaparece.
+fn capability_revoked(state: &State, capability: &Capability) -> State {
+    let _span = crate::trace_fn!("kernel::step::capability_revoked");
+
+    let mut next = state.clone();
+    next.capabilities.retain(|c| c != capability);
+    next
 }
 
 /// Regista o relatório do gate de verificação (E09-T03).

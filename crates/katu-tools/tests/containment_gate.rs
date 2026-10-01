@@ -7,12 +7,13 @@
 use katu_core::containment::{ContainmentStatus, Jail, NoJail, SandboxEnforcement};
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::{State, Tool, ToolOutput, dispatch};
-use katu_core::ports::{Env, ExecRequest, FakeEnv, MemProcess, Process};
+use katu_core::ports::{Env, ExecRequest, FakeEnv, MemFs, MemProcess, Process};
 use katu_policy::{
     Enforcement, PolicyError, ResolvedArgv, ResolvedPath, Rule, RuleCategory, RuleExamples, RuleId,
     RuleScope, RuleSet, Severity, ToolArgs, ToolName, ToolUse,
 };
 use katu_tools::exec::ExecTool;
+use std::path::Path;
 
 type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -46,9 +47,12 @@ fn allow_all() -> RuleSet {
 fn unknown_vocabulary_never_runs() -> TestResult<()> {
     let process = MemProcess::ok("");
     let env = FakeEnv::new();
+    let fs = MemFs::new();
     let tool = ExecTool {
         process: &process,
         env: &env,
+        fs: &fs,
+        root: Path::new("/work"),
         timeout_ms: 1_000,
         parent: None,
     };
@@ -69,9 +73,12 @@ fn unknown_vocabulary_never_runs() -> TestResult<()> {
 fn missing_argv_is_unavailable_and_does_not_run() -> TestResult<()> {
     let process = MemProcess::ok("");
     let env = FakeEnv::new();
+    let fs = MemFs::new();
     let tool = ExecTool {
         process: &process,
         env: &env,
+        fs: &fs,
+        root: Path::new("/work"),
         timeout_ms: 1_000,
         parent: None,
     };
@@ -148,9 +155,12 @@ fn authorization_missing_outside_the_workspace_is_refused() -> TestResult<()> {
 fn soft_containment_does_not_confine_the_host() -> TestResult<()> {
     let process = MemProcess::ok("");
     let env = FakeEnv::new();
+    let fs = MemFs::new();
     let tool = ExecTool {
         process: &process,
         env: &env,
+        fs: &fs,
+        root: Path::new("/work"),
         timeout_ms: 1_000,
         parent: None,
     };

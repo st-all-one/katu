@@ -126,6 +126,10 @@ impl AuditRecord {
                 record.rule = rule_id.as_str().to_string();
                 record.text = format!("aprovado por {granted_by}");
             }
+            Event::ApprovalRevoked { .. } => {
+                record.kind = "approval_revoked";
+                record.text = "aprovação one-shot revogada".to_string();
+            }
             Event::VerificationRecorded { report } => {
                 record.kind = "verify";
                 record.status = report.status.as_str().to_string();

@@ -44,6 +44,8 @@ fn command(outcome: Outcome) -> CommandRecord {
         duration_ms: 1,
         stdout_tail: String::new(),
         stderr_tail: String::new(),
+        stdout_spill: None,
+        stderr_spill: None,
         parent_command_id: None,
     }
 }

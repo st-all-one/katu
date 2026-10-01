@@ -1,0 +1,36 @@
+{
+  "caveat": "proxy determinístico (sem I/O real): mede o teto de bytes e o ponteiro, não a latência de escrita do spill",
+  "criterion": "model-visible <= head + tail + ponteiro, e o spill recupera o output inteiro",
+  "criterion_met": true,
+  "decision": "default on (o ledger é o mecanismo unificado de truncagem)",
+  "question": "o ledger unificado limita o output model-visible e recupera o resto por spill",
+  "rule": "head/tail + spill com ponteiro; o teto model-visible nunca é excedido",
+  "scenarios": [
+    {
+      "has_pointer": false,
+      "input_bytes": 8,
+      "model_visible_bytes": 8,
+      "name": "small"
+    },
+    {
+      "has_pointer": false,
+      "input_bytes": 6000,
+      "model_visible_bytes": 4123,
+      "name": "head_tail"
+    },
+    {
+      "has_pointer": true,
+      "input_bytes": 20000,
+      "model_visible_bytes": 4153,
+      "name": "spill"
+    }
+  ],
+  "schema": "katu.bench.ledger.v1",
+  "totals": {
+    "head_bytes": 2048,
+    "input_bytes": 26008,
+    "model_visible_bytes": 8284,
+    "spill_threshold_bytes": 8192,
+    "tail_bytes": 2048
+  }
+}

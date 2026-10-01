@@ -445,6 +445,22 @@ unit = "count"
 basis = "measured"
 artifact = { path = "bench/e18/voi/raw.json", note = "chamadas de só-leitura evitadas em 5 cenários canónicos (11 chamadas); nunca o irreconstruível. Proxy: a adoção por omissão exige A/B com o modelo (default off)" }
 
+# --- B-04: output ledger unificado (OPTIMIZATION_PLAN.md Anexo B) ---
+[[metrics]]
+name = "w92.ledger.model_visible.ratio"
+value = 0.318
+unit = "ratio"
+basis = "measured"
+artifact = { path = "bench/e18/ledger/raw.json", note = "bytes model-visible / bytes de input em 3 cenários canónicos (26 008 → 8 284); o teto é head + tail + ponteiro (~4 153 B), independentemente do input. O spill recupera o output inteiro" }
+
+# --- B-06: aprovação one-shot (OPTIMIZATION_PLAN.md Anexo B) ---
+[[metrics]]
+name = "w93.approval.one_shot_revoked"
+value = 1.0
+unit = "count"
+basis = "measured"
+artifact = { path = "bench/e18/approval/raw.json", note = "a aprovação de escalação de sandbox é revogada depois de usada e a segunda escalação exige nova aprovação (não herdada). Default on" }
+
 # --- Q-15: retomada com cauda limitada (OPTIMIZATION_PLAN.md §Q-15) ---
 [[metrics]]
 name = "q15.resume.bounded.micros"

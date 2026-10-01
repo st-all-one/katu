@@ -78,6 +78,9 @@ todo o código impuro confinado.
   cacheada. **Opt-in** (`behavior.tool_voi`, default **off** até A/B com o modelo — precedente
   Q-02b/Q-03). Medido em [`bench/e18/voi`](../../bench/e18/voi/PROTOCOL.md): 2 de 11 chamadas
   evitadas em cenários canónicos, 0 irreconstruíveis saltados.
+- **Aprovação one-shot** (B-06, `src/agent/turn.rs`): a aprovação de escalação de sandbox é
+  **one-shot** — depois de usada, a capacidade é revogada e a próxima escalação exige nova
+  aprovação. Medido em [`bench/e18/approval`](../../bench/e18/approval/PROTOCOL.md).
 - **UI de terminal** (`src/tui.rs`, feature `memory-in-process`, E10-T01/T02/T05): comando
   `katu tui`. A UI (`katu-tui`) é pura (estado central + keymap + render) e a borda implementa o
   `Handler` que corre o turno e injeta `Update`s; `Runtime::begin_turn` abre o próximo turno

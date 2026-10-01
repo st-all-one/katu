@@ -25,8 +25,9 @@ sem veredicto; controlo em falta = recusa.
   −19,9 % e, com a 3.ª substituição a falhar, a forma antiga deixava o ficheiro a meio (375 B) e a
   atómica não escreve nada (383 B = original).
 - `exec` (E06-T04/T07): `ExecTool` com `argv`/`cwd` resolvidos, ambiente filtrado de segredos e
-  timeout; devolve um `CommandRecord` (redigido + truncado pela cauda, `duration_ms`); outcomes
-  ortogonais (`exit`/`signal`/`timed_out`); porta `Process` (fake `MemProcess`).
+  timeout; devolve um `CommandRecord` (redigido + truncado pelo `Ledger`, B-04: head/tail + *spill*
+  com ponteiro para `.katu/spill/`, `duration_ms`); outcomes ortogonais (`exit`/`signal`/`timed_out`);
+  portas `Process` (fake `MemProcess`) e `Fs` (para o *spill*).
 - `move_file` (E06-T11): renomeação atómica (`Fs::rename`) sob escopo; recusa destino existente.
 - `trash` (E06-T09): move para `<root>/.katu/trash` (preserva o relativo) com índice append-only;
   `list` (vista do utilizador, filtra removidos), `restore` (sempre permitido) e `empty`

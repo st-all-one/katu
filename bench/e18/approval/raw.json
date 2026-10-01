@@ -1,0 +1,25 @@
+{
+  "caveat": "proxy determinístico (sem I/O real de sandbox): mede a revogação e a não-reutilização, não a execução do comando",
+  "criterion": "a aprovação é revogada depois de usada e a segunda escalação exige nova aprovação",
+  "criterion_met": true,
+  "decision": "default on (a aprovação one-shot é o mecanismo de escalação de sandbox)",
+  "question": "a aprovação one-shot de escalação de sandbox não é herdada",
+  "rule": "aprovação com justificação, revogada depois de usada; a próxima escalação exige nova aprovação",
+  "scenarios": [
+    {
+      "granted": true,
+      "name": "one_shot_revoked",
+      "revoked": true
+    },
+    {
+      "name": "non_reuse",
+      "needs_new_approval": true,
+      "reapproved": true
+    }
+  ],
+  "schema": "katu.bench.approval.v1",
+  "totals": {
+    "non_reuse": true,
+    "one_shot_revoked": true
+  }
+}

@@ -249,9 +249,12 @@ fn deny_trash_does_not_move() -> TestResult<()> {
 fn deny_exec_does_not_run_the_command() -> TestResult<()> {
     let process = MemProcess::ok("boom");
     let env = FakeEnv::new();
+    let fs = MemFs::new();
     let tool = ExecTool {
         process: &process,
         env: &env,
+        fs: &fs,
+        root: Path::new("/work"),
         timeout_ms: 1_000,
         parent: None,
     };

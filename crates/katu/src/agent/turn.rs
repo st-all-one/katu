@@ -252,12 +252,15 @@ fn retry_with_approval(
     };
     runtime.session.approve(
         request.rule_id.clone(),
-        capability,
+        capability.clone(),
         &approval.reason,
         &approval.granted_by,
     )?;
     let retry = CallId::new(format!("{}#approved", call.as_str()));
     *outcome = execute_call(runtime, ports, retry, name, arguments)?;
     emit_outcome(activity, name, &outcome.outcome);
+    // B-06: a aprovação é **one-shot** — depois de usada, a capacidade é revogada. A próxima
+    // escalação exige nova aprovação (não é herdada).
+    runtime.session.revoke_approval(&capability)?;
     Ok(())
 }

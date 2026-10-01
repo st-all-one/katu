@@ -43,6 +43,10 @@ pub enum Message {
         /// Delta model-visible (§18/G6): o **mesmo** texto que o provider recebe, vindo do log.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         delta: Option<String>,
+        /// Nome da tool que falhou (B-03): torna o erro **auto-contido** — o modelo não precisa
+        /// de correlacionar com o `ToolCall` para saber qual tool foi.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tool_name: Option<ToolName>,
     },
 }
 
@@ -51,11 +55,19 @@ pub enum Message {
 pub fn derive_messages(events: &[Event]) -> Vec<Message> {
     let _span = crate::trace_fn!("kernel::project::derive_messages");
 
-    events.iter().filter_map(project_event).collect()
+    let mut tool_names: std::collections::BTreeMap<CallId, ToolName> =
+        std::collections::BTreeMap::new();
+    events
+        .iter()
+        .filter_map(|event| project_event(event, &mut tool_names))
+        .collect()
 }
 
 /// Projeta um evento, se for visível ao modelo.
-fn project_event(event: &Event) -> Option<Message> {
+fn project_event(
+    event: &Event,
+    tool_names: &mut std::collections::BTreeMap<CallId, ToolName>,
+) -> Option<Message> {
     let _span = crate::fn_span!(
         Level::Trace,
         events::MODEL_PROJECT,
@@ -64,10 +76,13 @@ fn project_event(event: &Event) -> Option<Message> {
     match event {
         Event::UserMessage { text } => Some(Message::User { text: text.clone() }),
         Event::AssistantMessage { text } => Some(Message::Assistant { text: text.clone() }),
-        Event::ToolCall { call, tool } => Some(Message::ToolCall {
-            call: call.clone(),
-            tool: tool.clone(),
-        }),
+        Event::ToolCall { call, tool } => {
+            tool_names.insert(call.clone(), tool.name);
+            Some(Message::ToolCall {
+                call: call.clone(),
+                tool: tool.clone(),
+            })
+        }
         Event::ToolResult {
             call,
             outcome,
@@ -76,6 +91,7 @@ fn project_event(event: &Event) -> Option<Message> {
             call: call.clone(),
             outcome: outcome.clone(),
             delta: delta.clone(),
+            tool_name: tool_names.get(call).copied(),
         }),
         _ => None,
     }
@@ -133,8 +149,9 @@ pub fn snapshot(events: &[Event]) -> Result<Snapshot, Refusal> {
 #[cfg(test)]
 mod tests {
     use super::{Message, derive_messages, snapshot, state_of};
+    use crate::error::ToolOutcome;
     use crate::kernel::event::Event;
-    use crate::kernel::{State, step};
+    use crate::kernel::{CallId, State, step};
     use katu_policy::Phase;
 
     fn session() -> Vec<Event> {
@@ -218,5 +235,58 @@ mod tests {
             })
             .count();
         assert_eq!(derive_messages(&events).len(), visible);
+    }
+
+    #[test]
+    fn tool_result_carries_the_tool_name_from_the_call() -> Result<(), Box<dyn std::error::Error>> {
+        let path = katu_policy::ResolvedPath::from_canonical("/work/src/main.rs")?;
+        let events = vec![
+            Event::ToolCall {
+                call: CallId::new("c1"),
+                tool: katu_policy::ToolUse {
+                    name: katu_policy::ToolName::Read,
+                    args: katu_policy::ToolArgs::Read { path: path.clone() },
+                    resolved_paths: vec![path.clone()],
+                    argv: None,
+                    cwd: path,
+                },
+            },
+            Event::ToolResult {
+                call: CallId::new("c1"),
+                outcome: ToolOutcome::Ok,
+                delta: Some("conteúdo".into()),
+            },
+        ];
+        let messages = derive_messages(&events);
+        let Some(Message::ToolResult { tool_name, .. }) = messages.get(1) else {
+            return Err("esperado um ToolResult".into());
+        };
+        assert_eq!(*tool_name, Some(katu_policy::ToolName::Read));
+        Ok(())
+    }
+
+    #[test]
+    fn a_blind_retry_gets_a_fix_that_points_elsewhere() -> Result<(), Box<dyn std::error::Error>> {
+        // Cenário canónico: o modelo lê fora da raiz, é negado, e a negação ensina a ler sob a
+        // raiz — uma tentativa cega (repetir o mesmo caminho) continuaria a ser negada.
+        let rule = katu_policy::RuleId::from("contain-read-outside-workspace");
+        let evidence = katu_policy::Evidence::new("fora da raiz", "/etc/passwd", rule)
+            .with_remedy(Some("leia só sob a raiz do workspace".to_string()));
+        let denied = ToolOutcome::Denied {
+            rule_id: katu_policy::RuleId::from("contain-read-outside-workspace"),
+            evidence,
+        };
+        let summary = denied.summary();
+        assert!(
+            summary.contains("fix: leia só sob a raiz do workspace"),
+            "{summary}"
+        );
+        // O remédio aponta para uma ação **diferente** da que foi negada (ler sob a raiz, não fora).
+        let fix = denied.fix().ok_or("esperado um remédio")?;
+        assert!(
+            !fix.contains("/etc/passwd"),
+            "o remédio não deve repetir o caminho negado"
+        );
+        Ok(())
     }
 }

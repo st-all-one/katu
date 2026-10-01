@@ -25,9 +25,11 @@ fn unavailable_outcome_names_the_control() {
         control: ControlId::new("approval"),
         rule_id: None,
     };
-    assert_eq!(outcome.summary(), "unavailable approval");
+    assert!(outcome.summary().starts_with("unavailable approval"));
+    assert!(outcome.summary().contains("fix:"), "{}", outcome.summary());
     let rendered = emit(&project(&outcome.to_value()));
     assert!(rendered.contains("ctrl\u{1f}approval"), "{rendered}");
+    assert!(rendered.contains("fix\u{1f}"), "{rendered}");
 }
 
 #[test]
@@ -35,6 +37,35 @@ fn outcome_summary_is_not_debug() {
     let outcome = ToolOutcome::Partial;
     assert_eq!(outcome.summary(), "partial");
     assert!(!outcome.summary().contains("Partial"));
+}
+
+#[test]
+fn denied_summary_includes_the_fix() {
+    let rule = RuleId::from("contain-read-outside-workspace");
+    let evidence = Evidence::new("fora da raiz", "/etc/passwd", rule)
+        .with_remedy(Some("leia só sob a raiz do workspace".to_string()));
+    let denied = ToolOutcome::Denied {
+        rule_id: RuleId::from("contain-read-outside-workspace"),
+        evidence,
+    };
+    let summary = denied.summary();
+    assert!(
+        summary.contains("denied contain-read-outside-workspace"),
+        "{summary}"
+    );
+    assert!(
+        summary.contains("fix: leia só sob a raiz do workspace"),
+        "{summary}"
+    );
+}
+
+#[test]
+fn denied_summary_without_remedy_has_no_fix_suffix() {
+    let denied = ToolOutcome::Denied {
+        rule_id: RuleId::from("r"),
+        evidence: Evidence::new("facto", "argumento", RuleId::from("r")),
+    };
+    assert_eq!(denied.summary(), "denied r argumento");
 }
 
 #[test]

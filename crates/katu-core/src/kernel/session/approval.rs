@@ -34,4 +34,22 @@ impl Session<'_> {
             granted_by: granted_by.to_string(),
         })
     }
+
+    /// Revoga uma capacidade **one-shot** (B-06): a aprovação de escalação de sandbox não é
+    /// herdada. Depois de usada, a capacidade é removida e a próxima escalação exige nova
+    /// aprovação.
+    ///
+    /// # Errors
+    /// [`SessionError`] se o evento não puder ser logado.
+    pub fn revoke_approval(&mut self, capability: &Capability) -> Result<(), SessionError> {
+        let _span = crate::fn_span!(
+            Level::Debug,
+            events::POLICY_APPROVAL,
+            "kernel::session::revoke_approval"
+        );
+        crate::event!(Level::Info, events::POLICY_APPROVAL);
+        self.apply(&Event::ApprovalRevoked {
+            capability: capability.clone(),
+        })
+    }
 }

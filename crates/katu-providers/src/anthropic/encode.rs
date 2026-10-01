@@ -114,6 +114,7 @@ fn encode_message(message: &Message) -> Option<Value> {
             call,
             outcome,
             delta,
+            ..
         } => json!({
             "role": "user",
             "content": [{

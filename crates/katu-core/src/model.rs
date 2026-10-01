@@ -31,18 +31,25 @@ impl ToolOutcome {
     }
 
     /// Resumo de uma linha (usado no digest da compactação; nunca `Debug`).
+    ///
+    /// Inclui o remédio acionável (B-03): a negação ensina o modelo a corrigir-se, em vez de
+    /// deixar uma regra opaca que convida a tentativas cegas.
     #[must_use]
     pub fn summary(&self) -> String {
         let _span = crate::trace_fn!("model::summary");
 
-        match self {
-            Self::Ok | Self::Partial | Self::Timeout => self.status_str().to_string(),
+        let base = match self {
+            Self::Ok | Self::Partial | Self::Timeout => return self.status_str().to_string(),
             Self::Denied { rule_id, evidence } => {
                 format!("denied {} {}", rule_id.as_str(), evidence.argument)
             }
             Self::Unavailable { control, .. } => {
                 format!("unavailable {}", control.as_str())
             }
+        };
+        match self.fix() {
+            Some(fix) => format!("{base} — fix: {fix}"),
+            None => base,
         }
     }
 
@@ -67,6 +74,9 @@ impl ToolOutcome {
                 }
             }
             Self::Ok | Self::Partial | Self::Timeout => {}
+        }
+        if let Some(fix) = self.fix() {
+            entries.push(field("fix", Value::str(fix.to_string())));
         }
         Value::map(entries)
     }

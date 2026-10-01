@@ -144,6 +144,7 @@ fn a_tool_result_carries_the_delta_to_the_wire() -> Result<(), Box<dyn std::erro
         call: CallId::new("c1"),
         outcome: ToolOutcome::Ok,
         delta: Some("r\nread.summary\nk\npath nota.txt".to_string()),
+        tool_name: None,
     }];
     let body = super::encode_request(&with_delta, &super::EncodeOptions::default())?;
     let value: serde_json::Value = serde_json::from_str(&body)?;
@@ -156,6 +157,7 @@ fn a_tool_result_carries_the_delta_to_the_wire() -> Result<(), Box<dyn std::erro
         call: CallId::new("c1"),
         outcome: ToolOutcome::Timeout,
         delta: None,
+        tool_name: None,
     }];
     let body = super::encode_request(&no_delta, &super::EncodeOptions::default())?;
     let value: serde_json::Value = serde_json::from_str(&body)?;

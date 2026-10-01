@@ -49,6 +49,7 @@ fn render(messages: &[Message]) -> Vec<String> {
                 call,
                 outcome,
                 delta,
+                ..
             } => {
                 lines.push(format!("**resultado** ({})", call.as_str()));
                 lines.push(outcome_label(outcome));

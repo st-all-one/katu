@@ -119,6 +119,13 @@ pub enum Event {
         /// Quem assinou (`granted_by`).
         granted_by: String,
     },
+    /// Revogação de capacidade **one-shot** (B-06): a aprovação de escalação de sandbox não é
+    /// herdada — depois de usada, a capacidade é removida e a próxima escalação exige nova
+    /// aprovação. Evento de controlo, append-only e auditável.
+    ApprovalRevoked {
+        /// Capacidade revogada.
+        capability: Capability,
+    },
     /// Relatório do gate de verificação registado (E09-T03). Evento de controlo.
     VerificationRecorded {
         /// Relatório determinístico.
@@ -174,6 +181,7 @@ impl Event {
             Self::CommandRecorded { .. } => "command_recorded",
             Self::WorkspaceSet { .. } => "workspace_set",
             Self::ApprovalGranted { .. } => "approval_granted",
+            Self::ApprovalRevoked { .. } => "approval_revoked",
             Self::VerificationRecorded { .. } => "verification_recorded",
             Self::Control { .. } => "control",
             Self::ProjectContext { .. } => "project_context",

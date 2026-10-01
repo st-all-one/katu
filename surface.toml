@@ -13,4 +13,4 @@ rules = 8
 adrs = 25
 diag_events = 115
 xtask_commands = 31
-bench_artifacts = 21
+bench_artifacts = 23

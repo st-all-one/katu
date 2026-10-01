@@ -85,3 +85,50 @@ fn unavailable_schema_is_backward_compatible() -> Result<(), serde_json::Error> 
     assert_eq!(old.rule_id(), None);
     Ok(())
 }
+
+#[test]
+fn denied_fix_comes_from_the_evidence_remedy() {
+    let rule = RuleId::from("contain-read-outside-workspace");
+    let evidence = Evidence::new("fora da raiz", "/etc/passwd", rule)
+        .with_remedy(Some("leia só sob a raiz do workspace".to_string()));
+    let denied = ToolOutcome::Denied {
+        rule_id: RuleId::from("contain-read-outside-workspace"),
+        evidence,
+    };
+    assert_eq!(denied.fix(), Some("leia só sob a raiz do workspace"));
+}
+
+#[test]
+fn denied_fix_is_absent_when_the_rule_declares_no_remedy() {
+    let denied = ToolOutcome::Denied {
+        rule_id: RuleId::from("r"),
+        evidence: Evidence::new("facto", "argumento", RuleId::from("r")),
+    };
+    assert_eq!(denied.fix(), None);
+}
+
+#[test]
+fn unavailable_fix_teaches_the_control_path() {
+    let approval = ToolOutcome::Unavailable {
+        control: ControlId::new("approval"),
+        rule_id: None,
+    };
+    assert!(approval.fix().is_some_and(|f| f.contains("aprovação")));
+    let budget = ToolOutcome::Unavailable {
+        control: ControlId::new("budget"),
+        rule_id: None,
+    };
+    assert!(budget.fix().is_some_and(|f| f.contains("orçamento")));
+    let unknown = ToolOutcome::Unavailable {
+        control: ControlId::new("unknown"),
+        rule_id: None,
+    };
+    assert_eq!(unknown.fix(), None);
+}
+
+#[test]
+fn success_outcomes_have_no_fix() {
+    assert_eq!(ToolOutcome::Ok.fix(), None);
+    assert_eq!(ToolOutcome::Partial.fix(), None);
+    assert_eq!(ToolOutcome::Timeout.fix(), None);
+}

@@ -262,6 +262,7 @@ fn encode_message(message: &Message) -> Option<MessageJson<'_>> {
             call,
             outcome,
             delta,
+            ..
         } => MessageJson::ToolResult(ToolResultMessage {
             role: "tool",
             tool_call_id: call.as_str(),

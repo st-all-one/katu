@@ -263,6 +263,38 @@ impl ToolOutcome {
             _ => None,
         }
     }
+
+    /// Remédio acionável (B-03): o que **passaria** — a negação ensina a corrigir-se.
+    ///
+    /// Para [`Self::Denied`] é o `evidence.remedy` (Q-08); para [`Self::Unavailable`] é derivado
+    /// do controlo em falta. Ausente quando não há remédio conhecido (o modelo fica com a regra e
+    /// o argumento, que já são acionáveis).
+    #[must_use]
+    pub fn fix(&self) -> Option<&str> {
+        let _span = crate::trace_fn!("error::fix");
+
+        match self {
+            Self::Denied { evidence, .. } => evidence.remedy.as_deref(),
+            Self::Unavailable { control, .. } => control_fix(control),
+            _ => None,
+        }
+    }
+}
+
+/// Remédio determinístico por controlo em falta (B-03).
+///
+/// É o "o que passaria" para uma operação [`ToolOutcome::Unavailable`]: em vez de um controlo
+/// opaco, o modelo recebe a ação que desbloquearia a operação.
+fn control_fix(control: &ControlId) -> Option<&'static str> {
+    let _span = crate::trace_fn!("error::control_fix");
+
+    match control.as_str() {
+        "approval" => Some(
+            "forneça uma aprovação humana (reason + granted_by) para desbloquear esta operação",
+        ),
+        "budget" => Some("o orçamento esgotou; não são permitidas mais operações nesta tarefa"),
+        _ => None,
+    }
 }
 
 /// Erro associado a um resultado de tool, com proveniência (§38).
