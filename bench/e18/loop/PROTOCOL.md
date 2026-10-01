@@ -15,13 +15,18 @@ RNG, sem relógio, estável entre execuções. Duas estatísticas clássicas de 
 novidade  = |assinaturas novas| / |assinaturas do passo|        (milésimos)
 repetição = 1 − novidade
 CUSUM     S ← max(0, S + repetição − k)      alarme se S ≥ h
-SPRT      Λ ← Λ + log(p₁/p₀)  (passo todo repetido)
-          Λ ← Λ + log((1−p₁)/(1−p₀))  (caso contrário)
-          alarme se Λ ≥ log((1−β)/α)
+e-value   log Λ ← log Λ + log(p₁/p₀)  (passo todo repetido)
+          log Λ ← log Λ + log((1−p₁)/(1−p₀))  (caso contrário)
+          alarme se log Λ ≥ log(1/α)
 ```
 
 Parâmetros (`GuardParams::DEFAULT`): `k = 0,5`, `h = 2,0`, `p₀ = 0,1`, `p₁ = 0,6`, `α = 0,01`,
-`β = 0,10`, `min_steps = 3`. São **dados** (DF8), não derivados da observação.
+`min_steps = 3`. São **dados** (DF8), não derivados da observação.
+
+**Anytime-valid (C1/W8-3).** A razão de verosimilhança `Λ_n` é um **martingale não-negativo** sob
+`H0`; por **Ville**, `P_{H0}(∃n: log Λ_n ≥ log(1/α)) ≤ α` para **qualquer** regra de parada. É este
+o corte formal — o SPRT clássico (`log((1−β)/α)`) só garante `α` a `n` fixo (o limite teórico é
+`α/(1−β)`). O CUSUM mantém-se como sinal para a repetição parcial, onde a e-value não avança.
 
 **Progresso reinicia**: um passo com uma chamada **exclusiva** (altera o workspace: `write`, `edit`,
 `move`, `trash`, `bash`, `memory`...) zera `S`, `Λ` e a memória de assinaturas. É esta a razão pela
@@ -56,14 +61,15 @@ O caminho de produção tem teste de integração próprio (provider *fake*, sem
 |---|---|
 | falsos positivos em **200** turnos normais de 12 passos | **0** (taxa 0,000) |
 | primeiro alarme num turno normal | **nenhum** (`S = 0`, `Λ < 0`) |
-| primeiro alarme num turno em ciclo puro | **passo 4** (SPRT) |
+| primeiro alarme num turno em ciclo puro | **passo 5** (e-value) |
 | teto global de passos (referência) | 12 |
+| erro tipo I sob parada opcional (DP exata) | **≤ α** (`4‰` em 12 passos; fronteira nominal do SPRT: `6‰`) |
 | determinismo | mesma entrada ⇒ mesmo alarme |
 
-O 1.º passo é novidade e contribui **contra** o SPRT (`log(0,4/0,9) = −811`), pelo que o alarme cai
-no 4.º passo (`3 × 1 792 − 811 = 4 565 ≥ 4 500`); o CUSUM, se fosse o único detetor, precisaria de
-**5** repetições (`5 × 500 ≥ 2 000`). O corte acontece **8 passos** antes do teto de 12 — cada passo
-poupado é um pedido ao provider inteiro.
+O 1.º passo é novidade e contribui **contra** (`log(0,4/0,9) = −811`), pelo que a e-value cruza
+`log(1/0,01) = 4 605` no 5.º passo (`4 × 1 792 − 811 = 6 357`); a fronteira nominal do SPRT
+(`4 500`) cruzaria no 4.º, mas sem a garantia anytime-valid. O corte acontece **7 passos** antes do
+teto de 12 — cada passo poupado é um pedido ao provider inteiro.
 
 ## Custos
 
@@ -85,5 +91,5 @@ poupado é um pedido ao provider inteiro.
   porque o *prompt* é ambíguo": o corte diz o que se repetiu, não a causa.
 - Um ciclo que **escreve** (progresso) não é cortado: é uma escolha explícita (o *polling* legítimo
   tem precedência) e está documentada no módulo.
-- Sem *anytime-valid* / e-values (C1 do Anexo A fica em aberto): o `α` do SPRT é nominal, não
-  corrigido para parada opcional.
+- A e-value é **conservadora**: paga um passo a mais no alarme em troca da garantia de cobertura a
+  qualquer `n`; a fronteira nominal do SPRT continua disponível como sinal, não como corte.

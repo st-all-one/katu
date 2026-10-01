@@ -226,6 +226,8 @@ fn default_config() -> toml::Table {
         "behavior.context_selection",
         toml::Value::String("suffix".to_owned()),
     );
+    // A3/W8-4: o gate de VOI fica **off** por omissão até A/B com o modelo (precedente Q-02b/Q-03).
+    config::set_key(&mut table, "behavior.tool_voi", toml::Value::Boolean(false));
     // ADR 0024 (P-01): a barreira de durabilidade é dado explícito; o default não muda o contrato.
     config::set_key(
         &mut table,

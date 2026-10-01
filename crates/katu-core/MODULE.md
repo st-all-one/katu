@@ -50,11 +50,13 @@ função, o log é a fonte da verdade.
     são verificadas: o TOML continua a ser a autoridade e o veredicto diz se o log a **sustenta**
     (`bench/e18/confidence/`; o comando `xtask policy:confidence` corre no `check`).
   - `kernel::guard` (Q-12/F7) — `Fingerprint`/`Call`/`Guard`: deteção de loop por assinatura
-    (FNV-1a de nome + argumentos canónicos) com **CUSUM** (fração de repetição, média) e **SPRT**
-    (passo inteiramente repetido, binário). Um passo com chamada **exclusiva** é progresso e
-    reinicia o detector — um *polling* legítimo de `bash` não é cortado. Medido em
+    (FNV-1a de nome + argumentos canónicos) com **CUSUM** (fração de repetição, média) e **e-value**
+    (razão de verosimilhança `Λ_n`, martingale sob `H0`; corte `log(1/α)`, *anytime-valid* por
+    Ville — C1/W8-3). Um passo com chamada **exclusiva** é progresso e reinicia o detector — um
+    *polling* legítimo de `bash` não é cortado. Medido em
     [`bench/e18/loop`](../../bench/e18/loop/PROTOCOL.md): **0** falsos positivos em 200 turnos
-    normais e alarme no **4.º** passo de um ciclo puro (teto de referência: 12).
+    normais, alarme no **5.º** passo de um ciclo puro (teto de referência: 12) e erro tipo I sob
+    parada opcional **≤ α** (DP exata, sem RNG).
   - `kernel::checkpoint` — `Checkpoint` tipado (schema v1, validador zero-dep `validate`,
     `write_atomic`); erros agregados em `Issue { path, message }` (OA19/E09-T02).
   - `kernel::control` — `Control`/`ControlState` (E12-T10): modelo/pensamento do **utilizador** no

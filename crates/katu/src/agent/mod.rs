@@ -117,7 +117,7 @@ pub(crate) enum AgentError {
     LoopDetected {
         /// Passo em que o detector disparou.
         step: u32,
-        /// Detector que disparou (`cusum`/`sprt`).
+        /// Detector que disparou (`cusum`/`evalue`).
         kind: &'static str,
         /// Motivo com a evidência (o que se repetiu).
         reason: String,

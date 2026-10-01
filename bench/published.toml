@@ -418,17 +418,32 @@ artifact = { path = "bench/e18/loop/raw.json", note = "0 falsos positivos em 200
 
 [[metrics]]
 name = "q12.loop.first_alarm.step"
-value = 4.0
+value = 5.0
 unit = "count"
 basis = "measured"
-artifact = { path = "bench/e18/loop/raw.json", note = "passo do alarme num ciclo puro (SPRT); teto global de referência: 12 passos" }
+artifact = { path = "bench/e18/loop/raw.json", note = "passo do alarme num ciclo puro (e-value, C1/W8-3); teto global de referência: 12 passos" }
 
 [[metrics]]
 name = "q12.loop.steps_saved.count"
-value = 8.0
+value = 7.0
 unit = "count"
 basis = "inferred"
-artifact = { path = "bench/e18/loop/raw.json", note = "teto de 12 − alarme no passo 4 (cada passo poupado é um pedido ao provider inteiro); depende do teto configurado" }
+artifact = { path = "bench/e18/loop/raw.json", note = "teto de 12 − alarme no passo 5 (cada passo poupado é um pedido ao provider inteiro); depende do teto configurado" }
+
+[[metrics]]
+name = "q12.loop.e_value.optional_stopping.error"
+value = 0.004
+unit = "ratio"
+basis = "inferred"
+artifact = { path = "bench/e18/loop/raw.json", note = "erro tipo I exato sob parada opcional (DP determinística sob H0, iid p₀); ≤ α = 0,01 para qualquer n (Ville). A fronteira nominal do SPRT (0,006) não tem esta garantia" }
+
+# --- A3/W8-4: gate de Value of Information (OPTIMIZATION_PLAN.md Anexo A) ---
+[[metrics]]
+name = "w84.voi.calls_avoided.count"
+value = 2.0
+unit = "count"
+basis = "measured"
+artifact = { path = "bench/e18/voi/raw.json", note = "chamadas de só-leitura evitadas em 5 cenários canónicos (11 chamadas); nunca o irreconstruível. Proxy: a adoção por omissão exige A/B com o modelo (default off)" }
 
 # --- Q-15: retomada com cauda limitada (OPTIMIZATION_PLAN.md §Q-15) ---
 [[metrics]]

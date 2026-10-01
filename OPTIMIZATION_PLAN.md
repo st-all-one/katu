@@ -76,6 +76,8 @@ remoção de complexidade; senão reverter e escrever a rejeição). Nada muda b
 | **W7-3** S-04 órfãos | ✔ feito | `context.compact` passou a ser emitido; `check-diag` trava órfãos (`xtask/src/orphans.rs`); **0** órfãos em 114 ids |
 | **W8-1** B1 · gramática/schema | ✔ feito | `response_format` `json_schema` derivado das tools do pedido, **opt-in** (`provider.structured_output`) e **fail-open** (400 ⇒ repetição sem o campo); ADR 0025; artefacto `bench/e18/grammar/` (+962 B, p50 153 µs); 4 testes |
 | **W8-2** C3 · calibração ECE/Brier | ✔ feito | `katu_policy::calibrate` (10 baldes, base `inferred`); o ECE do registo perfeito desce **730‰ → 83‰** com a evidência; `policy:confidence` publica ECE/Brier; artefacto `bench/e18/confidence/` |
+| **W8-3** C1 · e-value anytime-valid | ✔ feito | `kernel::guard` corta por `log(1/α)` (Ville) em vez do SPRT nominal; erro tipo I **≤ α** para qualquer `n` (DP exata, sem RNG); alarme no **5.º** passo; artefacto `bench/e18/loop/` |
+| **W8-4** A3 · VOI para tool calls | ✔ feito (decisão escrita) | `agent::turn::voi` (não repetir só-leitura já satisfeita; nunca o irreconstruível); opt-in `behavior.tool_voi` (default **off** até A/B); artefacto `bench/e18/voi/` (2 de 11 evitadas) |
 
 **Nota de método (Q-07).** O `diag:coverage` conta qualquer `fn` de `crates/*/src` fora de
 `#[cfg(test)] mod` e fora de ficheiros `*tests*`/`/tests/`: um *bench* em `edit/bench.rs` fez a
@@ -636,7 +638,7 @@ W4 (superfície)  ~~Q-07~~, ~~Q-08~~                        (menos turnos)
 W5 (segurança)   ~~Q-11~~, ~~Q-12~~                        (F6/F7)
 W6 (estabilidade)~~Q-13~~, ~~Q-14~~, ~~Q-15~~, ~~P-01~~, ~~P-02~~, ~~P-03~~, ~~P-04~~
 W7 (método)      ~~E18-T10 (harness zero-dep) + regerar atribuição + S-04~~  ✔
-W8 (Anexo A T1)  ~~B1 gramática + C3 calibração~~ ✔ → C1 e-values → A3 VOI
+W8 (Anexo A T1)  ~~B1 gramática + C3 calibração + C1 e-values + A3 VOI~~ ✔
 W9 (Anexo B)     B-03 → B-04 → B-06 → B-07 (gated) → ADR B-08
 W10 (Anexo A T2/3) A1/A2 · D1 · C2/C7/C5 · E1 · D2/D3 · E18-T05/T08/T09
 ```
@@ -710,6 +712,10 @@ esperam. Só depois as frentes formais. Cada PR: A/B + `make check` verde.
       atribuição regerada (`bench/e18/atomics/`) + **0** ids órfãos travados pelo `check-diag`.
 - [x] W8-1/W8-2 instalados: decodificação estruturada por JSON Schema (opt-in, fail-open, ADR 0025;
       `bench/e18/grammar/`) e calibração ECE/Brier publicada (`bench/e18/confidence/`).
+- [x] W8-3 instalado: e-value *anytime-valid* no guard (corte `log(1/α)`; erro tipo I ≤ α para
+      qualquer `n`, DP exata; `bench/e18/loop/` regenerado).
+- [x] W8-4 instalado (decisão escrita): gate de VOI em `agent::turn::voi` (opt-in
+      `behavior.tool_voi`, default **off** até A/B; `bench/e18/voi/`).
 - [ ] Cada número publicado em `bench/published.toml` tem base tipada (DF5).
 - [ ] Zero alteração de bytes observáveis; `Model-visible ⟺ logged` intacto.
 - [ ] `make check` e `msrv` (1.97.0) verdes em cada PR; `OPTIMIZATION_PLAN.md` mantido como lar.
@@ -718,12 +724,13 @@ esperam. Só depois as frentes formais. Cada PR: A/B + `make check` verde.
 
 ## 10. Próximos passos (W7–W10)
 
-**Ponto de partida.** W1–W7 estão fechadas e W8-1/W8-2 instalados: Q-01..Q-21 e P-01..P-04 com
+**Ponto de partida.** W1–W7 estão fechadas e W8-1/W8-2/W8-3/W8-4 instalados: Q-01..Q-21 e P-01..P-04 com
 artefacto em `bench/`, S-01..S-05 fechados (o resíduo S-04 — o id órfão `context.compact` — fechou
 em W7-3), o harness estatístico zero-dep de E18-T10 instalado (W7-1), a decodificação estruturada
-(B1) e a calibração ECE/Brier (C3) publicadas. O que falta vem do **Anexo A** (W8-3/W8-4 + Tier
-2–3) e do **Anexo B** (Camada 1 residual e as decisões de Camada 2). A ordem segue Q > P > S e
-o método do §0: cada item traz fórmula, artefacto cru e teste que o trava; adotar-ou-reverter.
+(B1), a calibração ECE/Brier (C3), a e-value *anytime-valid* (C1) e o gate de VOI (A3, *default*
+off) publicados. O que falta vem do **Anexo A** (Tier 2–3) e do **Anexo B** (Camada 1 residual e as
+decisões de Camada 2). A ordem segue Q > P > S e o método do §0: cada item traz fórmula, artefacto
+cru e teste que o trava; adotar-ou-reverter.
 
 ### W7 · Fecho de método (pré-requisito de W8)
 
@@ -790,19 +797,41 @@ vivos. Nenhum teto de `surface.toml` subiu.
   `the_ece_decreases_as_the_evidence_accumulates`, `a_violation_worsens_the_calibration`,
   `the_calibration_is_a_pure_function_of_the_verdicts`, `the_reliability_bins_partition_the_trials`.
 
-**W8-3 · C1 · Parada opcional válida (e-values / anytime-valid).**
+**W8-3 · C1 · Parada opcional válida (e-values / anytime-valid).** ✔ feito
 - **Onde:** `kernel::guard` (F7); artefacto `bench/e18/loop/`.
 - **Proposta:** e-value que torna a rejeição válida a qualquer `n`, mantendo o CUSUM como sinal; o
   corte continua `agent.loop`.
 - **Teste:** falso-positivo sob parada opcional; determinismo; alarme ≤ teto.
 - **Adoção:** zero falso positivo e cobertura a qualquer `n` (senão mantém-se o SPRT).
+- **Resultado ✔:** a razão de verosimilhança `Λ_n` (log-LR) é um **martingale não-negativo** sob
+  `H0`; o corte passou a ser `log(1/α)` (limiar de Ville) em vez do `log((1−β)/α)` do SPRT, que só
+  garante `α` a `n` fixo. Por **Ville**, `P_{H0}(∃n: log Λ_n ≥ log(1/α)) ≤ α` para **qualquer** regra
+  de parada — verificado **exatamente** por DP determinística sobre `(passos, repetições)` (sem RNG,
+  sem simulação): `4‰ ≤ α = 10‰` em 12 passos, e a fronteira nominal do SPRT (`6‰`) não tem a
+  garantia. O CUSUM mantém-se como sinal para a repetição parcial (onde a e-value não avança). O
+  alarme num ciclo puro passou do 4.º para o **5.º** passo (o preço da garantia), ainda **7 passos**
+  antes do teto de 12. `bench/e18/loop/raw.json` regenerado com `e_value` + `sprt_nominal`;
+  `bench/published.toml` publica o erro sob parada opcional. Testes: `the_e_value_covers_any_stopping_time`,
+  `the_nominal_sprt_boundary_is_less_conservative`, `the_optional_stopping_error_is_deterministic`,
+  `the_error_grows_with_the_horizon`.
 
-**W8-4 · A3 · VOI para tool calls.**
+**W8-4 · A3 · VOI para tool calls.** ✔ feito (decisão escrita)
 - **Onde:** gate de tool em `agent`.
 - **Proposta:** regra determinística "não chamar quando o valor esperado < custo", **nunca** saltando
   o irreconstruível. Proxy: tool calls evitadas em cenários canónicos.
 - **Adoção:** só com A/B; sem modelo local que emita tool calls nativas, fica como **decisão
   escrita** (precedente Q-02b/Q-03).
+- **Resultado ✔:** `agent::turn::voi` — `Voi::decide` mede a informação marginal por impressão
+  (FNV-1a de nome + argumentos canónicos): uma só-leitura já satisfeita (sem mutação desde então)
+  tem `VOI = 0 < custo` ⇒ **Skip**; o irreconstruível (`write`/`edit`/`move`/`trash`/`bash`/
+  `plan`/`memory`) **nunca** é saltado, e a mutação **invalida** a informação cacheada (conservador:
+  re-executa em vez de servir obsoleto). Opt-in `behavior.tool_voi` (default **off** até A/B);
+  ligado em `drive` antes de `run_calls`, com um `ToolCall`/`ToolResult` sintético para o modelo.
+  Artefacto `bench/e18/voi/raw.json`: 5 cenários canónicos, **2 de 11** chamadas evitadas, **0**
+  irreconstruíveis saltados. Testes: `a_duplicate_read_is_skipped`, `distinct_reads_are_executed`,
+  `an_irreconstructible_call_is_never_skipped`, `a_mutation_invalidates_the_cached_read`,
+  `the_decisions_are_deterministic`, `the_gate_skips_a_duplicate_read_when_enabled`,
+  `the_gate_is_off_by_default`, `the_gate_avoids_duplicates_and_keeps_the_irreconstructible`.
 
 **A4** mantém-se **rejeitado** (§Q-18, 14,0 %); não reabrir sem sinal novo.
 

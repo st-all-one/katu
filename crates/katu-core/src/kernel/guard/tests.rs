@@ -5,6 +5,7 @@ use serde_json::json;
 use super::{Alarm, AlarmKind, Call, Fingerprint, Guard, GuardParams};
 
 mod bench;
+mod optional;
 
 /// Uma chamada de leitura com o argumento `path`.
 fn read(path: &str) -> Fingerprint {
@@ -36,9 +37,9 @@ fn a_pure_loop_is_cut_early() {
     let Some(alarm) = alarm else {
         return;
     };
-    assert_eq!(alarm.kind, AlarmKind::Sprt);
-    assert_eq!(alarm.step, 4, "alarme no 4.º passo, muito antes do teto");
-    assert_eq!(alarm.repeated, 3);
+    assert_eq!(alarm.kind, AlarmKind::EValue);
+    assert_eq!(alarm.step, 5, "alarme no 5.º passo, muito antes do teto");
+    assert_eq!(alarm.repeated, 4);
     assert_eq!(alarm.novelty_milli, 0);
     assert!(alarm.reason().contains("loop detectado"));
 }
@@ -46,7 +47,7 @@ fn a_pure_loop_is_cut_early() {
 #[test]
 fn the_cusum_catches_a_partial_loop() {
     // Cada passo relê **duas** chamadas já vistas e acrescenta uma nova: a novidade nunca é nula
-    // (o SPRT não dispara) mas a fração de repetição fica acima do alvo `k` e o CUSUM acumula.
+    // (a e-value não dispara) mas a fração de repetição fica acima do alvo `k` e o CUSUM acumula.
     let mut guard = Guard::with_defaults();
     let mut alarm = None;
     let first = read("/work/0.rs");
@@ -71,7 +72,7 @@ fn the_cusum_catches_a_partial_loop() {
         return;
     };
     assert_eq!(alarm.kind, AlarmKind::Cusum);
-    assert!(alarm.novelty_milli > 0, "o SPRT não era o detector aqui");
+    assert!(alarm.novelty_milli > 0, "a e-value não era o detector aqui");
     assert!(alarm.cusum_milli >= GuardParams::DEFAULT.cusum_h_milli);
 }
 
@@ -88,8 +89,8 @@ fn progress_resets_the_detector() {
     );
     assert_eq!(guard.cusum_milli(), 0, "o progresso zera o CUSUM");
     assert!(
-        guard.sprt_milli() < 0,
-        "o progresso empurra o SPRT para a hipótese normal"
+        guard.e_value_log_milli() < 0,
+        "o progresso empurra a e-value para a hipótese normal"
     );
     // Um *polling* legítimo de `bash` (progresso) nunca é cortado, mesmo em ciclo puro.
     let mut polling = Guard::with_defaults();
@@ -125,8 +126,15 @@ fn a_short_turn_is_not_cut() {
     // Um passo inteiramente repetido com `min_steps = 3` não pode alarmar no passo 1 nem 2.
     assert!(guard.observe(&[Call::shared(read("/work/a.rs"))]).is_none());
     assert!(guard.observe(&[Call::shared(read("/work/a.rs"))]).is_none());
+    // Passos 3–4: `min_steps` já permite, mas a e-value ainda não cruzou `log(1/α)`.
     assert!(guard.observe(&[Call::shared(read("/work/a.rs"))]).is_none());
-    assert!(guard.observe(&[Call::shared(read("/work/a.rs"))]).is_some());
+    assert!(guard.observe(&[Call::shared(read("/work/a.rs"))]).is_none());
+    assert_eq!(
+        guard
+            .observe(&[Call::shared(read("/work/a.rs"))])
+            .map(|a| a.step),
+        Some(5)
+    );
 }
 
 #[test]
@@ -160,7 +168,7 @@ fn the_detector_is_deterministic() {
         first.observe(&[Call::shared(read("/work/a.rs"))]);
         second.observe(&[Call::shared(read("/work/a.rs"))]);
     }
-    assert_eq!(first.sprt_milli(), second.sprt_milli());
+    assert_eq!(first.e_value_log_milli(), second.e_value_log_milli());
     assert_eq!(first.cusum_milli(), second.cusum_milli());
     assert_eq!(first.steps(), second.steps());
 }
@@ -186,5 +194,5 @@ fn a_loop_with_many_calls_per_step_is_still_caught() {
     let Some(alarm) = alarm else {
         return;
     };
-    assert_eq!(alarm.repeated, 3);
+    assert_eq!(alarm.repeated, 4);
 }

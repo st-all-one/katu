@@ -54,8 +54,8 @@ fn a_repeated_call_is_cut_before_the_step_cap() -> Result<(), Box<dyn std::error
     let Some(AgentError::LoopDetected { step, kind, reason }) = error else {
         return Err(format!("esperava um corte por loop, veio {error:?}").into());
     };
-    assert_eq!(step, 4, "corta no 4.º passo, não no teto de 8");
-    assert_eq!(kind, "sprt");
+    assert_eq!(step, 5, "corta no 5.º passo, não no teto de 8");
+    assert_eq!(kind, "evalue");
     assert!(reason.contains("loop detectado"), "{reason}");
     // O turno fica **fechado** (`turn_open` vem do log): `TurnStart` sem `TurnEnd` deixaria a
     // retomada inconsistente.

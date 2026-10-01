@@ -87,6 +87,11 @@ pub(crate) const KEYS: &[KeySpec] = &[
         doc: "Política de seleção do contexto: `suffix` (default) ou `utility` (Q-02b/Q-03).",
     },
     KeySpec {
+        key: "behavior.tool_voi",
+        kind: Kind::Bool,
+        doc: "Não repetir uma só-leitura já satisfeita no turno (A3/W8-4; default `false` até A/B).",
+    },
+    KeySpec {
         key: "recall.default_limit",
         kind: Kind::Integer,
         doc: "Máximo de resultados por omissão no `memo ask`.",

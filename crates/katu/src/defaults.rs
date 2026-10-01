@@ -28,6 +28,8 @@ pub(crate) struct Defaults {
     pub(crate) prompt_state: Option<bool>,
     /// Política de seleção do contexto (Q-02b/Q-03): `suffix`/`utility`.
     pub(crate) context_selection: Option<String>,
+    /// Gate de Value of Information para tool calls (A3/W8-4): `true`/`false`.
+    pub(crate) tool_voi: Option<bool>,
     /// Durabilidade do log (ADR 0024/P-01): `event`/`turn`.
     pub(crate) durability: Option<String>,
     /// Saída estruturada do provider (B1/W8-1).
@@ -76,6 +78,7 @@ pub(crate) fn from_root(root: &Path) -> Defaults {
         auto_compact: boolean(&table, "behavior.auto_compact"),
         prompt_state: boolean(&table, "behavior.prompt_state"),
         context_selection: text(&table, "behavior.context_selection"),
+        tool_voi: boolean(&table, "behavior.tool_voi"),
         durability: text(&table, "behavior.durability"),
         structured_output: boolean(&table, "provider.structured_output"),
         recall_limit: integer(&table, "recall.default_limit")

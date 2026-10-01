@@ -198,6 +198,11 @@ catalog! {
         "agent.loop",
         "Corte por repetição patológica do turno (Q-12/F7)."
     ),
+    (
+        AGENT_VOI_SKIP,
+        "agent.voi.skip",
+        "Chamada de só-leitura não repetida: a informação já está no contexto (A3/W8-4)."
+    ),
     (MEMORY_OPEN, "memory.open", "Abertura do adaptador de memória."),
     (BUS_PUBLISH, "bus.publish", "Publicação de um evento no bus do kernel."),
     (BUS_DELIVER, "bus.deliver", "Entrega de um evento aos observadores (waterfall)."),

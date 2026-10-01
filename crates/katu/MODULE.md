@@ -69,10 +69,15 @@ todo o código impuro confinado.
   E07-T02) e no executor; a tool `memory` passa pelos caminhos de recall/escrita do gate de E05.
   O comando `katu run` exercita-o. Envelopes de `Dispatch`/memória vivem em `src/memory/commands.rs`.
   **Guard de loop** (Q-12/F7): cada passo é observado **antes** de executar
-  (`kernel::guard`, CUSUM + SPRT sobre a assinatura das chamadas); um ciclo de leitura sem progresso
-  corta o turno no 4.º passo com `AgentError::LoopDetected` (categoria `conflict`, exit 5), emite
-  `agent.loop` e **fecha** o turno. O turno fecha também nos outros erros (`TooManySteps`): um
-  `TurnStart` sem `TurnEnd` deixaria a retomada inconsistente.
+  (`kernel::guard`, CUSUM + **e-value** *anytime-valid* sobre a assinatura das chamadas); um ciclo de
+  leitura sem progresso corta o turno no 5.º passo com `AgentError::LoopDetected` (categoria
+  `conflict`, exit 5), emite `agent.loop` e **fecha** o turno. O turno fecha também nos outros
+  erros (`TooManySteps`): um `TurnStart` sem `TurnEnd` deixaria a retomada inconsistente.
+- **Gate de VOI** (A3/W8-4, `src/agent/turn/voi.rs`): não repete uma só-leitura já satisfeita no
+  turno (`VOI = 0 < custo`) e **nunca** salta o irreconstruível; a mutação invalida a informação
+  cacheada. **Opt-in** (`behavior.tool_voi`, default **off** até A/B com o modelo — precedente
+  Q-02b/Q-03). Medido em [`bench/e18/voi`](../../bench/e18/voi/PROTOCOL.md): 2 de 11 chamadas
+  evitadas em cenários canónicos, 0 irreconstruíveis saltados.
 - **UI de terminal** (`src/tui.rs`, feature `memory-in-process`, E10-T01/T02/T05): comando
   `katu tui`. A UI (`katu-tui`) é pura (estado central + keymap + render) e a borda implementa o
   `Handler` que corre o turno e injeta `Update`s; `Runtime::begin_turn` abre o próximo turno

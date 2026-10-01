@@ -1,15 +1,19 @@
-//! Deteção de **loop patológico** por artefacto (Q-12/F7): CUSUM + SPRT + novidade por assinatura.
+//! Deteção de **loop patológico** por artefacto (Q-12/F7): CUSUM + e-value + novidade por
+//! assinatura.
 //!
 //! O único travão até aqui era o teto global de passos (`AgentError::TooManySteps`), que corta
 //! **depois** de o orçamento ter ardido devagar (brecha (h) do `OPTIMIZATION_PLAN.md` §1.4). Aqui
 //! vive o sinal cedo: cada passo do turno deixa uma **assinatura** (nome da tool + argumentos
-//! canónicos, hash FNV-1a determinístico) e duas estatísticas clássicas de deteção de mudança:
+//! canónicos, hash FNV-1a determinístico) e duas estatísticas de deteção de mudança:
 //!
 //! - **CUSUM** sobre a *fração de repetição* do passo (`1 − novidade`, contínua): alarme quando a
 //!   média se desvia de forma **sustentada** (`S ← max(0, S + x − k)`, alarme se `S ≥ h`).
-//! - **SPRT** sobre o binário "o passo inteiro já foi visto" (novidade nula): razão de
-//!   verosimilhança `Λ` entre `H1: loop (p₁)` e `H0: normal (p₀)`, com fronteiras
-//!   `log((1−β)/α)` e `log(β/(1−α))`.
+//! - **e-value** sobre o binário "o passo inteiro já foi visto" (novidade nula): a razão de
+//!   verosimilhança `Λ_n` entre `H1: loop (p₁)` e `H0: normal (p₀)` é um **martingale não-negativo**
+//!   sob `H0`; rejeita-se quando `log Λ_n ≥ log(1/α)`. Por **Ville**, `P_{H0}(∃n: Λ_n ≥ 1/α) ≤ α`
+//!   para **qualquer** regra de parada — a rejeição é *anytime-valid* (parada opcional), ao
+//!   contrário da fronteira `log((1−β)/α)` do SPRT clássico, que só garante `α` a `n` fixo
+//!   (C1/W8-3; a fronteira nominal continua disponível como sinal, não como corte).
 //!
 //! **Progresso reinicia.** Um passo com uma chamada de **escrita** (não `Shared`, isto é, exclusiva:
 //! `write`/`edit`/`bash`/...) reinicia o CUSUM, o SPRT e a memória de assinaturas: fazer progresso
@@ -97,33 +101,41 @@ pub struct GuardParams {
     /// Limiar de alarme do CUSUM (milésimos).
     pub cusum_h_milli: u32,
     /// `H0` (turno normal): probabilidade de um passo inteiramente repetido (milésimos).
-    pub sprt_p0_milli: u32,
+    pub e_value_p0_milli: u32,
     /// `H1` (loop): probabilidade de um passo inteiramente repetido (milésimos).
-    pub sprt_p1_milli: u32,
-    /// Falso positivo alvo do SPRT (milésimos).
-    pub sprt_alpha_milli: u32,
-    /// Falso negativo alvo do SPRT (milésimos).
-    pub sprt_beta_milli: u32,
+    pub e_value_p1_milli: u32,
+    /// Falso positivo alvo **anytime-valid** da e-value (milésimos).
+    pub e_value_alpha_milli: u32,
     /// Passos mínimos antes de poder alarmar (não cortar um turno curto).
     pub min_steps: u32,
 }
 
 impl GuardParams {
     /// Defaults conservadores: `k = 0,5`, `h = 2,0`, `p₀ = 0,1`, `p₁ = 0,6`, `α = 0,01`,
-    /// `β = 0,10`, `min_steps = 3`.
+    /// `min_steps = 3`.
     ///
-    /// Consequências (medidas em `bench/e18/loop/`): com o passo inteiramente repetido, o SPRT
-    /// alarme no **4.º** passo (o 1.º é novidade e contribui contra) e o CUSUM precisaria de **5**
+    /// Consequências (medidas em `bench/e18/loop/`): com o passo inteiramente repetido, a e-value
+    /// alarme no **5.º** passo (o 1.º é novidade e contribui contra) e o CUSUM precisaria de **5**
     /// repetições seguidas. Um turno sem repetições nunca alarme (`S` fica em 0 e `Λ` desce).
     pub const DEFAULT: Self = Self {
         cusum_k_milli: 500,
         cusum_h_milli: 2_000,
-        sprt_p0_milli: 100,
-        sprt_p1_milli: 600,
-        sprt_alpha_milli: 10,
-        sprt_beta_milli: 100,
+        e_value_p0_milli: 100,
+        e_value_p1_milli: 600,
+        e_value_alpha_milli: 10,
         min_steps: 3,
     };
+
+    /// Fronteira de rejeição **anytime-valid**: `log(1/α)` em milésimos.
+    ///
+    /// É o limiar de Ville, mais conservador do que o `log((1−β)/α)` do SPRT: paga um passo a
+    /// mais no alarme em troca da garantia de cobertura a qualquer `n`.
+    #[must_use]
+    pub fn e_value_threshold_milli(&self) -> i64 {
+        let _span = crate::trace_fn!("kernel::guard::e_value_threshold_milli");
+
+        log_ratio(1_000, self.e_value_alpha_milli.max(1))
+    }
 }
 
 /// Qual detector disparou.
@@ -132,8 +144,8 @@ impl GuardParams {
 pub enum AlarmKind {
     /// Desvio sustentado da fração de repetição (CUSUM).
     Cusum,
-    /// Passos inteiramente repetidos (SPRT).
-    Sprt,
+    /// Rejeição anytime-valid da razão de verosimilhança (e-value).
+    EValue,
 }
 
 impl AlarmKind {
@@ -142,7 +154,7 @@ impl AlarmKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Cusum => "cusum",
-            Self::Sprt => "sprt",
+            Self::EValue => "evalue",
         }
     }
 }
@@ -160,8 +172,8 @@ pub struct Alarm {
     pub novelty_milli: u32,
     /// Estatística do CUSUM em milésimos.
     pub cusum_milli: u32,
-    /// Estatística do SPRT em milésimos (`Λ`).
-    pub sprt_milli: i64,
+    /// Log da e-value em milésimos (`log Λ`).
+    pub e_value_log_milli: i64,
     /// Assinatura do passo, em hexadecimal (o que se repetiu).
     pub signature: u64,
 }
@@ -173,13 +185,13 @@ impl Alarm {
         let _span = crate::trace_fn!("kernel::guard::reason");
 
         format!(
-            "loop detectado ({}) no passo {}: {} passo(s) repetido(s), novidade {}‰, CUSUM {}‰, SPRT {}‰",
+            "loop detectado ({}) no passo {}: {} passo(s) repetido(s), novidade {}‰, CUSUM {}‰, e-value {}‰",
             self.kind.as_str(),
             self.step,
             self.repeated,
             self.novelty_milli,
             self.cusum_milli,
-            self.sprt_milli
+            self.e_value_log_milli
         )
     }
 }
@@ -190,7 +202,7 @@ pub struct Guard {
     params: GuardParams,
     seen: BTreeSet<u64>,
     cusum_milli: i64,
-    sprt_milli: i64,
+    e_value_log_milli: i64,
     steps: u32,
     repeated: u32,
 }
@@ -205,7 +217,7 @@ impl Guard {
             params,
             seen: BTreeSet::new(),
             cusum_milli: 0,
-            sprt_milli: 0,
+            e_value_log_milli: 0,
             steps: 0,
             repeated: 0,
         }
@@ -233,7 +245,7 @@ impl Guard {
         if calls.iter().any(|call| call.mutates) {
             self.seen.clear();
             self.cusum_milli = 0;
-            self.sprt_milli = 0;
+            self.e_value_log_milli = 0;
             self.repeated = 0;
         }
         let unique: BTreeSet<u64> = calls.iter().map(|call| call.print.bits()).collect();
@@ -253,16 +265,18 @@ impl Guard {
             self.repeated = 0;
         }
         self.update_cusum(novelty_milli);
-        self.update_sprt(fresh);
+        self.update_e_value(fresh);
         if self.steps < self.params.min_steps {
             return None;
         }
         let signature = unique.iter().next().copied().unwrap_or_default();
+        // A e-value (anytime-valid) tem primazia sobre o CUSUM (heurístico) no mesmo passo: o corte
+        // formal é o que a estatística justifica; o CUSUM fica como sinal para a repetição parcial.
+        if self.e_value_alarmed() {
+            return Some(self.alarm(AlarmKind::EValue, novelty_milli, signature));
+        }
         if self.cusum_milli >= i64::from(self.params.cusum_h_milli) {
             return Some(self.alarm(AlarmKind::Cusum, novelty_milli, signature));
-        }
-        if self.sprt_alarmed() {
-            return Some(self.alarm(AlarmKind::Sprt, novelty_milli, signature));
         }
         None
     }
@@ -276,28 +290,25 @@ impl Guard {
         self.cusum_milli = self.cusum_milli.saturating_add(delta).max(0);
     }
 
-    /// SPRT sobre o binário "passo inteiramente repetido" (`fresh == 0`).
-    fn update_sprt(&mut self, fresh: usize) {
-        let _span = crate::trace_fn!("kernel::guard::update_sprt");
+    /// e-value sobre o binário "passo inteiramente repetido" (`fresh == 0`).
+    fn update_e_value(&mut self, fresh: usize) {
+        let _span = crate::trace_fn!("kernel::guard::update_e_value");
 
-        let p1 = self.params.sprt_p1_milli;
-        let p0 = self.params.sprt_p0_milli;
+        let p1 = self.params.e_value_p1_milli;
+        let p0 = self.params.e_value_p0_milli;
         let step = if fresh == 0 {
             log_ratio(p1, p0)
         } else {
             log_ratio(1_000_u32.saturating_sub(p1), 1_000_u32.saturating_sub(p0))
         };
-        self.sprt_milli = self.sprt_milli.saturating_add(step);
+        self.e_value_log_milli = self.e_value_log_milli.saturating_add(step);
     }
 
-    /// `Λ ≥ log((1 − β)/α)`: há evidência suficiente de loop.
-    fn sprt_alarmed(&self) -> bool {
-        let _span = crate::trace_fn!("kernel::guard::sprt_alarmed");
+    /// `log Λ ≥ log(1/α)`: rejeição válida a qualquer `n` (Ville).
+    fn e_value_alarmed(&self) -> bool {
+        let _span = crate::trace_fn!("kernel::guard::e_value_alarmed");
 
-        let alpha = f64::from(self.params.sprt_alpha_milli.max(1)) / 1_000.0;
-        let beta = f64::from(self.params.sprt_beta_milli) / 1_000.0;
-        let boundary = to_milli(((1.0 - beta) / alpha).ln());
-        self.sprt_milli >= boundary
+        self.e_value_log_milli >= self.params.e_value_threshold_milli()
     }
 
     /// Estatística do CUSUM (milésimos) — telemetria/testes.
@@ -306,10 +317,10 @@ impl Guard {
         self.cusum_milli
     }
 
-    /// Estatística do SPRT (milésimos) — telemetria/testes.
+    /// Log da e-value (milésimos) — telemetria/testes.
     #[must_use]
-    pub const fn sprt_milli(&self) -> i64 {
-        self.sprt_milli
+    pub const fn e_value_log_milli(&self) -> i64 {
+        self.e_value_log_milli
     }
 
     /// Passos observados.
@@ -328,7 +339,7 @@ impl Guard {
             repeated: self.repeated,
             novelty_milli,
             cusum_milli: u32::try_from(self.cusum_milli.max(0)).unwrap_or(u32::MAX),
-            sprt_milli: self.sprt_milli,
+            e_value_log_milli: self.e_value_log_milli,
             signature,
         }
     }

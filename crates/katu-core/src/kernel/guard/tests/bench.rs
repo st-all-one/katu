@@ -7,6 +7,7 @@
 //! O "turno normal" imita um turno real: passos com chamadas **diversas** (caminhos diferentes,
 //! leitura + escrita), sem repetição pura. O "loop" repete a mesma chamada de leitura.
 
+use super::optional::{error_milli, sprt_boundary_milli};
 use super::{Call, Fingerprint, Guard, GuardParams};
 use serde_json::json;
 
@@ -79,11 +80,29 @@ pub(super) fn measure() -> Result<String, Box<dyn std::error::Error>> {
         "params": {
             "cusum_k_milli": GuardParams::DEFAULT.cusum_k_milli,
             "cusum_h_milli": GuardParams::DEFAULT.cusum_h_milli,
-            "sprt_p0_milli": GuardParams::DEFAULT.sprt_p0_milli,
-            "sprt_p1_milli": GuardParams::DEFAULT.sprt_p1_milli,
-            "sprt_alpha_milli": GuardParams::DEFAULT.sprt_alpha_milli,
-            "sprt_beta_milli": GuardParams::DEFAULT.sprt_beta_milli,
+            "e_value_p0_milli": GuardParams::DEFAULT.e_value_p0_milli,
+            "e_value_p1_milli": GuardParams::DEFAULT.e_value_p1_milli,
+            "e_value_alpha_milli": GuardParams::DEFAULT.e_value_alpha_milli,
             "min_steps": GuardParams::DEFAULT.min_steps,
+        },
+        "e_value": {
+            "threshold_milli": GuardParams::DEFAULT.e_value_threshold_milli(),
+            "reject_step": loop_alarm,
+            "optional_stopping_error_milli": error_milli(
+                GuardParams::DEFAULT,
+                GuardParams::DEFAULT.e_value_threshold_milli(),
+                steps,
+            ),
+            "coverage_any_n": true,
+        },
+        "sprt_nominal": {
+            "boundary_milli": sprt_boundary_milli(GuardParams::DEFAULT, 100),
+            "optional_stopping_error_milli": error_milli(
+                GuardParams::DEFAULT,
+                sprt_boundary_milli(GuardParams::DEFAULT, 100),
+                steps,
+            ),
+            "anytime_valid": false,
         },
         "false_positives": {
             "turns": turns,
@@ -94,9 +113,9 @@ pub(super) fn measure() -> Result<String, Box<dyn std::error::Error>> {
         "normal_turn_first_alarm_step": normal,
         "loop_turn_first_alarm_step": loop_alarm,
         "global_step_cap": steps,
-        "criterion": "falso positivo = 0 em 200 turnos normais e alarme do loop antes do teto de passos",
+        "criterion": "falso positivo = 0 em 200 turnos normais, alarme do loop antes do teto de passos e cobertura anytime-valid (erro tipo I ≤ α)",
         "criterion_met": false_positive == 0 && loop_alarm > 0 && loop_alarm < steps,
-        "caveat": "sequências sintéticas determinísticas (nenhum modelo local emite tool calls nativas): mede o detector, não o comportamento de um modelo real. O teto global de passos é configurável (`--max-steps`); aqui usa-se 12 como referência",
+        "caveat": "sequências sintéticas determinísticas (nenhum modelo local emite tool calls nativas): mede o detector, não o comportamento de um modelo real. O teto global de passos é configurável (`--max-steps`); aqui usa-se 12 como referência. O erro sob parada opcional é calculado por DP exata sob H0 (iid p₀), não simulado",
     });
     Ok(serde_json::to_string_pretty(&value)?)
 }
@@ -106,7 +125,7 @@ pub(super) fn measure() -> Result<String, Box<dyn std::error::Error>> {
 fn the_guard_has_no_false_positive_on_normal_turns() {
     assert_eq!(false_positives(200, 12), 0);
     assert_eq!(first_alarm(Turn::Normal, 12), 0);
-    assert_eq!(first_alarm(Turn::Loop, 12), 4);
+    assert_eq!(first_alarm(Turn::Loop, 12), 5);
     assert_eq!(
         first_alarm(Turn::Loop, 12),
         first_alarm(Turn::Loop, 12),

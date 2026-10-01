@@ -1,0 +1,41 @@
+{
+  "caveat": "proxy determinístico (nenhum modelo local emite tool calls nativas): mede o que o gate evita, não o que o modelo perderia; a adoção por omissão exige A/B com o modelo",
+  "criterion": "evitar só-leitura duplicada e nunca saltar o irreconstruível",
+  "criterion_met": true,
+  "decision": "default off até A/B (precedente Q-02b/Q-03): behavior.tool_voi = false no arranque",
+  "question": "o gate de VOI evita tool calls sem saltar o irreconstruível",
+  "rule": "não chamar quando VOI = 0 < custo (só-leitura já satisfeita); nunca o irreconstruível",
+  "scenarios": [
+    {
+      "avoided": 1,
+      "calls": 2,
+      "name": "duplicate_read"
+    },
+    {
+      "avoided": 0,
+      "calls": 2,
+      "name": "distinct_reads"
+    },
+    {
+      "avoided": 0,
+      "calls": 2,
+      "name": "irreconstructible_write"
+    },
+    {
+      "avoided": 0,
+      "calls": 3,
+      "name": "mutation_invalidates"
+    },
+    {
+      "avoided": 1,
+      "calls": 2,
+      "name": "repeated_grep"
+    }
+  ],
+  "schema": "katu.bench.voi.v1",
+  "totals": {
+    "avoided": 2,
+    "calls": 11,
+    "executed": 9
+  }
+}

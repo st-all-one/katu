@@ -21,6 +21,7 @@ mod guard;
 mod live;
 mod steering;
 mod verify;
+mod voi;
 
 /// Pedido de turno a partir dos componentes (o `ports` é `Copy`).
 pub(super) fn request<'a>(

@@ -14,6 +14,7 @@ use serde_json::Value;
 use super::request::build_request;
 use super::{Activity, ActivitySink, run_calls};
 use crate::agent::{AgentError, Ports, TurnOptions, TurnReport, TurnRequest, catalog};
+use crate::defaults;
 use crate::runtime::Runtime;
 use katu_tools::schema::concurrency_of;
 
@@ -122,6 +123,11 @@ fn drive(
 
     let tools = catalog::tool_defs();
     let mut guard = Guard::with_defaults();
+    // A3/W8-4: gate de Value of Information — **off** por omissão até A/B com o modelo.
+    let mut voi = super::voi::Voi::new();
+    let voi_enabled = defaults::from_root(runtime.root())
+        .tool_voi
+        .unwrap_or(false);
     let mut accum = Accum {
         text: String::new(),
         calls: 0,
@@ -149,7 +155,13 @@ fn drive(
         }
         // Q-12/F7: o guard observa as chamadas do passo **antes** de as executar (corta primeiro).
         cut_if_looping(&mut guard, &step.calls)?;
-        if !run_calls(runtime, ports, step.calls, activity)? {
+        // A3/W8-4: o gate de VOI não repete uma só-leitura já satisfeita (nunca o irreconstruível).
+        let calls = if voi_enabled {
+            super::voi::apply(runtime, ports, &mut voi, step.calls)?
+        } else {
+            step.calls
+        };
+        if !run_calls(runtime, ports, calls, activity)? {
             accum.cancelled = true;
             return Ok(accum);
         }
@@ -185,7 +197,7 @@ fn cut_if_looping(guard: &mut Guard, calls: &[(CallId, String, Value)]) -> Resul
         "repeated" => alarm.repeated,
         "novelty_milli" => alarm.novelty_milli,
         "cusum_milli" => alarm.cusum_milli,
-        "sprt_milli" => alarm.sprt_milli
+        "e_value_log_milli" => alarm.e_value_log_milli
     );
     Err(AgentError::LoopDetected {
         step: alarm.step,

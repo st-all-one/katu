@@ -13,6 +13,7 @@ use crate::runtime::Runtime;
 mod batch;
 mod request;
 mod run;
+pub(crate) mod voi;
 
 #[cfg(test)]
 pub(crate) use batch::PARALLEL_BATCHES;
