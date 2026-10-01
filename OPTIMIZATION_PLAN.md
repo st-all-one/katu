@@ -63,6 +63,7 @@ remoção de complexidade; senão reverter e escrever a rejeição). Nada muda b
 | **Q-03** compactação por informação | ✔ feito (**proxy**) | digest por utilidade: **+338,0 %** de `I_ret` com 219 → 50 tokens; gatilho `τ_JS` |
 | **Q-04** o modelo vê o estado | ✔ feito (**off**) | secção `estado` + evento `PromptState` (log/replay); ligada por `behavior.prompt_state` |
 | **P-02** emissor TOON de uma passagem | ✔ feito | `emit` **−62,0 %** dev / **−33,3 %** release; `to_toon` −39,9 %; `bench/e18/toon/` |
+| **Q-07** `edit` multi-bloco atómico | ✔ feito | 5 chamadas → 1 (**−80 %**), payload −19,9 %, atómico (0 B gravados em falha); `bench/e18/edit/` |
 
 **Lição de método (B-01).** O primeiro A/B deu −5 % e quase reverteu B-01: a causa era um
 *refactor* do `clippy::needless_collect`, que ao encadear `.map(spawn).map(join)` **entrelaça** o
@@ -278,12 +279,24 @@ o que ajuda é **encurtar** o texto nosso e **medir** o que sobra.
 
 #### Q-07 · `edit` multi-bloco atómico (reduz turnos, o custo dominante)
 - **Problema:** uma substituição por chamada; refactors custam N turnos × provider.
-- **Proposta:** `edit` aceita uma **lista** de pares `old→new` aplicada **atómica** (tudo ou nada,
-  `dry_run`); **não** é tool nova (mantém 11, G3), é um parâmetro.
-- **Teste:** atomicidade (falha ⇒ nada muda); determinismo; política por caminho intacta;
-  A/B: menos turnos por refactor.
-- **Adoção:** ≥ 20 % menos turnos numa tarefa de refactor canônica, ou reverter.
-- **Mapa:** E06-T03 · `check-surface`.
+- **Proposta (feita):** `edit` aceita uma **lista** de pares `old→new` (`Replacement`) aplicada
+  **atómica** (tudo ou nada, `dry_run`); **não** é tool nova (mantém 11, G3), é um parâmetro: o par
+  `old`/`new` passou a `ListText` no schema e a forma única continua **aceite** pelo roteador (um
+  texto = lista de um). A recusa por “não encontrado” devolve as **âncoras únicas mais próximas** e o
+  remédio (Q-08).
+- **Teste:** atomicidade (a 3.ª falha ⇒ nada muda), ordem (a 2.ª âncora pode depender da 1.ª),
+  equivalência do ficheiro final, âncoras determinísticas, `dry_run`, comprimentos diferentes ⇒ erro
+  que ensina.
+- **Resultado:** 5 chamadas → **1** (**−80 %**, critério ≥ 20 % cumprido no proxy determinístico),
+  payload do modelo 763 → **611 B** (**−19,9 %**), eventos de log 10 → 2; com a 3.ª substituição a
+  falhar, a forma antiga deixava o ficheiro a meio (375 B) e a atómica **não escreve nada** (383 B =
+  original). Artefacto `bench/e18/edit/raw.json`; 3 métricas `q07.edit.*`.
+- **Custo:** o wire das tools cresceu **+162 B / +45 tokens** (5 013 → 5 175 B; medido no
+  `gate:prompt`). Não é parâmetro novo, mas **é** custo de prompt.
+- **Adoção:** aceite (critério cumprido e a atomicidade é uma correção, não uma preferência). O A/B de
+  **turnos** com o modelo continua a não ser executável localmente — o que se publica é o proxy de
+  chamadas, com a limitação escrita.
+- **Mapa:** E06-T03 · `check-surface` (11 tools intactas) · Q-08.
 
 #### Q-08 · Erro que ensina (negação acionável)
 - **Problema:** `Denied`/`Unavailable` dão `rule_id`+evidência, mas não "o que passaria";
@@ -507,7 +520,7 @@ W1 (método)      P-00→Q-09  harness + atribuição release  ── desbloquei
 W2 (correções)   Q-06, Q-10, S-01..S-05  (baixo risco, ganho imediato de qualidade)
 W2b (densidade)  Q-16 → Q-05 → Q-20 → Q-19 → Q-18        (frente F2b; §1.5)
 W3 (dados)       Q-01 → Q-02 → Q-03 → Q-04 → Q-05        (frente F2/F3/F9)
-W4 (superfície)  Q-07, Q-08                              (menos turnos)
+W4 (superfície)  ~~Q-07~~, Q-08                            (menos turnos)
 W5 (segurança)   Q-11, Q-12                              (F6/F7)
 W6 (estabilidade)Q-13, Q-14, Q-15, P-01, ~~P-02~~, P-03, P-04
 ```

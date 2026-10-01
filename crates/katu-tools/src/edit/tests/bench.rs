@@ -16,7 +16,7 @@ use katu_core::ports::{Fs, MemFs};
 use katu_policy::{ResolvedPath, ToolArgs, ToolName, ToolUse};
 use serde_json::json;
 
-use super::{EditFileTool, Replacement};
+use crate::edit::{EditFileTool, Replacement};
 
 /// Ficheiro canónico do refactor: 5 sítios com contexto distinto (cada âncora é única).
 pub(super) const FILE: &str = "\
@@ -108,8 +108,6 @@ fn call(fs: &MemFs, replacements: Vec<Replacement>) -> Result<Vec<u8>, Box<dyn s
 pub(super) fn measure() -> Result<String, Box<dyn std::error::Error>> {
     let hunks = replacements();
     let count = hunks.len();
-    let before_calls = count;
-    let after_calls = 1_usize;
     let before_bytes: usize = hunks
         .iter()
         .map(|replacement| call_bytes(PATH, std::slice::from_ref(replacement)))
@@ -117,61 +115,81 @@ pub(super) fn measure() -> Result<String, Box<dyn std::error::Error>> {
         .iter()
         .sum();
     let after_bytes = call_bytes(PATH, &hunks)?;
+    let (final_before, final_after) = both_shapes(&hunks)?;
+    let (partial, atomic) = on_failure(&hunks)?;
 
-    // Forma antiga: uma chamada por hunk (o ficheiro é lido e gravado N vezes).
-    let fs_before = MemFs::new();
-    fs_before.write_atomic(Path::new(PATH), FILE.as_bytes())?;
-    let mut final_before = Vec::new();
-    for replacement in &hunks {
-        final_before = call(&fs_before, vec![replacement.clone()])?;
-    }
-
-    // Forma nova: uma chamada com todos os hunks, atómica.
-    let fs_after = MemFs::new();
-    fs_after.write_atomic(Path::new(PATH), FILE.as_bytes())?;
-    let final_after = call(&fs_after, hunks.clone())?;
-
-    // Falha a meio: a 4.ª âncora não existe.
-    let mut broken = hunks;
-    broken.push(Replacement::new(
-        "fn six() {\n    let allowed",
-        "fn six() {\n    let ok",
-    ));
-    let fs_partial = MemFs::new();
-    fs_partial.write_atomic(Path::new(PATH), FILE.as_bytes())?;
-    let mut partial = Vec::new();
-    for replacement in &broken {
-        partial = call(&fs_partial, vec![replacement.clone()])?;
-    }
-    let fs_atomic = MemFs::new();
-    fs_atomic.write_atomic(Path::new(PATH), FILE.as_bytes())?;
-    let atomic = call(&fs_atomic, broken)?;
-
-    let calls_gain = 100.0 * (1.0 - ratio(after_calls, before_calls));
+    let calls_gain = 100.0 * (1.0 - ratio(1, count));
     let bytes_gain = 100.0 * (1.0 - ratio(after_bytes, before_bytes.max(1)));
     let value = json!({
         "schema": "katu.bench.edit.v1",
         "question": "atomic_multi_block_edit",
         "hunks": count,
-        "calls": { "before": before_calls, "after": after_calls, "gain_pct": calls_gain },
+        "calls": { "before": count, "after": 1, "gain_pct": calls_gain },
         "call_payload_bytes": {
             "before": before_bytes,
             "after": after_bytes,
             "gain_pct": bytes_gain,
         },
+        "log_events": { "before": count.saturating_mul(2), "after": 2 },
         "identical_final_state": final_before == final_after,
         "final_bytes": final_after.len(),
         "on_failure": {
             "before_partial_bytes": partial.len(),
             "after_partial_bytes": atomic.len(),
-            "before_left_the_file_half_edited": partial != FILE.as_bytes(),
+            "before_left_the_file_in_a_partial_state": partial != FILE.as_bytes(),
             "after_left_the_file_untouched": atomic == FILE.as_bytes(),
         },
         "criterion_pct": 20.0,
         "criterion_met": calls_gain >= 20.0,
-        "caveat": "o número de *turnos* depende do modelo (com B-02 já pode agrupar as N chamadas num passo): o que é determinístico é o nº de chamadas, os bytes do payload e a atomicidade; o A/B de turnos com o modelo não corre localmente (o modelo local não emite tool calls nativas)",
+        "caveat": "o número de *turnos* depende do modelo (com B-02 já pode agrupar as N chamadas num passo): o que é determinístico é o nº de chamadas, os bytes do payload, os eventos de log e a atomicidade; o A/B de turnos com o modelo não corre localmente (o modelo local não emite tool calls nativas)",
     });
     Ok(serde_json::to_string_pretty(&value)?)
+}
+
+/// Par `(antes, depois)`: o conteúdo do ficheiro em cada forma.
+type Pair = (Vec<u8>, Vec<u8>);
+
+/// Aplica o refactor pelas duas formas e devolve o conteúdo final de cada uma.
+fn both_shapes(hunks: &[Replacement]) -> Result<Pair, Box<dyn std::error::Error>> {
+    // Forma antiga: uma chamada por hunk (o ficheiro é lido e gravado N vezes).
+    let fs_before = MemFs::new();
+    fs_before.write_atomic(Path::new(PATH), FILE.as_bytes())?;
+    let mut final_before = Vec::new();
+    for replacement in hunks {
+        final_before = call(&fs_before, vec![replacement.clone()])?;
+    }
+    // Forma nova: uma chamada com todos os hunks, atómica.
+    let fs_after = MemFs::new();
+    fs_after.write_atomic(Path::new(PATH), FILE.as_bytes())?;
+    let final_after = call(&fs_after, hunks.to_vec())?;
+    Ok((final_before, final_after))
+}
+
+/// O pior caso: a **3.ª** âncora não existe (a forma antiga para com 2 de 5 aplicadas).
+fn on_failure(hunks: &[Replacement]) -> Result<Pair, Box<dyn std::error::Error>> {
+    let mut broken = hunks.to_vec();
+    let failing = Replacement::new(
+        "fn three() {\n    let allowed = policy.missing(&use_)?;",
+        "fn three() {\n    let ok = 1;",
+    );
+    if let Some(slot) = broken.get_mut(2) {
+        *slot = failing;
+    }
+    let fs_partial = MemFs::new();
+    fs_partial.write_atomic(Path::new(PATH), FILE.as_bytes())?;
+    let mut partial = Vec::new();
+    for replacement in &broken {
+        let next = call(&fs_partial, vec![replacement.clone()])?;
+        if next == partial {
+            // A chamada falhou (nada mudou): é aqui que a forma antiga **para**.
+            break;
+        }
+        partial = next;
+    }
+    let fs_atomic = MemFs::new();
+    fs_atomic.write_atomic(Path::new(PATH), FILE.as_bytes())?;
+    let atomic = call(&fs_atomic, broken)?;
+    Ok((partial, atomic))
 }
 
 /// A/B publicado: escreve o artefacto em `KATU_EDIT_OUT` (opt-in) e afirma as invariantes do plano.

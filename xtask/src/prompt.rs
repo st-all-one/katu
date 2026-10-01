@@ -26,12 +26,17 @@ use katu_core::skill::{SKILL_DIRS, Skill, catalog, discover, relative_path};
 use katu_tools::schema::{tool_defs, wire_json};
 use serde_json::{Value, json};
 
-/// Orçamento por parte, em bytes (teto; exceder falha o gate).
+/// Orçamento por parte, em bytes (teto; exceder **falha** o gate).
+///
+/// O teto das tools subiu de 5 100 para 5 200 B em Q-07: o par `old`/`new` passou a **lista** (edição
+/// multi-bloco atómica), o que custou **+162 B** (+45 tokens) de wire — o preço de ensinar a forma
+/// sem gastar um parâmetro novo. Antes desta correção o teto das tools era impresso mas **não**
+/// verificado (um teto que não trava não é um teto).
 const BUDGETS: [(&str, usize); 4] = [
     ("AGENTS.md", 1_300),
     ("catálogo de skills", 1_300),
     ("prime", 1_400),
-    ("tools (wire JSON)", 5_100),
+    ("tools (wire JSON)", 5_200),
 ];
 
 /// Orçamento do `system` (AGENTS.md + prime + catálogo de skills), em tokens estimados.
@@ -203,7 +208,7 @@ pub(crate) fn gate_prompt(args: &[String]) -> Result<(), String> {
             "  {name:24} {bytes:>6} B  {:>5} tok  (teto {budget} B)",
             tokens_from_bytes(bytes)
         );
-        if name != "tools (wire JSON)" && bytes > budget {
+        if bytes > budget {
             violations.push(format!("{name}: {bytes} B excede o teto de {budget} B"));
         }
     }

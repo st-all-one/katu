@@ -8,7 +8,7 @@
 | --- | --- |
 | `read` | Use when you need file contents or structure. Do not use for searching many files (use grep or find). |
 | `write` | Use when creating a brand-new file. Do not use for changing an existing file (use edit). |
-| `edit` | Use when changing an existing file with a unique anchor. Do not use for new files (use write). |
+| `edit` | Use when changing an existing file. Do not use for new files (use write). One call may carry several replacements, applied in order and all-or-nothing. |
 | `move` | Use when renaming or relocating a file. Do not use for copying contents between files. |
 | `trash` | Use when removing a file recoverably. Do not use for permanent deletion. |
 | `bash` | Use when running a program with known argv. Do not use for evaluating a shell string. |

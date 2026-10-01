@@ -1,5 +1,7 @@
 //! Testes do `edit` (Q-07): atomicidade, ordem, ambiguidade e as âncoras que ensinam.
 
+mod bench;
+
 use super::{EditFileTool, FailureKind, Replacement, apply, nearest_anchors};
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::Tool;

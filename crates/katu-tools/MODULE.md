@@ -16,7 +16,14 @@ sem veredicto; controlo em falta = recusa.
   A view `diff` compara com a versão anterior (`base`) via `diff::unified`.
 - `diff` (E06-T03): diff unificado determinístico (prefixo/sufixo comum, sem LCS O(n·m)).
 - `write_file` (E06-T03): só ficheiros **novos**; existentes via `edit`.
-- `edit` (E06-T03/OA16): patch otimista com `write_atomic_if` (CAS), `dry-run`, `Stale` recuperável.
+- `edit` (E06-T03/OA16, Q-07): patch otimista com `write_atomic_if` (CAS), `dry-run`, `Stale`
+  recuperável. Uma chamada leva **várias** substituições (`Replacement`), aplicadas **por ordem** e
+  **atomicamente** (`apply`): uma que não case exatamente uma vez ⇒ **nada** é gravado e o relatório
+  `edit.rejected` diz qual falhou, porquê e as **âncoras únicas mais próximas** (`nearest_anchors`,
+  Q-08) — o modelo recebe o que existe perto em vez de adivinhar. Medido em
+  [`bench/e18/edit`](../../bench/e18/edit/PROTOCOL.md): 5 chamadas → 1 (**−80 %**), payload do modelo
+  −19,9 % e, com a 3.ª substituição a falhar, a forma antiga deixava o ficheiro a meio (375 B) e a
+  atómica não escreve nada (383 B = original).
 - `exec` (E06-T04/T07): `ExecTool` com `argv`/`cwd` resolvidos, ambiente filtrado de segredos e
   timeout; devolve um `CommandRecord` (redigido + truncado pela cauda, `duration_ms`); outcomes
   ortogonais (`exit`/`signal`/`timed_out`); porta `Process` (fake `MemProcess`).

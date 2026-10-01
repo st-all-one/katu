@@ -1,0 +1,30 @@
+{
+  "call_payload_bytes": {
+    "after": 611,
+    "before": 763,
+    "gain_pct": 19.921363040629092
+  },
+  "calls": {
+    "after": 1,
+    "before": 5,
+    "gain_pct": 80.0
+  },
+  "caveat": "o número de *turnos* depende do modelo (com B-02 já pode agrupar as N chamadas num passo): o que é determinístico é o nº de chamadas, os bytes do payload, os eventos de log e a atomicidade; o A/B de turnos com o modelo não corre localmente (o modelo local não emite tool calls nativas)",
+  "criterion_met": true,
+  "criterion_pct": 20.0,
+  "final_bytes": 363,
+  "hunks": 5,
+  "identical_final_state": true,
+  "log_events": {
+    "after": 2,
+    "before": 10
+  },
+  "on_failure": {
+    "after_left_the_file_untouched": true,
+    "after_partial_bytes": 383,
+    "before_left_the_file_in_a_partial_state": true,
+    "before_partial_bytes": 375
+  },
+  "question": "atomic_multi_block_edit",
+  "schema": "katu.bench.edit.v1"
+}

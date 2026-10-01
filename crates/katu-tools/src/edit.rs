@@ -27,8 +27,6 @@ use crate::diff::{Diff, unified};
 use crate::lang::to_i64;
 
 #[cfg(test)]
-mod bench;
-#[cfg(test)]
 mod tests;
 
 /// Trechos mínimos para uma âncora candidata ser útil (abaixo disto é ruído).

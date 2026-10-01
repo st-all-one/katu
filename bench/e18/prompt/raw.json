@@ -4,14 +4,14 @@
     "skills_bytes": 4636,
     "system_bytes": 7566,
     "system_tokens": 2084,
-    "total_tokens": 3465
+    "total_tokens": 3509
   },
   "bytes_per_token_milli": 3631,
   "gains": {
     "agents": 0.2906,
     "skills": 0.7388,
     "system": 0.5137,
-    "total": 0.309
+    "total": 0.3051
   },
   "parts": [
     {
@@ -30,18 +30,18 @@
       "tokens": 370
     },
     {
-      "bytes": 5013,
+      "bytes": 5175,
       "name": "tools (wire JSON)",
-      "tokens": 1381
+      "tokens": 1426
     }
   ],
   "probes": {
-    "tools_core_bytes": 4310,
-    "tools_core_gain": 0.1402
+    "tools_core_bytes": 4472,
+    "tools_core_gain": 0.1358
   },
   "protocol": "bench/e18/prompt/PROTOCOL.md",
   "system_bytes": 3679,
   "system_tokens": 1014,
-  "total_bytes": 8692,
-  "total_tokens": 2394
+  "total_bytes": 8854,
+  "total_tokens": 2439
 }
