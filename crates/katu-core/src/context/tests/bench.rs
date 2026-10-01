@@ -11,6 +11,10 @@
 //! --nocapture ab_context_selection_by_information`; o artefacto é publicado e `bench/published.toml`
 //! cita-o (DF5). `check-diag` proíbe `println!` em `crates/`: o número sai para **ficheiro**.
 
+mod rate_distortion;
+
+use rate_distortion::{distortion, intra_similarity, probe_swaps, rate, tokens_total};
+
 use crate::context::{
     AssembleOptions, CompactionMode, ContextBudget, Digest, PrimeMode, SelectionParams,
     SelectionPolicy, Stats, assemble_all, chosen_units, digest, dropped_messages, kept_messages,
@@ -42,6 +46,12 @@ pub(super) struct Measurement {
     information: u64,
     /// `I_ret` por token, em milésimos.
     efficiency: u64,
+    /// Distorção `D = 1 − I_ret(S)/I_ret(U)` em milésimos (A1: fração de informação perdida).
+    pub(super) distortion: u64,
+    /// Similaridade de Jaccard média **intra-conjunto** das unidades escolhidas, em milésimos (A2).
+    pub(super) mean_similarity: u64,
+    /// Similaridade de Jaccard **máxima** entre duas unidades escolhidas, em milésimos (A2).
+    pub(super) max_similarity: u64,
 }
 
 /// Termos de um conjunto de mensagens (a informação **retida**).
@@ -78,12 +88,16 @@ pub(super) fn measure_policy(events: &[Event], policy: SelectionPolicy) -> Measu
         .map(|unit| unit.candidate.tokens)
         .sum();
     let information = stats.mass_milli(&retained_terms(&kept));
+    let (mean_similarity, max_similarity) = intra_similarity(&all, &chosen);
     Measurement {
         units: chosen.len(),
         tokens,
         dropped: dropped_messages(&messages, &all, &chosen).len(),
         information,
         efficiency: efficiency(information, tokens),
+        distortion: distortion(stats.mass_milli(&retained_terms(&messages)), information),
+        mean_similarity,
+        max_similarity,
     }
 }
 
@@ -245,6 +259,7 @@ fn measure() -> Result<String, Box<dyn std::error::Error>> {
     let utility = measure_policy(&events, SelectionPolicy::Utility);
     let control_suffix = measure_policy(&uniform_scenario(), SelectionPolicy::Suffix);
     let control_utility = measure_policy(&uniform_scenario(), SelectionPolicy::Utility);
+    let probe = probe_swaps(&events);
     let pair = digest_pair(&events)?;
     let (chronological, by_utility) = (&pair.chronological, &pair.by_utility);
     let prefix_len = pair.prefix;
@@ -280,6 +295,9 @@ fn measure() -> Result<String, Box<dyn std::error::Error>> {
             "dropped_messages": suffix.dropped,
             "information_milli": suffix.information,
             "efficiency_milli_per_token": suffix.efficiency,
+            "distortion_milli": suffix.distortion,
+            "mean_similarity_milli": suffix.mean_similarity,
+            "max_similarity_milli": suffix.max_similarity,
         },
         "utility": {
             "units": utility.units,
@@ -287,6 +305,33 @@ fn measure() -> Result<String, Box<dyn std::error::Error>> {
             "dropped_messages": utility.dropped,
             "information_milli": utility.information,
             "efficiency_milli_per_token": utility.efficiency,
+            "distortion_milli": utility.distortion,
+            "mean_similarity_milli": utility.mean_similarity,
+            "max_similarity_milli": utility.max_similarity,
+        },
+        "a1_rate_distortion": {
+            "definition": "R = tokens(S)/tokens(U); D = 1 - I_ret(S)/I_ret(U); D0 = distorcao do historico (sufixo) na mesma taxa",
+            "rate_milli_suffix": rate(suffix.tokens, tokens_total(&events)),
+            "rate_milli_utility": rate(utility.tokens, tokens_total(&events)),
+            "d0_milli": suffix.distortion,
+            "d_milli": utility.distortion,
+            "criterion_met": utility.distortion <= suffix.distortion,
+        },
+        "a2_diversity": {
+            "definition": "Jaccard intra-conjunto das unidades escolhidas (media e maximo); sem DPP",
+            "sim_max_milli": SelectionParams::default().sim_max_milli,
+            "max_utility_milli": utility.max_similarity,
+            "max_suffix_milli": suffix.max_similarity,
+            "mean_utility_milli": utility.mean_similarity,
+            "mean_suffix_milli": suffix.mean_similarity,
+            "criterion_met": utility.max_similarity
+                <= u64::from(SelectionParams::default().sim_max_milli),
+        },
+        "a2_dpp_decision": {
+            "definition": "DPP (determinantal) maximiza log-det; a 1a ordem e' penalizar redundancia",
+            "best_swap_gain_milli": probe.gain_milli,
+            "improving_swaps": probe.improving,
+            "decision": "rejeitado: o MMR ja resolve a diversidade (media 17 per-mil, maximo 500 per-mil <= sim_max 700 per-mil; o historico chega a 1000 per-mil). As trocas que sobram sao de UTILIDADE, nao de redundancia (nao ha par redundante para o determinante penalizar) - o que as fecharia e uma busca local do greedy, nao um DPP. Reavaliar se, com log real, a similaridade media passar de sim_max/2",
         },
         "selection_gain_pct": selection_gain,
         "control_uniform": {

@@ -1,7 +1,7 @@
 use super::{
-    COMPACTION_SCHEMA_VERSION, CompactionMode, ContextBudget, PRIME_VERSION, PrimeMode, assemble,
-    assemble_with_prime, compact, message_id, prime, prime_for, prime_long, prime_with_catalog,
-    recover, tokens_from_bytes,
+    COMPACTION_SCHEMA_VERSION, CompactionMode, ContextBudget, PRIME_VERSION, PrimeMode,
+    SelectionParams, SelectionPolicy, assemble, assemble_with_prime, compact, message_id, prime,
+    prime_for, prime_long, prime_with_catalog, recover, tokens_from_bytes,
 };
 
 mod bench;
@@ -313,4 +313,50 @@ fn prime_teaches_the_taint_contract() {
             "o prime {name} tem de ensinar que o dado não é instrução: {rendered}"
         );
     }
+}
+
+// -- A1/A2: distorção e diversidade (W10, Anexo A) --------------------------------------------
+
+/// A1: à mesma taxa, a política de utilidade **não distorce mais** que a histórica.
+///
+/// `D0` é a distorção do sufixo no mesmo orçamento — o contrato é `D ≤ D0`, não "gain > 20 %".
+#[test]
+fn the_utility_policy_never_distorts_more_than_the_historical_one()
+-> Result<(), Box<dyn std::error::Error>> {
+    let events = bench::scenario()?;
+    let suffix = bench::measure_policy(&events, SelectionPolicy::Suffix);
+    let utility = bench::measure_policy(&events, SelectionPolicy::Utility);
+    assert!(
+        utility.distortion <= suffix.distortion,
+        "D(utilidade) = {} > D0(sufixo) = {}",
+        utility.distortion,
+        suffix.distortion
+    );
+    assert_eq!(
+        utility.distortion, 0,
+        "no cenário, a seleção não perde informação"
+    );
+    Ok(())
+}
+
+/// A2: nenhum par escolhido passa o teto de similaridade, e a média é menor que a do histórico.
+#[test]
+fn no_chosen_pair_exceeds_the_similarity_ceiling() -> Result<(), Box<dyn std::error::Error>> {
+    let events = bench::scenario()?;
+    let params = SelectionParams::default();
+    let utility = bench::measure_policy(&events, SelectionPolicy::Utility);
+    let suffix = bench::measure_policy(&events, SelectionPolicy::Suffix);
+    assert!(
+        utility.max_similarity <= u64::from(params.sim_max_milli),
+        "par com {}‰ acima do teto {}‰",
+        utility.max_similarity,
+        params.sim_max_milli
+    );
+    assert!(
+        utility.mean_similarity < suffix.mean_similarity,
+        "a seleção não é mais diversa que o histórico: {} >= {}",
+        utility.mean_similarity,
+        suffix.mean_similarity
+    );
+    Ok(())
 }

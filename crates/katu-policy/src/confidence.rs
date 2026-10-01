@@ -10,8 +10,12 @@
 //! O limiar é **dado** ([`Threshold::DEFAULT`]), nunca derivado dos dados: nada aqui escala política
 //! ou modelo sozinho (DF8). A conta é determinística (IEEE-754, sem RNG, sem relógio).
 
+mod fdr;
+
 use crate::decision::Reason;
 use crate::rule::RuleId;
+
+pub use fdr::{MultipleTests, P_FLOOR_MICRO, P_MICRO_SCALE, benjamini_hochberg, control_fdr};
 
 /// Contagem de ensaios de Bernoulli com prior uniforme: posterior `Beta(1 + s, 1 + n − s)`.
 ///
@@ -30,6 +34,18 @@ impl Trials {
         Self {
             successes: 0,
             trials: 0,
+        }
+    }
+
+    /// Acumulador a partir das contagens (retoma de um resumo serializado).
+    ///
+    /// `successes > trials` é normalizado para `trials` (contagem defensiva: o somatório nunca
+    /// produz esta situação).
+    #[must_use]
+    pub fn from_parts(successes: u32, trials: u32) -> Self {
+        Self {
+            successes: successes.min(trials),
+            trials,
         }
     }
 
@@ -114,6 +130,8 @@ pub struct Threshold {
     pub n_min: u32,
     /// Quantil normal unilateral em milésimos (`1 645` ≈ 95 %).
     pub z_milli: u32,
+    /// FDR alvo da família de promoções, em milésimos (C5: `50` = 5 %).
+    pub q_milli: u32,
 }
 
 impl Threshold {
@@ -126,6 +144,7 @@ impl Threshold {
         theta_milli: 900,
         n_min: 5,
         z_milli: 1_645,
+        q_milli: 50,
     };
 }
 

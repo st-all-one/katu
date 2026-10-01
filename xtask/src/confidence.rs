@@ -20,10 +20,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use katu_core::kernel::{
-    Event, LOG_SCHEMA_VERSION, enforced_verdicts, read_records, rule_trials, tool_trials,
+    Event, LOG_SCHEMA_VERSION, enforced_verdicts_report, read_records, rule_trials, tool_trials,
 };
 use katu_core::ports::{Fs as _, MemFs};
-use katu_policy::{Calibration, RuleSet, Threshold, ToolName, Verdict, calibrate};
+use katu_policy::{Calibration, MultipleTests, RuleSet, Threshold, ToolName, Verdict, calibrate};
 
 use crate::walk::collect_rule_files;
 
@@ -54,10 +54,18 @@ pub(crate) fn policy_confidence(args: &[String]) -> Result<(), String> {
     for file in &files {
         events.extend(events_of(file)?);
     }
-    let verdicts = enforced_verdicts(&events, &rules, &Threshold::DEFAULT);
+    let (verdicts, fdr) = enforced_verdicts_report(&events, &rules, &Threshold::DEFAULT);
     let trials = rule_trials(&events);
     let contradictions = print_rules(&verdicts);
-    print_summary(&files, &events, &trials, &verdicts, &events_tools(&events));
+    let summary = Summary {
+        files: &files,
+        events: &events,
+        trials: &trials,
+        verdicts: &verdicts,
+        tools: &events_tools(&events),
+        fdr: &fdr,
+    };
+    print_summary(&summary);
     print_calibration(&calibrate(&verdicts));
     if contradictions.is_empty() {
         Ok(())
@@ -93,14 +101,26 @@ fn print_rules(verdicts: &[Verdict]) -> Vec<String> {
     contradictions
 }
 
-/// Imprime o resumo (regras, logs, eventos e as tools mais chamadas).
-fn print_summary(
-    files: &[PathBuf],
-    events: &[Event],
-    trials: &std::collections::BTreeMap<katu_policy::RuleId, katu_policy::Trials>,
-    verdicts: &[Verdict],
-    tools: &[(ToolName, u32, u32)],
-) {
+/// Entradas do resumo (agregadas numa struct para não passar seis argumentos).
+struct Summary<'a> {
+    files: &'a [PathBuf],
+    events: &'a [Event],
+    trials: &'a std::collections::BTreeMap<katu_policy::RuleId, katu_policy::Trials>,
+    verdicts: &'a [Verdict],
+    tools: &'a [(ToolName, u32, u32)],
+    fdr: &'a MultipleTests,
+}
+
+/// Imprime o resumo (regras, logs, eventos, FDR e as tools mais chamadas).
+fn print_summary(summary: &Summary<'_>) {
+    let Summary {
+        files,
+        events,
+        trials,
+        verdicts,
+        tools,
+        fdr,
+    } = summary;
     let unmeasured = verdicts
         .iter()
         .filter(|verdict| verdict.confidence.as_str() == "unmeasured")
@@ -112,7 +132,13 @@ fn print_summary(
     println!(
         "  {rules} regras Enforced, {logs} logs, {total} eventos, {fired} regras com ensaios, {unmeasured} sem observações"
     );
-    for (name, calls, ok) in tools {
+    println!(
+        "  FDR (BH, C5): {tested} testadas, {rejected} promoções sobrevivem a q = {q}‰",
+        tested = fdr.tested,
+        rejected = fdr.rejected,
+        q = fdr.q_milli
+    );
+    for (name, calls, ok) in *tools {
         println!("  tool {:24} n = {calls:>4}  ok = {ok:>4}", name.as_str());
     }
 }

@@ -1,0 +1,173 @@
+{
+  "caveat": "amostras SINTETICAS (SplitMix64): mede a estatistica do conformal e o peso do pressuposto de troca, nao o modelo nem o log real",
+  "criterion": "no regime TROCÁVEL, cobertura empirica >= nivel nominal em todas as linhas publicadas",
+  "criterion_met": false,
+  "decision": "REJEITADO para adocao: com residuos correlacionados (forecast rolante) a cobertura mergulha abaixo do nominal, mesmo no regime trocavel; o conformal so entra quando o log der uma base de calibracao NAO correlacionada (n >= 19 por regra, hoje 0). A formula mora neste bench, nao em src/: item rejeitado deixa o numero, nao uma API publica sem consumidores",
+  "exchangeable_rows": 8,
+  "forecast": "media dos 10 anteriores (o residual tem de ser previsto, nao nulo por construcao)",
+  "question": "a cobertura empirica do split conformal atinge o nivel nominal, e o que a faz falhar",
+  "rows": [
+    {
+      "calibration_n": 19,
+      "criterion_met": true,
+      "empirical_coverage_milli": 910,
+      "level_milli": 800,
+      "radius_milli": 480,
+      "regime": "trocavel"
+    },
+    {
+      "calibration_n": 19,
+      "criterion_met": true,
+      "empirical_coverage_milli": 898,
+      "level_milli": 800,
+      "radius_milli": 480,
+      "regime": "nao_trocavel"
+    },
+    {
+      "calibration_n": 49,
+      "criterion_met": true,
+      "empirical_coverage_milli": 837,
+      "level_milli": 800,
+      "radius_milli": 434,
+      "regime": "trocavel"
+    },
+    {
+      "calibration_n": 49,
+      "criterion_met": true,
+      "empirical_coverage_milli": 841,
+      "level_milli": 800,
+      "radius_milli": 434,
+      "regime": "nao_trocavel"
+    },
+    {
+      "calibration_n": 99,
+      "criterion_met": true,
+      "empirical_coverage_milli": 872,
+      "level_milli": 800,
+      "radius_milli": 449,
+      "regime": "trocavel"
+    },
+    {
+      "calibration_n": 99,
+      "criterion_met": true,
+      "empirical_coverage_milli": 864,
+      "level_milli": 800,
+      "radius_milli": 449,
+      "regime": "nao_trocavel"
+    },
+    {
+      "calibration_n": 199,
+      "criterion_met": true,
+      "empirical_coverage_milli": 852,
+      "level_milli": 800,
+      "radius_milli": 439,
+      "regime": "trocavel"
+    },
+    {
+      "calibration_n": 199,
+      "criterion_met": true,
+      "empirical_coverage_milli": 848,
+      "level_milli": 800,
+      "radius_milli": 439,
+      "regime": "nao_trocavel"
+    },
+    {
+      "calibration_n": 19,
+      "level_milli": 950,
+      "published": false,
+      "reason": "k > n: sem intervalo publicavel (fail-closed)",
+      "regime": "trocavel"
+    },
+    {
+      "calibration_n": 49,
+      "criterion_met": false,
+      "empirical_coverage_milli": 913,
+      "level_milli": 950,
+      "radius_milli": 489,
+      "regime": "trocavel"
+    },
+    {
+      "calibration_n": 49,
+      "criterion_met": false,
+      "empirical_coverage_milli": 908,
+      "level_milli": 950,
+      "radius_milli": 489,
+      "regime": "nao_trocavel"
+    },
+    {
+      "calibration_n": 99,
+      "criterion_met": false,
+      "empirical_coverage_milli": 946,
+      "level_milli": 950,
+      "radius_milli": 523,
+      "regime": "trocavel"
+    },
+    {
+      "calibration_n": 99,
+      "criterion_met": false,
+      "empirical_coverage_milli": 947,
+      "level_milli": 950,
+      "radius_milli": 523,
+      "regime": "nao_trocavel"
+    },
+    {
+      "calibration_n": 199,
+      "criterion_met": false,
+      "empirical_coverage_milli": 947,
+      "level_milli": 950,
+      "radius_milli": 523,
+      "regime": "trocavel"
+    },
+    {
+      "calibration_n": 199,
+      "criterion_met": false,
+      "empirical_coverage_milli": 947,
+      "level_milli": 950,
+      "radius_milli": 523,
+      "regime": "nao_trocavel"
+    },
+    {
+      "calibration_n": 19,
+      "level_milli": 990,
+      "published": false,
+      "reason": "k > n: sem intervalo publicavel (fail-closed)",
+      "regime": "trocavel"
+    },
+    {
+      "calibration_n": 49,
+      "level_milli": 990,
+      "published": false,
+      "reason": "k > n: sem intervalo publicavel (fail-closed)",
+      "regime": "trocavel"
+    },
+    {
+      "calibration_n": 99,
+      "level_milli": 990,
+      "published": false,
+      "reason": "k > n: sem intervalo publicavel (fail-closed)",
+      "regime": "trocavel"
+    },
+    {
+      "calibration_n": 199,
+      "criterion_met": true,
+      "empirical_coverage_milli": 995,
+      "level_milli": 990,
+      "radius_milli": 643,
+      "regime": "trocavel"
+    },
+    {
+      "calibration_n": 199,
+      "criterion_met": true,
+      "empirical_coverage_milli": 995,
+      "level_milli": 990,
+      "radius_milli": 643,
+      "regime": "nao_trocavel"
+    }
+  ],
+  "rows_met_in_exchangeable_regime": 5,
+  "rule": "k = ceil((n+1) * nivel); q = k-esimo menor residual de calibracao; cobre se |erro| <= q",
+  "schema": "katu.bench.conformal.v1",
+  "test_sample": 2000,
+  "worst_slip_when_exchangeable_milli": 37,
+  "worst_slip_when_not_exchangeable_milli": 42
+}

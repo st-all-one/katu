@@ -15,7 +15,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use katu_policy::{RuleCategory, RuleId, RuleSet, Threshold, ToolName, Trials, Verdict, verdict};
+use katu_policy::{
+    MultipleTests, RuleCategory, RuleId, RuleSet, Threshold, ToolName, Trials, Verdict,
+    control_fdr, verdict,
+};
 
 use super::event::{CallId, Event};
 use crate::error::ToolOutcome;
@@ -122,8 +125,23 @@ pub fn tool_trials(events: &[Event]) -> BTreeMap<ToolName, Trials> {
 pub fn enforced_verdicts(events: &[Event], rules: &RuleSet, threshold: &Threshold) -> Vec<Verdict> {
     let _span = crate::trace_fn!("kernel::confidence::enforced_verdicts");
 
+    enforced_verdicts_report(events, rules, threshold).0
+}
+
+/// Os veredictos **e** o resumo do controlo de múltiplas comparações (C5).
+///
+/// O BH entra aqui, sobre a família de regras `Enforced` do `RuleSet`: é o único sítio onde a
+/// família existe. `enforced_verdicts` é a forma curta (descarta o resumo).
+#[must_use]
+pub fn enforced_verdicts_report(
+    events: &[Event],
+    rules: &RuleSet,
+    threshold: &Threshold,
+) -> (Vec<Verdict>, MultipleTests) {
+    let _span = crate::trace_fn!("kernel::confidence::enforced_verdicts_report");
+
     let trials = rule_trials(events);
-    rules
+    let mut verdicts: Vec<Verdict> = rules
         .rules
         .iter()
         .filter(|rule| rule.category == RuleCategory::Enforced)
@@ -131,7 +149,9 @@ pub fn enforced_verdicts(events: &[Event], rules: &RuleSet, threshold: &Threshol
             let observed = trials.get(&rule.id).copied().unwrap_or_default();
             verdict(&rule.id, observed, threshold)
         })
-        .collect()
+        .collect();
+    let control = control_fdr(&mut verdicts, threshold);
+    (verdicts, control)
 }
 
 #[cfg(test)]

@@ -1,4 +1,27 @@
 {
+  "a1_rate_distortion": {
+    "criterion_met": true,
+    "d0_milli": 356,
+    "d_milli": 0,
+    "definition": "R = tokens(S)/tokens(U); D = 1 - I_ret(S)/I_ret(U); D0 = distorcao do historico (sufixo) na mesma taxa",
+    "rate_milli_suffix": 804,
+    "rate_milli_utility": 109
+  },
+  "a2_diversity": {
+    "criterion_met": true,
+    "definition": "Jaccard intra-conjunto das unidades escolhidas (media e maximo); sem DPP",
+    "max_suffix_milli": 1000,
+    "max_utility_milli": 500,
+    "mean_suffix_milli": 624,
+    "mean_utility_milli": 17,
+    "sim_max_milli": 700
+  },
+  "a2_dpp_decision": {
+    "best_swap_gain_milli": 12584,
+    "decision": "rejeitado: o MMR ja resolve a diversidade (media 17 per-mil, maximo 500 per-mil <= sim_max 700 per-mil; o historico chega a 1000 per-mil). As trocas que sobram sao de UTILIDADE, nao de redundancia (nao ha par redundante para o determinante penalizar) - o que as fecharia e uma busca local do greedy, nao um DPP. Reavaliar se, com log real, a similaridade media passar de sim_max/2",
+    "definition": "DPP (determinantal) maximiza log-det; a 1a ordem e' penalizar redundancia",
+    "improving_swaps": 81
+  },
   "caveat": "I_ret (idf) é proxy de informação, não sucesso de tarefa: adotar o default exige A/B com o modelo",
   "compact_applied": true,
   "control_uniform": {
@@ -31,18 +54,24 @@
   "schema": "katu.bench.select.v1",
   "selection_gain_pct": 1037.92,
   "suffix": {
+    "distortion_milli": 356,
     "dropped_messages": 22,
     "efficiency_milli_per_token": 93997,
     "information_milli": 81214,
+    "max_similarity_milli": 1000,
+    "mean_similarity_milli": 624,
     "tokens": 864,
     "units": 70
   },
   "summary_max": 220,
   "units": 89,
   "utility": {
+    "distortion_milli": 0,
     "dropped_messages": 90,
     "efficiency_milli_per_token": 1069610,
     "information_milli": 126214,
+    "max_similarity_milli": 500,
+    "mean_similarity_milli": 17,
     "tokens": 118,
     "units": 8
   }

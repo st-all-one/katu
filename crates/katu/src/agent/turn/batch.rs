@@ -23,7 +23,17 @@ use crate::agent::{ActivitySink, AgentError, CallOutcome, Ports, router};
 use crate::runtime::Runtime;
 
 /// Teto de calls `Shared` num lote paralelo (absorvido do PTC: pool limitado, ≤ 10).
+///
+/// O valor **8** é um limite de **custo**, não uma afirmação de paralelismo. A curva USL do
+/// mecanismo `spawn`/`join` ([`usl`], [`bench/e18/pool`](../../../../../../bench/e18/pool/PROTOCOL.md))
+/// **não** o justifica nem o contraria: na máquina onde foi medida, `available_parallelism` era 16
+/// e mesmo assim 2 threads não deram 1,5× (`scaling_suspect`), logo o número descreve o
+/// ambiente, não o mecanismo. Para mexer neste valor é preciso repetir o A/B numa máquina que
+/// escale — ver a receita no `PROTOCOL.md`.
 pub(super) const MAX_PARALLEL_CALLS: usize = 8;
+
+#[cfg(test)]
+mod usl;
 
 /// Contador de lotes efetivamente corridos em paralelo (verificação de teste; B-01).
 #[cfg(test)]

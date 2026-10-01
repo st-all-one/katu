@@ -1,5 +1,7 @@
 //! Testes do resumo estatístico (E18-T10/W7).
 
+mod conformal_bench;
+
 use super::{MIN_SAMPLES, Summary, TooFewSamples, percentile};
 
 #[test]

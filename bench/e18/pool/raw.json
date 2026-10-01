@@ -1,0 +1,56 @@
+{
+  "available_parallelism": 16,
+  "caveat": "mede o mecanismo spawn/join com carga sintetica calibrada, nao o dispatch real (avaliacao de politica de microssegundos)",
+  "ceiling_in_production": 8,
+  "criterion": "o teto de producao (8) tem de estar medido na curva",
+  "criterion_met": true,
+  "curve": [
+    {
+      "efficiency_milli": 970,
+      "speedup_milli": 970,
+      "threads": 1,
+      "wall_us": 19252
+    },
+    {
+      "efficiency_milli": 498,
+      "speedup_milli": 996,
+      "threads": 2,
+      "wall_us": 18755
+    },
+    {
+      "efficiency_milli": 314,
+      "speedup_milli": 943,
+      "threads": 3,
+      "wall_us": 19811
+    },
+    {
+      "efficiency_milli": 225,
+      "speedup_milli": 898,
+      "threads": 4,
+      "wall_us": 20801
+    },
+    {
+      "efficiency_milli": 145,
+      "speedup_milli": 870,
+      "threads": 6,
+      "wall_us": 21479
+    },
+    {
+      "efficiency_milli": 101,
+      "speedup_milli": 806,
+      "threads": 8,
+      "wall_us": 23178
+    }
+  ],
+  "decision": "",
+  "environment": "a maquina nao escala (2 threads nao dao 1,5x): o numero mede o ambiente, nao o pool do katu",
+  "question": "quantas threads o pool de lote aproveita (curva USL)",
+  "repeats": 7,
+  "rule": "S(T) = T_wall(1)/T_wall(T); E(T) = S(T)/T; saturacao = primeiro T com E < 500 per-mil",
+  "saturating_threads": 2,
+  "scaling_suspect": true,
+  "schema": "katu.bench.pool.v1",
+  "speedup_at_2_threads_milli": 996,
+  "tasks": 64,
+  "work_per_task": 200000
+}

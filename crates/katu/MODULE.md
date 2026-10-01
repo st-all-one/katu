@@ -73,6 +73,11 @@ todo o código impuro confinado.
   leitura sem progresso corta o turno no 5.º passo com `AgentError::LoopDetected` (categoria
   `conflict`, exit 5), emite `agent.loop` e **fecha** o turno. O turno fecha também nos outros
   erros (`TooManySteps`): um `TurnStart` sem `TurnEnd` deixaria a retomada inconsistente.
+- **Lote paralelo** (B-01, `src/agent/turn/batch.rs`): as calls `Shared` de um lote correm em
+  `std::thread::scope` com spawn **eager** (encadear spawn/join serializa o lote: medido 547 ms
+  contra ~107 ms) e são cometidas na ordem do modelo; o teto é `MAX_PARALLEL_CALLS = 8`, um limite
+  de **custo** (PTC), não de paralelismo. A curva USL do mecanismo está em
+  [`bench/e18/pool`](../../bench/e18/pool/PROTOCOL.md) (E1).
 - **Gate de VOI** (A3/W8-4, `src/agent/turn/voi.rs`): não repete uma só-leitura já satisfeita no
   turno (`VOI = 0 < custo`) e **nunca** salta o irreconstruível; a mutação invalida a informação
   cacheada. **Opt-in** (`behavior.tool_voi`, default **off** até A/B com o modelo — precedente

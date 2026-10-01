@@ -43,7 +43,8 @@ função, o log é a fonte da verdade.
     reconstrução `from_events`; teto por ferramenta antes do global. Ligado ao `Session`
     (`open_with_cost`/`apply_at` com o relógio de `CallContext`).
   - `kernel::bus` — `EventBus` (observadores + waterfall com a regra "tem de chamar `next`").
-  - `kernel::confidence` (Q-11/F6) — `rule_trials`/`tool_trials`/`enforced_verdicts`: a ponte entre
+  - `kernel::confidence` (Q-11/F6, C5) — `rule_trials`/`tool_trials`/`enforced_verdicts` (e
+    `enforced_verdicts_report`, que traz o resumo do controlo FDR da família): a ponte entre
     o log e a estatística de `katu-policy`. O ensaio de uma regra é *recusou ⇒ não correu* (a
     chamada recusada não pode aparecer executada sob o mesmo `CallId`); por tool mede-se o contrato
     de conclusão (uma chamada que expira conta contra a tool). Só regras **declaradas** `Enforced`
@@ -151,6 +152,13 @@ função, o log é a fonte da verdade.
   **−62,0 %** em dev e **−33,3 %** em release (P-02).
 - Envelope [`report`](src/report.rs) (DF12/E06-T12): `ToolReport`/`Page`/`Cost`, ids
   content-addressed e hash; renderiza em TOON ou JSON. Transportado por `ToolOutput`.
+- Estatística [`stats`](src/stats.rs): resumo determinístico (média, percentis, MAD/IC robusto — C7).
+- **C2 (conformal) não vive aqui**: foi medido e **rejeitado**, logo não há `stats::conformal` em
+  produção. A fórmula está no bench que produziu o número
+  ([`stats/tests/conformal_bench.rs`](src/stats/tests/conformal_bench.rs)) e a decisão em
+  [`bench/e18/conformal`](../../bench/e18/conformal/PROTOCOL.md): com resíduos correlacionados a
+  cobertura cai até 17 ‰ abaixo do nominal, e o log real não tem base (`n_cal ≥ 19` por regra).
+  *Regra:* item rejeitado deixa o número, não uma API pública sem consumidores.
 - *Taint*/*spotlighting* do output de tool [`taint`](src/taint.rs) (D1): o delta *model-visible*
   viaja entre `<katu:untrusted kind=… bytes=…>` e `</katu:untrusted>` — dado **não confiável**,
   nunca instrução. `escape` neutraliza (`<` → `[`) qualquer `<` que inicia `katu:`/`/katu:` **sem

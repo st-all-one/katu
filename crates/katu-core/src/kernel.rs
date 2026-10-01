@@ -26,7 +26,7 @@ pub(crate) mod step;
 pub use budget::{Budget, BudgetCap, BudgetGate, BudgetRefusal, Charge};
 pub use bus::{EventBus, HandlerError, HandlerResult, Middleware, Next, Observer};
 pub use checkpoint::{CHECKPOINT_SCHEMA_VERSION, Checkpoint, CheckpointError, checkpoint_path};
-pub use confidence::{enforced_verdicts, rule_trials, tool_trials};
+pub use confidence::{enforced_verdicts, enforced_verdicts_report, rule_trials, tool_trials};
 pub use control::{Control, ControlError, ControlState};
 pub use cost::{
     CostCaps, CostCharge, CostGovernor, CostLayer, CostRefusal, KillSwitch, Reenable,

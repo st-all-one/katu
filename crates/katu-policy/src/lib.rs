@@ -53,8 +53,8 @@ pub use approval::{capability_for, capability_for_request};
 pub use argv::{ArgvInspection, inspect};
 pub use audit::{Activity, AuditIssue, AuditReport, ExampleCoverage, RuleSummary, audit};
 pub use confidence::{
-    CALIBRATION_BINS, Calibration, CalibrationBin, Confidence, Threshold, Trials, Verdict,
-    calibrate, verdict,
+    CALIBRATION_BINS, Calibration, CalibrationBin, Confidence, MultipleTests, P_FLOOR_MICRO,
+    P_MICRO_SCALE, Threshold, Trials, Verdict, benjamini_hochberg, calibrate, control_fdr, verdict,
 };
 pub use decision::{ApprovalRequest, ControlId, Decision, Evidence, Reason};
 pub use error::PolicyError;

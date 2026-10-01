@@ -13,4 +13,4 @@ rules = 8
 adrs = 26
 diag_events = 116  # +1 `taint.spotlight` (D1)
 xtask_commands = 31
-bench_artifacts = 26  # +1 `bench/e18/taint/` (D1)
+bench_artifacts = 28  # +1 `bench/e18/taint/` (D1) · +1 `bench/e18/pool/` (E1) · +1 `bench/e18/conformal/` (C2)

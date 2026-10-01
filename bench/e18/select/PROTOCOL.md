@@ -37,6 +37,58 @@ pelo que uma regressão aparece no `make check` sem correr o gate manual.
 num cenário com enchimento repetitivo; o número que importa para a adoção é o de uma conversa real, e
 esse exige o modelo.
 
+## A1/A2 (W10) — formalizar o proxy: distorção `D ≤ D0` e diversidade medida
+
+O A/B de Q-02b mede **eficiência** (`I_ret` por token). A1 formaliza-o como uma curva
+taxa–distorção, e A2 mede a diversidade com o mesmo rigor — o que falta ao primeiro é o
+**contrato**, não o número.
+
+**Fórmula (A1).** `U` = histórico inteiro, `S` = selecionado:
+
+```
+R(S) = tokens(S) / tokens(U)          taxa
+D(S) = 1 − I_ret(S) / I_ret(U)        distorção (fração de informação perdida)
+D0    = D(sufixo) na mesma taxa       contrato: D(utilidade) ≤ D0
+```
+
+`D0` não é um número mágico: é a distorção da política **histórica** no mesmo orçamento. A
+afirmação deixa de ser "ganho > 20 %" (um proxy) e passa a ser "à mesma taxa, não distorce mais
+que o histórico" (um contrato, com base zero).
+
+**Resultado** (`raw.json` → `a1_rate_distortion`):
+
+| política | taxa `R` | distorção `D` |
+|---|---|---|
+| sufixo (histórica) | 804 ‰ | **356 ‰** = `D0` |
+| utilidade | 109 ‰ | **0 ‰** |
+
+No cenário sintético a seleção **não perde informação nenhuma** (`I_ret(S) = I_ret(U)`: as unidades
+escolhidas cobrem todos os termos distintos do histórico) a uma taxa 7× menor. Contrato cumprido.
+
+**Fórmula (A2).** Diversidade = Jaccard intra-conjunto das unidades escolhidas (média e máximo), com
+o teto `sim_max` já versionado nos parâmetros. Resultado (`a2_diversity`):
+
+| política | média | máximo | `sim_max` |
+|---|---|---|---|
+| sufixo | 624 ‰ | **1000 ‰** (viola o teto) | 700 ‰ |
+| utilidade (MMR) | **17 ‰** | **500 ‰** | 700 ‰ |
+
+O MMR em produção satisfaz o critério de aceitação de A2 ("nenhum par acima de `sim_max`"); o
+histórico não.
+
+**DPP (A2, parte determinantal): rejeitado com o número.** O DPP maximiza `log det`; à primeira
+ordem é penalizar redundância. Mediu-se o quanto há a ganhar (`a2_dpp_decision`): existem **81
+trocas** de uma unidade que aumentam a informação dentro do orçamento, com o melhor ganho em
+**12 584 µ** de massa. Mas essas trocas são de **utilidade**, não de redundância — a similaridade
+média já é 17 ‰, ou seja, não há par redundante para o determinante penalizar. O que fecharia a
+lacuna é uma **busca local** do greedy (troca 1‑para‑1), que é outra frente, não um DPP.
+*Condição para rever:* com log real, se a similaridade média passar de `sim_max/2`, o determinante
+volta a ter trabalho.
+
+**Como correr.** O mesmo comando do A/B acima regrava `raw.json`; os invariantes de CI (sem
+`#[ignore]`) são `the_utility_policy_never_distorts_more_than_the_historical_one` (A1) e
+`no_chosen_pair_exceeds_the_similarity_ceiling` (A2).
+
 **Limites (o que este A/B não diz).**
 
 - Não mede coerência: a política de utilidade pode manter unidades **não contíguas** e largar o meio da

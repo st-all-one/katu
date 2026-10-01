@@ -206,6 +206,57 @@
   "criterion": "veredicto medido com evidência (n, sucessos, LB) + demolição com uma violação + determinismo (Q-11 não é um ganho de latência: é evidência)",
   "criterion_met": true,
   "deterministic": true,
+  "fdr": {
+    "families": [
+      {
+        "bh_rejected": 1,
+        "n_per_rule": 29,
+        "promoted_after_fdr": 1,
+        "promoted_by_threshold": 1,
+        "q_milli": 50,
+        "rules": 1
+      },
+      {
+        "bh_rejected": 8,
+        "n_per_rule": 29,
+        "promoted_after_fdr": 8,
+        "promoted_by_threshold": 8,
+        "q_milli": 50,
+        "rules": 8
+      },
+      {
+        "bh_rejected": 0,
+        "n_per_rule": 25,
+        "promoted_after_fdr": 0,
+        "promoted_by_threshold": 40,
+        "q_milli": 50,
+        "rules": 40
+      },
+      {
+        "bh_rejected": 40,
+        "n_per_rule": 29,
+        "promoted_after_fdr": 40,
+        "promoted_by_threshold": 40,
+        "q_milli": 50,
+        "rules": 40
+      },
+      {
+        "bh_rejected": 40,
+        "n_per_rule": 60,
+        "promoted_after_fdr": 40,
+        "promoted_by_threshold": 40,
+        "q_milli": 50,
+        "rules": 40
+      }
+    ],
+    "rule": "H0: p >= theta por regra; Benjamini-Hochberg na família Enforced com q = 5 % (micro, cauda binomial superior exacta)",
+    "worst_case": {
+      "caveat": "p = 0,9^25 = 0,0718 > q = 0,05: nenhuma sobrevive — o motivo de o limiar effectively passar a n = 29",
+      "promoted_after_fdr": 0,
+      "promoted_by_threshold": 40,
+      "scenario": "40 regras, 25 ensaios honrados cada"
+    }
+  },
   "no_observations": {
     "confidence": "unmeasured",
     "contradiction": false,
@@ -219,9 +270,10 @@
     "trials": 20
   },
   "perfect_record": {
-    "lower_milli_at_n": 902,
+    "lower_milli_at_n": 915,
     "lower_milli_at_n_minus_one": 899,
-    "proves_at_n": 25
+    "proves_at_n": 29,
+    "proves_at_n_without_fdr": 25
   },
   "question": "quanto custa provar `Enforced` e quanto custa uma violação",
   "schema": "katu.bench.confidence.v1",

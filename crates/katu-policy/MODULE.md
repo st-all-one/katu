@@ -18,9 +18,16 @@ O **motor de política** do katu: avalia factos tipados e devolve um veredicto d
 - `verdict(id, Trials, Threshold) -> Verdict` (Q-11/F6) — confiança **medida**: posterior
   Beta–Bernoulli (`Trials`) + limite inferior de Wilson; `Enforced` só com `LB ≥ θ` **e**
   `n ≥ n_min`, senão demove a `Advisory` **com a evidência** no motivo. O limiar é dado
-  (`Threshold::DEFAULT`), nunca derivado dos dados (DF8). Com registo perfeito prova-se a regra a
-  **n = 25** (LB `902 ≥ 900`); uma violação em 20 derruba o LB para `804` e marca
-  `contradiction` (artefacto em [`bench/e18/confidence`](../../bench/e18/confidence/PROTOCOL.md)).
+  (`Threshold::DEFAULT`), nunca derivado dos dados (DF8). Com registo perfeito o limiar sozinho
+  prova a regra a **n = 25** (LB `902 ≥ 900`); com o controlo de família (abaixo) a **n = 29**. Uma
+  violação em 20 derruba o LB para `804` e marca `contradiction` (artefacto em
+  [`bench/e18/confidence`](../../bench/e18/confidence/PROTOCOL.md)).
+- `benjamini_hochberg(&[u32], q) -> MultipleTests` + `control_fdr(&mut [Verdict], &Threshold)`
+  (C5) — **controlo de múltiplas comparações** sobre a família de regras `Enforced`: p-value exacto
+  unilateral (`H0: p ≥ θ`, cauda binomial superior `P[X ≥ s | n, θ]`, em micro com piso 1 µ) por
+  regra, BH a `q = 5 %` (`Threshold.q_milli`). `control_fdr` só pode **demover** uma promoção
+  (fail-closed) e deixa o motivo com a evidência. Medido: 40 regras com 25 honras cada → o limiar
+  sozinho promove 40, o BH **nenhuma** (`p = 0,0718 > 0,05`).
 - `calibrate(&[Verdict]) -> Calibration` (C3/W8-2) — **calibração** do LB face à frequência
   empírica do log (base `inferred`): ECE, Brier e diagrama de fiabilidade (10 baldes), determinístico.
   No registo perfeito o ECE desce de `730‰` (n = 1) a `83‰` (n = 30); o `policy:confidence` publica
@@ -58,7 +65,7 @@ similaridade; as pré-condições semânticas (dedup ≥ 0.92, âncora, uma afir
 | `evaluate` | `evaluate` puro + seleção do veredicto de maior `rank` |
 | `approval` | `capability_for`/`capability_for_request` — capacidade **mínima** que satisfaz um `RequireApproval` (E07-T05, §33) |
 | `audit` | auditoria de regras (E02-T04) |
-| `confidence` | `Trials`/`Threshold`/`Confidence`/`Verdict`/`verdict` — confiança medida (Q-11/F6) |
+| `confidence` | `Trials`/`Threshold`/`Confidence`/`Verdict`/`verdict`/`benjamini_hochberg`/`control_fdr` — confiança medida (Q-11/F6) e FDR (C5) |
 | `error` | `PolicyError` |
 
 ## Artefactos versionados (na raiz `policy/`)

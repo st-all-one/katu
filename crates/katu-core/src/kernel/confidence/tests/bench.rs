@@ -11,7 +11,7 @@ use katu_policy::{
 };
 use serde_json::json;
 
-use super::{call, denied, enforced_verdicts, ran, rule_trials};
+use super::{call, denied, enforced_verdicts, enforced_verdicts_report, ran, rule_trials};
 use crate::kernel::event::Event;
 use crate::kernel::log::LogRecord;
 
@@ -86,6 +86,78 @@ fn rules() -> RuleSet {
     }
 }
 
+/// `RuleSet` com `count` regras `Enforced` (`r0`..`r{count-1}`, como `family_events`).
+fn family(count: usize) -> RuleSet {
+    let mut set = rules();
+    let Some(first) = set.rules.first_mut() else {
+        return set;
+    };
+    first.id = RuleId::from("r0");
+    let Some(template) = set.rules.first().cloned() else {
+        return set;
+    };
+    for index in 1..count {
+        let mut rule = template.clone();
+        rule.id = RuleId::from(format!("r{index}"));
+        set.rules.push(rule);
+    }
+    set
+}
+
+/// Log sintético: `count` regras, cada uma com `n` recusas honradas.
+fn family_events(count: usize, n: u32) -> Vec<Event> {
+    let mut events = Vec::new();
+    for rule in 0..count {
+        for index in 0..n {
+            let call = format!("c{rule}-{index}");
+            events.push(denied(&call, &format!("r{rule}")));
+        }
+    }
+    events
+}
+
+/// FDR (C5): a família como o BH a vê, e o que ele corta face ao limiar sozinho.
+///
+/// As duas colunas usam **os mesmos eventos** (todas as regras com `n` honras): a única diferença
+/// é o controlo de família. É assim que se vê o efeito sem misturar données.
+fn fdr_json() -> (serde_json::Value, serde_json::Value) {
+    let threshold = Threshold::DEFAULT;
+    let mut rows = Vec::new();
+    for (rules, n) in [(1_usize, 29_u32), (8, 29), (40, 25), (40, 29), (40, 60)] {
+        let set = family(rules);
+        let events = family_events(rules, n);
+        let trials = rule_trials(&events);
+        let before = set
+            .rules
+            .iter()
+            .filter(|rule| {
+                let observed = trials.get(&rule.id).copied().unwrap_or_default();
+                katu_policy::verdict(&rule.id, observed, &threshold).is_proven()
+            })
+            .count();
+        let (controlled, fdr) = enforced_verdicts_report(&events, &set, &threshold);
+        let after = controlled
+            .iter()
+            .filter(|verdict| verdict.is_proven())
+            .count();
+        rows.push(json!({
+            "rules": rules,
+            "n_per_rule": n,
+            "promoted_by_threshold": before,
+            "promoted_after_fdr": after,
+            "bh_rejected": fdr.rejected,
+            "q_milli": fdr.q_milli,
+        }));
+    }
+    let worst = json!({
+        "scenario": "40 regras, 25 ensaios honrados cada",
+        "promoted_by_threshold": 40,
+        "promoted_after_fdr": 0,
+        "caveat": "p = 0,9^25 = 0,0718 > q = 0,05: nenhuma sobrevive — o motivo de o limiar effectively passar a n = 29",
+    });
+    (serde_json::Value::Array(rows), worst)
+}
+
 /// Mede o primeiro `n` em que um registo perfeito prova a regra, e o LB aí.
 fn flip() -> (u32, u32) {
     let rules = rules();
@@ -158,6 +230,7 @@ pub(super) fn measure() -> Result<String, Box<dyn std::error::Error>> {
     let empty_first = empty.first().ok_or("sem veredicto")?;
     let deterministic = rule_trials(&honored(7)) == rule_trials(&honored(7));
     let (calibration, calibration_by_n) = calibration_json(&rules);
+    let (fdr, fdr_worst) = fdr_json();
 
     let value = json!({
         "schema": "katu.bench.confidence.v1",
@@ -170,6 +243,7 @@ pub(super) fn measure() -> Result<String, Box<dyn std::error::Error>> {
         "perfect_record": {
             "proves_at_n": flip_n,
             "lower_milli_at_n": flip_lower,
+            "proves_at_n_without_fdr": 25,
             "lower_milli_at_n_minus_one": 899,
         },
         "one_violation": {
@@ -183,6 +257,11 @@ pub(super) fn measure() -> Result<String, Box<dyn std::error::Error>> {
             "trials": empty_first.trials,
             "confidence": empty_first.confidence.as_str(),
             "contradiction": empty_first.contradiction,
+        },
+        "fdr": {
+            "rule": "H0: p >= theta por regra; Benjamini-Hochberg na família Enforced com q = 5 % (micro, cauda binomial superior exacta)",
+            "families": fdr,
+            "worst_case": fdr_worst,
         },
         "deterministic": deterministic,
         "calibration": calibration,
@@ -198,8 +277,10 @@ pub(super) fn measure() -> Result<String, Box<dyn std::error::Error>> {
 #[test]
 fn the_confidence_flip_and_demolition_are_stable() -> Result<(), Box<dyn std::error::Error>> {
     let (flip_n, flip_lower) = flip();
-    assert_eq!(flip_n, 25, "25 ensaios honrados provam a regra");
-    assert_eq!(flip_lower, 902);
+    // C5: com o controlo FDR da família (q = 5 %), um registo perfeito passa a n = 29 (25 = 0,9ⁿ
+    // ≤ 0,05 pede n ≥ 28,43). O custo é fail-closed: 4 ensaios a mais para promover.
+    assert_eq!(flip_n, 29, "29 ensaios honrados provam a regra (com FDR)");
+    assert_eq!(flip_lower, 915);
     let dirty = enforced_verdicts(&violated(20), &rules(), &Threshold::DEFAULT);
     let first = dirty.first().ok_or("sem veredicto")?;
     assert!(first.contradiction);
@@ -233,7 +314,11 @@ fn ab_confidence_by_artifact() -> Result<(), Box<dyn std::error::Error>> {
     let proves_at = value
         .get("perfect_record")
         .and_then(|record| record.get("proves_at_n"));
-    assert_eq!(proves_at, Some(&json!(25)));
+    assert_eq!(proves_at, Some(&json!(29)), "com FDR, provar exige n = 29");
+    let proves_without_fdr = value
+        .get("perfect_record")
+        .and_then(|record| record.get("proves_at_n_without_fdr"));
+    assert_eq!(proves_without_fdr, Some(&json!(25)));
     let ece = value
         .get("calibration")
         .and_then(|calibration| calibration.get("ece_milli"))

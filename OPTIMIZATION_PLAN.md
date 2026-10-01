@@ -640,7 +640,9 @@ W6 (estabilidade)~~Q-13~~, ~~Q-14~~, ~~Q-15~~, ~~P-01~~, ~~P-02~~, ~~P-03~~, ~~P
 W7 (método)      ~~E18-T10 (harness zero-dep) + regerar atribuição + S-04~~  ✔
 W8 (Anexo A T1)  ~~B1 gramática + C3 calibração + C1 e-values + A3 VOI~~ ✔
 W9 (Anexo B)     ~~B-03~~ → ~~B-04~~ → ~~B-06~~ → ~~B-07~~ → ~~ADR B-08~~ ✔
-W10 (Anexo A T2/3) A1/A2 · D1 · C2/C7/C5 · E1 · D2/D3 · E18-T05/T08/T09
+W10 (Anexo A T2/3) ~~A1/A2~~ (A1 adotado, DPP rejeitado) · ~~D1~~ · ~~C5~~ · ~~C7~~ · ~~D2/D3~~
+                 ~~E1~~ (medido, sem mudança) · ~~C2~~ (medido, rejeitado) ·
+                 ~~E18-T05~~ (feito em Q-15) · ~~E18-T08/T09~~ (rejeitados)  ✔
 ```
 
 **Regra:** W1 primeiro (sem medir, não se otimiza — a lição do E18 §0.3). W2 são correções que não
@@ -939,8 +941,15 @@ vivos. Nenhum teto de `surface.toml` subiu.
 
 ### W10 · Anexo A — Tier 2/3 e resíduos do E18
 
-- **A1/A2 (Tier 2):** formalizar o proxy de Q-02b/Q-03 com distorção `D ≤ D0`; artefacto
-  `bench/e18/select/`.
+- **A1/A2 (Tier 2):** ✔ feito (A1 adotado, **DPP rejeitado com o número**). O proxy de Q-02b/Q-03
+  passa a ser um **contrato de distorção** e não um ganho: `R = tokens(S)/tokens(U)`,
+  `D = 1 − I_ret(S)/I_ret(U)`, `D0 = D(sufixo)` na mesma taxa. Medido em `bench/e18/select/`
+  (`raw.json` → `a1_rate_distortion`): a `R = 109‰` a distorção é **0 ‰** contra `D0 = 356‰` do
+  histórico a `R = 804‰`. A2 mede a diversidade com o mesmo critério de aceitação do Anexo A
+  (nenhum par acima de `sim_max`): utilidade **17 ‰** média / **500 ‰** máximo contra **624 ‰** /
+  **1000 ‰** do histórico (que viola o teto). O **DPP é rejeitado**: há 81 trocas que aumentam a
+  informação (ganho máximo 12 584 µ), mas são de **utilidade** e não de redundância — o MMR já
+  resolve a diversidade, logo o determinante não tem o que maximizar.
 - **D1 (Tier 2):** ✔ feito. *Taint*/*spotlighting* do output de tool antes do modelo
   ([`katu-core/src/taint.rs`](crates/katu-core/src/taint.rs)): o delta viaja entre
   `<katu:untrusted …>`/`</katu:untrusted>`, com `escape` a neutralizar (`<` → `[`) qualquer `<` que
@@ -950,13 +959,64 @@ vivos. Nenhum teto de `surface.toml` subiu.
   ensina o modelo a tratar as tags como dado. Artefacto `bench/e18/taint/`: **6/6 ataques da
   suíte red-team bloqueados**, custo **71 B** por resultado de tool (0,87 % de um delta de 8 KiB).
   Limite declarado: mede escape *estrutural*, não obediência do modelo.
-- **C2/C7/C5 (Tier 2/3):** conformal, estatística robusta (mediana/MAD) e Benjamini–Hochberg.
-- **E1 (Tier 3):** curva USL do pool de B-01 (wall-clock vs threads).
+- **C5 (Tier 2):** ✔ feito. Benjamini–Hochberg na família de regras `Enforced`
+  ([`confidence.rs`](crates/katu-policy/src/confidence.rs)): p-value **exacto** unilateral
+  (`H0: p ≥ θ`, cauda binomial superior `P[X ≥ s | n, θ]`, em micro) por regra e BH a `q = 5 %`
+  (`Threshold.q_milli`); `control_fdr` só pode **demover** uma promoção (fail-closed). Fecha a
+  lacuna declarada em Q-11 ("LB unilateral sem controlo de múltiplas comparações"). Medido em
+  `bench/e18/confidence/` (`raw.json` → `fdr`): **40 regras com 25 honras cada** — o limiar sozinho
+  promove as 40, o BH **nenhuma** (`p = 0,0718 > 0,05`); nas mesma log com `n = 29` promove as 40.
+  Preço escrito: **provar `Enforced` passa de `n = 25` a `n = 29`** (`0,9ⁿ ≤ 0,05` pede 28,43) —
+  mais disciplina, nunca mais confiança.
+- **C7 (Tier 2):** ✔ feito. Estatística robusta (mediana/MAD, IC robusto) em
+  [`stats.rs`](crates/katu-core/src/stats.rs); artefacto `bench/e18/stats/`.
+- **C2 (Tier 3):** ✔ medido; **rejeitado para adoção** com o número — e **sem código em `src/`**.
+  A fórmula do split conformal (`k = ⌈(n+1)·nível⌉`, quantil dos resíduos, *fail-closed* quando
+  `k > n`) mora no bench que a mediu
+  ([`stats/tests/conformal_bench.rs`](crates/katu-core/src/stats/tests/conformal_bench.rs)), porque
+  um item rejeitado deixa o **número**, não uma API pública sem consumidores (a `stats::conformal`
+  que existia foi removida nesta revisão). Medido em `bench/e18/conformal/`, série sintética
+  SplitMix64 com forecast rolante de 10: no regime **trocável** só **5 de 8** linhas publicadas
+  atingem o nominal — a 95 % a cobertura fica em **913–947 ‰** contra as 950 ‰ prometidas (pior
+  queda **37 ‰**). Achado que reformula o item: a diferença entre o regime trocável e o
+  não-trocável é **≤ 12 ‰**, logo **a troca não é o que falha** — a independência dos resíduos é.
+  Segunda condição, hoje decisiva: o `log` tem **0 ensaios** por regra (`n_cal ≥ 19` necessárias).
+  Só entra em `src/` com base real não correlacionada e a varredura repetida.
+- **E1 (Tier 3):** ✔ medido, **sem mudança** (o número é do ambiente, não do pool). Curva USL do
+  mecanismo `spawn`/`join` do lote (mesmo de `in_parallel`), `N = 64` tarefas, mediana de 7, escada
+  `T ∈ {1,2,3,4,6,8}`: `S(T) = 0,94 / 0,93 / 0,92 / 0,94 / 0,88 / 0,85`. A máquina **não escala**
+  (2 threads não dão 1,5× apesar de `available_parallelism = 16`), pelo que o artefacto marca
+  `scaling_suspect: true` e o número descreve o cgroup, não o katu. O teto de 8 é um limite de
+  **custo** (PTC), não de paralelismo: fica como está, e o invariante que se trava é a cobertura da
+  curva (`the_production_ceiling_is_inside_the_measured_ladder`). Condição para rever: repetir o A/B
+  numa máquina com `S(2) ≥ 1,5×`; aí o teto passa a `min(8, available_parallelism())`.
+  Artefacto `bench/e18/pool/`.
 - **D2/D3:** ✔ feito. **D2:** cadeia de hash nos segmentos de auditoria (`hash` + `prev_hash`);
   `verify()` deteta adulteração e remoção. **D3:** MAC das aprovações (chave `audit.mac_key`,
   fail-closed sem ela). Artefactos `bench/e18/audit/`.
-- **E18-T05/T08/T09:** decidir — T05 (partilha estrutural) mede-se contra o snapshot atual; T08
-  (PERT/CPM) e T09 (PPR; o RRF já existe em Q-02b) mantêm o `✂` até haver sinal.
+- **E18-T08 (PERT/CPM): ✂ rejeitado com o número.** O plano é uma **lista sequencial por
+  invariante** ([`plan.rs`](crates/katu-core/src/plan.rs): `feature_list` sem arestas de
+  dependência, e `validate()` recusa mais de uma feature `in_progress` — `MultipleInProgress`, testado
+  em `multiple_in_progress_is_rejected`). Com `0` arestas e largura 1, o caminho crítico **é** a
+  lista: o CPM devolveria a ordem atual, e o `L(id)` memoizado não teria o que memorizar. Para
+  reavaliar é preciso primeiro **criar** o DAG (dependências explícitas entre features), que é uma
+  mudança de schema e de produto, não uma otimização.
+- **E18-T09 (PPR semeado pelo working set): ✂ rejeitado com o número.** A parte de fusão **está
+  feita** (RRF com `k = 60` em Q-02b, `SelectionParams::k_rrf`); a parte nova é o PPR, que exige um
+  grafo de ligações entre memórias. Hoje [`Memory::search`](crates/katu-core/src/memory.rs) devolve
+  um **ranking plano** (`Vec<RecallHit>` com `score`), sem arestas: `0` arestas ⇒ Personalized
+  PageRank não tem grafo para percorrer, e semeá-lo pelo working set seria reranking de uma lista
+  (que o RRF já faz, com pesos versionados). Reavaliar quando existir uma frente que crie ligações
+  explícitas entre notas.
+- **E18-T05 (estado persistente e checkpoint): ✔ feito em Q-15; a parte restante rejeitada com o
+  número.** `checkpoint = snapshot + Δ` com cauda limitada (128 KiB), hash canónico do estado e
+  `state_of(replay) == state_at_end` já estão medidos em [`bench/e18/resume`](bench/e18/resume/PROTOCOL.md):
+  20 000 turnos retomam em **321 µs** contra **23 839 µs** do replay total (**−98,7 %**) e
+  2 165 µs da política anterior por fase (**−85,2 %**). O que resta do entregável é a **partilha
+  estrutural** do `State`, e o custo restante da retomada (321 µs) é a leitura da cauda (61 812 B)
+  mais a leitura do snapshot — a cópia do estado é um `memcpy` de alguns KiB dentro desses 321 µs,
+  ou seja, abaixo do ruído de medição. Sem número a retirar, fica **rejeitada**; se a retomada
+  voltar a ser um gargalo (≥ 1 ms), mede-se de novo com o mesmo harness.
 
 ### Resumo W7–W10
 

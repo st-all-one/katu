@@ -2,10 +2,10 @@
 
 use katu_policy::{
     Enforcement, Evidence, PolicyError, ResolvedPath, Rule, RuleCategory, RuleExamples, RuleId,
-    RuleScope, RuleSet, Severity, Threshold, ToolArgs, ToolName, ToolUse,
+    RuleScope, RuleSet, Severity, Threshold, ToolArgs, ToolName, ToolUse, Verdict,
 };
 
-use super::{enforced_verdicts, rule_trials, tool_trials};
+use super::{enforced_verdicts, enforced_verdicts_report, rule_trials, tool_trials};
 use crate::error::ToolOutcome;
 use crate::kernel::event::{CallId, Event};
 
@@ -181,6 +181,62 @@ fn the_verdict_covers_only_declared_enforced_rules() -> Result<(), PolicyError> 
     assert!(first.is_proven(), "30 recusas honradas provam a regra");
     assert!(!first.contradiction);
     Ok(())
+}
+
+/// `RuleSet` com uma regra `Enforced` chamada `r1`.
+fn one_rule() -> RuleSet {
+    RuleSet {
+        vocab: katu_policy::POLICY_VOCAB_VERSION,
+        rules: vec![rule("r1", RuleCategory::Enforced)],
+    }
+}
+
+#[test]
+fn the_fdr_control_is_reported_with_the_verdicts() {
+    // C5: o relatório traz o resumo da família (o que o `policy:confidence` imprime).
+    let rules = one_rule();
+    let events: Vec<Event> = (0..29)
+        .map(|index| denied(&format!("c{index}"), "r1"))
+        .collect();
+    let (verdicts, control) = enforced_verdicts_report(&events, &rules, &Threshold::DEFAULT);
+    assert_eq!(control.tested, 1);
+    assert_eq!(control.rejected, 1, "29 honras dão p = 0,9^29 ≤ 0,05");
+    assert!(verdicts.first().is_some_and(Verdict::is_proven));
+}
+
+#[test]
+fn a_family_of_rules_is_controlled_as_a_family() {
+    // Duas regras na família: `r1` com 25 honras (o limiar sozinho promove: LB = 902) e `r2` com
+    // 40 (p = 0,0148). Com m = 2, q = 5 % dá folga 0,025 ao rank 1: só `r2` entra. O BH é um
+    // *degrau* — `r1` não é resgatado por a outra ser forte.
+    let mut rules = one_rule();
+    let Some(template) = rules.rules.first().cloned() else {
+        return;
+    };
+    let mut second = template;
+    second.id = RuleId::from("r2");
+    rules.rules.push(second);
+    let events: Vec<Event> = (0..65)
+        .map(|index| {
+            let rule = if index < 25 { "r1" } else { "r2" };
+            denied(&format!("c{index}"), rule)
+        })
+        .collect();
+    let (verdicts, control) = enforced_verdicts_report(&events, &rules, &Threshold::DEFAULT);
+    assert_eq!(control.tested, 2);
+    assert_eq!(control.rejected, 1);
+    let proven: Vec<&str> = verdicts
+        .iter()
+        .filter(|verdict| verdict.is_proven())
+        .map(|verdict| verdict.id.as_str())
+        .collect();
+    assert_eq!(proven, vec!["r2"]);
+    let demoted = verdicts
+        .iter()
+        .find(|verdict| verdict.id.as_str() == "r1")
+        .map(|verdict| verdict.reason.to_string())
+        .unwrap_or_default();
+    assert!(demoted.contains("FDR"), "{demoted}");
 }
 
 #[test]

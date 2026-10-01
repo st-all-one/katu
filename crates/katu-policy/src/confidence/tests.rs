@@ -1,4 +1,5 @@
-//! Testes da confiança medida (Q-11): limites do posterior, limiar, demolição e determinismo.
+//! Testes da confiança medida (Q-11) e do controlo de múltiplas comparações (C5): limites do
+//! posterior, limiar, demolição, Benjamini–Hochberg e determinismo.
 
 use super::{CALIBRATION_BINS, Confidence, Threshold, Trials, calibrate, verdict};
 use crate::rule::RuleId;

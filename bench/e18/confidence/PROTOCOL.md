@@ -99,6 +99,48 @@ recusas. O comando entrou no `check` (`xtask/src/check.rs`), portanto uma viola�
 - Mede o invariante **recusa ⇒ não correu**, não o sucesso da tarefa. Um kernel correto dá sempre
   1,0: o valor da medida é ser um **detetor de regressão** (um bypass, uma capacidade indevida).
 - Não mede se o **remédio** (Q-08) ensina: isso é comportamento do modelo e é do Q-12.
-- O LB é unilateral a 95 % e **não** tem controlo de múltiplas comparações (C5 do Anexo A fica em
-  aberto): com muitas regras, o erro família é maior do que 5 %.
+- O LB é unilateral a 95 %; o **FDR** (C5, em baixo) controla a família, mas só a 5 % — não
+  elimina o erro de tipo II em famílias grandes (com `m = 40`, cada regra precisa de `p ≤ 0,00125`,
+  ou seja `n ≥ 66` honras perfeitas).
 - `unmeasured` não é um defeito: um projeto novo não tem ensaios. Só a contradição medida falha.
+
+## C5 · Benjamini–Hochberg (controlo de múltiplas comparações) — feito
+
+**Pergunta.** O LB é unilateral **por regra**: com `m` regras `Enforced` testadas ao mesmo nível,
+o erro de tipo I da família é `≈ α·m` (a 5 %, `m = 20` ⇒ ~1 promoção falsa em média). O BH
+controla esse erro a `q` para a família inteira.
+
+**Fórmula.** Cada `Enforced` é a afirmação "esta regra sustenta-se em `θ = 0,90`". O p-value é o
+**exacto** unilateral (`H0: p ≥ θ`), com a cauda binomial superior `P[X ≥ s | n, θ]` (micro, piso
+1 µ), não o Wald nem o LB:
+
+```
+p(regra)  = P[X ≥ s | n, θ]
+BH:        ordena p por ordem crescente (desempate pelo índice, p-empates estável)
+           k = maior i com p_(i) ≤ q·i/m ; rejeita H0_(i) para todo o i ≤ k
+```
+
+`Threshold.q_milli = 50` (5 %) entra no `DEFAULT`; `control_fdr` só pode **demover** uma promoção
+(fail-closed), nunca promover. Com `m = 1` o controlo degenera no teste unilateral a 5 %.
+
+**Resultado** (`raw.json` → `fdr`, mesmo log nas duas colunas):
+
+| família | `n` por regra | promovidas pelo limiar | promovidas **após** FDR | rejeitadas BH |
+|---|---|---|---|---|
+| 1 | 29 | 1 | 1 | 1 |
+| 8 | 29 | 8 | 8 | 8 |
+| **40** | **25** | **40** | **0** | 0 |
+| 40 | 29 | 40 | 40 | 40 |
+| 40 | 60 | 40 | 40 | 40 |
+
+**Critérios.** (1) a tabela é reprodutível (`benjamini_hochberg` é pura, ordem-independente);
+(2) o pior caso é o demonstrativo: **40 regras com 25 honras cada** — o limiar sozinho promove as
+40, o BH **nenhuma** (`p = 0,9²⁵ = 0,0718 > 0,05`); (3) fail-closed verificado nos testes.
+
+**Decisão (escrita).** Adotado, default on, com um preço medido: **provar `Enforced` passa de
+`n = 25` a `n = 29`** (`0,9ⁿ ≤ 0,05` pede `n ≥ 28,43`). É a direção fail-closed — mais disciplina,
+numa prova, nunca mais confiança. O relatório operacional imprime a linha
+`FDR (BH, C5): m testadas, r promoções sobrevivem a q = 50‰`.
+
+**Limites.** O p-value é exacto mas **não condicional**: com `m` regras testadas em simultâneo, o
+preço é a folga `q/m` por regra. BH é passo-degrau: uma regra fraca não é resgatada por outra forte.
