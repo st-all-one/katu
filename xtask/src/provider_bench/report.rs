@@ -12,26 +12,6 @@ use serde_json::{Value, json};
 /// Deltas de texto no corpus canónico.
 pub(super) const DELTAS: usize = 512;
 
-/// Agregado de percentis (nearest-rank, inteiro; sem vírgula flutuante na decisão).
-pub(super) fn percentiles(samples: &[u64]) -> (u64, u64, u64, u64) {
-    let mut sorted = samples.to_vec();
-    sorted.sort_unstable();
-    let pick = |p: u32| -> u64 {
-        let n = u64::try_from(sorted.len()).unwrap_or(u64::MAX);
-        if n == 0 {
-            return 0;
-        }
-        let rank = n.saturating_mul(u64::from(p)).div_ceil(100).max(1);
-        let index = usize::try_from(rank.saturating_sub(1)).unwrap_or(0);
-        sorted
-            .get(index.min(sorted.len().saturating_sub(1)))
-            .copied()
-            .unwrap_or(0)
-    };
-    let max = sorted.last().copied().unwrap_or(0);
-    (pick(50), pick(95), pick(99), max)
-}
-
 /// Nanos de uma `Duration` (saturando).
 pub(super) fn nanos(duration: Duration) -> u64 {
     u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX)
@@ -93,24 +73,12 @@ pub(super) fn usage_value(usage: Option<TokenUsage>) -> Value {
 
 #[cfg(test)]
 mod tests {
-    use super::{DELTAS, corpus, percentiles};
+    use super::{DELTAS, corpus};
 
     #[test]
     fn corpus_is_well_formed_sse() {
         let body = corpus();
         assert!(body.ends_with("data: [DONE]\n\n"));
         assert_eq!(body.matches("data: ").count(), DELTAS.saturating_add(3));
-    }
-
-    #[test]
-    fn nearest_rank_percentiles_are_monotone() {
-        let samples: Vec<u64> = (1..=100).collect();
-        let (p50, p95, p99, max) = percentiles(&samples);
-        assert_eq!((p50, p95, p99, max), (50, 95, 99, 100));
-    }
-
-    #[test]
-    fn empty_samples_are_zero() {
-        assert_eq!(percentiles(&[]), (0, 0, 0, 0));
     }
 }

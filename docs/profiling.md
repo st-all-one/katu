@@ -88,7 +88,10 @@ binário já construído, ou uma bancada `examples/` dedicada.
 
 ## 5. Reprodutibilidade (fecho do E18-T10)
 
-- ≥ 3 repetições e IC 95 % por métrica publicada; a média não chega (a cauda mente).
+- ≥ 3 repetições e IC 95 % por métrica publicada; a média não chega (a cauda mente). O resumo vive
+  em [`katu_core::stats`](../crates/katu-core/src/stats.rs) — zero-dep, determinístico (normal para
+  `n ≥ 30`, *bootstrap* com índices derivados de `n` abaixo disso) — e os artefactos ganham o campo
+  `ci95`; `gate:render`/`gate:provider` comparam o **limite superior** com o orçamento.
 - Todo o número publicado cita um artefacto cru em `bench/` (base `measured`/`provider_reported`),
   validado por `xtask gate:bench` (DF5).
 - Negativos visíveis: `unpriced` com valor zero, nunca um número adivinhado.

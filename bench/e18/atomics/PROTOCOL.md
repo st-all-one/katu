@@ -13,7 +13,7 @@ Como reproduzir e comparar [`REPORT.md`](REPORT.md) / [`raw.json`](raw.json).
 
 ```bash
 cargo run -q -p xtask -- diag:coverage
-# diag-coverage: 1187/1194 instrumentáveis (99.4%); com 121 const fn: 1187/1315 (90.2%)
+# diag-coverage: 1322/1322 instrumentáveis (100.0%); com 136 const fn: 1322/1458 (90.6%)
 ```
 
 ## 2. Por função (secção 2) — `measure_mvk`

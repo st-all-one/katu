@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 use crate::context::prime::prime_text;
 use crate::diag::{Level, events};
 use crate::error::ToolOutcome;
+#[cfg(feature = "instrument")]
+use crate::evidence::from_f64;
 use crate::evidence::{EvidenceBasis, Metric, Unit, to_f64};
 use crate::kernel::{Event, Message, derive_messages};
 use katu_policy::ToolUse;
@@ -213,7 +215,11 @@ fn compact_prefix(
     budget: ContextBudget,
     options: AssembleOptions<'_>,
 ) -> Option<Compaction> {
-    let _span = crate::trace_fn!("context::compact_prefix");
+    let _span = crate::fn_span!(
+        Level::Debug,
+        events::CONTEXT_COMPACT,
+        "context::compact_prefix"
+    );
 
     let digest = digest(
         prefix,
@@ -230,7 +236,7 @@ fn compact_prefix(
         crate::event!(
             Level::Debug,
             events::CONTEXT_DIGEST,
-            "js_milli" => crate::evidence::from_f64(digest.divergence.value),
+            "js_milli" => from_f64(digest.divergence.value),
             "tau_milli" => options.params.tau_js_milli,
             "applied" => 0,
         );

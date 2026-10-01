@@ -4,6 +4,16 @@
     "timings": [
       {
         "count": 2511,
+        "event": "kernel.step",
+        "max_nanos": 16553,
+        "min_nanos": 908,
+        "p50_nanos": 2305,
+        "p95_nanos": 3353,
+        "p99_nanos": 8102,
+        "total_nanos": 6018557
+      },
+      {
+        "count": 2511,
         "event": "kernel.transition",
         "max_nanos": 46864,
         "min_nanos": 8591,
@@ -11,16 +21,6 @@
         "p95_nanos": 21023,
         "p99_nanos": 30521,
         "total_nanos": 38139155
-      },
-      {
-        "count": 502,
-        "event": "memory.write",
-        "max_nanos": 23328,
-        "min_nanos": 7054,
-        "p50_nanos": 9918,
-        "p95_nanos": 10477,
-        "p99_nanos": 20324,
-        "total_nanos": 5031159
       },
       {
         "count": 2511,
@@ -33,6 +33,26 @@
         "total_nanos": 18553687
       },
       {
+        "count": 1006,
+        "event": "log.replay",
+        "max_nanos": 13270,
+        "min_nanos": 907,
+        "p50_nanos": 1466,
+        "p95_nanos": 1886,
+        "p99_nanos": 1956,
+        "total_nanos": 1513339
+      },
+      {
+        "count": 502,
+        "event": "memory.write",
+        "max_nanos": 23328,
+        "min_nanos": 7054,
+        "p50_nanos": 9918,
+        "p95_nanos": 10477,
+        "p99_nanos": 20324,
+        "total_nanos": 5031159
+      },
+      {
         "count": 502,
         "event": "policy.evaluate",
         "max_nanos": 15645,
@@ -43,16 +63,6 @@
         "total_nanos": 1152756
       },
       {
-        "count": 2511,
-        "event": "kernel.step",
-        "max_nanos": 16553,
-        "min_nanos": 908,
-        "p50_nanos": 2305,
-        "p95_nanos": 3353,
-        "p99_nanos": 8102,
-        "total_nanos": 6018557
-      },
-      {
         "count": 501,
         "event": "tool.write",
         "max_nanos": 15295,
@@ -61,870 +71,1265 @@
         "p95_nanos": 1956,
         "p99_nanos": 2374,
         "total_nanos": 854030
-      },
-      {
-        "count": 1006,
-        "event": "log.replay",
-        "max_nanos": 13270,
-        "min_nanos": 907,
-        "p50_nanos": 1466,
-        "p95_nanos": 1886,
-        "p99_nanos": 1956,
-        "total_nanos": 1513339
       }
     ]
   },
   "coverage": {
-    "const_fns_excluded": 121,
+    "const_fns_excluded": 136,
     "instrumentable": {
-      "covered": 1187,
-      "permille": 994,
-      "total": 1194
+      "covered": 1322,
+      "permille": 1000,
+      "total": 1322
     },
     "policy": "excluded (firewall: instrumented by caller)",
     "with_const": {
-      "covered": 1187,
-      "permille": 902,
-      "total": 1315
+      "covered": 1322,
+      "permille": 906,
+      "total": 1458
     }
   },
   "functions": [
     {
+      "ci95": {
+        "high_nanos": 14054,
+        "low_nanos": 13591
+      },
       "count": 1507,
       "event": "cost.check",
       "function": "kernel::cost::check",
-      "max_nanos": 48470,
-      "min_nanos": 8521,
-      "p50_nanos": 13270,
+      "max_nanos": 165037,
+      "min_nanos": 9080,
+      "p50_nanos": 13898,
       "p95_nanos": 16413,
-      "p99_nanos": 23816,
-      "total_nanos": 19787081
+      "p99_nanos": 25003,
+      "total_nanos": 20830545
     },
     {
+      "ci95": {
+        "high_nanos": 1533,
+        "low_nanos": 1466
+      },
       "count": 1507,
       "event": "katu.fn",
       "function": "kernel::budget::check",
-      "max_nanos": 2445,
-      "min_nanos": 907,
-      "p50_nanos": 1397,
-      "p95_nanos": 1886,
-      "p99_nanos": 1956,
-      "total_nanos": 2075528
+      "max_nanos": 4749,
+      "min_nanos": 489,
+      "p50_nanos": 1466,
+      "p95_nanos": 1956,
+      "p99_nanos": 2305,
+      "total_nanos": 2289298
     },
     {
+      "ci95": {
+        "high_nanos": 1514,
+        "low_nanos": 1451
+      },
       "count": 1507,
       "event": "katu.fn",
       "function": "kernel::budget::commit",
-      "max_nanos": 19137,
-      "min_nanos": 838,
-      "p50_nanos": 1397,
+      "max_nanos": 14388,
+      "min_nanos": 489,
+      "p50_nanos": 1466,
       "p95_nanos": 1886,
-      "p99_nanos": 1956,
-      "total_nanos": 2019165
+      "p99_nanos": 2375,
+      "total_nanos": 2233616
     },
     {
+      "ci95": {
+        "high_nanos": 1461,
+        "low_nanos": 1397
+      },
       "count": 1507,
       "event": "katu.fn",
       "function": "kernel::cost::check_kill",
-      "max_nanos": 18159,
-      "min_nanos": 907,
+      "max_nanos": 12920,
+      "min_nanos": 489,
       "p50_nanos": 1397,
-      "p95_nanos": 1885,
+      "p95_nanos": 1886,
       "p99_nanos": 1956,
-      "total_nanos": 1979997
+      "total_nanos": 2171454
     },
     {
+      "ci95": {
+        "high_nanos": 10826,
+        "low_nanos": 10294
+      },
       "count": 1507,
       "event": "katu.fn",
       "function": "kernel::cost::check_layers",
-      "max_nanos": 44210,
-      "min_nanos": 6146,
-      "p50_nanos": 10127,
-      "p95_nanos": 12641,
-      "p99_nanos": 17600,
-      "total_nanos": 14935099
+      "max_nanos": 161755,
+      "min_nanos": 6076,
+      "p50_nanos": 10826,
+      "p95_nanos": 12781,
+      "p99_nanos": 20813,
+      "total_nanos": 15856562
     },
     {
+      "ci95": {
+        "high_nanos": 1994,
+        "low_nanos": 1405
+      },
       "count": 1004,
       "event": "katu.fn",
       "function": "kernel::cost::check_per_tool",
-      "max_nanos": 6216,
-      "min_nanos": 839,
-      "p50_nanos": 1397,
-      "p95_nanos": 1886,
-      "p99_nanos": 2304,
-      "total_nanos": 1367917
+      "max_nanos": 150370,
+      "min_nanos": 907,
+      "p50_nanos": 1466,
+      "p95_nanos": 1955,
+      "p99_nanos": 1956,
+      "total_nanos": 1706600
     },
     {
+      "ci95": {
+        "high_nanos": 5346,
+        "low_nanos": 4889
+      },
       "count": 1507,
       "event": "katu.fn",
       "function": "kernel::cost::commit",
-      "max_nanos": 30520,
-      "min_nanos": 3701,
-      "p50_nanos": 4749,
-      "p95_nanos": 6775,
-      "p99_nanos": 10057,
-      "total_nanos": 7576419
+      "max_nanos": 125367,
+      "min_nanos": 3352,
+      "p50_nanos": 4889,
+      "p95_nanos": 6076,
+      "p99_nanos": 8590,
+      "total_nanos": 7805980
     },
     {
+      "ci95": {
+        "high_nanos": 1503,
+        "low_nanos": 1454
+      },
       "count": 2511,
       "event": "katu.fn",
       "function": "kernel::cost::cost_charge_for",
-      "max_nanos": 22070,
-      "min_nanos": 907,
-      "p50_nanos": 1397,
-      "p95_nanos": 1886,
-      "p99_nanos": 1956,
-      "total_nanos": 3288069
+      "max_nanos": 19137,
+      "min_nanos": 489,
+      "p50_nanos": 1466,
+      "p95_nanos": 1955,
+      "p99_nanos": 2374,
+      "total_nanos": 3711797
     },
     {
+      "ci95": {
+        "high_nanos": 4996,
+        "low_nanos": 4819
+      },
       "count": 503,
       "event": "katu.fn",
       "function": "kernel::cost::new",
-      "max_nanos": 15156,
-      "min_nanos": 3771,
-      "p50_nanos": 4609,
-      "p95_nanos": 5797,
-      "p99_nanos": 7264,
-      "total_nanos": 2383556
+      "max_nanos": 16204,
+      "min_nanos": 3353,
+      "p50_nanos": 4819,
+      "p95_nanos": 5727,
+      "p99_nanos": 6635,
+      "total_nanos": 2480030
     },
     {
+      "ci95": {
+        "high_nanos": 1582,
+        "low_nanos": 1466
+      },
       "count": 503,
       "event": "katu.fn",
       "function": "kernel::cost::with_usage",
-      "max_nanos": 2864,
-      "min_nanos": 907,
-      "p50_nanos": 1397,
+      "max_nanos": 7124,
+      "min_nanos": 908,
+      "p50_nanos": 1466,
       "p95_nanos": 1956,
       "p99_nanos": 2374,
-      "total_nanos": 728879
+      "total_nanos": 779637
     },
     {
+      "ci95": {
+        "high_nanos": 1568,
+        "low_nanos": 1467
+      },
       "count": 1506,
       "event": "katu.fn",
       "function": "kernel::event::new",
-      "max_nanos": 20394,
-      "min_nanos": 907,
-      "p50_nanos": 1397,
-      "p95_nanos": 1955,
-      "p99_nanos": 2305,
-      "total_nanos": 2190586
+      "max_nanos": 16274,
+      "min_nanos": 489,
+      "p50_nanos": 1467,
+      "p95_nanos": 1956,
+      "p99_nanos": 2374,
+      "total_nanos": 2325553
     },
     {
+      "ci95": {
+        "high_nanos": 19272,
+        "low_nanos": 18952
+      },
       "count": 2511,
       "event": "katu.fn",
       "function": "kernel::log::append",
-      "max_nanos": 70400,
-      "min_nanos": 13479,
+      "max_nanos": 43931,
+      "min_nanos": 11734,
       "p50_nanos": 19137,
-      "p95_nanos": 32965,
-      "p99_nanos": 47841,
-      "total_nanos": 51245729
+      "p95_nanos": 26261,
+      "p99_nanos": 32477,
+      "total_nanos": 47990306
     },
     {
+      "ci95": {
+        "high_nanos": 5096,
+        "low_nanos": 4819
+      },
       "count": 503,
       "event": "katu.fn",
       "function": "kernel::log::resume",
-      "max_nanos": 26820,
-      "min_nanos": 3771,
-      "p50_nanos": 4749,
-      "p95_nanos": 5867,
-      "p99_nanos": 7962,
-      "total_nanos": 2474842
+      "max_nanos": 17181,
+      "min_nanos": 3282,
+      "p50_nanos": 4819,
+      "p95_nanos": 5727,
+      "p99_nanos": 8451,
+      "total_nanos": 2523269
     },
     {
+      "ci95": {
+        "high_nanos": 2052,
+        "low_nanos": 1886
+      },
       "count": 1006,
       "event": "katu.fn",
       "function": "kernel::log::session_path",
-      "max_nanos": 22559,
-      "min_nanos": 908,
+      "max_nanos": 15365,
+      "min_nanos": 488,
       "p50_nanos": 1886,
-      "p95_nanos": 3353,
-      "p99_nanos": 4820,
-      "total_nanos": 2082178
+      "p95_nanos": 2794,
+      "p99_nanos": 3352,
+      "total_nanos": 2010456
     },
     {
+      "ci95": {
+        "high_nanos": 1609,
+        "low_nanos": 1467
+      },
       "count": 502,
       "event": "katu.fn",
       "function": "kernel::memory_gate::capabilities_for",
-      "max_nanos": 16343,
-      "min_nanos": 907,
-      "p50_nanos": 1397,
+      "max_nanos": 2445,
+      "min_nanos": 908,
+      "p50_nanos": 1467,
       "p95_nanos": 1956,
-      "p99_nanos": 2444,
-      "total_nanos": 766378
+      "p99_nanos": 2374,
+      "total_nanos": 796058
     },
     {
+      "ci95": {
+        "high_nanos": 1643,
+        "low_nanos": 1467
+      },
       "count": 1004,
       "event": "katu.fn",
       "function": "kernel::memory_gate::memory_write_use",
-      "max_nanos": 28705,
+      "max_nanos": 14178,
       "min_nanos": 907,
-      "p50_nanos": 1397,
-      "p95_nanos": 1955,
-      "p99_nanos": 1956,
-      "total_nanos": 1449419
+      "p50_nanos": 1467,
+      "p95_nanos": 1956,
+      "p99_nanos": 2374,
+      "total_nanos": 1603093
     },
     {
+      "ci95": {
+        "high_nanos": 223495,
+        "low_nanos": 220232
+      },
+      "count": 502,
+      "event": "katu.fn",
+      "function": "kernel::pipeline::delta",
+      "max_nanos": 309402,
+      "min_nanos": 5168,
+      "p50_nanos": 221191,
+      "p95_nanos": 249966,
+      "p99_nanos": 270639,
+      "total_nanos": 111375540
+    },
+    {
+      "ci95": {
+        "high_nanos": 261266,
+        "low_nanos": 256880
+      },
       "count": 502,
       "event": "katu.fn",
       "function": "kernel::pipeline::dispatch_with",
-      "max_nanos": 390972,
-      "min_nanos": 12571,
-      "p50_nanos": 205054,
-      "p95_nanos": 262325,
-      "p99_nanos": 364293,
-      "total_nanos": 107715549
+      "max_nanos": 460890,
+      "min_nanos": 15225,
+      "p50_nanos": 256880,
+      "p95_nanos": 287680,
+      "p99_nanos": 325187,
+      "total_nanos": 130128143
     },
     {
+      "ci95": {
+        "high_nanos": 2091,
+        "low_nanos": 1955
+      },
       "count": 502,
       "event": "katu.fn",
       "function": "kernel::pipeline::facts_from",
-      "max_nanos": 22489,
-      "min_nanos": 977,
+      "max_nanos": 14178,
+      "min_nanos": 908,
       "p50_nanos": 1955,
-      "p95_nanos": 2933,
-      "p99_nanos": 3841,
-      "total_nanos": 1075704
+      "p95_nanos": 2445,
+      "p99_nanos": 4260,
+      "total_nanos": 1018856
     },
     {
+      "ci95": {
+        "high_nanos": 1553,
+        "low_nanos": 1466
+      },
       "count": 1004,
       "event": "katu.fn",
       "function": "kernel::pipeline::outcome",
-      "max_nanos": 16552,
-      "min_nanos": 907,
-      "p50_nanos": 1397,
-      "p95_nanos": 1886,
-      "p99_nanos": 1956,
-      "total_nanos": 1349989
+      "max_nanos": 12851,
+      "min_nanos": 908,
+      "p50_nanos": 1466,
+      "p95_nanos": 1955,
+      "p99_nanos": 2444,
+      "total_nanos": 1527037
     },
     {
-      "count": 501,
+      "ci95": {
+        "high_nanos": 1519,
+        "low_nanos": 1466
+      },
+      "count": 1003,
       "event": "katu.fn",
       "function": "kernel::pipeline::report",
-      "max_nanos": 2374,
-      "min_nanos": 907,
-      "p50_nanos": 1397,
-      "p95_nanos": 1886,
+      "max_nanos": 12083,
+      "min_nanos": 489,
+      "p50_nanos": 1466,
+      "p95_nanos": 1955,
       "p99_nanos": 1956,
-      "total_nanos": 670540
+      "total_nanos": 1497206
     },
     {
+      "ci95": {
+        "high_nanos": 1886,
+        "low_nanos": 908
+      },
       "count": 2,
       "event": "katu.fn",
       "function": "kernel::pipeline::skipped_outcome",
-      "max_nanos": 1956,
-      "min_nanos": 1466,
-      "p50_nanos": 1466,
-      "p95_nanos": 1956,
-      "p99_nanos": 1956,
-      "total_nanos": 3422
+      "max_nanos": 1886,
+      "min_nanos": 908,
+      "p50_nanos": 908,
+      "p95_nanos": 1886,
+      "p99_nanos": 1886,
+      "total_nanos": 2794
     },
     {
+      "ci95": {
+        "high_nanos": 212314,
+        "low_nanos": 208619
+      },
       "count": 501,
       "event": "katu.fn",
       "function": "kernel::pipeline::with_estimated_cost",
-      "max_nanos": 297106,
-      "min_nanos": 136749,
-      "p50_nanos": 157004,
-      "p95_nanos": 201632,
-      "p99_nanos": 278109,
-      "total_nanos": 82839473
+      "max_nanos": 391676,
+      "min_nanos": 176421,
+      "p50_nanos": 208619,
+      "p95_nanos": 235858,
+      "p99_nanos": 272804,
+      "total_nanos": 105575137
     },
     {
+      "ci95": {
+        "high_nanos": 57328,
+        "low_nanos": 56139
+      },
       "count": 2511,
       "event": "katu.fn",
       "function": "kernel::session::apply",
-      "max_nanos": 160775,
-      "min_nanos": 30032,
-      "p50_nanos": 50705,
-      "p95_nanos": 86324,
-      "p99_nanos": 113213,
-      "total_nanos": 136145590
+      "max_nanos": 232854,
+      "min_nanos": 31290,
+      "p50_nanos": 56223,
+      "p95_nanos": 79062,
+      "p99_nanos": 88700,
+      "total_nanos": 142457642
     },
     {
+      "ci95": {
+        "high_nanos": 1707,
+        "low_nanos": 1467
+      },
       "count": 502,
       "event": "katu.fn",
       "function": "kernel::session::context::log_outcome",
-      "max_nanos": 27937,
+      "max_nanos": 13689,
       "min_nanos": 908,
-      "p50_nanos": 1397,
-      "p95_nanos": 1955,
-      "p99_nanos": 2375,
-      "total_nanos": 770758
+      "p50_nanos": 1467,
+      "p95_nanos": 1956,
+      "p99_nanos": 2444,
+      "total_nanos": 823109
     },
     {
+      "ci95": {
+        "high_nanos": 12239,
+        "low_nanos": 11873
+      },
       "count": 503,
       "event": "katu.fn",
       "function": "kernel::session::identity::load_meta",
-      "max_nanos": 30032,
-      "min_nanos": 9080,
-      "p50_nanos": 11314,
-      "p95_nanos": 16413,
-      "p99_nanos": 24724,
-      "total_nanos": 6089433
+      "max_nanos": 28705,
+      "min_nanos": 9010,
+      "p50_nanos": 11873,
+      "p95_nanos": 13759,
+      "p99_nanos": 18299,
+      "total_nanos": 6082154
     },
     {
+      "ci95": {
+        "high_nanos": 1659,
+        "low_nanos": 1467
+      },
       "count": 503,
       "event": "katu.fn",
       "function": "kernel::session::identity::meta_path",
-      "max_nanos": 9010,
+      "max_nanos": 7613,
       "min_nanos": 908,
-      "p50_nanos": 1466,
+      "p50_nanos": 1467,
       "p95_nanos": 1956,
-      "p99_nanos": 2444,
-      "total_nanos": 770419
+      "p99_nanos": 2375,
+      "total_nanos": 817165
     },
     {
+      "ci95": {
+        "high_nanos": 1495,
+        "low_nanos": 1457
+      },
+      "count": 2511,
+      "event": "katu.fn",
+      "function": "kernel::session::maybe_snapshot",
+      "max_nanos": 15645,
+      "min_nanos": 908,
+      "p50_nanos": 1466,
+      "p95_nanos": 1886,
+      "p99_nanos": 2304,
+      "total_nanos": 3706043
+    },
+    {
+      "ci95": {
+        "high_nanos": 70115,
+        "low_nanos": 68306
+      },
       "count": 503,
       "event": "katu.fn",
       "function": "kernel::session::open",
-      "max_nanos": 139613,
-      "min_nanos": 54267,
-      "p50_nanos": 64883,
-      "p95_nanos": 94495,
-      "p99_nanos": 112794,
-      "total_nanos": 34940583
+      "max_nanos": 152815,
+      "min_nanos": 56712,
+      "p50_nanos": 68306,
+      "p95_nanos": 81017,
+      "p99_nanos": 89258,
+      "total_nanos": 34958073
     },
     {
+      "ci95": {
+        "high_nanos": 66557,
+        "low_nanos": 64884
+      },
       "count": 503,
       "event": "katu.fn",
       "function": "kernel::session::open_with_cap",
-      "max_nanos": 134794,
-      "min_nanos": 51543,
-      "p50_nanos": 61530,
-      "p95_nanos": 89118,
-      "p99_nanos": 107906,
-      "total_nanos": 33211721
+      "max_nanos": 148485,
+      "min_nanos": 54198,
+      "p50_nanos": 64884,
+      "p95_nanos": 76128,
+      "p99_nanos": 85626,
+      "total_nanos": 33177078
     },
     {
+      "ci95": {
+        "high_nanos": 11964,
+        "low_nanos": 11454
+      },
       "count": 503,
       "event": "katu.fn",
       "function": "kernel::session::snapshot::load",
-      "max_nanos": 42115,
-      "min_nanos": 9149,
-      "p50_nanos": 10895,
-      "p95_nanos": 14457,
-      "p99_nanos": 27658,
-      "total_nanos": 5832465
+      "max_nanos": 28007,
+      "min_nanos": 8940,
+      "p50_nanos": 11454,
+      "p95_nanos": 13340,
+      "p99_nanos": 22908,
+      "total_nanos": 5930042
     },
     {
+      "ci95": {
+        "high_nanos": 1568,
+        "low_nanos": 1466
+      },
       "count": 503,
       "event": "katu.fn",
       "function": "kernel::session::snapshot::snapshot_path",
-      "max_nanos": 8940,
+      "max_nanos": 2444,
       "min_nanos": 908,
       "p50_nanos": 1466,
-      "p95_nanos": 1955,
+      "p95_nanos": 1956,
       "p99_nanos": 2375,
-      "total_nanos": 745429
+      "total_nanos": 776432
     },
     {
+      "ci95": {
+        "high_nanos": 1816,
+        "low_nanos": 1636
+      },
       "count": 503,
       "event": "katu.fn",
       "function": "kernel::state::initial",
-      "max_nanos": 4400,
+      "max_nanos": 2864,
       "min_nanos": 908,
-      "p50_nanos": 1467,
-      "p95_nanos": 2374,
-      "p99_nanos": 2445,
-      "total_nanos": 788936
+      "p50_nanos": 1816,
+      "p95_nanos": 1956,
+      "p99_nanos": 2375,
+      "total_nanos": 835593
     },
     {
+      "ci95": {
+        "high_nanos": 1474,
+        "low_nanos": 1397
+      },
       "count": 1004,
       "event": "katu.fn",
       "function": "kernel::step::require_open",
-      "max_nanos": 2445,
-      "min_nanos": 907,
+      "max_nanos": 12641,
+      "min_nanos": 489,
       "p50_nanos": 1397,
       "p95_nanos": 1886,
-      "p99_nanos": 1956,
-      "total_nanos": 1297931
+      "p99_nanos": 2304,
+      "total_nanos": 1452040
     },
     {
+      "ci95": {
+        "high_nanos": 6261,
+        "low_nanos": 5797
+      },
       "count": 1004,
       "event": "katu.fn",
       "function": "kernel::step::tool_call",
-      "max_nanos": 39111,
-      "min_nanos": 3841,
-      "p50_nanos": 6635,
-      "p95_nanos": 10825,
-      "p99_nanos": 14317,
-      "total_nanos": 6819392
+      "max_nanos": 27168,
+      "min_nanos": 3772,
+      "p50_nanos": 5797,
+      "p95_nanos": 7682,
+      "p99_nanos": 11943,
+      "total_nanos": 6191643
     },
     {
+      "ci95": {
+        "high_nanos": 4072,
+        "low_nanos": 3702
+      },
       "count": 1004,
       "event": "katu.fn",
       "function": "kernel::step::tool_result",
-      "max_nanos": 23257,
-      "min_nanos": 1397,
-      "p50_nanos": 3352,
-      "p95_nanos": 7264,
-      "p99_nanos": 10127,
-      "total_nanos": 3818377
+      "max_nanos": 19136,
+      "min_nanos": 1466,
+      "p50_nanos": 3702,
+      "p95_nanos": 6635,
+      "p99_nanos": 12432,
+      "total_nanos": 3975722
     },
     {
+      "ci95": {
+        "high_nanos": 2004,
+        "low_nanos": 1886
+      },
       "count": 503,
       "event": "katu.fn",
       "function": "memory::fake::default",
-      "max_nanos": 18228,
-      "min_nanos": 978,
+      "max_nanos": 13479,
+      "min_nanos": 908,
       "p50_nanos": 1886,
-      "p95_nanos": 2445,
-      "p99_nanos": 3352,
-      "total_nanos": 948322
+      "p95_nanos": 2375,
+      "p99_nanos": 2863,
+      "total_nanos": 981541
     },
     {
+      "ci95": {
+        "high_nanos": 1501,
+        "low_nanos": 1397
+      },
       "count": 1003,
       "event": "katu.fn",
       "function": "memory::fake::failure",
-      "max_nanos": 17740,
-      "min_nanos": 489,
-      "p50_nanos": 1397,
-      "p95_nanos": 1886,
-      "p99_nanos": 2375,
-      "total_nanos": 1358547
-    },
-    {
-      "count": 502,
-      "event": "katu.fn",
-      "function": "memory::fake::pre_write",
-      "max_nanos": 25422,
-      "min_nanos": 3422,
-      "p50_nanos": 4330,
-      "p95_nanos": 5727,
-      "p99_nanos": 7264,
-      "total_nanos": 2289543
-    },
-    {
-      "count": 501,
-      "event": "katu.fn",
-      "function": "memory::fake::record",
-      "max_nanos": 26679,
-      "min_nanos": 6216,
-      "p50_nanos": 7683,
-      "p95_nanos": 10546,
-      "p99_nanos": 16762,
-      "total_nanos": 4112885
-    },
-    {
-      "count": 502,
-      "event": "katu.fn",
-      "function": "memory::fake::recorded",
-      "max_nanos": 2375,
-      "min_nanos": 907,
-      "p50_nanos": 1397,
-      "p95_nanos": 1886,
-      "p99_nanos": 1956,
-      "total_nanos": 692838
-    },
-    {
-      "count": 1002,
-      "event": "katu.fn",
-      "function": "memory::types::as_str",
-      "max_nanos": 17531,
-      "min_nanos": 907,
-      "p50_nanos": 1397,
-      "p95_nanos": 1886,
-      "p99_nanos": 1956,
-      "total_nanos": 1332007
-    },
-    {
-      "count": 501,
-      "event": "katu.fn",
-      "function": "memory::types::new",
-      "max_nanos": 15854,
-      "min_nanos": 907,
-      "p50_nanos": 1466,
-      "p95_nanos": 1956,
-      "p99_nanos": 2445,
-      "total_nanos": 770628
-    },
-    {
-      "count": 2511,
-      "event": "katu.fn",
-      "function": "ports::fs::mem::append",
-      "max_nanos": 28146,
-      "min_nanos": 3771,
-      "p50_nanos": 5098,
-      "p95_nanos": 7124,
-      "p99_nanos": 11384,
-      "total_nanos": 13501409
-    },
-    {
-      "count": 503,
-      "event": "katu.fn",
-      "function": "ports::fs::mem::exists",
-      "max_nanos": 24584,
-      "min_nanos": 3701,
-      "p50_nanos": 4749,
-      "p95_nanos": 6285,
-      "p99_nanos": 8660,
-      "total_nanos": 2461777
-    },
-    {
-      "count": 4020,
-      "event": "katu.fn",
-      "function": "ports::fs::mem::lock",
-      "max_nanos": 22000,
-      "min_nanos": 838,
-      "p50_nanos": 1397,
-      "p95_nanos": 1886,
-      "p99_nanos": 1956,
-      "total_nanos": 5488432
-    },
-    {
-      "count": 503,
-      "event": "katu.fn",
-      "function": "ports::fs::mem::new",
-      "max_nanos": 6635,
-      "min_nanos": 907,
-      "p50_nanos": 1397,
-      "p95_nanos": 1955,
-      "p99_nanos": 2375,
-      "total_nanos": 734371
-    },
-    {
-      "count": 1006,
-      "event": "katu.fn",
-      "function": "ports::fs::mem::read",
-      "max_nanos": 27238,
-      "min_nanos": 3352,
-      "p50_nanos": 4330,
-      "p95_nanos": 6076,
-      "p99_nanos": 16762,
-      "total_nanos": 4794358
-    },
-    {
-      "count": 501,
-      "event": "katu.fn",
-      "function": "report::envelope",
-      "max_nanos": 79270,
-      "min_nanos": 19486,
-      "p50_nanos": 21860,
-      "p95_nanos": 32477,
-      "p99_nanos": 43721,
-      "total_nanos": 11694742
-    },
-    {
-      "count": 501,
-      "event": "katu.fn",
-      "function": "report::push_next",
-      "max_nanos": 2375,
-      "min_nanos": 907,
-      "p50_nanos": 1397,
-      "p95_nanos": 1886,
-      "p99_nanos": 1956,
-      "total_nanos": 674244
-    },
-    {
-      "count": 501,
-      "event": "katu.fn",
-      "function": "report::with_id",
-      "max_nanos": 17390,
-      "min_nanos": 907,
-      "p50_nanos": 1397,
-      "p95_nanos": 1886,
-      "p99_nanos": 1956,
-      "total_nanos": 696394
-    },
-    {
-      "count": 5511,
-      "event": "katu.fn",
-      "function": "toon::colunar::emit_cell",
-      "max_nanos": 57200,
-      "min_nanos": 838,
-      "p50_nanos": 7473,
-      "p95_nanos": 9917,
-      "p99_nanos": 14876,
-      "total_nanos": 30040843
-    },
-    {
-      "count": 3006,
-      "event": "katu.fn",
-      "function": "toon::colunar::has_delimiter",
-      "max_nanos": 21092,
-      "min_nanos": 907,
-      "p50_nanos": 1467,
-      "p95_nanos": 2375,
-      "p99_nanos": 3283,
-      "total_nanos": 5008808
-    },
-    {
-      "count": 1002,
-      "event": "katu.fn",
-      "function": "toon::colunar::new",
-      "max_nanos": 31010,
-      "min_nanos": 907,
-      "p50_nanos": 1397,
-      "p95_nanos": 1955,
-      "p99_nanos": 2375,
-      "total_nanos": 1511288
-    },
-    {
-      "count": 501,
-      "event": "katu.fn",
-      "function": "toon::colunar::optional",
-      "max_nanos": 2444,
-      "min_nanos": 907,
-      "p50_nanos": 1397,
-      "p95_nanos": 1886,
-      "p99_nanos": 1956,
-      "total_nanos": 670467
-    },
-    {
-      "count": 1002,
-      "event": "katu.fn",
-      "function": "toon::colunar::push",
-      "max_nanos": 19206,
-      "min_nanos": 907,
-      "p50_nanos": 1397,
-      "p95_nanos": 1955,
-      "p99_nanos": 2305,
-      "total_nanos": 1437191
-    },
-    {
-      "count": 3006,
-      "event": "katu.fn",
-      "function": "toon::colunar::push_sanitized",
-      "max_nanos": 30521,
-      "min_nanos": 3422,
-      "p50_nanos": 4889,
-      "p95_nanos": 6775,
-      "p99_nanos": 10127,
-      "total_nanos": 15835605
-    },
-    {
-      "count": 2505,
-      "event": "katu.fn",
-      "function": "toon::colunar::text",
-      "max_nanos": 20674,
-      "min_nanos": 489,
-      "p50_nanos": 1397,
-      "p95_nanos": 1886,
-      "p99_nanos": 1956,
-      "total_nanos": 3384148
-    },
-    {
-      "count": 501,
-      "event": "katu.fn",
-      "function": "toon::project::cell",
-      "max_nanos": 8520,
-      "min_nanos": 3352,
-      "p50_nanos": 4331,
-      "p95_nanos": 5727,
-      "p99_nanos": 7264,
-      "total_nanos": 2312112
-    },
-    {
-      "count": 1002,
-      "event": "katu.fn",
-      "function": "toon::project::is_scalar",
-      "max_nanos": 16762,
-      "min_nanos": 907,
-      "p50_nanos": 1397,
-      "p95_nanos": 1885,
-      "p99_nanos": 1956,
-      "total_nanos": 1323218
-    },
-    {
-      "count": 501,
-      "event": "katu.fn",
-      "function": "toon::str",
-      "max_nanos": 13619,
-      "min_nanos": 907,
+      "max_nanos": 11594,
+      "min_nanos": 419,
       "p50_nanos": 1397,
       "p95_nanos": 1886,
       "p99_nanos": 2374,
-      "total_nanos": 677035
+      "total_nanos": 1477868
     },
     {
+      "ci95": {
+        "high_nanos": 4907,
+        "low_nanos": 4749
+      },
+      "count": 502,
+      "event": "katu.fn",
+      "function": "memory::fake::pre_write",
+      "max_nanos": 18019,
+      "min_nanos": 2864,
+      "p50_nanos": 4749,
+      "p95_nanos": 5587,
+      "p99_nanos": 6286,
+      "total_nanos": 2424021
+    },
+    {
+      "ci95": {
+        "high_nanos": 8572,
+        "low_nanos": 8172
+      },
+      "count": 501,
+      "event": "katu.fn",
+      "function": "memory::fake::record",
+      "max_nanos": 21093,
+      "min_nanos": 6565,
+      "p50_nanos": 8172,
+      "p95_nanos": 9987,
+      "p99_nanos": 12502,
+      "total_nanos": 4241942
+    },
+    {
+      "ci95": {
+        "high_nanos": 1636,
+        "low_nanos": 1445
+      },
+      "count": 502,
+      "event": "katu.fn",
+      "function": "memory::fake::recorded",
+      "max_nanos": 23258,
+      "min_nanos": 908,
+      "p50_nanos": 1466,
+      "p95_nanos": 1955,
+      "p99_nanos": 2305,
+      "total_nanos": 773228
+    },
+    {
+      "ci95": {
+        "high_nanos": 1501,
+        "low_nanos": 1397
+      },
+      "count": 1002,
+      "event": "katu.fn",
+      "function": "memory::types::as_str",
+      "max_nanos": 18578,
+      "min_nanos": 908,
+      "p50_nanos": 1397,
+      "p95_nanos": 1886,
+      "p99_nanos": 1956,
+      "total_nanos": 1467443
+    },
+    {
+      "ci95": {
+        "high_nanos": 1705,
+        "low_nanos": 1467
+      },
+      "count": 501,
+      "event": "katu.fn",
+      "function": "memory::types::new",
+      "max_nanos": 13479,
+      "min_nanos": 907,
+      "p50_nanos": 1467,
+      "p95_nanos": 1956,
+      "p99_nanos": 2863,
+      "total_nanos": 826430
+    },
+    {
+      "ci95": {
+        "high_nanos": 5445,
+        "low_nanos": 5238
+      },
+      "count": 2511,
+      "event": "katu.fn",
+      "function": "ports::fs::mem::append",
+      "max_nanos": 21791,
+      "min_nanos": 3352,
+      "p50_nanos": 5238,
+      "p95_nanos": 6566,
+      "p99_nanos": 10127,
+      "total_nanos": 13554325
+    },
+    {
+      "ci95": {
+        "high_nanos": 5257,
+        "low_nanos": 4889
+      },
+      "count": 503,
+      "event": "katu.fn",
+      "function": "ports::fs::mem::exists",
+      "max_nanos": 17810,
+      "min_nanos": 3353,
+      "p50_nanos": 4889,
+      "p95_nanos": 6216,
+      "p99_nanos": 9079,
+      "total_nanos": 2592400
+    },
+    {
+      "ci95": {
+        "high_nanos": 1522,
+        "low_nanos": 1466
+      },
+      "count": 4020,
+      "event": "katu.fn",
+      "function": "ports::fs::mem::lock",
+      "max_nanos": 16273,
+      "min_nanos": 489,
+      "p50_nanos": 1466,
+      "p95_nanos": 1955,
+      "p99_nanos": 2375,
+      "total_nanos": 6034726
+    },
+    {
+      "ci95": {
+        "high_nanos": 1696,
+        "low_nanos": 1467
+      },
+      "count": 503,
+      "event": "katu.fn",
+      "function": "ports::fs::mem::new",
+      "max_nanos": 13898,
+      "min_nanos": 908,
+      "p50_nanos": 1467,
+      "p95_nanos": 1956,
+      "p99_nanos": 2444,
+      "total_nanos": 821610
+    },
+    {
+      "ci95": {
+        "high_nanos": 4952,
+        "low_nanos": 4749
+      },
+      "count": 1006,
+      "event": "katu.fn",
+      "function": "ports::fs::mem::read",
+      "max_nanos": 20464,
+      "min_nanos": 3282,
+      "p50_nanos": 4749,
+      "p95_nanos": 5658,
+      "p99_nanos": 9289,
+      "total_nanos": 4908530
+    },
+    {
+      "ci95": {
+        "high_nanos": 28156,
+        "low_nanos": 27435
+      },
+      "count": 1002,
+      "event": "katu.fn",
+      "function": "report::envelope",
+      "max_nanos": 54408,
+      "min_nanos": 19067,
+      "p50_nanos": 28146,
+      "p95_nanos": 35829,
+      "p99_nanos": 44908,
+      "total_nanos": 27851182
+    },
+    {
+      "ci95": {
+        "high_nanos": 1583,
+        "low_nanos": 1466
+      },
+      "count": 1002,
+      "event": "katu.fn",
+      "function": "report::push_next",
+      "max_nanos": 18718,
+      "min_nanos": 419,
+      "p50_nanos": 1466,
+      "p95_nanos": 1956,
+      "p99_nanos": 2374,
+      "total_nanos": 1536890
+    },
+    {
+      "ci95": {
+        "high_nanos": 1502,
+        "low_nanos": 1454
+      },
+      "count": 1503,
+      "event": "katu.fn",
+      "function": "report::to_i64",
+      "max_nanos": 12432,
+      "min_nanos": 907,
+      "p50_nanos": 1466,
+      "p95_nanos": 1955,
+      "p99_nanos": 2374,
+      "total_nanos": 2221468
+    },
+    {
+      "ci95": {
+        "high_nanos": 1543,
+        "low_nanos": 1466
+      },
+      "count": 501,
+      "event": "katu.fn",
+      "function": "report::with_id",
+      "max_nanos": 2444,
+      "min_nanos": 908,
+      "p50_nanos": 1466,
+      "p95_nanos": 1956,
+      "p99_nanos": 2305,
+      "total_nanos": 761778
+    },
+    {
+      "ci95": {
+        "high_nanos": 52500,
+        "low_nanos": 51055
+      },
+      "count": 1002,
+      "event": "katu.fn",
+      "function": "toon::colunar::byte_len",
+      "max_nanos": 123481,
+      "min_nanos": 43093,
+      "p50_nanos": 51055,
+      "p95_nanos": 61532,
+      "p99_nanos": 70750,
+      "total_nanos": 52275892
+    },
+    {
+      "ci95": {
+        "high_nanos": 2745,
+        "low_nanos": 1467
+      },
+      "count": 11022,
+      "event": "katu.fn",
+      "function": "toon::colunar::cell_len",
+      "max_nanos": 25772,
+      "min_nanos": 489,
+      "p50_nanos": 1467,
+      "p95_nanos": 5308,
+      "p99_nanos": 6077,
+      "total_nanos": 29881336
+    },
+    {
+      "ci95": {
+        "high_nanos": 7543,
+        "low_nanos": 5261
+      },
+      "count": 11022,
+      "event": "katu.fn",
+      "function": "toon::colunar::emit_cell",
+      "max_nanos": 128789,
+      "min_nanos": 489,
+      "p50_nanos": 7543,
+      "p95_nanos": 9150,
+      "p99_nanos": 11454,
+      "total_nanos": 58773892
+    },
+    {
+      "ci95": {
+        "high_nanos": 1586,
+        "low_nanos": 1466
+      },
+      "count": 6012,
+      "event": "katu.fn",
+      "function": "toon::colunar::has_control_byte",
+      "max_nanos": 39671,
+      "min_nanos": 489,
+      "p50_nanos": 1466,
+      "p95_nanos": 1956,
+      "p99_nanos": 2375,
+      "total_nanos": 9414361
+    },
+    {
+      "ci95": {
+        "high_nanos": 1506,
+        "low_nanos": 1466
+      },
+      "count": 4008,
+      "event": "katu.fn",
+      "function": "toon::colunar::int_len",
+      "max_nanos": 14877,
+      "min_nanos": 489,
+      "p50_nanos": 1466,
+      "p95_nanos": 1955,
+      "p99_nanos": 2375,
+      "total_nanos": 5968533
+    },
+    {
+      "ci95": {
+        "high_nanos": 1520,
+        "low_nanos": 1461
+      },
+      "count": 2004,
+      "event": "katu.fn",
+      "function": "toon::colunar::new",
+      "max_nanos": 14877,
+      "min_nanos": 489,
+      "p50_nanos": 1466,
+      "p95_nanos": 1886,
+      "p99_nanos": 1956,
+      "total_nanos": 2986545
+    },
+    {
+      "ci95": {
+        "high_nanos": 1497,
+        "low_nanos": 1440
+      },
+      "count": 1002,
+      "event": "katu.fn",
+      "function": "toon::colunar::optional",
+      "max_nanos": 13829,
+      "min_nanos": 907,
+      "p50_nanos": 1466,
+      "p95_nanos": 1886,
+      "p99_nanos": 1956,
+      "total_nanos": 1471454
+    },
+    {
+      "ci95": {
+        "high_nanos": 1594,
+        "low_nanos": 1467
+      },
+      "count": 2004,
+      "event": "katu.fn",
+      "function": "toon::colunar::push",
+      "max_nanos": 13969,
+      "min_nanos": 489,
+      "p50_nanos": 1467,
+      "p95_nanos": 1956,
+      "p99_nanos": 2375,
+      "total_nanos": 3144947
+    },
+    {
+      "ci95": {
+        "high_nanos": 5083,
+        "low_nanos": 4819
+      },
+      "count": 6012,
+      "event": "katu.fn",
+      "function": "toon::colunar::push_sanitized",
+      "max_nanos": 123063,
+      "min_nanos": 2863,
+      "p50_nanos": 4819,
+      "p95_nanos": 5797,
+      "p99_nanos": 7194,
+      "total_nanos": 30260420
+    },
+    {
+      "ci95": {
+        "high_nanos": 1482,
+        "low_nanos": 1397
+      },
+      "count": 4008,
+      "event": "katu.fn",
+      "function": "toon::colunar::text",
+      "max_nanos": 15714,
+      "min_nanos": 489,
+      "p50_nanos": 1397,
+      "p95_nanos": 1886,
+      "p99_nanos": 1956,
+      "total_nanos": 5876358
+    },
+    {
+      "ci95": {
+        "high_nanos": 1492,
+        "low_nanos": 1460
+      },
+      "count": 1002,
+      "event": "katu.fn",
+      "function": "toon::project::cell",
+      "max_nanos": 3283,
+      "min_nanos": 907,
+      "p50_nanos": 1466,
+      "p95_nanos": 1955,
+      "p99_nanos": 1956,
+      "total_nanos": 1479245
+    },
+    {
+      "ci95": {
+        "high_nanos": 1458,
+        "low_nanos": 1397
+      },
+      "count": 2004,
+      "event": "katu.fn",
+      "function": "toon::project::is_scalar",
+      "max_nanos": 11733,
+      "min_nanos": 907,
+      "p50_nanos": 1397,
+      "p95_nanos": 1886,
+      "p99_nanos": 1956,
+      "total_nanos": 2890344
+    },
+    {
+      "ci95": {
+        "high_nanos": 1503,
+        "low_nanos": 1454
+      },
+      "count": 501,
+      "event": "katu.fn",
+      "function": "toon::str",
+      "max_nanos": 4330,
+      "min_nanos": 489,
+      "p50_nanos": 1466,
+      "p95_nanos": 1886,
+      "p99_nanos": 1956,
+      "total_nanos": 740696
+    },
+    {
+      "ci95": {
+        "high_nanos": 16487,
+        "low_nanos": 15715
+      },
       "count": 501,
       "event": "katu.fn",
       "function": "write::record_report",
-      "max_nanos": 49727,
-      "min_nanos": 13130,
-      "p50_nanos": 15156,
-      "p95_nanos": 21930,
-      "p99_nanos": 32476,
-      "total_nanos": 8103160
+      "max_nanos": 35690,
+      "min_nanos": 12502,
+      "p50_nanos": 15715,
+      "p95_nanos": 19067,
+      "p99_nanos": 27937,
+      "total_nanos": 8152965
     },
     {
+      "ci95": {
+        "high_nanos": 8007,
+        "low_nanos": 7806
+      },
       "count": 2511,
       "event": "kernel.step",
       "function": "kernel::step::step",
-      "max_nanos": 49728,
-      "min_nanos": 3771,
-      "p50_nanos": 7543,
-      "p95_nanos": 13269,
-      "p99_nanos": 19905,
-      "total_nanos": 20161785
+      "max_nanos": 32337,
+      "min_nanos": 3283,
+      "p50_nanos": 7962,
+      "p95_nanos": 11105,
+      "p99_nanos": 18997,
+      "total_nanos": 19852968
     },
     {
+      "ci95": {
+        "high_nanos": 53944,
+        "low_nanos": 52761
+      },
       "count": 2511,
       "event": "kernel.transition",
       "function": "kernel::session::apply_at",
-      "max_nanos": 155467,
-      "min_nanos": 26749,
-      "p50_nanos": 47492,
-      "p95_nanos": 82692,
-      "p99_nanos": 108255,
-      "total_nanos": 127819012
+      "max_nanos": 229432,
+      "min_nanos": 28356,
+      "p50_nanos": 52801,
+      "p95_nanos": 75500,
+      "p99_nanos": 85347,
+      "total_nanos": 133968250
     },
     {
+      "ci95": {
+        "high_nanos": 1829,
+        "low_nanos": 1650
+      },
       "count": 503,
       "event": "kernel.transition",
       "function": "kernel::step::turn_start",
-      "max_nanos": 18019,
+      "max_nanos": 19975,
       "min_nanos": 908,
-      "p50_nanos": 1467,
-      "p95_nanos": 2375,
-      "p99_nanos": 3352,
-      "total_nanos": 847320
+      "p50_nanos": 1816,
+      "p95_nanos": 1956,
+      "p99_nanos": 2445,
+      "total_nanos": 875108
     },
     {
+      "ci95": {
+        "high_nanos": 15854,
+        "low_nanos": 15541
+      },
       "count": 2511,
       "event": "log.append",
       "function": "kernel::log::append",
-      "max_nanos": 66070,
-      "min_nanos": 10267,
-      "p50_nanos": 15645,
-      "p95_nanos": 28914,
-      "p99_nanos": 42953,
-      "total_nanos": 42866113
+      "max_nanos": 39601,
+      "min_nanos": 8521,
+      "p50_nanos": 15854,
+      "p95_nanos": 22280,
+      "p99_nanos": 28216,
+      "total_nanos": 39404570
     },
     {
+      "ci95": {
+        "high_nanos": 8821,
+        "low_nanos": 8521
+      },
       "count": 503,
       "event": "log.replay",
       "function": "kernel::log::read_records_with_len",
-      "max_nanos": 29822,
-      "min_nanos": 6565,
-      "p50_nanos": 8032,
-      "p95_nanos": 10407,
-      "p99_nanos": 14667,
-      "total_nanos": 4260063
+      "max_nanos": 21162,
+      "min_nanos": 6147,
+      "p50_nanos": 8521,
+      "p95_nanos": 10337,
+      "p99_nanos": 13130,
+      "total_nanos": 4380120
     },
     {
+      "ci95": {
+        "high_nanos": 278722,
+        "low_nanos": 274132
+      },
       "count": 502,
       "event": "memory.write",
       "function": "kernel::memory_gate::enforce_memory_write",
-      "max_nanos": 418700,
-      "min_nanos": 34851,
-      "p50_nanos": 221886,
-      "p95_nanos": 281042,
-      "p99_nanos": 391881,
-      "total_nanos": 116264360
+      "max_nanos": 482331,
+      "min_nanos": 35340,
+      "p50_nanos": 274132,
+      "p95_nanos": 307167,
+      "p99_nanos": 344323,
+      "total_nanos": 138854185
     },
     {
+      "ci95": {
+        "high_nanos": 643341,
+        "low_nanos": 632772
+      },
       "count": 502,
       "event": "memory.write",
       "function": "kernel::session::memory_write",
-      "max_nanos": 706796,
-      "min_nanos": 185010,
-      "p50_nanos": 347741,
-      "p95_nanos": 454668,
-      "p99_nanos": 623824,
-      "total_nanos": 182845362
+      "max_nanos": 945387,
+      "min_nanos": 237884,
+      "p50_nanos": 632772,
+      "p95_nanos": 708900,
+      "p99_nanos": 764564,
+      "total_nanos": 320925441
     },
     {
+      "ci95": {
+        "high_nanos": 2789,
+        "low_nanos": 2445
+      },
       "count": 502,
       "event": "policy.evaluate",
-      "function": null,
-      "max_nanos": 19137,
-      "min_nanos": 1396,
-      "p50_nanos": 2444,
-      "p95_nanos": 5238,
-      "p99_nanos": 7612,
-      "total_nanos": 1545650
+      "function": "policy::evaluate",
+      "max_nanos": 12362,
+      "min_nanos": 1467,
+      "p50_nanos": 2445,
+      "p95_nanos": 3353,
+      "p99_nanos": 7124,
+      "total_nanos": 1362151
     },
     {
+      "ci95": {
+        "high_nanos": 62779,
+        "low_nanos": 61042
+      },
       "count": 503,
       "event": "store.load",
       "function": "kernel::session::open_with_cost",
-      "max_nanos": 127111,
-      "min_nanos": 48679,
-      "p50_nanos": 58178,
-      "p95_nanos": 84369,
-      "p99_nanos": 102178,
-      "total_nanos": 31354224
+      "max_nanos": 132980,
+      "min_nanos": 51334,
+      "p50_nanos": 61042,
+      "p95_nanos": 72287,
+      "p99_nanos": 81786,
+      "total_nanos": 31295247
     },
     {
+      "ci95": {
+        "high_nanos": 34248,
+        "low_nanos": 32965
+      },
       "count": 501,
       "event": "tool.write",
       "function": "write::execute",
-      "max_nanos": 78712,
-      "min_nanos": 28146,
-      "p50_nanos": 31498,
-      "p95_nanos": 47004,
-      "p99_nanos": 58388,
-      "total_nanos": 16826981
+      "max_nanos": 57131,
+      "min_nanos": 26610,
+      "p50_nanos": 32965,
+      "p95_nanos": 41068,
+      "p99_nanos": 48121,
+      "total_nanos": 17002427
     },
     {
+      "ci95": {
+        "high_nanos": 216646,
+        "low_nanos": 213928
+      },
       "count": 501,
       "event": "toon.emit",
-      "function": "report::to_toon",
-      "max_nanos": 291518,
-      "min_nanos": 133886,
-      "p50_nanos": 153721,
-      "p95_nanos": 197372,
-      "p99_nanos": 272382,
-      "total_nanos": 81080945
+      "function": "report::to_delta",
+      "max_nanos": 300881,
+      "min_nanos": 175863,
+      "p50_nanos": 213928,
+      "p95_nanos": 241865,
+      "p99_nanos": 263097,
+      "total_nanos": 107860156
     },
     {
-      "count": 501,
-      "event": "toon.emit",
-      "function": "toon::colunar::emit",
-      "max_nanos": 171531,
-      "min_nanos": 75708,
-      "p50_nanos": 89118,
-      "p95_nanos": 122083,
-      "p99_nanos": 157981,
-      "total_nanos": 47306495
-    },
-    {
+      "ci95": {
+        "high_nanos": 210553,
+        "low_nanos": 207432
+      },
       "count": 1002,
       "event": "toon.emit",
-      "function": "toon::colunar::emit_rows",
-      "max_nanos": 119010,
-      "min_nanos": 18228,
-      "p50_nanos": 51962,
-      "p95_nanos": 76058,
-      "p99_nanos": 107206,
-      "total_nanos": 44463397
+      "function": "report::to_toon",
+      "max_nanos": 385530,
+      "min_nanos": 173000,
+      "p50_nanos": 207432,
+      "p95_nanos": 235509,
+      "p99_nanos": 266868,
+      "total_nanos": 209933756
     },
     {
-      "count": 501,
+      "ci95": {
+        "high_nanos": 143821,
+        "low_nanos": 141849
+      },
+      "count": 1002,
+      "event": "toon.emit",
+      "function": "toon::colunar::emit",
+      "max_nanos": 306887,
+      "min_nanos": 116847,
+      "p50_nanos": 141849,
+      "p95_nanos": 160637,
+      "p99_nanos": 182568,
+      "total_nanos": 143342180
+    },
+    {
+      "ci95": {
+        "high_nanos": 50007,
+        "low_nanos": 40733
+      },
+      "count": 2004,
+      "event": "toon.emit",
+      "function": "toon::colunar::emit_rows",
+      "max_nanos": 206874,
+      "min_nanos": 17112,
+      "p50_nanos": 50007,
+      "p95_nanos": 67678,
+      "p99_nanos": 76827,
+      "total_nanos": 83408049
+    },
+    {
+      "ci95": {
+        "high_nanos": 26860,
+        "low_nanos": 25981
+      },
+      "count": 1002,
       "event": "toon.project",
       "function": "toon::project::project",
-      "max_nanos": 80108,
-      "min_nanos": 25841,
-      "p50_nanos": 29124,
-      "p95_nanos": 41067,
-      "p99_nanos": 53429,
-      "total_nanos": 15578699
+      "max_nanos": 69563,
+      "min_nanos": 20394,
+      "p50_nanos": 25981,
+      "p95_nanos": 32406,
+      "p99_nanos": 40229,
+      "total_nanos": 26707107
     },
     {
-      "count": 501,
+      "ci95": {
+        "high_nanos": 23281,
+        "low_nanos": 22489
+      },
+      "count": 1002,
       "event": "toon.project",
       "function": "toon::project::project_map",
-      "max_nanos": 73962,
-      "min_nanos": 22978,
-      "p50_nanos": 25772,
-      "p95_nanos": 36248,
-      "p99_nanos": 46445,
-      "total_nanos": 13743326
+      "max_nanos": 41836,
+      "min_nanos": 18019,
+      "p50_nanos": 22489,
+      "p95_nanos": 27448,
+      "p99_nanos": 34851,
+      "total_nanos": 23154770
     }
   ],
   "gates": {
     "provider": {
       "budget_p95_nanos": 5000000,
       "gate": "gate:provider",
-      "measured_p95_nanos": 2251760
+      "measured_p95_nanos": 1862137
     },
     "render": {
       "budget_p95_nanos": 3000000,
       "gate": "gate:render",
-      "measured_p95_nanos": 1027438
+      "measured_p95_nanos": 933932
     }
   },
   "instrument": true,
@@ -938,338 +1343,498 @@
     "operations: real CLI/turn runs (prime/config/memo doctor/run llama) with instrument ON, dev build; wrapper spans (katu.run/cli.run/kernel.turn/provider.request) are totals incl. children.",
     "baseline_release: committed bench/mvk/raw.json, release, instrument OFF (zero-cost path).",
     "katu-policy and const fn are excluded from coverage by design/possibility.",
-    "live per-function attribution is not in stderr; the sink does not print Record.function (aggregating harness only)."
+    "per-function attribution: the stderr sink prints Record.function (Q-09); the aggregating sink groups by (event, function). Percentiles carry a 95% CI (W7/E18-T10)."
   ],
   "operations": [
     {
-      "count": 522,
-      "event": "katu.fn",
-      "max_nanos": 20206576829,
-      "min_nanos": 907,
-      "p50_nanos": 3841,
-      "p95_nanos": 394674,
-      "p99_nanos": 20197225683,
-      "total_nanos": 141442827744
+      "ci95": {
+        "high_nanos": 980002,
+        "low_nanos": 234216
+      },
+      "count": 8,
+      "event": "bootstrap.init",
+      "max_nanos": 1349494,
+      "min_nanos": 16133,
+      "p50_nanos": 375613,
+      "p95_nanos": 1349494,
+      "p99_nanos": 1349494,
+      "total_nanos": 4676366
     },
     {
-      "count": 10,
-      "event": "provider.request",
-      "max_nanos": 20196631193,
-      "min_nanos": 1886,
-      "p50_nanos": 20195339195,
-      "p95_nanos": 20196631193,
-      "p99_nanos": 20196631193,
-      "total_nanos": 121177190519
-    },
-    {
-      "count": 4,
-      "event": "cli.run",
-      "max_nanos": 20205613645,
-      "min_nanos": 1009070,
-      "p50_nanos": 20204551706,
-      "p95_nanos": 20205613645,
-      "p99_nanos": 20205613645,
-      "total_nanos": 60615692603
-    },
-    {
-      "count": 4,
-      "event": "katu.run",
-      "max_nanos": 20206916399,
-      "min_nanos": 639050,
-      "p50_nanos": 1616481,
-      "p95_nanos": 20206916399,
-      "p99_nanos": 20206916399,
-      "total_nanos": 20210478455
-    },
-    {
-      "count": 1,
-      "event": "kernel.turn",
-      "max_nanos": 20200339426,
-      "min_nanos": 20200339426,
-      "p50_nanos": 20200339426,
-      "p95_nanos": 20200339426,
-      "p99_nanos": 20200339426,
-      "total_nanos": 20200339426
-    },
-    {
-      "count": 53,
-      "event": "provider.chunk",
-      "max_nanos": 1241362,
-      "min_nanos": 1327,
-      "p50_nanos": 193880,
-      "p95_nanos": 680116,
-      "p99_nanos": 1000968,
-      "total_nanos": 14750104
-    },
-    {
-      "count": 45,
-      "event": "config.load",
-      "max_nanos": 921837,
-      "min_nanos": 1396,
-      "p50_nanos": 2374,
-      "p95_nanos": 786275,
-      "p99_nanos": 921837,
-      "total_nanos": 4289591
-    },
-    {
-      "count": 2,
-      "event": "cli.memo",
-      "max_nanos": 1436081,
-      "min_nanos": 1417223,
-      "p50_nanos": 1417223,
-      "p95_nanos": 1436081,
-      "p99_nanos": 1436081,
-      "total_nanos": 2853304
-    },
-    {
+      "ci95": {
+        "high_nanos": 671045,
+        "low_nanos": 661128
+      },
       "count": 2,
       "event": "cli.config",
-      "max_nanos": 1115089,
-      "min_nanos": 1073114,
-      "p50_nanos": 1073114,
-      "p95_nanos": 1115089,
-      "p99_nanos": 1115089,
-      "total_nanos": 2188203
+      "max_nanos": 671045,
+      "min_nanos": 661128,
+      "p50_nanos": 661128,
+      "p95_nanos": 671045,
+      "p99_nanos": 671045,
+      "total_nanos": 1332173
     },
     {
-      "count": 5,
-      "event": "bootstrap.init",
-      "max_nanos": 860657,
-      "min_nanos": 30032,
-      "p50_nanos": 181308,
-      "p95_nanos": 860657,
-      "p99_nanos": 860657,
-      "total_nanos": 1618018
-    },
-    {
-      "count": 7,
-      "event": "kernel.transition",
-      "max_nanos": 380636,
-      "min_nanos": 1955,
-      "p50_nanos": 278807,
-      "p95_nanos": 380636,
-      "p99_nanos": 380636,
-      "total_nanos": 1480289
-    },
-    {
-      "count": 1,
-      "event": "session.open",
-      "max_nanos": 1325242,
-      "min_nanos": 1325242,
-      "p50_nanos": 1325242,
-      "p95_nanos": 1325242,
-      "p99_nanos": 1325242,
-      "total_nanos": 1325242
-    },
-    {
-      "count": 4,
-      "event": "katu.shutdown",
-      "max_nanos": 265258,
-      "min_nanos": 119010,
-      "p50_nanos": 261417,
-      "p95_nanos": 265258,
-      "p99_nanos": 265258,
-      "total_nanos": 776917
-    },
-    {
-      "count": 1,
-      "event": "kernel.stop",
-      "max_nanos": 556986,
-      "min_nanos": 556986,
-      "p50_nanos": 556986,
-      "p95_nanos": 556986,
-      "p99_nanos": 556986,
-      "total_nanos": 556986
-    },
-    {
-      "count": 2,
-      "event": "policy.load",
-      "max_nanos": 368833,
-      "min_nanos": 113493,
-      "p50_nanos": 113493,
-      "p95_nanos": 368833,
-      "p99_nanos": 368833,
-      "total_nanos": 482326
-    },
-    {
-      "count": 3,
-      "event": "cli.prime",
-      "max_nanos": 250801,
-      "min_nanos": 10127,
-      "p50_nanos": 160217,
-      "p95_nanos": 250801,
-      "p99_nanos": 250801,
-      "total_nanos": 421145
-    },
-    {
-      "count": 5,
-      "event": "log.append",
-      "max_nanos": 140521,
-      "min_nanos": 39041,
-      "p50_nanos": 74451,
-      "p95_nanos": 140521,
-      "p99_nanos": 140521,
-      "total_nanos": 414999
-    },
-    {
-      "count": 1,
-      "event": "store.load",
-      "max_nanos": 396769,
-      "min_nanos": 396769,
-      "p50_nanos": 396769,
-      "p95_nanos": 396769,
-      "p99_nanos": 396769,
-      "total_nanos": 396769
-    },
-    {
-      "count": 2,
-      "event": "memory.open",
-      "max_nanos": 206172,
-      "min_nanos": 183055,
-      "p50_nanos": 183055,
-      "p95_nanos": 206172,
-      "p99_nanos": 206172,
-      "total_nanos": 389227
-    },
-    {
-      "count": 1,
-      "event": "context.build",
-      "max_nanos": 377075,
-      "min_nanos": 377075,
-      "p50_nanos": 377075,
-      "p95_nanos": 377075,
-      "p99_nanos": 377075,
-      "total_nanos": 377075
-    },
-    {
-      "count": 7,
-      "event": "fs.write",
-      "max_nanos": 145340,
-      "min_nanos": 9638,
-      "p50_nanos": 25283,
-      "p95_nanos": 145340,
-      "p99_nanos": 145340,
-      "total_nanos": 319037
-    },
-    {
-      "count": 3,
-      "event": "log.replay",
-      "max_nanos": 174114,
-      "min_nanos": 27168,
-      "p50_nanos": 79619,
-      "p95_nanos": 174114,
-      "p99_nanos": 174114,
-      "total_nanos": 280901
-    },
-    {
-      "count": 5,
-      "event": "kernel.step",
-      "max_nanos": 47492,
-      "min_nanos": 25701,
-      "p50_nanos": 29962,
-      "p95_nanos": 47492,
-      "p99_nanos": 47492,
-      "total_nanos": 176070
-    },
-    {
-      "count": 1,
-      "event": "skill.discover",
-      "max_nanos": 103435,
-      "min_nanos": 103435,
-      "p50_nanos": 103435,
-      "p95_nanos": 103435,
-      "p99_nanos": 103435,
-      "total_nanos": 103435
-    },
-    {
-      "count": 4,
-      "event": "fs.read",
-      "max_nanos": 30731,
-      "min_nanos": 15645,
-      "p50_nanos": 20743,
-      "p95_nanos": 30731,
-      "p99_nanos": 30731,
-      "total_nanos": 82834
-    },
-    {
-      "count": 1,
-      "event": "cost.check",
-      "max_nanos": 65581,
-      "min_nanos": 65581,
-      "p50_nanos": 65581,
-      "p95_nanos": 65581,
-      "p99_nanos": 65581,
-      "total_nanos": 65581
-    },
-    {
-      "count": 2,
-      "event": "memory.status",
-      "max_nanos": 32896,
-      "min_nanos": 28076,
-      "p50_nanos": 28076,
-      "p95_nanos": 32896,
-      "p99_nanos": 32896,
-      "total_nanos": 60972
-    },
-    {
-      "count": 3,
-      "event": "fs.mkdir",
-      "max_nanos": 36667,
-      "min_nanos": 7194,
-      "p50_nanos": 16273,
-      "p95_nanos": 36667,
-      "p99_nanos": 36667,
-      "total_nanos": 60134
-    },
-    {
-      "count": 2,
-      "event": "fs.list",
-      "max_nanos": 31988,
-      "min_nanos": 26749,
-      "p50_nanos": 26749,
-      "p95_nanos": 31988,
-      "p99_nanos": 31988,
-      "total_nanos": 58737
-    },
-    {
-      "count": 1,
-      "event": "scope.load",
-      "max_nanos": 53917,
-      "min_nanos": 53917,
-      "p50_nanos": 53917,
-      "p95_nanos": 53917,
-      "p99_nanos": 53917,
-      "total_nanos": 53917
-    },
-    {
-      "count": 1,
-      "event": "context.trim",
-      "max_nanos": 48470,
-      "min_nanos": 48470,
-      "p50_nanos": 48470,
-      "p95_nanos": 48470,
-      "p99_nanos": 48470,
-      "total_nanos": 48470
-    },
-    {
+      "ci95": {
+        "high_nanos": 12990,
+        "low_nanos": 2864
+      },
       "count": 2,
       "event": "cli.input",
-      "max_nanos": 7124,
-      "min_nanos": 1396,
-      "p50_nanos": 1396,
-      "p95_nanos": 7124,
-      "p99_nanos": 7124,
-      "total_nanos": 8520
+      "max_nanos": 12990,
+      "min_nanos": 2864,
+      "p50_nanos": 2864,
+      "p95_nanos": 12990,
+      "p99_nanos": 12990,
+      "total_nanos": 15854
     },
     {
+      "ci95": {
+        "high_nanos": 943012,
+        "low_nanos": 934351
+      },
+      "count": 2,
+      "event": "cli.memo",
+      "max_nanos": 943012,
+      "min_nanos": 934351,
+      "p50_nanos": 934351,
+      "p95_nanos": 943012,
+      "p99_nanos": 943012,
+      "total_nanos": 1877363
+    },
+    {
+      "ci95": {
+        "high_nanos": 117266,
+        "low_nanos": 8032
+      },
       "count": 3,
+      "event": "cli.prime",
+      "max_nanos": 117266,
+      "min_nanos": 8032,
+      "p50_nanos": 91982,
+      "p95_nanos": 117266,
+      "p99_nanos": 117266,
+      "total_nanos": 217280
+    },
+    {
+      "ci95": {
+        "high_nanos": 29966458111,
+        "low_nanos": 7491924710
+      },
+      "count": 4,
+      "event": "cli.run",
+      "max_nanos": 29966606230,
+      "min_nanos": 557691,
+      "p50_nanos": 29966013757,
+      "p95_nanos": 29966606230,
+      "p99_nanos": 29966606230,
+      "total_nanos": 89899203448
+    },
+    {
+      "ci95": {
+        "high_nanos": 74077,
+        "low_nanos": 2375
+      },
+      "count": 73,
+      "event": "config.load",
+      "max_nanos": 474719,
+      "min_nanos": 1397,
+      "p50_nanos": 2375,
+      "p95_nanos": 423175,
+      "p99_nanos": 474719,
+      "total_nanos": 3453779
+    },
+    {
+      "ci95": {
+        "high_nanos": 330005,
+        "low_nanos": 1588
+      },
+      "count": 4,
+      "event": "context.build",
+      "max_nanos": 439379,
+      "min_nanos": 1466,
+      "p50_nanos": 1885,
+      "p95_nanos": 439379,
+      "p99_nanos": 439379,
+      "total_nanos": 444685
+    },
+    {
+      "ci95": {
+        "high_nanos": 200378,
+        "low_nanos": 12362
+      },
+      "count": 2,
+      "event": "context.trim",
+      "max_nanos": 200378,
+      "min_nanos": 12362,
+      "p50_nanos": 12362,
+      "p95_nanos": 200378,
+      "p99_nanos": 200378,
+      "total_nanos": 212740
+    },
+    {
+      "ci95": {
+        "high_nanos": 31220,
+        "low_nanos": 31220
+      },
+      "count": 1,
+      "event": "cost.check",
+      "max_nanos": 31220,
+      "min_nanos": 31220,
+      "p50_nanos": 31220,
+      "p95_nanos": 31220,
+      "p99_nanos": 31220,
+      "total_nanos": 31220
+    },
+    {
+      "ci95": {
+        "high_nanos": 466757,
+        "low_nanos": 21372
+      },
+      "count": 2,
+      "event": "fs.list",
+      "max_nanos": 466757,
+      "min_nanos": 21372,
+      "p50_nanos": 21372,
+      "p95_nanos": 466757,
+      "p99_nanos": 466757,
+      "total_nanos": 488129
+    },
+    {
+      "ci95": {
+        "high_nanos": 148066,
+        "low_nanos": 10127
+      },
+      "count": 3,
+      "event": "fs.mkdir",
+      "max_nanos": 148066,
+      "min_nanos": 10127,
+      "p50_nanos": 18648,
+      "p95_nanos": 148066,
+      "p99_nanos": 148066,
+      "total_nanos": 176841
+    },
+    {
+      "ci95": {
+        "high_nanos": 290044,
+        "low_nanos": 93105
+      },
+      "count": 13,
+      "event": "fs.read",
+      "max_nanos": 566002,
+      "min_nanos": 12362,
+      "p50_nanos": 157983,
+      "p95_nanos": 566002,
+      "p99_nanos": 566002,
+      "total_nanos": 2394126
+    },
+    {
+      "ci95": {
+        "high_nanos": 696939,
+        "low_nanos": 478280
+      },
+      "count": 8,
+      "event": "fs.write",
+      "max_nanos": 926179,
+      "min_nanos": 446153,
+      "p50_nanos": 478979,
+      "p95_nanos": 926179,
+      "p99_nanos": 926179,
+      "total_nanos": 4580401
+    },
+    {
+      "ci95": {
+        "high_nanos": 419054046,
+        "low_nanos": 3772
+      },
+      "count": 870,
+      "event": "katu.fn",
+      "max_nanos": 29967996652,
+      "min_nanos": 907,
+      "p50_nanos": 3772,
+      "p95_nanos": 482331,
+      "p99_nanos": 11262223,
+      "total_nanos": 209773318378
+    },
+    {
+      "ci95": {
+        "high_nanos": 22476255015,
+        "low_nanos": 426963
+      },
+      "count": 4,
+      "event": "katu.run",
+      "max_nanos": 29968084374,
+      "min_nanos": 225870,
+      "p50_nanos": 766940,
+      "p95_nanos": 29968084374,
+      "p99_nanos": 29968084374,
+      "total_nanos": 29970107429
+    },
+    {
+      "ci95": {
+        "high_nanos": 75132,
+        "low_nanos": 62893
+      },
+      "count": 4,
+      "event": "katu.shutdown",
+      "max_nanos": 77734,
+      "min_nanos": 61112,
+      "p50_nanos": 67328,
+      "p95_nanos": 77734,
+      "p99_nanos": 77734,
+      "total_nanos": 274410
+    },
+    {
+      "ci95": {
+        "high_nanos": 24526,
+        "low_nanos": 12711
+      },
+      "count": 6,
+      "event": "kernel.step",
+      "max_nanos": 32686,
+      "min_nanos": 12502,
+      "p50_nanos": 12851,
+      "p95_nanos": 32686,
+      "p99_nanos": 32686,
+      "total_nanos": 107139
+    },
+    {
+      "ci95": {
+        "high_nanos": 817714,
+        "low_nanos": 817714
+      },
+      "count": 1,
+      "event": "kernel.stop",
+      "max_nanos": 817714,
+      "min_nanos": 817714,
+      "p50_nanos": 817714,
+      "p95_nanos": 817714,
+      "p99_nanos": 817714,
+      "total_nanos": 817714
+    },
+    {
+      "ci95": {
+        "high_nanos": 779860,
+        "low_nanos": 302469
+      },
+      "count": 8,
+      "event": "kernel.transition",
+      "max_nanos": 1129142,
+      "min_nanos": 2863,
+      "p50_nanos": 573266,
+      "p95_nanos": 1129142,
+      "p99_nanos": 1129142,
+      "total_nanos": 4288113
+    },
+    {
+      "ci95": {
+        "high_nanos": 29954311877,
+        "low_nanos": 29954311877
+      },
+      "count": 1,
+      "event": "kernel.turn",
+      "max_nanos": 29954311877,
+      "min_nanos": 29954311877,
+      "p50_nanos": 29954311877,
+      "p95_nanos": 29954311877,
+      "p99_nanos": 29954311877,
+      "total_nanos": 29954311877
+    },
+    {
+      "ci95": {
+        "high_nanos": 723247,
+        "low_nanos": 305391
+      },
+      "count": 7,
+      "event": "log.append",
+      "max_nanos": 1001679,
+      "min_nanos": 1886,
+      "p50_nanos": 499373,
+      "p95_nanos": 1001679,
+      "p99_nanos": 1001679,
+      "total_nanos": 3678878
+    },
+    {
+      "ci95": {
+        "high_nanos": 124040,
+        "low_nanos": 34432
+      },
+      "count": 3,
+      "event": "log.replay",
+      "max_nanos": 124040,
+      "min_nanos": 34432,
+      "p50_nanos": 73125,
+      "p95_nanos": 124040,
+      "p99_nanos": 124040,
+      "total_nanos": 231597
+    },
+    {
+      "ci95": {
+        "high_nanos": 250175,
+        "low_nanos": 215324
+      },
+      "count": 2,
+      "event": "memory.open",
+      "max_nanos": 250175,
+      "min_nanos": 215324,
+      "p50_nanos": 215324,
+      "p95_nanos": 250175,
+      "p99_nanos": 250175,
+      "total_nanos": 465499
+    },
+    {
+      "ci95": {
+        "high_nanos": 24095,
+        "low_nanos": 15156
+      },
+      "count": 2,
+      "event": "memory.status",
+      "max_nanos": 24095,
+      "min_nanos": 15156,
+      "p50_nanos": 15156,
+      "p95_nanos": 24095,
+      "p99_nanos": 24095,
+      "total_nanos": 39251
+    },
+    {
+      "ci95": {
+        "high_nanos": 1938,
+        "low_nanos": 1571
+      },
+      "count": 4,
       "event": "model.project",
-      "max_nanos": 1886,
-      "min_nanos": 1396,
-      "p50_nanos": 1397,
-      "p95_nanos": 1886,
-      "p99_nanos": 1886,
-      "total_nanos": 4679
+      "max_nanos": 1956,
+      "min_nanos": 1467,
+      "p50_nanos": 1886,
+      "p95_nanos": 1956,
+      "p99_nanos": 1956,
+      "total_nanos": 7195
+    },
+    {
+      "ci95": {
+        "high_nanos": 13829,
+        "low_nanos": 13829
+      },
+      "count": 1,
+      "event": "policy.audit",
+      "max_nanos": 13829,
+      "min_nanos": 13829,
+      "p50_nanos": 13829,
+      "p95_nanos": 13829,
+      "p99_nanos": 13829,
+      "total_nanos": 13829
+    },
+    {
+      "ci95": {
+        "high_nanos": 371631,
+        "low_nanos": 84021
+      },
+      "count": 2,
+      "event": "policy.load",
+      "max_nanos": 371631,
+      "min_nanos": 84021,
+      "p50_nanos": 84021,
+      "p95_nanos": 371631,
+      "p99_nanos": 371631,
+      "total_nanos": 455652
+    },
+    {
+      "ci95": {
+        "high_nanos": 154972,
+        "low_nanos": 110588
+      },
+      "count": 102,
+      "event": "provider.chunk",
+      "max_nanos": 408857,
+      "min_nanos": 908,
+      "p50_nanos": 132561,
+      "p95_nanos": 309751,
+      "p99_nanos": 399359,
+      "total_nanos": 13543550
+    },
+    {
+      "ci95": {
+        "high_nanos": 29948420044,
+        "low_nanos": 8984739311
+      },
+      "count": 10,
+      "event": "provider.request",
+      "max_nanos": 29949241460,
+      "min_nanos": 1816,
+      "p50_nanos": 29948420044,
+      "p95_nanos": 29949241460,
+      "p99_nanos": 29949241460,
+      "total_nanos": 179693772333
+    },
+    {
+      "ci95": {
+        "high_nanos": 31499,
+        "low_nanos": 31499
+      },
+      "count": 1,
+      "event": "scope.load",
+      "max_nanos": 31499,
+      "min_nanos": 31499,
+      "p50_nanos": 31499,
+      "p95_nanos": 31499,
+      "p99_nanos": 31499,
+      "total_nanos": 31499
+    },
+    {
+      "ci95": {
+        "high_nanos": 2361999,
+        "low_nanos": 2361999
+      },
+      "count": 1,
+      "event": "session.open",
+      "max_nanos": 2361999,
+      "min_nanos": 2361999,
+      "p50_nanos": 2361999,
+      "p95_nanos": 2361999,
+      "p99_nanos": 2361999,
+      "total_nanos": 2361999
+    },
+    {
+      "ci95": {
+        "high_nanos": 4572581,
+        "low_nanos": 4572581
+      },
+      "count": 1,
+      "event": "skill.discover",
+      "max_nanos": 4572581,
+      "min_nanos": 4572581,
+      "p50_nanos": 4572581,
+      "p95_nanos": 4572581,
+      "p99_nanos": 4572581,
+      "total_nanos": 4572581
+    },
+    {
+      "ci95": {
+        "high_nanos": 53691,
+        "low_nanos": 40744
+      },
+      "count": 8,
+      "event": "skill.read",
+      "max_nanos": 68655,
+      "min_nanos": 36178,
+      "p50_nanos": 42604,
+      "p95_nanos": 68655,
+      "p99_nanos": 68655,
+      "total_nanos": 369117
+    },
+    {
+      "ci95": {
+        "high_nanos": 365415,
+        "low_nanos": 365415
+      },
+      "count": 1,
+      "event": "store.load",
+      "max_nanos": 365415,
+      "min_nanos": 365415,
+      "p50_nanos": 365415,
+      "p95_nanos": 365415,
+      "p99_nanos": 365415,
+      "total_nanos": 365415
     }
   ],
   "produced_by": "E19-T03",

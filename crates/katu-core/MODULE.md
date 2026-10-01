@@ -91,6 +91,11 @@ função, o log é a fonte da verdade.
   `Jail`/`NoJail` (jail futura E17; `Full`/`Partial` ⇒ `Unavailable`).
 - Evidência tipada [`evidence`](src/evidence.rs) (DF5/E09-T05): `Metric`/`EvidenceBasis`/
   `ArtifactRef`; um número sem artefacto não fundamenta decisão; a base não muda numa agregação.
+- Resumo estatístico [`stats`](src/stats.rs) (E18-T10/W7): `Summary { n, p50, p95, mean, ci95_low,
+  ci95_high }` determinístico — IC 95 % normal para `n ≥ 30` e *bootstrap* com índices derivados do
+  próprio `n` abaixo disso (sem RNG); o intervalo contém sempre a mediana e a média. É a fonte única
+  do `diag`, do `measure_mvk` e dos gates `gate:render`/`gate:provider` (que comparam o **limite
+  superior** ao orçamento).
 - Contexto com orçamento [`context`](src/context.rs) (E09-T01/T07, S-01): `ContextBudget`/
   `Context`/`AssembleOptions`/`assemble_all` — **uma** derivação do log, **uma** partição em
   unidades e **um** teto por turno (antes derivava-se o log até três vezes). `prime()`

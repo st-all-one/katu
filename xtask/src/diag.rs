@@ -6,6 +6,7 @@
 use std::fs;
 use std::path::Path;
 
+use crate::orphans::check_event_orphans;
 use crate::walk::collect_by_extension;
 
 /// Macros de saída de texto livre proibidas no caminho de produção.
@@ -14,8 +15,10 @@ const FORBIDDEN_OUTPUT_MACROS: &[&str] = &["eprintln!", "eprint!", "println!", "
 /// Únicos ficheiros onde escrever texto é legítimo (a borda de diagnóstico).
 const DIAG_ALLOWED: &[&str] = &["crates/katu/src/diag.rs"];
 
-/// Verifica que nenhuma macro de texto livre aparece no código de produção.
+/// Verifica que nenhuma macro de texto livre aparece no código de produção e que nenhum id do
+/// catálogo fica órfão (S-04/W7).
 pub(crate) fn check_diag() -> Result<(), String> {
+    check_event_orphans()?;
     let mut files = Vec::new();
     collect_by_extension(Path::new("crates"), "rs", &mut files)?;
     let mut violations: Vec<String> = Vec::new();

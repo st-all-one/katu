@@ -199,6 +199,7 @@ fn main() -> HarnessResult<()> {
             "p95_nanos": s.p95_nanos,
             "p99_nanos": s.p99_nanos,
             "max_nanos": s.max_nanos,
+            "ci95": { "low_nanos": s.ci95_low_nanos, "high_nanos": s.ci95_high_nanos },
         })).collect::<Vec<_>>(),
     });
 

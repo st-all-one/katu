@@ -8,7 +8,7 @@
 >
 > **Evidência de partida** (nenhum número aqui é inventado):
 > [`bench/e18/raw.json`](bench/e18/raw.json) (turno), [`bench/e18/atomics/`](bench/e18/atomics/REPORT.md)
-> (tempo atómico por função, cobertura 99,4 %), [`bench/mvk/raw.json`](bench/mvk/raw.json) (release),
+> (tempo atómico por função, cobertura 100,0 %), [`bench/mvk/raw.json`](bench/mvk/raw.json) (release),
 > [`bench/published.toml`](bench/published.toml) (DF5).
 >
 > **Autoridade:** os objetivos de [`plan/00b`](plan/00b-objetivos.md) (G1–G9) vencem. Este plano
@@ -71,6 +71,9 @@ remoção de complexidade; senão reverter e escrever a rejeição). Nada muda b
 | **Q-15** retomada com cauda limitada | ✔ feito | 20 000 turnos: **321 µs** (−98,7 % vs replay, −85,2 % vs fronteira de fase); cauda ≤ 128 KiB; hash canónico do estado; `bench/e18/resume/` |
 | **Q-12** guard de loop/anomalia | ✔ feito | CUSUM + SPRT + assinatura: **0** falsos positivos em 200 turnos normais, alarme no **4.º** passo (teto 12); corte com `agent.loop` + turno fechado; `bench/e18/loop/` |
 | **Q-09** atribuição por função no `stderr` | ✔ feito | `StderrSink` imprime `function=…` (nível `trace`); `format_record` puro + 3 testes; `bench/e18/atomics/PROTOCOL.md` atualizado |
+| **W7-1** harness estatístico zero-dep | ✔ feito | `katu_core::stats` (`Summary` + IC 95 %: normal para `n ≥ 30`, *bootstrap* determinístico abaixo); `ci95` em `frame.json`/`latency.json`/`atomics`; os gates comparam o **limite superior**; testes `n < 5`/IC contém a mediana/determinismo/orçamento |
+| **W7-2** atribuição regerada | ✔ feito | cobertura **1322/1322 (100,0 %)** / **1322/1458 (90,6 %)** com `const fn`; rótulo `policy::evaluate`; `bench/e18/atomics/{raw.json,REPORT.md}` regenerados (`git diff` é a prova) |
+| **W7-3** S-04 órfãos | ✔ feito | `context.compact` passou a ser emitido; `check-diag` trava órfãos (`xtask/src/orphans.rs`); **0** órfãos em 114 ids |
 
 **Nota de método (Q-07).** O `diag:coverage` conta qualquer `fn` de `crates/*/src` fora de
 `#[cfg(test)] mod` e fora de ficheiros `*tests*`/`/tests/`: um *bench* em `edit/bench.rs` fez a
@@ -629,7 +632,7 @@ W3 (dados)       Q-01 → Q-02 → Q-03 → Q-04 → Q-05        (frente F2/F3/F
 W4 (superfície)  ~~Q-07~~, ~~Q-08~~                        (menos turnos)
 W5 (segurança)   ~~Q-11~~, ~~Q-12~~                        (F6/F7)
 W6 (estabilidade)~~Q-13~~, ~~Q-14~~, ~~Q-15~~, ~~P-01~~, ~~P-02~~, ~~P-03~~, ~~P-04~~
-W7 (método)      E18-T10 (harness zero-dep) + regerar atribuição + S-04
+W7 (método)      ~~E18-T10 (harness zero-dep) + regerar atribuição + S-04~~  ✔
 W8 (Anexo A T1)  B1 gramática → C3 calibração → C1 e-values → A3 VOI
 W9 (Anexo B)     B-03 → B-04 → B-06 → B-07 (gated) → ADR B-08
 W10 (Anexo A T2/3) A1/A2 · D1 · C2/C7/C5 · E1 · D2/D3 · E18-T05/T08/T09
@@ -700,6 +703,8 @@ esperam. Só depois as frentes formais. Cada PR: A/B + `make check` verde.
 - [ ] `Model-visible ⟺ logged` **fechado** também para o contexto do projeto (Q-16): o prompt de
       sistema é reconstruível do log.
 - [x] W1 instalado: atribuição por função em release + harness e gate de regressão.
+- [x] W7 instalado: harness estatístico zero-dep (IC 95 % nos artefactos; gates pelo limite superior) +
+      atribuição regerada (`bench/e18/atomics/`) + **0** ids órfãos travados pelo `check-diag`.
 - [ ] Cada número publicado em `bench/published.toml` tem base tipada (DF5).
 - [ ] Zero alteração de bytes observáveis; `Model-visible ⟺ logged` intacto.
 - [ ] `make check` e `msrv` (1.97.0) verdes em cada PR; `OPTIMIZATION_PLAN.md` mantido como lar.
@@ -708,16 +713,16 @@ esperam. Só depois as frentes formais. Cada PR: A/B + `make check` verde.
 
 ## 10. Próximos passos (W7–W10)
 
-**Ponto de partida.** W1–W6 estão fechadas: Q-01..Q-21 e P-01..P-04 com artefacto em `bench/`, e
-S-01..S-05 fechados (S-04 é o único resíduo). O que falta vem de três sítios — o **harness** de
-E18-T10 (adiado em Q-09), o **Anexo A** (Tier 1–3) e o **Anexo B** (Camada 1 residual e as
-decisões de Camada 2). A ordem segue Q > P > S e o método do §0: cada item traz fórmula, artefacto
-cru e teste que o trava; adotar-ou-reverter.
+**Ponto de partida.** W1–W7 estão fechadas: Q-01..Q-21 e P-01..P-04 com artefacto em `bench/`,
+S-01..S-05 fechados (o resíduo S-04 — o id órfão `context.compact` — fechou em W7-3) e o harness
+estatístico zero-dep de E18-T10 instalado (W7-1). O que falta vem de dois sítios — o **Anexo A**
+(Tier 1–3) e o **Anexo B** (Camada 1 residual e as decisões de Camada 2). A ordem segue Q > P > S e
+o método do §0: cada item traz fórmula, artefacto cru e teste que o trava; adotar-ou-reverter.
 
 ### W7 · Fecho de método (pré-requisito de W8)
 
-**W7-1 · Harness estatístico zero-dep (E18-T10).**
-- **Onde:** `xtask` (novo `stats.rs`), consumido por `render_bench`, `provider_bench` e `measure_mvk`.
+**W7-1 · Harness estatístico zero-dep (E18-T10).** ✔ feito
+- **Onde:** `katu_core::stats` (fonte única — o `measure_mvk` é um `example` do binário e não pode depender do `xtask`) + `xtask/src/stats.rs` (forma JSON dos artefactos), consumido por `render_bench`, `provider_bench` e `measure_mvk`.
 - **Problema:** os gates medem p95 sem IC 95 % nem repetições declaradas; Q-09 ficou sem harness.
 - **Proposta:** `Summary { n, p50, p95, mean, ci95_low, ci95_high }` com IC 95 % (normal sobre a
   média para `n ≥ 30`; para `n` menor, *bootstrap* **determinístico** — índices derivados do próprio
@@ -729,14 +734,18 @@ cru e teste que o trava; adotar-ou-reverter.
 - **Teste:** `n < 5` ⇒ erro; o IC contém a mediana; determinismo (mesmo input → mesmo `Summary`);
   regressão acima do orçamento falha.
 - **Adoção:** menos falsos alarmes sem esconder regressões.
+- **Resultado ✔:** `Summary { n, p50, p95, mean, ci95_low, ci95_high }` em `crates/katu-core/src/stats.rs`; IC 95 % normal (`n ≥ 30`) ou *bootstrap* determinístico (`splitmix64` semeado por `n`, sem RNG); o intervalo é alargado para conter a mediana e a média. `frame.json`/`latency.json`/`atomics` ganham `ci95`; `gate:render`/`gate:provider` falham quando o limite superior excede o orçamento. Testes: `n < 5` ⇒ erro, o IC contém a mediana, determinismo e regressão acima do orçamento.
 
-**W7-2 · Regerar a atribuição (fecha S-03/Q-09).** Regenerar `bench/e18/atomics/raw.json`/`REPORT.md`
-com a cobertura atual (**100 %** instrumentáveis / **90,7 %** com `const fn`) e os rótulos novos
-(`policy::evaluate`/`policy::audit`/`policy::capability_for`); o `git diff` do artefacto é a prova.
-Gate: `diag:coverage` + `gate:bench`.
+**W7-2 · Regerar a atribuição (fecha S-03/Q-09).** ✔ feito — regenerar `bench/e18/atomics/raw.json`/`REPORT.md`
+com a cobertura atual (**1322/1322 = 100,0 %** instrumentáveis / **1322/1458 = 90,6 %** com `const fn`)
+e os rótulos novos (`policy::evaluate`/`policy::audit`/`policy::capability_for`); o `git diff` do
+artefacto é a prova. Gate: `diag:coverage` + `gate:bench`. O `bench/mvk/raw.json` versionado é o
+baseline **release** (citado em `published.toml`) e **não** foi tocado por uma corrida `dev`.
 
-**W7-3 · S-04 (drift residual).** Varrer ids prometidos sem emissão e nomes mortos; qualquer teto de
-`surface.toml` sobe **em PR**.
+**W7-3 · S-04 (drift residual).** ✔ feito — a varredura encontrou **um** id órfão (`context.compact`, nunca
+emitido); passou a abrir o span da compactação (`fn_span!` em `compact_prefix`) e o `check-diag`
+passou a travar órfãos (`xtask/src/orphans.rs`, 114 ids, 0 órfãos). `store.load`/`store.save` estão
+vivos. Nenhum teto de `surface.toml` subiu.
 
 ### W8 · Anexo A — Tier 1
 
@@ -817,9 +826,9 @@ Gate: `diag:coverage` + `gate:bench`.
 | **W9** Anexo B | B-03 · B-04 · B-06 · B-07 (gated) · ADR B-08 | Anexo B C1/C2 | W7 |
 | **W10** Anexo A T2/T3 | A1/A2 · D1 · C2/C7/C5 · E1 · D2/D3 · E18-T05/T08/T09 | Anexo A + E18 | W8 |
 
-**Regra de entrada em W8:** nenhuma frente nova sem o harness de W7 (a lição de W1). Cada item fecha
-com artefacto cru, teste que o trava (`make check` + `msrv`) e a decisão adotar-ou-reverter escrita —
-adotado com o número, ou rejeitado **com** o número.
+**Regra de entrada em W8:** o harness de W7 está instalado (a lição de W1), logo as frentes novas
+medem contra ele. Cada item fecha com artefacto cru, teste que o trava (`make check` + `msrv`) e a
+decisão adotar-ou-reverter escrita — adotado com o número, ou rejeitado **com** o número.
 
 ---
 

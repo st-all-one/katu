@@ -18,6 +18,8 @@ use ratatui::backend::TestBackend;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
+use crate::stats::{aggregate, ci95_json};
+
 /// Repetições do gate (rápido e estável).
 const GATE_REPS: u32 = 400;
 /// Aquecimento antes de medir (caches de layout do `ratatui`).
@@ -58,7 +60,13 @@ pub(crate) fn run(args: &[String]) {
             return;
         }
     };
-    let (p50, p95, p99, max) = percentiles(&samples);
+    let (summary, p99, max) = match aggregate(&samples) {
+        Ok(aggregate) => aggregate,
+        Err(error) => {
+            println!("{{\"error\":\"{error}\"}}");
+            return;
+        }
+    };
     let artifact = json!({
         "schema": 1,
         "machine": { "os": std::env::consts::OS, "arch": std::env::consts::ARCH },
@@ -66,7 +74,14 @@ pub(crate) fn run(args: &[String]) {
         "size": { "width": WIDTH, "height": HEIGHT },
         "entries": ENTRIES,
         "reps": reps,
-        "frame_nanos": { "p50": p50, "p95": p95, "p99": p99, "max": max },
+        "frame_nanos": {
+            "p50": summary.p50,
+            "p95": summary.p95,
+            "p99": p99,
+            "max": max,
+            "mean": summary.mean,
+            "ci95": ci95_json(&summary),
+        },
         "raw_nanos": samples,
     });
     match serde_json::to_string_pretty(&artifact) {
@@ -81,7 +96,10 @@ pub(crate) fn run(args: &[String]) {
             return;
         }
     }
-    println!("{{\"artifact\":\"{out}\",\"reps\":{reps},\"frame_p95_nanos\":{p95}}}");
+    println!(
+        "{{\"artifact\":\"{out}\",\"reps\":{reps},\"frame_p95_nanos\":{}}}",
+        summary.p95
+    );
 }
 
 /// Ponto de entrada de `gate:render`: trava a regressão contra o orçamento versionado.
@@ -91,18 +109,22 @@ pub(crate) fn gate(args: &[String]) -> Result<(), String> {
     let file: BudgetFile =
         toml::from_str(&text).map_err(|err| format!("{path} inválido: {err}"))?;
     let samples = frame_samples(GATE_REPS)?;
-    let (_, p95, _, _) = percentiles(&samples);
+    let (summary, _, _) = aggregate(&samples)?;
     let budget = file.render.frame_p95_nanos;
     let artifact =
         std::fs::read_to_string(ARTIFACT).map_err(|err| format!("lendo {ARTIFACT}: {err}"))?;
     serde_json::from_str::<Value>(&artifact)
         .map_err(|err| format!("{ARTIFACT} inválido: {err}"))?;
-    if p95 > budget {
+    if !summary.within_budget(budget) {
         return Err(format!(
-            "gate:render falhou: quadro p95={p95} ns > orçamento {budget} ns"
+            "gate:render falhou: quadro IC95 superior={} ns > orçamento {budget} ns (p95={})",
+            summary.ci95_high, summary.p95
         ));
     }
-    println!("gate:render ok: quadro p95={p95} ns (orçamento {budget} ns)");
+    println!(
+        "gate:render ok: quadro p95={} ns CI95=[{}, {}] (orçamento {budget} ns)",
+        summary.p95, summary.ci95_low, summary.ci95_high
+    );
     Ok(())
 }
 
@@ -159,26 +181,6 @@ fn scenario() -> App {
     app
 }
 
-/// Agregado de percentis (nearest-rank, inteiro; sem vírgula flutuante na decisão).
-fn percentiles(samples: &[u64]) -> (u64, u64, u64, u64) {
-    let mut sorted = samples.to_vec();
-    sorted.sort_unstable();
-    let pick = |p: u32| -> u64 {
-        let n = u64::try_from(sorted.len()).unwrap_or(u64::MAX);
-        if n == 0 {
-            return 0;
-        }
-        let rank = n.saturating_mul(u64::from(p)).div_ceil(100).max(1);
-        let index = usize::try_from(rank.saturating_sub(1)).unwrap_or(0);
-        sorted
-            .get(index.min(sorted.len().saturating_sub(1)))
-            .copied()
-            .unwrap_or(0)
-    };
-    let max = sorted.last().copied().unwrap_or(0);
-    (pick(50), pick(95), pick(99), max)
-}
-
 /// Nanos de uma `Duration` (saturando).
 fn nanos(duration: Duration) -> u64 {
     u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX)
@@ -188,20 +190,4 @@ fn nanos(duration: Duration) -> u64 {
 fn value<'a>(args: &'a [String], key: &str) -> Option<&'a str> {
     let index = args.iter().position(|arg| arg == key)?;
     args.get(index.saturating_add(1)).map(String::as_str)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::percentiles;
-
-    #[test]
-    fn nearest_rank_percentiles_are_monotone() {
-        let samples: Vec<u64> = (1..=100).collect();
-        assert_eq!(percentiles(&samples), (50, 95, 99, 100));
-    }
-
-    #[test]
-    fn empty_samples_are_zero() {
-        assert_eq!(percentiles(&[]), (0, 0, 0, 0));
-    }
 }

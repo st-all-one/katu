@@ -44,6 +44,7 @@ mod diag_coverage;
 mod docs;
 mod ledger;
 mod memory_swap;
+mod orphans;
 mod policy;
 mod postmortems;
 mod prompt;
@@ -53,6 +54,7 @@ mod render_bench;
 mod schemas;
 mod session_bench;
 mod slices;
+mod stats;
 mod surface;
 mod test_runner;
 #[cfg(feature = "tokenizer")]

@@ -12,6 +12,7 @@ use std::collections::BTreeMap;
 use std::sync::{Mutex, PoisonError};
 
 use super::{Kind, Record, Sink};
+use crate::stats::{Summary, percentile};
 
 /// Resumo determinístico das durações de um evento.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,6 +35,10 @@ pub struct EventSummary {
     pub p99_nanos: u64,
     /// Máximo (ns).
     pub max_nanos: u64,
+    /// Limite inferior do IC 95 % da média (ns).
+    pub ci95_low_nanos: u64,
+    /// Limite superior do IC 95 % da média (ns).
+    pub ci95_high_nanos: u64,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -69,10 +74,19 @@ impl Sink for AggregatingSink {
 
 impl AggregatingSink {
     /// Instantâneo determinístico (ordem canónica por evento, percentis calculados agora).
+    ///
+    /// O `Mutex` é largado **antes** de resumir: os spans de `stats` que `summarize` abre voltariam
+    /// ao próprio sink (recursão no lock).
     #[must_use]
     pub fn snapshot(&self) -> Vec<EventSummary> {
-        let stats = self.stats.lock().unwrap_or_else(PoisonError::into_inner);
-        stats
+        let entries: Vec<(StatKey, Stat)> = {
+            let stats = self.stats.lock().unwrap_or_else(PoisonError::into_inner);
+            stats
+                .iter()
+                .map(|(key, stat)| (*key, stat.clone()))
+                .collect()
+        };
+        entries
             .iter()
             .map(|((event, function), stat)| summarize(event, *function, stat))
             .collect()
@@ -104,32 +118,20 @@ fn len_u64(stat: &Stat) -> u64 {
 fn summarize(event: &'static str, function: Option<&'static str>, stat: &Stat) -> EventSummary {
     let mut sorted = stat.durations.clone();
     sorted.sort_unstable();
+    let summary = Summary::from_sorted(&sorted);
     EventSummary {
         event,
         function,
         count: len_u64(stat),
         total_nanos: stat.total_nanos,
         min_nanos: sorted.first().copied().unwrap_or(0),
-        p50_nanos: percentile(&sorted, 5_000),
-        p95_nanos: percentile(&sorted, 9_500),
+        p50_nanos: summary.p50,
+        p95_nanos: summary.p95,
         p99_nanos: percentile(&sorted, 9_900),
         max_nanos: sorted.last().copied().unwrap_or(0),
+        ci95_low_nanos: summary.ci95_low,
+        ci95_high_nanos: summary.ci95_high,
     }
-}
-
-/// Percentil por *nearest-rank* em pontos base (sem vírgula flutuante).
-fn percentile(sorted: &[u64], basis_points: u64) -> u64 {
-    let n = u64::try_from(sorted.len()).unwrap_or(u64::MAX);
-    if n == 0 {
-        return 0;
-    }
-    // rank = ceil(bp · n / 10_000); índice = rank − 1.
-    let rank = basis_points
-        .saturating_mul(n)
-        .saturating_add(9_999)
-        .saturating_div(10_000);
-    let index = usize::try_from(rank.saturating_sub(1)).unwrap_or(usize::MAX);
-    sorted.get(index).copied().unwrap_or(0)
 }
 
 #[cfg(test)]

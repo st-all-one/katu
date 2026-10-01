@@ -26,8 +26,11 @@ use katu_providers::{Llama, LlamaConfig, MockTransport, OpenCode, OpenCodeConfig
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use report::{DELTAS, corpus, nanos, percentiles, request, usage_value};
+use report::{DELTAS, corpus, nanos, request, usage_value};
 use sse::ab;
+
+use crate::stats::{aggregate, ci95_json};
+use katu_core::stats::Summary;
 
 /// Repetições do gate (rápido e estável).
 const GATE_REPS: u32 = 200;
@@ -85,6 +88,24 @@ struct Offline {
     corpus_bytes: usize,
 }
 
+/// Amostras de uma medição live (TTFT/total/usage).
+struct LiveSamples {
+    ttft: Vec<u64>,
+    total: Vec<u64>,
+    usage: Option<TokenUsage>,
+}
+
+/// Dados do artefacto offline.
+struct OfflineReport<'a> {
+    reps: u32,
+    offline: &'a Offline,
+    summary: Summary,
+    p99: u64,
+    max: u64,
+    sse: &'a Value,
+    live: Option<&'a Value>,
+}
+
 /// Mede `reps` turnos offline pelo [`MockTransport`].
 #[allow(
     clippy::disallowed_methods,
@@ -116,14 +137,18 @@ fn offline(reps: u32) -> Result<Offline, String> {
     })
 }
 
-/// Mede `reps` turnos live (TTFT/total/usage).
+/// Mede `reps` turnos live (TTFT/total/usage) e devolve as amostras cruas.
 #[allow(
     clippy::disallowed_methods,
     reason = "instrumento dev-only: o relógio monotónico é o objeto da medição"
 )]
-fn live(provider_name: &str, args: &[String], reps: u32, model: &str) -> Result<Value, String> {
+fn collect_live(
+    provider_name: &str,
+    args: &[String],
+    reps: u32,
+    request: &ProviderRequest,
+) -> Result<LiveSamples, String> {
     let transport = UreqTransport::new(TIMEOUT_CONNECT, TIMEOUT_READ);
-    let request = request(model);
     let mut ttft = Vec::with_capacity(usize::try_from(reps).unwrap_or(0));
     let mut total = Vec::with_capacity(usize::try_from(reps).unwrap_or(0));
     let mut usage = None;
@@ -143,7 +168,7 @@ fn live(provider_name: &str, args: &[String], reps: u32, model: &str) -> Result<
             };
             let provider = Llama::new(transport, config);
             for _ in 0..reps {
-                measure(&provider, &request, &mut ttft, &mut total, &mut usage)?;
+                measure(&provider, request, &mut ttft, &mut total, &mut usage)?;
             }
         }
         "opencode-go" | "opencode-zen" => {
@@ -157,21 +182,56 @@ fn live(provider_name: &str, args: &[String], reps: u32, model: &str) -> Result<
             };
             let provider = OpenCode::new(transport, config);
             for _ in 0..reps {
-                measure(&provider, &request, &mut ttft, &mut total, &mut usage)?;
+                measure(&provider, request, &mut ttft, &mut total, &mut usage)?;
             }
         }
         other => return Err(format!("provider desconhecido: {other}")),
     }
-    let (t50, t95, _, tmax) = percentiles(&ttft);
-    let (w50, w95, _, wmax) = percentiles(&total);
-    Ok(json!({
-        "provider": provider_name,
+    Ok(LiveSamples { ttft, total, usage })
+}
+
+/// JSON do live (TTFT/total com IC 95 %), ou `None` sem `--live`.
+fn live_value(args: &[String], reps: u32) -> Option<Value> {
+    if !args.iter().any(|arg| arg == "--live") {
+        return None;
+    }
+    let model = value(args, "--model").unwrap_or("qwen");
+    let provider = value(args, "--provider").unwrap_or("llama");
+    match collect_live(provider, args, reps, &request(model)) {
+        Ok(samples) => Some(live_json(provider, model, reps, &samples)),
+        Err(error) => {
+            println!("{{\"error\":\"{error}\"}}");
+            None
+        }
+    }
+}
+
+/// JSON de uma medição live.
+fn live_json(provider: &str, model: &str, reps: u32, samples: &LiveSamples) -> Value {
+    let ttft_summary = Summary::from_samples(&samples.ttft);
+    let total_summary = Summary::from_samples(&samples.total);
+    let tmax = samples.ttft.iter().copied().max().unwrap_or(0);
+    let wmax = samples.total.iter().copied().max().unwrap_or(0);
+    json!({
+        "provider": provider,
         "model": model,
         "reps": reps,
-        "ttft_ms": { "p50": t50 / 1_000_000, "p95": t95 / 1_000_000, "max": tmax / 1_000_000 },
-        "total_ms": { "p50": w50 / 1_000_000, "p95": w95 / 1_000_000, "max": wmax / 1_000_000 },
-        "usage": usage_value(usage),
-    }))
+        "ttft_ms": {
+            "p50": ttft_summary.p50 / 1_000_000,
+            "p95": ttft_summary.p95 / 1_000_000,
+            "max": tmax / 1_000_000,
+            "mean": ttft_summary.mean / 1_000_000,
+            "ci95": { "low": ttft_summary.ci95_low / 1_000_000, "high": ttft_summary.ci95_high / 1_000_000 },
+        },
+        "total_ms": {
+            "p50": total_summary.p50 / 1_000_000,
+            "p95": total_summary.p95 / 1_000_000,
+            "max": wmax / 1_000_000,
+            "mean": total_summary.mean / 1_000_000,
+            "ci95": { "low": total_summary.ci95_low / 1_000_000, "high": total_summary.ci95_high / 1_000_000 },
+        },
+        "usage": usage_value(samples.usage),
+    })
 }
 
 /// Executa uma chamada e acumula TTFT/total.
@@ -210,51 +270,65 @@ pub(crate) fn run(args: &[String]) {
             return;
         }
     };
-    let (p50, p95, p99, max) = percentiles(&offline.samples);
-    let sse = sse_value();
-    let live = args.iter().any(|arg| arg == "--live").then(|| {
-        let model = value(args, "--model").unwrap_or("qwen");
-        live(
-            value(args, "--provider").unwrap_or("llama"),
-            args,
-            reps,
-            model,
-        )
-    });
-    let live = match live {
-        Some(Ok(value)) => Some(value),
-        Some(Err(error)) => {
-            println!("{{\"error\":\"{error}\"}}");
-            None
-        }
-        None => None,
-    };
-    let artifact = json!({
-        "machine": { "os": std::env::consts::OS, "arch": std::env::consts::ARCH },
-        "offline": {
-            "reps": reps,
-            "corpus_bytes": offline.corpus_bytes,
-            "deltas": DELTAS,
-            "overhead_nanos": { "p50": p50, "p95": p95, "p99": p99, "max": max },
-            "raw_nanos": offline.samples,
-            "usage": usage_value(offline.usage),
-        },
-        "sse": sse,
-        "live": live,
-    });
-    match serde_json::to_string_pretty(&artifact) {
-        Ok(pretty) => {
-            if let Err(error) = std::fs::write(out, format!("{pretty}\n")) {
-                println!("{{\"error\":\"gravando {out}: {error}\"}}");
-                return;
-            }
-        }
+    let (summary, p99, max) = match aggregate(&offline.samples) {
+        Ok(aggregate) => aggregate,
         Err(error) => {
-            println!("{{\"error\":\"serializando artefacto: {error}\"}}");
+            println!("{{\"error\":\"{error}\"}}");
             return;
         }
+    };
+    let sse = sse_value();
+    let live = live_value(args, reps);
+    let report = OfflineReport {
+        reps,
+        offline: &offline,
+        summary,
+        p99,
+        max,
+        sse: &sse,
+        live: live.as_ref(),
+    };
+    let artifact = offline_value(&report);
+    if let Err(error) = write_artifact(out, &artifact) {
+        println!("{{\"error\":\"{error}\"}}");
+        return;
     }
-    println!("{{\"artifact\":\"{out}\",\"reps\":{reps},\"offline_p95_nanos\":{p95}}}");
+    println!(
+        "{{\"artifact\":\"{out}\",\"reps\":{reps},\"offline_p95_nanos\":{}}}",
+        summary.p95
+    );
+}
+
+/// JSON do artefacto offline (com IC 95 %).
+fn offline_value(report: &OfflineReport<'_>) -> Value {
+    let summary = report.summary;
+    json!({
+        "machine": { "os": std::env::consts::OS, "arch": std::env::consts::ARCH },
+        "offline": {
+            "reps": report.reps,
+            "corpus_bytes": report.offline.corpus_bytes,
+            "deltas": DELTAS,
+            "overhead_nanos": {
+                "p50": summary.p50,
+                "p95": summary.p95,
+                "p99": report.p99,
+                "max": report.max,
+                "mean": summary.mean,
+                "ci95": ci95_json(&summary),
+            },
+            "raw_nanos": report.offline.samples,
+            "usage": usage_value(report.offline.usage),
+        },
+        "sse": report.sse,
+        "live": report.live,
+    })
+}
+
+/// Grava o artefacto pretty (falha legível).
+fn write_artifact(path: &str, artifact: &Value) -> Result<(), String> {
+    let pretty = serde_json::to_string_pretty(artifact)
+        .map_err(|error| format!("serializando artefacto: {error}"))?;
+    std::fs::write(path, format!("{pretty}\n")).map_err(|error| format!("gravando {path}: {error}"))
 }
 
 /// Ponto de entrada de `gate:provider`: trava a regressão contra o orçamento versionado.
@@ -264,18 +338,22 @@ pub(crate) fn gate(args: &[String]) -> Result<(), String> {
     let file: BudgetFile =
         toml::from_str(&text).map_err(|err| format!("{path} inválido: {err}"))?;
     let offline = offline(GATE_REPS)?;
-    let (_, p95, _, _) = percentiles(&offline.samples);
+    let (summary, _, _) = aggregate(&offline.samples)?;
     let budget = file.provider.client_overhead_p95_nanos;
     let artifact =
         std::fs::read_to_string(ARTIFACT).map_err(|err| format!("lendo {ARTIFACT}: {err}"))?;
     serde_json::from_str::<Value>(&artifact)
         .map_err(|err| format!("{ARTIFACT} inválido: {err}"))?;
-    if p95 > budget {
+    if !summary.within_budget(budget) {
         return Err(format!(
-            "gate:provider falhou: overhead p95={p95} ns > orçamento {budget} ns"
+            "gate:provider falhou: overhead IC95 superior={} ns > orçamento {budget} ns (p95={})",
+            summary.ci95_high, summary.p95
         ));
     }
-    println!("gate:provider ok: overhead p95={p95} ns (orçamento {budget} ns)");
+    println!(
+        "gate:provider ok: overhead p95={} ns CI95=[{}, {}] (orçamento {budget} ns)",
+        summary.p95, summary.ci95_low, summary.ci95_high
+    );
     Ok(())
 }
 
