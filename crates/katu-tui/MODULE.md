@@ -59,6 +59,11 @@ A **interface de terminal** do katu (uma das duas superfícies, com a CLI — G7
   (E20-T11) liga o modo de planeamento (barra mostra `PLANO`; `Update::Plan`) e `!<cmd>` (E20-T12)
   emite `Command::Shell` para a borda executar pela política. `/skill:<nome>` (E20-T13) emite
   `Command::Skill` e a borda força o carregamento do `SKILL.md`.
+- **E21 ☑** — **login na TUI**: `/login` abre o menu de provider (opencode Go/Zen **ou** llama.cpp)
+  e pede o que falta; `/login opencode <chave>` e `/login llama [url]` resolvem já o pedido; `/logout`
+  termina a sessão (E21). A chave é mascarada no render (`App::input_display`). O pedido
+  (`Command::Login(LoginRequest)`) é resolvido pela borda, que reconstrói o provider e o modelo;
+  o embedding **não** é tocado.
 
 ## Fronteira
 

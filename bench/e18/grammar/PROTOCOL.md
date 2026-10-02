@@ -26,7 +26,7 @@ Cada variante liga o **nome** (`const`) aos `parameters` da tool (`katu_tools::s
 `oneOf` só admite `{name, arguments}` com os campos obrigatórios de uma tool real. É o que impede,
 por construção, os argumentos que hoje falham a decodificação.
 
-- **Opt-in por provider**: `provider.structured_output` (config) para o `llama` local, ou
+- **Opt-in por provider**: `structured_output` (config) para o `llama` local, ou
   `structured_output` no JSON declarativo / `ModelEntry::with_structured_output` /
   `LlamaConfig::with_structured_output`. Por omissão, **desligado**.
 - **Fail-open**: se o endpoint responder `400` (campo não suportado), o pedido é repetido **sem**

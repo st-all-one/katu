@@ -143,7 +143,7 @@ pub(super) fn measure() -> Result<String, Box<dyn std::error::Error>> {
             "criterion": "com o schema, o argumento sem `path` não é gerável: a classe de falha fecha por construção",
         },
         "criterion_met": true,
-        "adoption": "opt-in (`provider.structured_output` / TOML declarativo), fail-open: desligado é byte a byte o atual e um 400 do endpoint volta ao pedido sem o campo. A adoção por omissão exige ≥ 20 % dos turnos falhados evitados em turnos reais — o modelo local não emite tool calls nativas, pelo que esse número ainda não é medível aqui (fica escrito).",
+        "adoption": "opt-in (`structured_output` / TOML declarativo), fail-open: desligado é byte a byte o atual e um 400 do endpoint volta ao pedido sem o campo. A adoção por omissão exige ≥ 20 % dos turnos falhados evitados em turnos reais — o modelo local não emite tool calls nativas, pelo que esse número ainda não é medível aqui (fica escrito).",
         "caveat": "mede o pedido e o que o schema garante por construção; não mede o modelo nem os turnos reais (a falha real acumula-se em `ProviderError::Decode`)",
     });
     Ok(serde_json::to_string_pretty(&value)?)

@@ -32,9 +32,9 @@
 | --- | --- | --- |
 | `prime [--long] [--group <g>]` | Contexto de arranque **estático** (byte-idêntico por versão) para IA/utilizador. | `{group, prime}` |
 | `upgrade` | Sincronização de versão. **Canal ainda não configurado** → recusa (exit 10). | — |
-| `config <get\|set\|unset\|list>` | Configuração global e do projeto (efetiva = projeto > global). | `{key, value\|entries, scope}` |
+| `config <init\|login\|get\|set\|unset\|list>` | Configuração global e do projeto (efetiva = projeto > global); `login` liga o agente a um provider. | `{key, value\|entries, scope}` · `login`: `{provider, model, base, logged_in, config, warning?, check?}` |
 | `memo <sub>` | Memória: **consulta/visão geral** (nunca escreve). | ver §1.1 |
-| `run [BODY]` | Executa **uma** rodada e sai; devolve id da sessão + exit code. | `{session, round_exit, model, steps, chars, calls, cancelled, usage}` |
+| `run [BODY]` | Executa **uma** rodada e sai; devolve a resposta + id da sessão + exit code. | `{session, round_exit, model, steps, chars, calls, cancelled, usage, text}` |
 | `tui` | Abre a UI de terminal (multi-turno). | *(nenhum; sucesso vazio)* |
 | *(sem verbo)* | Abre a TUI; **sem TTY falha fechado** (exit 3). | — |
 
@@ -52,7 +52,13 @@ existir** no topo → `invalid_input` (exit 2), sem retrocompatibilidade.
   (sincronização futura contra GitHub Releases).
 - **`config`** — `get`/`list` leem a config **efetiva** (projeto > global); `set`/`unset` escrevem
   no projeto (ou na global com `--global`). Conjunto **fechado** de chaves (E20-T09); chave/valor
-  inválido → exit 2. O `init` copia a global 1:1 (snapshot, E20-T18).
+  inválido → exit 2. O `init` copia a global 1:1 (snapshot, E20-T18). O `login` (E21) liga **um**
+  provider de agente (`opencode`/`opencode-zen`/`llama`) — sem `--provider` pergunta
+  interativamente; a chave do opencode fica na config **global** (`katu.toml`, chave
+  `opencode_api_key`, modo `0600`, fora do conjunto de chaves), e o embedding (`embeddings.*`)
+  **não** é tocado. `--logout` apaga a chave guardada. Com um terminal interactivo, o login
+  **verifica** a chave com um `chat/completions` mínimo (o `/models` não autentica) e reporta um
+  `401`; um `KATU_OPENCODE_KEY` no ambiente que se sobreponha à chave guardada é avisado.
 - **`memo`** — só consulta, espelhando o `kd`:
   - `memo ask [QUERY]` — consulta rica (espelha `kd ask`): filtros `--type`/`--class`/`--tag`/
     `--status`/`--scope`/`--anchor`, `--with-task`/`--full-content`/`--brief`, modos `--rank`/
@@ -73,7 +79,7 @@ existir** no topo → `invalid_input` (exit 2), sem retrocompatibilidade.
   A **escrita** de memória é do **agente** (tools no loop) e do `kd`; o `memo` nunca cria notas.
 - **`run`** — monta o runtime, escolhe o modelo (explícito ou por **tier**), corre **uma** rodada;
   as tool calls passam pela ordem §42. Saída humana: texto + **id da sessão em destaque** (após uma
-  linha em branco); envelope: `session` + `round_exit`. O `usage` vem com `basis`.
+  linha em branco); envelope: `text` + `session` + `round_exit`. O `usage` vem com `basis`.
 - **`tui`** — igual ao `run`, mas entra no loop de eventos da UI (multi-turno). O `goal` interno é
   `"tui"`; o objetivo real de cada turno é a mensagem escrita na UI.
 
@@ -103,7 +109,7 @@ existir** no topo → `invalid_input` (exit 2), sem retrocompatibilidade.
 | `--model <MODEL>` | `run`, `tui` | Modelo explícito (vence o tier). | pelo **tier** da fase |
 | `--base <URL>` | `run`, `tui` | Base URL do endpoint. | por provider (§2.3) |
 | `--thinking <GRAU>` | `run`, `tui` | Grau de pensamento (`off`/`low`/`medium`/`high`). | config, senão `off` |
-| `--max-tokens <N>` | `run`, `tui` | Teto de tokens de saída. | `512` |
+| `--max-tokens <N>` | `run`, `tui` | Teto de tokens de saída. | `4096` |
 | `--max-steps <N>` | `run`, `tui` | Máximo de passos (tool calls) por turno. | `8` |
 | `--compact` | `run`, `tui` | Liga a compactação do histórico no turno (E09-T07). | `false` |
 | `--resume [<ID>]` | `run`, `tui` | Retoma sessão. | sem valor = `last` |
@@ -112,18 +118,23 @@ existir** no topo → `invalid_input` (exit 2), sem retrocompatibilidade.
 flags explícitas; `-` = stdin) existe em `prime`/`run`/`tui`/`memo ask`; `--batch <ficheiro|->`
 (JSONL; valida tudo antes de executar) em `prime`/`run`/`memo ask`.
 
-**Defaults da config (E20-T17):** `provider`, `model`, `base`, `behavior.auto_compact`,
-`behavior.context_selection` (`suffix`/`utility`), `behavior.prompt_state`,
-`behavior.durability` (`event`/`turn`; ADR 0024) e `recall.default_limit` da
+**Defaults da config (E20-T17):** `provider`, `model`, `base`, `structured_output`,
+`behavior.auto_compact`, `behavior.context_selection` (`suffix`/`utility`), `behavior.prompt_state`,
+`behavior.tool_voi` (só atua com `suffix`), `behavior.durability` (`event`/`turn`; ADR 0024) e
+`recall.default_limit` da
 config efetiva (projeto > global) são o default de `run`/`tui`/`memo ask` (flags > `--params` >
-config > default do comando).
+config > default do comando). O `install.sh` prepara a global com `katu config init --global`
+(idempotente; não sobrescreve). O `katu config login` escreve `provider`/`model`/`base` na **global**
+(a chave, no `katu.toml` global, modo 0600), pelo que a escolha vale em todos os projetos até ser trocada.
 
 **Contexto do turno (Q-02b/Q-03/Q-04, só por config):** `behavior.context_selection` escolhe a
-política de seleção do contexto (`suffix` é o default histórico; `utility` liga utilidade + MMR + RRF)
-e `behavior.prompt_state` liga a secção `estado` no prime. Ambas ficam **desligadas** por omissão: os
-números publicados são um *proxy* de informação (`bench/e18/select/`) e a adoção do default exige A/B
-com o modelo. O envelope de `run --json` publica o que correu (`context_selection`, `state`) para que
-a medição não dependa do que se supõe.
+política de seleção do contexto (`suffix` é o default, histórico e seguro; `utility` entra por
+config explícita) e `behavior.prompt_state` liga a secção `estado` no prime (default **on**). O gate
+de VOI (`behavior.tool_voi`, default **off**) só atua com `suffix`: com `utility` a unidade lida pode
+ser descartada e o gate diria “já presente no contexto” sem o estar. Os números publicados são um
+*proxy* de informação (`bench/e18/select/`) e a adoção pode ser revertida pela própria chave de
+config. O envelope de `run --json` publica o que correu
+(`context_selection`, `state`) para que a medição não dependa do que se supõe.
 
 **Corte por loop (Q-12/F7):** o turno observa cada passo **antes** de executar as tools e corta um
 ciclo de leitura sem progresso com `conflict` (exit `5`) e a mensagem
@@ -212,8 +223,10 @@ Modos: `Normal` (navegação), `Insert` (edição/mensagem ou comando `/`), `Men
 | qualquer | `Ctrl-C` | Sai da UI (em todos os modos) |
 
 **Comandos `/`** (na linha de mensagem): `/model` (menu de modelos), `/thinking` (menu dos graus
-**suportados pelo modelo**), `/compact`, `/verify`, `/trash`, `/transcript`, `/help`, `/quit`,
-`/skill:<nome>` (força o carregamento de uma skill, E20-T13).
+**suportados pelo modelo**), `/login [opencode [chave] | llama [url]]` (menu interativo ou já com
+argumentos; a chave é mascarada — E21), `/logout` (termina a sessão do agente), `/compact`,
+`/verify`, `/trash`, `/transcript`, `/help`, `/quit`, `/skill:<nome>` (força o carregamento de uma
+skill, E20-T13).
 Comando desconhecido → erro na barra de estado (não é enviado ao modelo). `@<path>` **cita** um
 caminho: fica pendente e é prefixado (só o caminho, sem conteúdo) ao próximo turno (E20-T12).
 `!<cmd>` executa `sh -c` **pela política** (§42); no modo `/plan` é recusado com evidência

@@ -223,8 +223,8 @@ Rejeições documentadas com o número: **conformal** (cobertura colapsa com res
 
 | Feature | Estado |
 |---------|--------|
-| `behavior.tool_voi` | Gate de VOI — default **off** |
-| `behavior.prompt_state` | Secção `estado` no prime — default **off** |
+| `behavior.tool_voi` | Gate de VOI — default **off** (só atua com `suffix`) |
+| `behavior.prompt_state` | Secção `estado` no prime — default **on** (Q-04) |
 | `behavior.context_selection` | `suffix` vs `utility` — default `suffix` |
 
 **Dívida registada:** `upgrade` sem canal configurado (recusa), validação e2e em falta para

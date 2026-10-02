@@ -7,11 +7,31 @@ use katu_core::provider::Thinking;
 use crate::live::Live;
 use crate::trash::TrashEntry;
 
+/// Pedido de login emitido pela TUI (a borda escreve config/credenciais).
+///
+/// O embedding fica no `katu.toml` e **não** é tocado: o pedido só leva o provider/modelo/base do
+/// agente e, no opencode, a chave.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LoginRequest {
+    /// Provider: `opencode`, `opencode-zen` ou `llama`.
+    pub provider: String,
+    /// Chave da API do opencode; `None` mantém a guardada.
+    pub api_key: Option<String>,
+    /// URL base; `None` usa o default do provider.
+    pub base: Option<String>,
+    /// Modelo; `None` usa o default do provider.
+    pub model: Option<String>,
+    /// `true` termina a sessão (apaga a chave guardada).
+    pub logout: bool,
+}
+
 /// Comando emitido pela UI para a borda executar (I/O fora do render).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     /// Submeter uma mensagem ao agente.
     Submit(String),
+    /// Faz login num provider de agente (opencode **ou** llama.cpp).
+    Login(LoginRequest),
     /// Altera o modelo do **próximo** turno (E10-T07/E12-T10); o agente não se auto-escala.
     SetModel(String),
     /// Altera o grau de pensamento do **próximo** turno (E10-T07/E12-T10).

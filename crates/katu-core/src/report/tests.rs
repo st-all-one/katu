@@ -174,6 +174,17 @@ fn the_ceiling_covers_the_envelope() {
 }
 
 #[test]
+fn a_truncated_delta_points_at_the_continuation() {
+    // Q-02a: o aviso de truncagem tem de dizer **como** continuar (o modelo não repete a leitura).
+    let big = "linha de conteúdo com texto suficiente para encher o teto\n".repeat(2_000);
+    let report = ToolReport::new("read.full", Value::str(&big))
+        .with_id("f_demo")
+        .with_next(vec!["read f_demo@401".to_string()]);
+    let delta = report.to_delta();
+    assert!(delta.contains("continua com `read f_demo@401`"), "{delta}");
+}
+
+#[test]
 fn a_small_delta_pays_only_the_tags() {
     // O custo do envelope e' fixo (`reserve`): um delta pequeno paga ~71 B, nao uma fracao do teto.
     let report = ToolReport::new("read.summary", Value::str("olá"));

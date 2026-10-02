@@ -33,6 +33,10 @@ ratatui = { version = "0.30", default-features = false, features = ["crossterm"]
 toml = "0.8"
 # compressão do corpo do pedido do provider (opcional; nível rápido, latência primeiro)
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+# cliente HTTP para verificações de atualização
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+# leitura de segredos sem eco no terminal (login interativo)
+rpassword = "7"
 # crates internos
 katu-core = { path = "crates/katu-core" }
 katu-policy = { path = "crates/katu-policy" }

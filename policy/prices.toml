@@ -3,8 +3,219 @@
 # Vazio por omissão: um modelo **sem** entrada fica `unpriced` e o custo não é mostrado. O katu
 # **nunca inventa preço** (DF5); preencher aqui é uma decisão explícita do dono.
 #
-# Exemplo:
-# [models."meu-modelo"]
-# input = 1000000        # 1 US$ / 1M tokens de entrada
-# output = 3000000       # 3 US$ / 1M tokens de saída
-# cached_input = 100000  # 0,1 US$ / 1M tokens de cache
+# Modelos locais (llama.cpp) têm custo ~0 (electricidade); modelos remotos têm preços de API.
+# Os preços são de referência e podem mudar — atualize conforme necessário.
+
+# ── Modelos locais (llama.cpp) ───────────────────────────────────────────────
+# Custo de electricidade ~0; mantido explícito para não ser "unpriced"
+
+[models."qwen2.5-coder-1.5b"]
+input = 0
+output = 0
+cached_input = 0
+
+[models."qwen2.5-coder-1.5b-instruct-q4_k_m"]
+input = 0
+output = 0
+cached_input = 0
+
+[models."ibm-granite/granite-embedding-97m-multilingual-r2"]
+input = 0
+output = 0
+cached_input = 0
+
+# ── Modelos gratuitos (free tier) ────────────────────────────────────────────
+
+[models."longcat-2.5-preview-free"]
+input = 0
+output = 0
+cached_input = 0
+
+# ── OpenAI (preços de referência, podem mudar) ───────────────────────────────
+
+[models."gpt-4o"]
+input = 2500000    # $2.50 / 1M tokens
+output = 10000000  # $10.00 / 1M tokens
+cached_input = 1250000  # $1.25 / 1M tokens (50% de desconto)
+
+[models."gpt-4o-mini"]
+input = 150000     # $0.15 / 1M tokens
+output = 600000    # $0.60 / 1M tokens
+cached_input = 75000   # $0.075 / 1M tokens
+
+[models."gpt-4.1"]
+input = 2000000    # $2.00 / 1M tokens
+output = 8000000   # $8.00 / 1M tokens
+cached_input = 500000  # $0.50 / 1M tokens
+
+[models."gpt-4.1-mini"]
+input = 400000     # $0.40 / 1M tokens
+output = 1600000   # $1.60 / 1M tokens
+cached_input = 100000  # $0.10 / 1M tokens
+
+[models."gpt-4.1-nano"]
+input = 100000     # $0.10 / 1M tokens
+output = 400000    # $0.40 / 1M tokens
+cached_input = 25000   # $0.025 / 1M tokens
+
+[models."o1"]
+input = 15000000   # $15.00 / 1M tokens
+output = 60000000  # $60.00 / 1M tokens
+cached_input = 7500000  # $7.50 / 1M tokens
+
+[models."o1-mini"]
+input = 1100000    # $1.10 / 1M tokens
+output = 4400000   # $4.40 / 1M tokens
+cached_input = 550000  # $0.55 / 1M tokens
+
+[models."o3"]
+input = 10000000   # $10.00 / 1M tokens
+output = 40000000  # $40.00 / 1M tokens
+cached_input = 2500000  # $2.50 / 1M tokens
+
+[models."o3-mini"]
+input = 1100000    # $1.10 / 1M tokens
+output = 4400000   # $4.40 / 1M tokens
+cached_input = 550000  # $0.55 / 1M tokens
+
+[models."o4-mini"]
+input = 1100000    # $1.10 / 1M tokens
+output = 4400000   # $4.40 / 1M tokens
+cached_input = 275000  # $0.275 / 1M tokens
+
+# ── Anthropic Claude (preços de referência) ─────────────────────────────────
+
+[models."claude-opus-4-7"]
+input = 15000000   # $15.00 / 1M tokens
+output = 75000000  # $75.00 / 1M tokens
+cached_input = 1500000  # $1.50 / 1M tokens
+
+[models."claude-sonnet-4-6"]
+input = 3000000    # $3.00 / 1M tokens
+output = 15000000  # $15.00 / 1M tokens
+cached_input = 300000   # $0.30 / 1M tokens
+
+[models."claude-haiku-4-5"]
+input = 800000     # $0.80 / 1M tokens
+output = 4000000   # $4.00 / 1M tokens
+cached_input = 80000    # $0.08 / 1M tokens
+
+[models."claude-3-5-sonnet"]
+input = 3000000    # $3.00 / 1M tokens
+output = 15000000  # $15.00 / 1M tokens
+cached_input = 300000   # $0.30 / 1M tokens
+
+[models."claude-3-5-haiku"]
+input = 800000     # $0.80 / 1M tokens
+output = 4000000   # $4.00 / 1M tokens
+cached_input = 80000    # $0.08 / 1M tokens
+
+[models."claude-3-opus"]
+input = 15000000   # $15.00 / 1M tokens
+output = 75000000  # $75.00 / 1M tokens
+cached_input = 1500000  # $1.50 / 1M tokens
+
+# ── Google Gemini (preços de referência) ────────────────────────────────────
+
+[models."gemini-2.5-pro"]
+input = 1250000    # $1.25 / 1M tokens (≤200K), $2.50 / 1M (>200K)
+output = 10000000  # $10.00 / 1M tokens
+cached_input = 312500   # $0.3125 / 1M tokens
+
+[models."gemini-2.5-flash"]
+input = 300000     # $0.30 / 1M tokens
+output = 2500000   # $2.50 / 1M tokens
+cached_input = 75000    # $0.075 / 1M tokens
+
+[models."gemini-2.5-flash-lite"]
+input = 100000     # $0.10 / 1M tokens
+output = 400000    # $0.40 / 1M tokens
+cached_input = 25000    # $0.025 / 1M tokens
+
+[models."gemini-2.0-flash"]
+input = 100000     # $0.10 / 1M tokens
+output = 400000    # $0.40 / 1M tokens
+cached_input = 25000    # $0.025 / 1M tokens
+
+[models."gemini-2.0-flash-lite"]
+input = 75000      # $0.075 / 1M tokens
+output = 300000    # $0.30 / 1M tokens
+cached_input = 18750    # $0.01875 / 1M tokens
+
+# ── DeepSeek (preços de referência) ─────────────────────────────────────────
+
+[models."deepseek-chat"]
+input = 270000     # $0.27 / 1M tokens
+output = 1100000   # $1.10 / 1M tokens
+cached_input = 14000   # $0.014 / 1M tokens
+
+[models."deepseek-reasoner"]
+input = 550000     # $0.55 / 1M tokens
+output = 2190000   # $2.19 / 1M tokens
+cached_input = 14000   # $0.014 / 1M tokens
+
+# ── Mistral (preços de referência) ────────────────────────────────────────
+
+[models."mistral-large"]
+input = 2000000    # $2.00 / 1M tokens
+output = 6000000   # $6.00 / 1M tokens
+cached_input = 200000   # $0.20 / 1M tokens
+
+[models."mistral-small"]
+input = 200000     # $0.20 / 1M tokens
+output = 600000    # $0.60 / 1M tokens
+cached_input = 20000    # $0.02 / 1M tokens
+
+[models."codestral"]
+input = 300000     # $0.30 / 1M tokens
+output = 900000    # $0.90 / 1M tokens
+cached_input = 30000    # $0.03 / 1M tokens
+
+# ── Meta Llama (preços de referência) ───────────────────────────────────────
+
+[models."llama-4-maverick"]
+input = 180000     # $0.18 / 1M tokens
+output = 600000    # $0.60 / 1M tokens
+cached_input = 18000    # $0.018 / 1M tokens
+
+[models."llama-4-scout"]
+input = 150000     # $0.15 / 1M tokens
+output = 450000    # $0.45 / 1M tokens
+cached_input = 15000    # $0.015 / 1M tokens
+
+[models."llama-3.3-70b"]
+input = 220000     # $0.22 / 1M tokens
+output = 790000    # $0.79 / 1M tokens
+cached_input = 22000    # $0.022 / 1M tokens
+
+[models."llama-3.1-8b"]
+input = 20000      # $0.02 / 1M tokens
+output = 30000     # $0.03 / 1M tokens
+cached_input = 2000     # $0.002 / 1M tokens
+
+# ── Qwen (preços de referência, API) ────────────────────────────────────────
+
+[models."qwen-max"]
+input = 2000000    # $2.00 / 1M tokens
+output = 6000000   # $6.00 / 1M tokens
+cached_input = 200000   # $0.20 / 1M tokens
+
+[models."qwen-plus"]
+input = 400000     # $0.40 / 1M tokens
+output = 1200000   # $1.20 / 1M tokens
+cached_input = 40000    # $0.04 / 1M tokens
+
+[models."qwen-turbo"]
+input = 60000      # $0.06 / 1M tokens
+output = 200000    # $0.20 / 1M tokens
+cached_input = 6000     # $0.006 / 1M tokens
+
+[models."qwen2.5-coder-32b"]
+input = 200000     # $0.20 / 1M tokens
+output = 600000    # $0.60 / 1M tokens
+cached_input = 20000    # $0.02 / 1M tokens
+
+[models."qwen2.5-coder-7b"]
+input = 100000     # $0.10 / 1M tokens
+output = 300000    # $0.30 / 1M tokens
+cached_input = 10000    # $0.01 / 1M tokens

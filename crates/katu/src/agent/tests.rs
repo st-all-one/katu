@@ -6,6 +6,7 @@
 use std::path::{Path, PathBuf};
 
 use katu_core::kernel::{CallId, Event, Message, read_records};
+use katu_core::memory::{Memory, RecallReq};
 use katu_core::ports::{FixedClock, Timestamp};
 use katu_core::provider::{ModelSpec, Provider, ProviderEvent, StopReason};
 use katu_providers::{FakeProvider, Turn};
@@ -15,6 +16,7 @@ use super::{Ports, TurnOptions, TurnRequest, run_turn};
 use crate::ports::{StdEnv, StdFs, StdProcess};
 use crate::runtime::Runtime;
 
+mod args;
 mod calls;
 mod context;
 mod guard;
@@ -328,6 +330,65 @@ fn two_turns_run_back_to_back_without_reopening() -> Result<(), Box<dyn std::err
     )?;
     assert_eq!(second.text, "dois");
     assert_eq!(runtime.session().state().turn, 2);
+
+    runtime.session().verify()?;
+    drop(runtime);
+    std::fs::remove_dir_all(&root)?;
+    Ok(())
+}
+
+/// Ferramenta de escrita de memória que o modelo pede no guião.
+pub(super) fn memory_record_call() -> ProviderEvent {
+    ProviderEvent::ToolCall {
+        call: CallId::new("m1"),
+        name: "memory".to_string(),
+        arguments: json!({"command": "record", "statement": "o projeto usa Rust"}),
+    }
+}
+
+/// O agente usa o `Runtime::remember` para escrever na memória (recall prévio + gate de E05).
+#[test]
+fn agent_writes_memory_through_runtime_remember() -> Result<(), Box<dyn std::error::Error>> {
+    let root = root("memory-remember")?;
+    let fs = StdFs;
+    let clock = FixedClock::new(Timestamp::from_millis(1_000));
+    let mut runtime = Runtime::open(&fs, &clock, &root, "escreve na memória")?;
+
+    let provider = FakeProvider::new(
+        "fake",
+        vec![
+            Turn {
+                events: vec![memory_record_call()],
+                stop: StopReason::ToolCalls,
+            },
+            Turn::text("memória escrita"),
+        ],
+    );
+    let process = StdProcess;
+    let env = StdEnv;
+    let ports = Ports {
+        fs: &fs,
+        process: &process,
+        env: &env,
+    };
+
+    let report = run_turn(
+        &mut runtime,
+        request(&provider, ports, "escreve na memória", &options(4)),
+    )?;
+    assert_eq!(report.calls, 1);
+    assert_eq!(report.text, "memória escrita");
+
+    // Verifica que a nota foi escrita na memória
+    let hits = runtime.memory.search(&RecallReq {
+        query: "o projeto usa Rust".to_string(),
+        limit: 5,
+    })?;
+    assert!(
+        hits.iter()
+            .any(|h| h.statement.contains("o projeto usa Rust")),
+        "a nota foi escrita na memória"
+    );
 
     runtime.session().verify()?;
     drop(runtime);

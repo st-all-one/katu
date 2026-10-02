@@ -1,7 +1,6 @@
 //! Testes das views de `read` (E06-T03).
 
 use super::{LineRange, ReadBudget, ReadTool, View, views};
-use katu_core::error::ToolOutcome;
 use katu_core::kernel::Tool;
 use katu_core::ports::{Fs, MemFs};
 use katu_core::toon::Value;
@@ -200,7 +199,7 @@ fn tool_reads_and_reports() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn missing_file_is_unavailable() -> Result<(), Box<dyn std::error::Error>> {
+fn missing_file_is_reported() -> Result<(), Box<dyn std::error::Error>> {
     let fs = MemFs::new();
     let tool = ReadTool {
         fs: &fs,
@@ -210,10 +209,10 @@ fn missing_file_is_unavailable() -> Result<(), Box<dyn std::error::Error>> {
         base: None,
         budget: ReadBudget::default(),
     };
-    assert!(matches!(
-        tool.execute(&use_()?).outcome,
-        ToolOutcome::Unavailable { .. }
-    ));
+    let output = tool.execute(&use_()?);
+    let report = output.report.as_ref().ok_or("sem relatório")?;
+    assert_eq!(report.kind, "read.missing");
+    assert!(report.to_toon().contains("not_found"));
     Ok(())
 }
 

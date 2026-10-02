@@ -74,7 +74,7 @@ remoção de complexidade; senão reverter e escrever a rejeição). Nada muda b
 | **W7-1** harness estatístico zero-dep | ✔ feito | `katu_core::stats` (`Summary` + IC 95 %: normal para `n ≥ 30`, *bootstrap* determinístico abaixo); `ci95` em `frame.json`/`latency.json`/`atomics`; os gates comparam o **limite superior**; testes `n < 5`/IC contém a mediana/determinismo/orçamento |
 | **W7-2** atribuição regerada | ✔ feito | cobertura **1322/1322 (100,0 %)** / **1322/1458 (90,6 %)** com `const fn`; rótulo `policy::evaluate`; `bench/e18/atomics/{raw.json,REPORT.md}` regenerados (`git diff` é a prova) |
 | **W7-3** S-04 órfãos | ✔ feito | `context.compact` passou a ser emitido; `check-diag` trava órfãos (`xtask/src/orphans.rs`); **0** órfãos em 114 ids |
-| **W8-1** B1 · gramática/schema | ✔ feito | `response_format` `json_schema` derivado das tools do pedido, **opt-in** (`provider.structured_output`) e **fail-open** (400 ⇒ repetição sem o campo); ADR 0025; artefacto `bench/e18/grammar/` (+962 B, p50 153 µs); 4 testes |
+| **W8-1** B1 · gramática/schema | ✔ feito | `response_format` `json_schema` derivado das tools do pedido, **opt-in** (`structured_output`) e **fail-open** (400 ⇒ repetição sem o campo); ADR 0025; artefacto `bench/e18/grammar/` (+962 B, p50 153 µs); 4 testes |
 | **W8-2** C3 · calibração ECE/Brier | ✔ feito | `katu_policy::calibrate` (10 baldes, base `inferred`); o ECE do registo perfeito desce **730‰ → 83‰** com a evidência; `policy:confidence` publica ECE/Brier; artefacto `bench/e18/confidence/` |
 | **W8-3** C1 · e-value anytime-valid | ✔ feito | `kernel::guard` corta por `log(1/α)` (Ville) em vez do SPRT nominal; erro tipo I **≤ α** para qualquer `n` (DP exata, sem RNG); alarme no **5.º** passo; artefacto `bench/e18/loop/` |
 | **W8-4** A3 · VOI para tool calls | ✔ feito (decisão escrita) | `agent::turn::voi` (não repetir só-leitura já satisfeita; nunca o irreconstruível); opt-in `behavior.tool_voi` (default **off** até A/B); artefacto `bench/e18/voi/` (2 de 11 evitadas) |
@@ -790,7 +790,7 @@ vivos. Nenhum teto de `surface.toml` subiu.
   regista a capacidade por provider.
 - **Adoção:** ≥ 20 % dos turnos falhados evitados; senão reverter e escrever o número.
 - **Resultado ✔:** `response_format: {json_schema: {oneOf: […]}}` derivado dos `ToolDef` do pedido
-  (`tool_call_schema`), `strict: true`; **opt-in** (`provider.structured_output` / TOML declarativo /
+  (`tool_call_schema`), `strict: true`; **opt-in** (`structured_output` / TOML declarativo /
   `ModelEntry`/`LlamaConfig`) e **fail-open** (um `400` repete o pedido sem o campo). Desligado é
   byte a byte o atual. ADR **0025**. Artefacto `bench/e18/grammar/raw.json` (3 tools): corpo
   `970 → 1 932 B` (+962), p50 de codificação `35 → 153 µs` (IC 95 % do harness de W7). Testes:

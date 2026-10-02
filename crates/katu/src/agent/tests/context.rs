@@ -2,7 +2,7 @@
 
 use std::sync::{Mutex, PoisonError};
 
-use katu_core::context::CompactionMode;
+use katu_core::context::{CompactionMode, SelectionPolicy};
 use katu_core::ports::{FixedClock, Timestamp};
 use katu_core::provider::{
     Flow, Provider, ProviderError, ProviderEvent, ProviderOutcome, ProviderRequest, ProviderSink,
@@ -83,6 +83,9 @@ fn the_request_carries_the_prime_and_only_compacts_when_enabled()
     }
 
     // Liga a compactação e corre de novo: o digest passa a viajar no sistema.
+    // A política `suffix` isola o mecanismo de compactação do default `utility` (que pode suprimir
+    // o digest por baixa divergência).
+    runtime.set_selection(SelectionPolicy::Suffix);
     runtime.set_compaction(CompactionMode::Enabled);
     let recorder = Recorder::default();
     let report = run_turn(

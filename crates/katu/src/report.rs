@@ -119,8 +119,17 @@ fn human_data(data: Option<&Value>) -> String {
         Some(Value::String(text)) => format!("{text}\n"),
         Some(Value::Object(map)) => {
             let mut out = String::new();
+            // A resposta do modelo é o **corpo**: sai crua, antes dos metadados (que a repetiriam
+            // como `text = "…"`). `run` sem `--json` passa a devolver o que o agente escreveu.
+            if let Some(Value::String(text)) = map.get("text")
+                && !text.is_empty()
+            {
+                out.push_str(text);
+                out.push('\n');
+                out.push('\n');
+            }
             for (key, value) in map {
-                if key == "session" {
+                if key == "session" || key == "text" {
                     continue;
                 }
                 out.push_str(key);
@@ -198,6 +207,23 @@ mod tests {
         assert_eq!(text, "olá\n");
         let object = human_data(Some(&serde_json::json!({"a": 1})));
         assert!(object.contains("a = 1"));
+    }
+
+    #[test]
+    fn human_prints_the_run_text_as_the_body() {
+        let data = serde_json::json!({
+            "session": "s_1",
+            "text": "resumo do repo",
+            "chars": 14,
+        });
+        let out = human_data(Some(&data));
+        assert!(out.starts_with("resumo do repo\n\n"), "{out}");
+        assert!(out.contains("chars = 14"), "{out}");
+        assert!(out.contains("s_1"), "{out}");
+        assert!(
+            !out.contains("text = "),
+            "o texto não se repete como campo: {out}"
+        );
     }
 
     #[test]

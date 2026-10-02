@@ -4,6 +4,7 @@
 //! tool calls de cada passo e reencaminha a atividade **efémera** (deltas, tools, argumentos crus);
 //! nada disto entra no log. O cancelamento cooperativo fecha o turno de forma limpa.
 
+use katu_core::context::SelectionPolicy;
 use katu_core::diag::{Level, events};
 use katu_core::kernel::{Call, CallId, Fingerprint, Guard};
 use katu_core::provider::{
@@ -123,11 +124,14 @@ fn drive(
 
     let tools = catalog::tool_defs();
     let mut guard = Guard::with_defaults();
-    // A3/W8-4: gate de Value of Information — **off** por omissão até A/B com o modelo.
+    // A3/W8-4: o gate só é **seguro** com a seleção `suffix` — a `utility` pode descartar a unidade
+    // lida e o gate passaria a dizer “já presente no contexto” sem o estar. `behavior.tool_voi`
+    // fica assim limitado a quando o resultado lido está garantidamente no contexto.
     let mut voi = super::voi::Voi::new();
     let voi_enabled = defaults::from_root(runtime.root())
         .tool_voi
-        .unwrap_or(false);
+        .unwrap_or(false)
+        && runtime.selection() == SelectionPolicy::Suffix;
     let mut accum = Accum {
         text: String::new(),
         calls: 0,

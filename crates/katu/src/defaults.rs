@@ -82,7 +82,7 @@ pub(crate) fn from_root(root: &Path) -> Defaults {
         context_selection: text(&table, "behavior.context_selection"),
         tool_voi: boolean(&table, "behavior.tool_voi"),
         durability: text(&table, "behavior.durability"),
-        structured_output: boolean(&table, "provider.structured_output"),
+        structured_output: boolean(&table, "structured_output"),
         recall_limit: integer(&table, "recall.default_limit")
             .and_then(|value| usize::try_from(value).ok()),
         mac_key: text(&table, "audit.mac_key"),

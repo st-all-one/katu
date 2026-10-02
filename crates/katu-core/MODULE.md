@@ -17,8 +17,7 @@ função, o log é a fonte da verdade.
   - `kernel::step` — `step(State, Event) -> Result<State, Refusal>` (puro) + pré-condições de fase
     (`Verified` exige relatório não bloqueado, E09-T03).
   - `kernel::log` — `Log`/`LogRecord` append-only JSONL (`session.v1.jsonl`) sobre a porta `Fs`.
-    `Durability::{Event,Turn}` (ADR 0024/P-01): barreira por evento (default) ou por turno
-    (*group commit*, `behavior.durability = turn`) — **−78,1 %** no caminho de anexação
+    `Durability::{Event,Turn}` (ADR 0024/P-01): barreira por turno (*group commit*, `behavior.durability = turn`, **default**) ou por evento (`event`) — **−78,1 %** no caminho de anexação
     ([`bench/e18/durability`](../../bench/e18/durability/PROTOCOL.md)). Uma **cauda rasgada** (última
     linha sem `\n`, marca de crash) é descartada com aviso; corrupção a meio e saltos de `seq`
     continuam falha-fechado.
@@ -122,8 +121,9 @@ função, o log é a fonte da verdade.
 - Estado do turno no prompt [`context/state`](src/context/state.rs) (Q-04): secção `estado` compacta e
   determinística (modo, regras que travam, teto de passos, *working set*), com teto de bytes e sem
   duplicados, acrescentada **no fim** do prime. Registada como `Event::PromptState` com o texto exato
-  (`Model-visible ⟺ logged`); **desligada** por omissão (`behavior.prompt_state`) até haver A/B de
-  turnos de auto-correção. Estável **dentro** do turno, de propósito: um valor que mudasse a cada
+  (`Model-visible ⟺ logged`); **ligada** por omissão (`behavior.prompt_state`; desligável pela
+  config) — a adoção dos números publicados dependia de A/B de turnos de auto-correção, hoje
+  decidida pelo dono. Estável **dentro** do turno, de propósito: um valor que mudasse a cada
   passo destruiria o cache de prefixo do provider.
 - Gate de verificação [`verify`](src/verify/mod.rs) (E09-T03): `verify` **puro** (escopo/feedback/
   cobertura, zero LLM), `VerificationReport`/`Check`/`CheckStatus`, `--strict` promove warns a

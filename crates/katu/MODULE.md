@@ -12,8 +12,13 @@ todo o código impuro confinado.
   `prime` estático por grupo (`prime.rs`), `memo` só consulta (`memo.rs`), body/stdin (`input.rs`),
   `--json` por comando e `--log-level` global (default `quiet`); sem subcomando, `katu` abre a TUI.
   A **configuração** vive em `src/config.rs` (conjunto fechado de chaves, paths por SO, merge
-  projeto > global) e `cli/config_cmd.rs` (`get/set/unset/list [--global]`, ADR 0020); a entrada
-  estruturada `--params` (XOR com flags) e `--batch` JSONL vive em `cli/params.rs` +
+  projeto > global) e `cli/config_cmd.rs` (`init/login/get/set/unset/list [--global]`, ADR 0020); o
+  **login** (`src/login.rs`, E21) liga **um** provider de agente (opencode **ou** llama.cpp),
+  guardando a chave do opencode na config global (`katu.toml`, chave `opencode_api_key`, modo
+  `0600`, fora do conjunto fechado de chaves); o embedding
+  fica reservado ao `katu.toml` e **nunca** é tocado pelo login. `katu config login` escreve
+  `provider`/`model`/`base` na **global** (sem `--provider`, pergunta interativamente); `build_provider`
+  lê a chave do ambiente ou do ficheiro de credenciais. A entrada estruturada `--params` (XOR com flags) e `--batch` JSONL vive em `cli/params.rs` +
   `cli/run_params.rs` (E20-T08). Cada grupo expõe `<grupo> prime` (`memo prime`, `config prime`),
   equivalente a `katu prime --group <g>`. Os **padrões** da config efetiva
   (`provider`/`model`/`base`/`thinking`/`behavior.auto_compact`/`recall.default_limit`) alimentam
@@ -67,6 +72,8 @@ todo o código impuro confinado.
   + digest, E09-T01/T07) e o catálogo de tools, e executa cada tool call pela ordem §42 (logar → política → efeito). O `router` mapeia os
   argumentos JSON do modelo num `ToolUse` resolvido (caminhos canonicalizados antes do veredicto,
   E07-T02) e no executor; a tool `memory` passa pelos caminhos de recall/escrita do gate de E05.
+  Um argumento malformado do modelo **não** aborta o turno: vira `ToolOutcome::Unavailable`
+  (`control = "argument"`) com o erro no delta, pelo que o modelo o vê e corrige no passo seguinte.
   O comando `katu run` exercita-o. Envelopes de `Dispatch`/memória vivem em `src/memory/commands.rs`.
   **Guard de loop** (Q-12/F7): cada passo é observado **antes** de executar
   (`kernel::guard`, CUSUM + **e-value** *anytime-valid* sobre a assinatura das chamadas); um ciclo de
@@ -80,8 +87,9 @@ todo o código impuro confinado.
   [`bench/e18/pool`](../../bench/e18/pool/PROTOCOL.md) (E1).
 - **Gate de VOI** (A3/W8-4, `src/agent/turn/voi.rs`): não repete uma só-leitura já satisfeita no
   turno (`VOI = 0 < custo`) e **nunca** salta o irreconstruível; a mutação invalida a informação
-  cacheada. **Opt-in** (`behavior.tool_voi`, default **off** até A/B com o modelo — precedente
-  Q-02b/Q-03). Medido em [`bench/e18/voi`](../../bench/e18/voi/PROTOCOL.md): 2 de 11 chamadas
+  cacheada. **Opt-in** (`behavior.tool_voi`, default `false`; e só atua com a seleção `suffix` —
+  com `utility` a unidade lida pode ser descartada e o gate diria “já presente” sem o estar).
+  Medido em [`bench/e18/voi`](../../bench/e18/voi/PROTOCOL.md): 2 de 11 chamadas
   evitadas em cenários canónicos, 0 irreconstruíveis saltados.
 - **Aprovação one-shot** (B-06, `src/agent/turn.rs`): a aprovação de escalação de sandbox é
   **one-shot** — depois de usada, a capacidade é revogada e a próxima escalação exige nova

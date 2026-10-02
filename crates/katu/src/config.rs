@@ -52,9 +52,9 @@ pub(crate) const KEYS: &[KeySpec] = &[
         doc: "Base URL do provider por omissão.",
     },
     KeySpec {
-        key: "provider.structured_output",
+        key: "structured_output",
         kind: Kind::Bool,
-        doc: "Pede saída estruturada (json_schema) ao provider local (B1/W8-1; default `false`).",
+        doc: "Pede saída estruturada (json_schema) ao provider local (B1/W8-1; default `false`; ADR 0025).",
     },
     KeySpec {
         key: "log_level",
@@ -79,17 +79,22 @@ pub(crate) const KEYS: &[KeySpec] = &[
     KeySpec {
         key: "behavior.prompt_state",
         kind: Kind::Bool,
-        doc: "Incluir a secção `estado` no prime (Q-04; default `false`).",
+        doc: "Incluir a secção `estado` no prime (Q-04; default `true`).",
     },
     KeySpec {
         key: "behavior.context_selection",
         kind: Kind::Text,
-        doc: "Política de seleção do contexto: `suffix` (default) ou `utility` (Q-02b/Q-03).",
+        doc: "Política de seleção do contexto: `suffix` (default, histórico) ou `utility` (Q-02b/Q-03).",
+    },
+    KeySpec {
+        key: "behavior.durability",
+        kind: Kind::Text,
+        doc: "Durabilidade do log: `turn` (*group commit*, default) ou `event` (ADR 0024).",
     },
     KeySpec {
         key: "behavior.tool_voi",
         kind: Kind::Bool,
-        doc: "Não repetir uma só-leitura já satisfeita no turno (A3/W8-4; default `false` até A/B).",
+        doc: "Não repetir uma só-leitura já satisfeita no turno (A3/W8-4; default `false`; só atua com `suffix`).",
     },
     KeySpec {
         key: "recall.default_limit",

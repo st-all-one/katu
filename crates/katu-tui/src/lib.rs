@@ -37,7 +37,7 @@ pub use approval::{Challenge, ChallengePrompt, ChallengeSignature, QUESTIONS};
 pub use entry::{Entry, Role, Status};
 pub use live::Live;
 pub use menu::{Menu, MenuChoice, MenuKind};
-pub use message::{Command, Update};
+pub use message::{Command, LoginRequest, Update};
 pub use run::{Handler, Painter, run};
 pub use trash::TrashEntry;
 pub use ui::render;

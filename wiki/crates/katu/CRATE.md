@@ -253,7 +253,8 @@ pub(crate) const KEYS: &[KeySpec] = &[
 **Gate de VOI** (A3/W8-4):
 - Não repete uma só-leitura já satisfeita no turno
 - **Nunca** salta o irreconstruível
-- **Opt-in** (`behavior.tool_voi`, default **off** até A/B com o modelo)
+- **Opt-in** (`behavior.tool_voi`, default **off** até A/B com o modelo); só atua com a seleção
+  `suffix` (com `utility` a unidade lida pode ser descartada e o gate mentiria)
 
 ### 3.10 TUI (`src/tui.rs` + `src/tui/`)
 
@@ -439,8 +440,8 @@ Toda a execução de tools segue a ordem:
 | Gap | Descrição | Estado |
 |-----|-----------|--------|
 | `upgrade` | Canal de atualização não configurado | Recusa explicitamente (fail-closed) |
-| `behavior.tool_voi` | Gate de VOI | Default **off** até A/B com o modelo |
-| `behavior.prompt_state` | Secção `estado` no prime | Default **off** até A/B (Q-04) |
+| `behavior.tool_voi` | Gate de VOI | Default **off** até A/B; só atua com `suffix` |
+| `behavior.prompt_state` | Secção `estado` no prime | Default **on** (Q-04) |
 | `embeddings.command` | Comando para lançar o serviço | Reservado; não lança sozinho |
 | `memo knowledge --semantic` | Modo semântico do mapa | Adiado |
 | `memo knowledge --communities` | Comunidades | Adiado |
@@ -516,7 +517,7 @@ Toda a execução de tools segue a ordem:
 
 ## 7. Referências
 
-- **MODULE.md:** [`crates/katu/MODULE.md`](../../crates/katu/MODULE.md)
-- **ADRs:** [`wiki/_ref/docs/adr/`](../../wiki/_ref/docs/adr/)
-- **Políticas:** [`policy/`](../../policy/)
-- **Benches:** [`bench/`](../../bench/)
+- **MODULE.md:** [`crates/katu/MODULE.md`](../../../crates/katu/MODULE.md)
+- **ADRs:** [`wiki/_ref/adr/`](../../_ref/adr/)
+- **Políticas:** [`policy/`](../../../policy/)
+- **Benches:** [`bench/`](../../../bench/)

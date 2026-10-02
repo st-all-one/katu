@@ -18,6 +18,7 @@ use crate::message::Command;
 use crate::transcript::TranscriptView;
 use crate::trash::{Trash, TrashEntry};
 
+mod login;
 mod menu;
 mod panel;
 mod update;
@@ -53,6 +54,8 @@ pub struct App {
     menu: Option<Menu>,
     /// Menu a abrir quando a borda publicar as capacidades do novo modelo (E20-T10).
     pending_menu: Option<MenuKind>,
+    /// Login guiado em curso (E21); `None` quando não há.
+    login: Option<login::LoginFlow>,
     /// Graus de pensamento suportados pelo modelo ativo (E20-T10).
     thinking_options: Vec<Thinking>,
     /// Vista da lixeira (E10-T07/E06-T09).
@@ -97,6 +100,7 @@ impl App {
             controls: Controls::new(),
             menu: None,
             pending_menu: None,
+            login: None,
             thinking_options: Vec::new(),
             trash: Trash::new(),
             viewer: TranscriptView::new(),
@@ -153,6 +157,19 @@ impl App {
         let _span = katu_core::trace_fn!("app::input");
 
         &self.input
+    }
+
+    /// Texto a mostrar na linha de entrada; mascara a chave durante o login (E21).
+    #[must_use]
+    pub fn input_display(&self) -> String {
+        let _span = katu_core::trace_fn!("app::input_display");
+
+        match &self.login {
+            Some(flow) if flow.step == login::LoginStep::ApiKey => {
+                "*".repeat(self.input.chars().count())
+            }
+            _ => self.input.clone(),
+        }
     }
 
     /// Buffer de *steering* em curso durante um turno (E20-T16).

@@ -24,6 +24,9 @@ mod agent;
 mod diag;
 
 #[cfg(feature = "memory-in-process")]
+mod login;
+
+#[cfg(feature = "memory-in-process")]
 mod memory;
 
 #[cfg(feature = "memory-in-process")]
@@ -32,7 +35,13 @@ mod pricing;
 #[cfg(feature = "memory-in-process")]
 mod watch_service;
 
-#[allow(dead_code, reason = "adaptadores ligados ao kernel em E04")]
+#[cfg_attr(
+    not(feature = "memory-in-process"),
+    allow(
+        dead_code,
+        reason = "sem agente/TUI (feature `memory-in-process`) os adaptadores de processo não têm consumidor"
+    )
+)]
 mod ports;
 
 mod report;

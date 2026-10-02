@@ -516,8 +516,8 @@ resultado.
 
 ## 7. Referências
 
-- **MODULE.md:** [`crates/katu-policy/MODULE.md`](../../crates/katu-policy/MODULE.md)
-- **Artefactos de política:** [`policy/`](../../policy/) (`memory.toml`, `containment.toml`,
+- **MODULE.md:** [`crates/katu-policy/MODULE.md`](../../../crates/katu-policy/MODULE.md)
+- **Artefactos de política:** [`policy/`](../../../policy/) (`memory.toml`, `containment.toml`,
   `coverage-ledger.json`)
-- **Bench de confiança:** [`bench/e18/confidence`](../../bench/e18/confidence/PROTOCOL.md)
+- **Bench de confiança:** [`bench/e18/confidence`](../../../bench/e18/confidence/PROTOCOL.md)
 - **ADRs:** 0022 (vocabulário v3 / modo plano)

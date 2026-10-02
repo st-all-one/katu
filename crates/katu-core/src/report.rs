@@ -190,8 +190,12 @@ impl ToolReport {
         if text.len() <= budget(self.kind) {
             return taint::spotlight(self.kind, &text);
         }
+        let continuation = self
+            .next
+            .first()
+            .map_or_else(String::new, |next| format!("; continua com `{next}`"));
         let notice = format!(
-            "\n# delta truncado em {MAX_DELTA_BYTES} B; kind={}; id={}\n",
+            "\n# delta truncado em {MAX_DELTA_BYTES} B; kind={}; id={}{continuation}\n",
             self.kind,
             self.id.as_deref().unwrap_or("-")
         );

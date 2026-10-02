@@ -263,6 +263,10 @@ pub fn run<H: Handler>(mut app: App, handler: &mut H, clock: &dyn Clock) -> io::
                         let command = app.apply_action(action);
                         throttle.request();
                         if let Some(command) = command {
+                            // Desenha já o estado (mensagem do utilizador + `a trabalhar…`) antes
+                            // de bloquear no turno: sem isto, o ecrã fica no quadro anterior até ao
+                            // primeiro delta do modelo.
+                            guard.terminal.draw(|frame| render(frame, &app))?;
                             let mut painter = Painter {
                                 app: &mut app,
                                 terminal: &mut guard.terminal,

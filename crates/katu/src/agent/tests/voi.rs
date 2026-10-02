@@ -158,47 +158,18 @@ fn artifact_json(scenarios: &[Scenario], avoided: u32, executed: u32) -> serde_j
         "criterion": "evitar só-leitura duplicada e nunca saltar o irreconstruível",
         "criterion_met": avoided >= 2 && executed >= 3,
         "caveat": "proxy determinístico (nenhum modelo local emite tool calls nativas): mede o que o gate evita, não o que o modelo perderia; a adoção por omissão exige A/B com o modelo",
-        "decision": "default off até A/B (precedente Q-02b/Q-03): behavior.tool_voi = false no arranque",
+        "decision": "ligado por config com `behavior.tool_voi = true` **e** seleção `suffix` (com `utility` o gate não atua: podia descartar a unidade lida)",
     })
 }
 
 #[test]
-fn the_gate_skips_a_duplicate_read_when_enabled() -> Result<(), Box<dyn std::error::Error>> {
-    let root = root("voi-on")?;
+fn the_gate_can_be_disabled_by_config() -> Result<(), Box<dyn std::error::Error>> {
+    let root = root("voi-off")?;
     std::fs::create_dir_all(root.join(".katu"))?;
     std::fs::write(
         root.join(".katu").join("katu.toml"),
-        "behavior.tool_voi = true\n",
+        "behavior.context_selection = \"suffix\"\nbehavior.tool_voi = false\n",
     )?;
-    let fs = StdFs;
-    let clock = FixedClock::new(Timestamp::from_millis(1_000));
-    let mut runtime = Runtime::open(&fs, &clock, &root, "lê o ficheiro")?;
-    let provider = FakeProvider::new(
-        "fake",
-        vec![
-            Turn {
-                events: vec![read("c1", "a.txt"), read("c2", "a.txt")],
-                stop: StopReason::ToolCalls,
-            },
-            Turn::text("fim"),
-        ],
-    );
-    let ports = Ports {
-        fs: &fs,
-        process: &StdProcess,
-        env: &StdEnv,
-    };
-    run_turn(
-        &mut runtime,
-        request(&provider, ports, "lê o ficheiro", &options(4)),
-    )?;
-    assert_eq!(skipped_results(&runtime)?, 1, "a segunda leitura é saltada");
-    Ok(())
-}
-
-#[test]
-fn the_gate_is_off_by_default() -> Result<(), Box<dyn std::error::Error>> {
-    let root = root("voi-off")?;
     let fs = StdFs;
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     let mut runtime = Runtime::open(&fs, &clock, &root, "lê o ficheiro")?;
@@ -224,7 +195,84 @@ fn the_gate_is_off_by_default() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         skipped_results(&runtime)?,
         0,
-        "sem gate, ambas as leituras executam"
+        "com o gate desligado, ambas as leituras executam"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_gate_is_on_with_suffix_selection() -> Result<(), Box<dyn std::error::Error>> {
+    let root = root("voi-suffix")?;
+    std::fs::create_dir_all(root.join(".katu"))?;
+    std::fs::write(
+        root.join(".katu").join("katu.toml"),
+        "behavior.context_selection = \"suffix\"\nbehavior.tool_voi = true\n",
+    )?;
+    let fs = StdFs;
+    let clock = FixedClock::new(Timestamp::from_millis(1_000));
+    let mut runtime = Runtime::open(&fs, &clock, &root, "lê o ficheiro")?;
+    let provider = FakeProvider::new(
+        "fake",
+        vec![
+            Turn {
+                events: vec![read("c1", "a.txt"), read("c2", "a.txt")],
+                stop: StopReason::ToolCalls,
+            },
+            Turn::text("fim"),
+        ],
+    );
+    let ports = Ports {
+        fs: &fs,
+        process: &StdProcess,
+        env: &StdEnv,
+    };
+    run_turn(
+        &mut runtime,
+        request(&provider, ports, "lê o ficheiro", &options(4)),
+    )?;
+    assert_eq!(
+        skipped_results(&runtime)?,
+        1,
+        "com `suffix` + `tool_voi`, a segunda leitura é saltada"
+    );
+    Ok(())
+}
+
+/// Com `utility` o gate **não** atua: a seleção pode descartar a unidade lida e o gate mentiria.
+#[test]
+fn the_gate_is_off_with_utility_selection() -> Result<(), Box<dyn std::error::Error>> {
+    let root = root("voi-utility")?;
+    std::fs::create_dir_all(root.join(".katu"))?;
+    std::fs::write(
+        root.join(".katu").join("katu.toml"),
+        "behavior.context_selection = \"utility\"\nbehavior.tool_voi = true\n",
+    )?;
+    let fs = StdFs;
+    let clock = FixedClock::new(Timestamp::from_millis(1_000));
+    let mut runtime = Runtime::open(&fs, &clock, &root, "lê o ficheiro")?;
+    let provider = FakeProvider::new(
+        "fake",
+        vec![
+            Turn {
+                events: vec![read("c1", "a.txt"), read("c2", "a.txt")],
+                stop: StopReason::ToolCalls,
+            },
+            Turn::text("fim"),
+        ],
+    );
+    let ports = Ports {
+        fs: &fs,
+        process: &StdProcess,
+        env: &StdEnv,
+    };
+    run_turn(
+        &mut runtime,
+        request(&provider, ports, "lê o ficheiro", &options(4)),
+    )?;
+    assert_eq!(
+        skipped_results(&runtime)?,
+        0,
+        "com `utility`, o gate não atua"
     );
     Ok(())
 }

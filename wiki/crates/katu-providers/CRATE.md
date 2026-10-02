@@ -603,8 +603,8 @@ Sem rede, ambos devolvem `Ok(())` — o loop determinístico é coberto pelos te
 
 ## 7. Referências
 
-- **MODULE.md:** [`crates/katu-providers/MODULE.md`](../../crates/katu-providers/MODULE.md)
-- **Definições declarativas:** [`providers/`](../../crates/katu-providers/providers/)
-- **Bench de transporte:** [`bench/e18/transport`](../../bench/e18/transport/PROTOCOL.md)
-- **Bench de gramática:** [`bench/e18/grammar`](../../bench/e18/grammar/PROTOCOL.md)
+- **MODULE.md:** [`crates/katu-providers/MODULE.md`](../../../crates/katu-providers/MODULE.md)
+- **Definições declarativas:** [`providers/`](../../../crates/katu-providers/providers/)
+- **Bench de transporte:** [`bench/e18/transport`](../../../bench/e18/transport/PROTOCOL.md)
+- **Bench de gramática:** [`bench/e18/grammar`](../../../bench/e18/grammar/PROTOCOL.md)
 - **ADRs:** 0012/0013 (stack HTTP), 0014 (orçamento de latência), 0025 (saída estruturada)

@@ -58,7 +58,7 @@ pub fn render(frame: &mut Frame<'_>, app: &App) {
     );
 
     let (input_text, input_title) = if app.steering().is_empty() {
-        (app.input().to_string(), input_title(app))
+        (app.input_display(), input_title(app))
     } else {
         (
             app.steering().to_string(),
@@ -141,6 +141,9 @@ fn header_line(app: &App) -> Line<'static> {
 fn input_title(app: &App) -> &'static str {
     let _span = katu_core::trace_fn!("ui::input_title");
 
+    if app.login_pending() {
+        return "login (Enter confirma, Esc cancela)";
+    }
     if app.mode() == Mode::Insert {
         "mensagem (Enter envia, Esc cancela)"
     } else {

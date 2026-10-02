@@ -54,10 +54,56 @@ pub(crate) fn price_table() -> Result<PriceTable, String> {
 #[cfg(test)]
 mod tests {
     use super::price_table;
+    use katu_core::evidence::EvidenceBasis;
+    use katu_core::provider::TokenUsage;
+
+    /// Uso fixo para os testes de preço.
+    fn usage() -> TokenUsage {
+        TokenUsage {
+            input: Some(1000),
+            output: Some(500),
+            cached_input: Some(0),
+            reasoning: None,
+            basis: EvidenceBasis::Measured,
+        }
+    }
 
     #[test]
-    fn embedded_prices_load() {
-        let table = price_table();
-        assert!(table.is_ok(), "policy/prices.toml tem de ser TOML válido");
+    fn embedded_prices_load() -> Result<(), Box<dyn std::error::Error>> {
+        price_table()?;
+        Ok(())
+    }
+
+    #[test]
+    fn local_models_have_zero_cost() -> Result<(), Box<dyn std::error::Error>> {
+        let table = price_table()?;
+
+        // Modelos locais devem ter custo zero
+        let cost = table.cost("qwen2.5-coder-1.5b", &usage());
+        assert_eq!(cost.micros, Some(0), "modelo local deve ter custo zero");
+        assert_eq!(cost.basis, EvidenceBasis::Measured);
+        Ok(())
+    }
+
+    #[test]
+    fn remote_models_have_nonzero_cost() -> Result<(), Box<dyn std::error::Error>> {
+        let table = price_table()?;
+
+        // GPT-4o deve ter custo não-zero
+        let cost = table.cost("gpt-4o", &usage());
+        let micros = cost.micros.ok_or("GPT-4o tem de ter preço")?;
+        assert!(micros > 0, "GPT-4o deve ter custo não-zero");
+        Ok(())
+    }
+
+    #[test]
+    fn unknown_model_is_unpriced() -> Result<(), Box<dyn std::error::Error>> {
+        let table = price_table()?;
+
+        // Modelo desconhecido deve ser unpriced
+        let cost = table.cost("modelo-desconhecido-xyz", &usage());
+        assert_eq!(cost.micros, None, "modelo desconhecido deve ser unpriced");
+        assert_eq!(cost.basis, EvidenceBasis::Unpriced);
+        Ok(())
     }
 }

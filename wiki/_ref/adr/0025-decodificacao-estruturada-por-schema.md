@@ -33,7 +33,7 @@ provider e fail-open.**
   strict: true, schema: {oneOf: [...]}}}`. Cada variante liga o **nome** (`const`) aos
   `parameters` da tool — o schema que `katu_tools::schema` já valida no CI. O modelo não pode
   gerar argumentos que não validem: a classe `Decode` fecha-se **por construção**.
-- **Opt-in:** `provider.structured_output` (config fechada, default `false`) para o `llama` local,
+- **Opt-in:** `structured_output` (config fechada, default `false`) para o `llama` local,
   `structured_output` no JSON declarativo, `ModelEntry::with_structured_output` e
   `LlamaConfig::with_structured_output`. Nenhum provider o liga sozinho.
 - **Fail-open:** um `400` do endpoint faz o pedido ser repetido **sem** o campo; o comportamento

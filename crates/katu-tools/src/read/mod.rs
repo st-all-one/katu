@@ -17,6 +17,8 @@ use katu_core::diag::{Level, events};
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::{Tool, ToolOutput};
 use katu_core::ports::Fs;
+use katu_core::report::ToolReport;
+use katu_core::toon::Value;
 use katu_policy::{ControlId, ToolArgs, ToolName, ToolUse};
 
 pub use views::View;
@@ -78,7 +80,12 @@ impl Tool for ReadTool<'_> {
         let ToolArgs::Read { path } = &use_.args else {
             return unavailable("read");
         };
-        let Ok(bytes) = self.fs.read(Path::new(path.as_str())) else {
+        let path_ref = Path::new(path.as_str());
+        // Ficheiro inexistente: relatório **legível** (o modelo sabe que não adianta repetir).
+        if !self.fs.exists(path_ref) {
+            return missing(path.as_str());
+        }
+        let Ok(bytes) = self.fs.read(path_ref) else {
             return unavailable("read");
         };
         let text = String::from_utf8_lossy(&bytes);
@@ -106,4 +113,17 @@ fn unavailable(control: &'static str) -> ToolOutput {
         control: ControlId::new(control),
         rule_id: None,
     })
+}
+
+/// Ficheiro inexistente: relatório legível (evita o modelo repetir a leitura).
+fn missing(path: &str) -> ToolOutput {
+    let _span = katu_core::trace_fn!("read::missing");
+
+    let data = Value::map(vec![
+        ("path".to_string(), Value::str(path)),
+        ("reason".to_string(), Value::str("not_found")),
+    ]);
+    ToolOutput::report(ToolReport::new("read.missing", data).with_next(vec![
+        "verifique o caminho com `search` (mode=find)".to_string(),
+    ]))
 }

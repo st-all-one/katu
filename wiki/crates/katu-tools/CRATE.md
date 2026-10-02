@@ -678,6 +678,6 @@ existência do ficheiro.
 
 ## 7. Referências
 
-- **MODULE.md:** [`crates/katu-tools/MODULE.md`](../../crates/katu-tools/MODULE.md)
-- **Políticas:** [`policy/`](../../policy/)
-- **Bench:** [`bench/e18/edit`](../../bench/e18/edit/PROTOCOL.md)
+- **MODULE.md:** [`crates/katu-tools/MODULE.md`](../../../crates/katu-tools/MODULE.md)
+- **Políticas:** [`policy/`](../../../policy/)
+- **Bench:** [`bench/e18/edit`](../../../bench/e18/edit/PROTOCOL.md)

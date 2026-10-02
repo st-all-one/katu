@@ -14,6 +14,8 @@ pub enum MenuKind {
     Model,
     /// Seleção do grau de pensamento.
     Thinking,
+    /// Escolha do provider de login (opencode/llama.cpp).
+    Login,
 }
 
 impl MenuKind {
@@ -23,6 +25,7 @@ impl MenuKind {
         match self {
             Self::Model => "modelo",
             Self::Thinking => "pensamento",
+            Self::Login => "login",
         }
     }
 }
@@ -34,6 +37,8 @@ pub enum MenuChoice {
     Model(String),
     /// Um grau de pensamento.
     Thinking(Thinking),
+    /// Um provider de login (id canônico: `opencode-go`/`opencode-zen`/`llama`).
+    Login(String),
 }
 
 impl MenuChoice {
@@ -45,7 +50,19 @@ impl MenuChoice {
         match self {
             Self::Model(model) => model.clone(),
             Self::Thinking(thinking) => thinking.as_str().to_string(),
+            Self::Login(id) => login_label(id).to_string(),
         }
+    }
+}
+
+/// Rótulo humano de um provider de login.
+fn login_label(id: &str) -> &'static str {
+    let _span = katu_core::trace_fn!("menu::login_label");
+
+    match id {
+        "llama" => "llama.cpp (local)",
+        "opencode-zen" => "opencode (Zen)",
+        _ => "opencode (Go)",
     }
 }
 
@@ -89,6 +106,21 @@ impl Menu {
             kind: MenuKind::Thinking,
             items: options.iter().copied().map(MenuChoice::Thinking).collect(),
             index,
+        }
+    }
+
+    /// Menu de login: opencode (Go/Zen) **ou** llama.cpp.
+    #[must_use]
+    pub fn login() -> Self {
+        let _span = katu_core::trace_fn!("menu::login");
+
+        Self {
+            kind: MenuKind::Login,
+            items: ["opencode-go", "opencode-zen", "llama"]
+                .into_iter()
+                .map(|id| MenuChoice::Login(id.to_string()))
+                .collect(),
+            index: 0,
         }
     }
 
@@ -174,5 +206,18 @@ mod tests {
         assert_eq!(menu.items().len(), 1);
         assert_eq!(menu.kind(), MenuKind::Thinking);
         assert_eq!(menu.selected(), Some(&MenuChoice::Thinking(Thinking::Off)));
+    }
+
+    #[test]
+    fn login_menu_offers_opencode_and_llama() {
+        let menu = Menu::login();
+        assert_eq!(menu.kind(), MenuKind::Login);
+        assert_eq!(menu.items().len(), 3);
+        assert_eq!(
+            menu.selected(),
+            Some(&MenuChoice::Login("opencode-go".to_string()))
+        );
+        let labels: Vec<String> = menu.items().iter().map(MenuChoice::label).collect();
+        assert!(labels.iter().any(|label| label.contains("llama.cpp")));
     }
 }

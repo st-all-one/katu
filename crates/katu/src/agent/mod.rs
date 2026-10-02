@@ -28,16 +28,15 @@ pub(crate) use shell::dispatch as shell_dispatch;
 pub(crate) use turn::{Activity, ActivitySink, Approval, ApprovalPrompt, run_turn, run_turn_with};
 
 use katu_core::error::{Error, ToolOutcome};
-use katu_core::kernel::{CallContext, CallId, MemoryWriteRequest, SessionError, memory_recall_use};
+use katu_core::kernel::{CallContext, CallId, SessionError, memory_recall_use};
 use katu_core::memory::Memory;
 use katu_core::ports::{Env, Fs, Process};
 use katu_core::provider::{ModelSpec, Provider, ProviderError, TokenUsage};
-use katu_policy::{ApprovalRequest, Decision, ToolUse};
+use katu_policy::{ApprovalRequest, ControlId, Decision, ToolArgs, ToolUse};
 use katu_tools::recall::RecallTool;
-use katu_tools::write::WriteNoteTool;
 use serde_json::Value;
 
-use crate::runtime::Runtime;
+use crate::runtime::{Runtime, RuntimeError};
 
 /// Portas que o loop precisa, passadas pela borda (a memória vem do runtime).
 #[derive(Clone, Copy)]
@@ -100,6 +99,9 @@ pub(crate) enum AgentError {
     /// Falha de transição/custo/log na sessão.
     #[error("sessão: {0}")]
     Session(#[from] SessionError),
+    /// Falha do runtime (memória, recall, escrita).
+    #[error("runtime: {0}")]
+    Runtime(#[from] RuntimeError),
     /// Falha de roteamento (tool desconhecida ou argumento inválido).
     #[error("roteador: {0}")]
     Route(#[from] router::RouteError),
@@ -135,6 +137,7 @@ impl From<AgentError> for Error {
             }
             AgentError::Route(source) => Self::invalid_input(source.to_string()),
             AgentError::Session(source) => Self::internal(source.to_string()),
+            AgentError::Runtime(source) => Self::internal(source.to_string()),
             AgentError::TooManySteps { steps } => {
                 Self::internal(format!("turno excedeu {steps} passos sem terminar"))
             }
@@ -182,8 +185,12 @@ fn execute_call(
         clock: runtime.clock,
         root: &root,
     };
-    let call_outcome = match router::route(&route_ports, &runtime.cwd, name, args, loaded.as_ref())?
-    {
+    let routed = match router::route(&route_ports, &runtime.cwd, name, args, loaded.as_ref()) {
+        Ok(routed) => routed,
+        // Argumentos do modelo malformados: devolve o erro **ao modelo** (não aborta o turno).
+        Err(error) => return route_failure(runtime, call, name, &error, now),
+    };
+    let call_outcome = match routed {
         router::Routed::Plan { use_, plan } => {
             let outcome = plan::execute(runtime, call, &use_, &plan)?;
             CallOutcome {
@@ -219,6 +226,44 @@ fn execute_call(
         }
     };
     Ok(call_outcome)
+}
+
+/// Converte um erro de roteamento num resultado de tool **devolvido ao modelo**.
+///
+/// O modelo vê o erro e pode corrigir os argumentos no passo seguinte; o turno **não** aborta. Um
+/// nome fora do catálogo continua fail-closed (é um erro do turno, não um argumento corrigível).
+pub(crate) fn route_failure(
+    runtime: &mut Runtime<'_>,
+    call: CallId,
+    name: &str,
+    error: &router::RouteError,
+    now_millis: u64,
+) -> Result<CallOutcome, AgentError> {
+    let _span = katu_core::trace_fn!("agent::route_failure");
+
+    let Some(tool_name) = router::tool_name_for(name) else {
+        return Err(AgentError::Route(router::RouteError::UnknownTool(
+            name.to_string(),
+        )));
+    };
+    let use_ = router::use_of(tool_name, ToolArgs::Other, Vec::new(), None, &runtime.cwd);
+    runtime
+        .session
+        .begin_call(call.clone(), &use_, now_millis)?;
+    let outcome = ToolOutcome::Unavailable {
+        control: ControlId::new("argument"),
+        rule_id: None,
+    };
+    runtime.session.settle_call(
+        call,
+        outcome.clone(),
+        Some(format!("argumento inválido em `{name}`: {error}")),
+    )?;
+    Ok(CallOutcome {
+        outcome,
+        use_: None,
+        approval: None,
+    })
 }
 
 /// Executa a tool `memory` pelos caminhos de recall/escrita do gate de E05.
@@ -258,21 +303,8 @@ fn execute_memory(
             }
         }
         router::Routed::MemoryRecord { req } => {
-            let tool = WriteNoteTool {
-                memory,
-                req: req.clone(),
-            };
-            let dispatch = session.memory_write(
-                call,
-                MemoryWriteRequest {
-                    cwd,
-                    req: &req,
-                    memory,
-                    rules,
-                    now_millis: now,
-                    tool: &tool,
-                },
-            )?;
+            // Usa o caminho de escrita do runtime (recall prévio + gate de E05)
+            let dispatch = runtime.remember(&req)?;
             CallOutcome {
                 outcome: dispatch.outcome(),
                 use_: None,

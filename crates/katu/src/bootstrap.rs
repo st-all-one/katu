@@ -189,8 +189,8 @@ fn copy_guardrails(root: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-/// Config default escrita quando não há global.
-fn default_config() -> toml::Table {
+/// Config default (global ou snapshot do projeto).
+pub(crate) fn default_config() -> toml::Table {
     let _span = katu_core::trace_fn!("bootstrap::default_config");
 
     let mut table = toml::Table::new();
@@ -200,11 +200,7 @@ fn default_config() -> toml::Table {
         toml::Value::String("llama".to_owned()),
     );
     // B1/W8-1: saída estruturada desligada por omissão (opt-in explícito).
-    config::set_key(
-        &mut table,
-        "provider.structured_output",
-        toml::Value::Boolean(false),
-    );
+    config::set_key(&mut table, "structured_output", toml::Value::Boolean(false));
     config::set_key(&mut table, "git.versioned", toml::Value::Boolean(true));
     config::set_key(
         &mut table,
@@ -219,20 +215,21 @@ fn default_config() -> toml::Table {
     config::set_key(
         &mut table,
         "behavior.prompt_state",
-        toml::Value::Boolean(false),
+        toml::Value::Boolean(true),
     );
     config::set_key(
         &mut table,
         "behavior.context_selection",
         toml::Value::String("suffix".to_owned()),
     );
-    // A3/W8-4: o gate de VOI fica **off** por omissão até A/B com o modelo (precedente Q-02b/Q-03).
+    // A3/W8-4: o gate de VOI fica **desligado** por omissão (exige A/B com o modelo); quando
+    // ligado, só atua com a seleção `suffix` (com `utility` podia descartar a unidade lida).
     config::set_key(&mut table, "behavior.tool_voi", toml::Value::Boolean(false));
-    // ADR 0024 (P-01): a barreira de durabilidade é dado explícito; o default não muda o contrato.
+    // ADR 0024 (P-01): *group commit* por omissão (`turn`); `event` volta a sincronizar por evento.
     config::set_key(
         &mut table,
         "behavior.durability",
-        toml::Value::String("event".to_owned()),
+        toml::Value::String("turn".to_owned()),
     );
     config::set_key(&mut table, "recall.default_limit", toml::Value::Integer(5));
     table

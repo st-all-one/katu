@@ -1,0 +1,121 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  # ── build and package for all targets ──────────────────────────────────────
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            cross: false
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            cross: false
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            cross: false
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross (if needed)
+        if: matrix.cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Build release
+        run: |
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            cross build --release -p katu --locked --target ${{ matrix.target }}
+          else
+            cargo build --release -p katu --locked --target ${{ matrix.target }}
+          fi
+        shell: bash
+
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          VERSION_NO_V="${VERSION#v}"
+          ASSET="katu-${VERSION_NO_V}-${{ matrix.target }}"
+          cd target/${{ matrix.target }}/release
+          tar -czf "${ASSET}.tar.gz" katu
+          cd -
+          mkdir -p package
+          mv "target/${{ matrix.target }}/release/${ASSET}.tar.gz" package/
+          cd package
+          sha256sum "${ASSET}.tar.gz" > sha256sums.txt
+        shell: bash
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $env:VERSION = $env:GITHUB_REF_NAME
+          $env:VERSION_NO_V = $env:VERSION.TrimStart('v')
+          $env:ASSET = "katu-$($env:VERSION_NO_V)-${{ matrix.target }}"
+          cd target/${{ matrix.target }}/release
+          Compress-Archive -Path katu.exe -DestinationPath "$($env:ASSET).zip"
+          cd -
+          New-Item -ItemType Directory -Force -Path package
+          Move-Item "target/${{ matrix.target }}/release/$($env:ASSET).zip" package/
+          cd package
+          (Get-FileHash "$($env:ASSET).zip" -Algorithm SHA256).Hash.ToLower() + "  $($env:ASSET).zip" | Out-File -Encoding utf8 sha256sums.txt
+        shell: pwsh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: katu-${{ matrix.target }}
+          path: package/*
+
+  # ── create release and upload all assets ───────────────────────────────────
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          cat */sha256sums.txt > sha256sums.txt
+          ls -la
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false

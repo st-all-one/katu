@@ -45,8 +45,22 @@ documentos de crate ([`katu.md`](katu.md) e os `CRATE.md`) e nos planos de refer
 1. 🔴 **`--no-default-features` não compila** — quebra `make memory-swap` e o modo `--no-memory` do
    `install.sh`.
 2. 🔴 **Não há releases nem packaging do `katu`** — o modo release do `install.sh` é especulativo.
-3. ⏳ **Cinco features implementadas mas desligadas** à espera de A/B com um modelo que emita tool
-   calls nativas.
+3. ✅ **Cinco features implementadas** — ativadas por omissão por decisão do dono (§4),
+   configuráveis para reverter.
+
+### ✅ Resolvidos (2026-10-02)
+
+- **§3.1** — `--no-default-features` agora compila; `make memory-swap` e `--no-memory` funcionam.
+- **§3.2** — Workflow de release criado (`.github/workflows/release.yml`) + `scripts/package.sh`.
+- **§3.3** — `katu upgrade` com canal via GitHub Releases (com comparação numérica de versões).
+- **§3.4** — `policy/prices.toml` populado com preços de referência para modelos locais e remotos.
+- **§3.8** — Caminho de escrita de memória ligado ao agente via `Runtime::remember`.
+- **§3.9** — Adaptadores de portas verificados/ligados; `allow` históricos removidos e `StdRng` morto eliminado.
+- **§3.11** — `evaluate` passa a ignorar `Perception` (consistente com o audit; não decide).
+- **§4** — Duas flags opt-in ficaram **ligadas por omissão** (`prompt_state`, `durability`);
+  `tool_voi` e `context_selection` voltaram aos defaults seguros (`false`/`suffix`) por causarem
+  leituras repetidas/loop, e `structured_output` ficou `off` (parte a terminação do turno com o
+  provider `llama`; ver §4).
 
 ---
 
@@ -90,7 +104,7 @@ documentos de crate ([`katu.md`](katu.md) e os `CRATE.md`) e nos planos de refer
 
 ## 3. Lacunas concretas de código/gate (verificadas)
 
-### 3.1 🔴 `--no-default-features` não compila
+### 3.1 ✅ `--no-default-features` não compila
 
 - **Ficheiro:** `crates/katu/src/cli/memo.rs:11` faz `use crate::defaults;` **incondicionalmente**,
   mas `mod defaults;` só existe com a feature `memory-in-process` (`crates/katu/src/main.rs:17`).
@@ -98,8 +112,9 @@ documentos de crate ([`katu.md`](katu.md) e os `CRATE.md`) e nos planos de refer
   o alvo `make memory-swap` (que corre esse comando) e o `--no-memory` do `install.sh` ficam quebrados.
 - **Correção:** gatear `use crate::defaults` (e os ramos que o usam) com `#[cfg(feature =
   "memory-in-process")]`, ou tornar `defaults` incondicional.
+- **Estado:** ✅ Resolvido (2026-10-02) — `use crate::defaults` gateado com `#[cfg(feature = "memory-in-process")]`.
 
-### 3.2 🔴 Sem releases nem packaging do `katu`
+### 3.2 ✅ Sem releases nem packaging do `katu`
 
 - **Verificado:** `.github/workflows/` tem só `ci.yml`, `pr-fast.yml`, `pr-msrv.yml` — **nenhum**
   workflow de release. `scripts/` não tem empacotador (só `bench-pos`, `check_file_length`,
@@ -107,28 +122,33 @@ documentos de crate ([`katu.md`](katu.md) e os `CRATE.md`) e nos planos de refer
 - **Efeito:** o modo release do `install.sh` (asset `katu-<versão>-<target>.tar.gz` + `sha256sums.txt`)
   não tem artefacto publicado; só o `--from-source` funciona hoje.
 - **Falta:** workflow de release por tag + `scripts/package.sh` + `sha256sums.txt`.
+- **Estado:** ✅ Resolvido (2026-10-02) — Workflow `.github/workflows/release.yml` criado + `scripts/package.sh` funcional.
 
-### 3.3 🔴 `katu upgrade` sem canal
+### 3.3 ✅ `katu upgrade` sem canal
 
 - **Ficheiro:** `crates/katu/src/cli/upgrade.rs` · **Estado:** recusa explicitamente (fail-closed),
   canal de atualização não configurado. Falta o mecanismo de canal (como o `install.sh` resolve a
   versão).
+- **Estado:** ✅ Resolvido (2026-10-02) — Canal de atualização implementado via GitHub Releases API.
 
-### 3.4 🔴 Custos `unpriced`
+### 3.4 ✅ Custos `unpriced`
 
 - **Ficheiro:** `bench/published.toml` — 3 métricas com `basis = "unpriced"` e valor `0`:
   `mvk.cross_tool.gain_ratio`, `provider.request_compression.saved_ratio`,
   `w81.grammar.invalid_json_turns_avoided_ratio`.
 - **Causa:** `PriceTable` vazia por omissão (`katu-providers`) → tudo `unpriced` até a borda a
   preencher. Falta popular os preços reais por modelo.
+- **Estado:** ✅ Resolvido (2026-10-02) — `policy/prices.toml` populado com preços de referência para modelos locais (Qwen, Llama, Granite) e remotos (OpenAI, Anthropic, Google, DeepSeek, Mistral, Qwen API).
 
-### 3.5 🔴 Providers sem validação ao vivo (e2e)
+### 3.5 ✅/⏳ Providers sem validação ao vivo (e2e)
 
-- **Ficheiro:** `katu-providers` · **Estado:** `responses`/`messages`/`google` implementados mas
-  **sem validação e2e**; `google` no built-in opencode é explicitamente `Unsupported` (só via
-  declarativo).
-- **Falta:** testes ao vivo (ADR 0012/0013); WebSocket/HTTP2 (`Unsupported`); gzip do pedido
-  desligado (endpoints rejeitam); sem jitter no retry.
+- **Ficheiro:** `katu-providers` · **Estado:** `responses`/`messages`/`google` implementados;
+  `google` no built-in opencode é explicitamente `Unsupported` (só via declarativo).
+- **Verificado (2026-10-02):** já existem smoke tests ao vivo em `crates/katu-providers/tests/live.rs`
+  para os três dialetos (`opencode_responses_smoke`/`opencode_messages_smoke`/`opencode_google_smoke`),
+  com auto-*skip* sem chave; cobertos por `make test:integration`. Continuam por fazer (deliberados ou
+  dependentes de rede): WebSocket/HTTP2 (`Unsupported`), gzip do pedido desligado (endpoints rejeitam)
+  e jitter no retry (fora de escopo por desenho — `retry.rs`: "um cliente, não uma manada").
 
 ### 3.6 🔴 `outline` heurístico (sem tree-sitter)
 
@@ -141,32 +161,41 @@ documentos de crate ([`katu.md`](katu.md) e os `CRATE.md`) e nos planos de refer
   modelo (`katu-tools`).
 - **`memory`:** a tool só **pede**; o gate (`pre_write`/dedup/âncora) vive no kernel.
 
-### 3.8 🔴 Caminho de escrita de memória reservado
+### 3.8 ✅ Caminho de escrita de memória reservado
 
 - **Ficheiro:** `crates/katu/src/runtime/memory.rs` — `Runtime::remember` e `Runtime::note` estão
   `#[allow(dead_code)]`: "caminho de escrita reservado (agente/kd); exercido pelos testes do
   runtime". A superfície `memo` **só consulta** (E20-T06). Falta ligar a escrita pelo agente.
+- **Estado:** ✅ Resolvido (2026-10-02) — Agente agora usa `Runtime::remember` para escrever na memória (recall prévio + gate de E05).
 
-### 3.9 🔴 Adaptadores de portas `dead_code`
+### 3.9 ✅ Adaptadores de portas `dead_code`
 
 - **Ficheiro:** `crates/katu/src/ports/mod.rs` — `StdProcess`/`StdFs` com `allow(unused_imports)`
   ("adaptadores ligados ao kernel em E04/E10"). `crates/katu/src/main.rs:35` idem. Falta ligar os
   adaptadores ao loop (parte é histórica; verificar o que ainda está solto).
+- **Estado:** ✅ Resolvido (2026-10-02) — verificado: `StdProcess`/`StdFs`/`StdEnv` já são
+  consumidos em produção (`agent`, `tui`, `watch_service`, CLI); os `allow` históricos foram
+  removidos. O único item solto (`StdRng`, reservado para jitter) foi eliminado — o retry declara
+  jitter como fora de escopo (`retry.rs`: "um cliente, não uma manada").
 
-### 3.10 🔴 TUI: executor em background e benchmarks
+### 3.10 ⏳ TUI: executor em background e benchmarks
 
 - **Executor em background:** o turno é **síncrono** (trabalho futuro).
-- **`xtask bench-render` / `gate:render` / verificação de zero alocações no hot path** (E15-T01,
-  E18-T10): pendentes.
+- **`xtask bench-render` / `gate:render`:** ✅ implementados (`xtask/src/render_bench.rs`) e
+  versionados (`bench/render/budget.toml`); o CI corre `gate:render`. A verificação de zero
+  alocações no hot path (E18-T10) foi **medida e travada** (`crates/katu/tests/render_alloc.rs`): o
+  render aloca ~1,1k vezes por quadro; refazê-lo com dados emprestados fica para decisão própria.
 - **`Controls`:** só o utilizador muda; a borda aplica ao **próximo** turno.
 - **`pending_menu`:** menu a abrir quando a borda publicar as capacidades do novo modelo.
 
-### 3.11 🔴 Capacidades reservadas sem consumidor
+### 3.11 ✅ Capacidades reservadas sem consumidor
 
 - **`SpawnPty` / `McpSession`** (`katu-policy`): no vocabulário, sem consumidor.
 - **`Perception`:** categoria existe mas `evaluate` só ignora `RuleCategory::Advisory` — uma regra
   `Perception` com enforcement não-`Advisory` ainda é aplicada pelo motor (o `audit` classifica-a
   como advisory, o motor não).
+- **Estado:** ✅ Parcial (2026-10-02) — `evaluate` corrigido para ignorar `Perception` (coerente com
+  o audit); `SpawnPty`/`McpSession` continuam reservados (deferidos com o jail/MCP).
 
 ### 3.12 🔴 Plataforma limitada
 
@@ -195,25 +224,50 @@ documentos de crate ([`katu.md`](katu.md) e os `CRATE.md`) e nos planos de refer
 | `DEFAULT_CONTEXT_BUDGET` | core | Teto fixo; não adaptativo |
 | `MAX_PARALLEL_CALLS = 8` | katu | Limite de **custo**, não de paralelismo; medido em máquina com 16 cores |
 | `runtime::context::set_selection` | katu | Só existe para testes e um interruptor futuro |
-| `agent::turn::voi` | katu | Default off até A/B |
+| `agent::turn::voi` | katu | Opt-in (`behavior.tool_voi = true`) e só atua com a seleção `suffix`; com `utility` a unidade lida pode ser descartada |
 
 ---
 
-## 4. Decisões opt-in à espera de A/B ⏳
+## 4. Decisões opt-in — ativação por omissão ⏳→✅ (uma revertida)
 
-Tudo isto está **implementado** mas **desligado**; a adoção por omissão exige A/B com um modelo que
-emita *tool calls* nativas.
+Tudo isto estava **implementado mas desligado**; a adoção por omissão exigia A/B com um modelo que
+emitisse *tool calls* nativas. **Decisão do dono (2026-10-02): ativadas por omissão**; `tool_voi`
+e `context_selection` foram **revertidas** para o default seguro depois de causarem leituras
+repetidas/loop (ver nota), tal como `structured_output`. Continuam configuráveis (projeto > global)
+para reverter sem alterar código.
 
-| Feature | Default | O que mede | Fonte |
-|---------|---------|------------|-------|
-| `behavior.tool_voi` | **off** | tool calls evitadas; 0 irreconstruíveis saltados | A3/W8-4 |
-| `behavior.prompt_state` | **off** | secção `estado` no prime (Q-04) | Q-04 |
-| `behavior.context_selection` | `suffix` | `suffix` vs `utility` (Q-02b/Q-03) | Q-02b |
-| `provider.structured_output` | **off** | turnos com JSON inválido evitados; hoje `unpriced` | W8-1 |
-| `behavior.durability` | `event` | *group commit* do log (opt-in) | P-01 |
+| Feature | Default | Reversão (config) | O que mede | Fonte |
+|---------|---------|-------------------|------------|-------|
+| `behavior.tool_voi` | **off** | `true` (só com `suffix`) | tool calls evitadas; 0 irreconstruíveis saltados | A3/W8-4 |
+| `behavior.prompt_state` | **on** | `false` | secção `estado` no prime (Q-04) | Q-04 |
+| `behavior.context_selection` | `suffix` | `utility` | `suffix` vs `utility` (Q-02b/Q-03) | Q-02b |
+| `structured_output` | **off** ⏳ | `true` | turnos com JSON inválido evitados; hoje `unpriced` | W8-1 |
+| `behavior.durability` | `turn` | `event` | *group commit* do log (P-01) | P-01 |
 
-**Preço de método:** a adoção (manter a linha de prime / o default) reverte se o A/B mostrar custo
-alto demais; o mecanismo de reversão é o bump de `PRIME_VERSION` e o próprio flag.
+**Nota de método:** a ativação **não** foi precedida de A/B — é uma decisão explícita do dono (o preço
+continua a ser o da §4 original: reverter pela config e pelo bump de `PRIME_VERSION`). Os números
+publicados permanecem `unpriced` onde não há medição real; nada foi inventado.
+
+**`structured_output` foi revertido para `off` (2026-10-02).** O `response_format`
+`json_schema` com `oneOf` de tool calls (ADR 0025) **não tem variante de resposta final**: ligado, o
+modelo local fica obrigado a emitir sempre uma tool call, o loop nunca vê o passo sem chamadas e o
+turno corre até ao teto de passos sem devolver texto. É a causa de "executa uma ação e para" na TUI
+com o provider `llama`. Só reativar depois de (a) o schema ter uma variante terminal de texto /
+"sem tool" e (b) A/B garantir que não parte a terminação.
+
+**`tool_voi` e `context_selection` revertidos (2026-10-02).** O gate de VOI saltava uma leitura
+alegando “já presente no contexto”, mas com `context_selection = utility` a unidade lida pode ser
+descartada — o modelo repetia a leitura, o guard de loop cortava o turno (“erro e reinicia”). Os
+defaults voltam a `false`/`suffix` e o gate passa a **exigir** `suffix` (com `utility` não atua).
+
+**Leitura de ficheiro inexistente:** o `read` devolvia `Unavailable { control: "read" }` (parecia
+falha transitória) em vez de um relatório `read.missing` legível; o modelo repetia a leitura até o
+guard cortar. Corrigido no adaptador, e o aviso de truncagem passou a indicar a continuação
+(`read <id>@<linha>`) em vez de só dizer “truncado”.
+
+**Chave renomeada:** `provider.structured_output` → `structured_output` (2026-10-02). A chave antiga
+colidia com o escalar `provider` (TOML não admite `provider = "..."` e `[provider]` na mesma tabela),
+pelo que `set_key` descartava a escrita em silêncio. Há agora o guard `keys_have_no_scalar_table_collisions`.
 
 ---
 
@@ -264,12 +318,12 @@ classificação, `both` por default.
 
 | Item | Estado | Falta |
 |------|--------|-------|
-| Workflow de release | 🔴 ausente | `.github/workflows/release.yml` por tag |
-| Packaging | 🔴 ausente | `scripts/package.sh` (tar.gz/zip + `sha256sums.txt`) |
-| `install.sh` modo release | ⏳ especulativo | depende dos dois acima |
+| Workflow de release | ✅ presente | `.github/workflows/release.yml` por tag |
+| Packaging | ✅ presente | `scripts/package.sh` (tar.gz/zip + `sha256sums.txt`) |
+| `install.sh` modo release | ✅ real | depende dos dois acima (agora publicados) |
 | CI | ✅ presente | `ci.yml`, `pr-fast.yml`, `pr-msrv.yml` |
-| `make memory-swap` | 🔴 quebrado | ver §3.1 |
-| `katu upgrade` | 🔴 recusa | canal não configurado (§3.3) |
+| `make memory-swap` | ✅ verde | ver §3.1 |
+| `katu upgrade` | ✅ canal | canal via GitHub Releases (§3.3) |
 
 ---
 
@@ -294,12 +348,13 @@ sem base · Fase 5 terminal panic-safe · Fase 6 firewall LLM-free intacta.
 
 ## 9. Prioridade sugerida
 
-1. 🔴 **Corrigir `--no-default-features`** (§3.1) — desbloqueia `make memory-swap` e o `--no-memory`.
-2. 🔴 **Publicar releases + packaging** (§3.2/§7) — torna o `install.sh` release real.
-3. 🔴 **Popular `PriceTable`** (§3.4) — tira os custos de `unpriced`.
-4. 🔴 **Ligar o caminho de escrita de memória** (`Runtime::remember`) ao agente (§3.8).
+1. ✅ **Corrigir `--no-default-features`** (§3.1) — `make memory-swap` e o `--no-memory` funcionam.
+2. ✅ **Publicar releases + packaging** (§3.2/§7) — `install.sh` release com artefacto real.
+3. ✅ **Popular `PriceTable`** (§3.4) — custos deixam de ser `unpriced` por omissão.
+4. ✅ **Ligar o caminho de escrita de memória** (`Runtime::remember`) ao agente (§3.8).
 5. ⏳ **Correr os A/B pendentes** (§4) quando houver modelo que emita tool calls nativas.
-6. 🔴 **Validação e2e dos dialetos** `responses`/`messages`/`google` (§3.5).
+6. ✅ **Validação e2e dos dialetos** `responses`/`messages`/`google` (§3.5) — smoke tests existentes
+   (auto-*skip*); faltam só WebSocket/HTTP2 e gzip (deliberados/rede).
 7. ⚪ **Formalismos do Anexo A** (§5) por tier de prioridade (impacto × mensurabilidade × encaixe).
 
 ---

@@ -327,3 +327,187 @@ fn init_force_preserves_knowledge_and_resets_rest() -> Result<(), io::Error> {
     std::fs::remove_dir_all(&dir).ok();
     Ok(())
 }
+
+/// Corre o binário com a config global isolada em qualquer plataforma (HOME/XDG/APPDATA).
+fn run_isolated(dir: &Path, args: &[&str]) -> Result<std::process::Output, io::Error> {
+    Command::new(env!("CARGO_BIN_EXE_katu"))
+        .args(args)
+        .current_dir(dir)
+        .env("HOME", dir)
+        .env("USERPROFILE", dir)
+        .env("XDG_CONFIG_HOME", dir.join("xdg"))
+        .env("APPDATA", dir.join("appdata"))
+        .output()
+}
+
+/// `config init --global` prepara o ficheiro default (o que a instalação invoca).
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[test]
+fn config_init_global_creates_the_default_file() -> Result<(), io::Error> {
+    let dir = temp_dir("config-init-global")?;
+    let output = run_isolated(&dir, &["config", "init", "--global", "--json"])?;
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let path = dir.join("xdg/local/katu/katu.toml");
+    assert!(
+        path.is_file(),
+        "config global devia existir em {}",
+        path.display()
+    );
+    let text = std::fs::read_to_string(&path)?;
+    assert!(text.contains("provider = \"llama\""), "config: {text}");
+    assert!(text.contains("structured_output = false"), "config: {text}");
+    std::fs::remove_dir_all(&dir).ok();
+    Ok(())
+}
+
+/// `config init` no projeto cria `.katu/katu.toml`.
+#[test]
+fn config_init_project_creates_dot_katu() -> Result<(), io::Error> {
+    let dir = temp_dir("config-init-project")?;
+    let output = run_isolated(&dir, &["config", "init", "--json"])?;
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        dir.join(".katu/katu.toml").is_file(),
+        "config do projeto devia existir"
+    );
+    std::fs::remove_dir_all(&dir).ok();
+    Ok(())
+}
+
+/// `config init` é idempotente: não sobrescreve sem `--force`.
+#[test]
+fn config_init_does_not_overwrite_without_force() -> Result<(), io::Error> {
+    let dir = temp_dir("config-init-idempotent")?;
+    assert!(run_isolated(&dir, &["config", "init"])?.status.success());
+    let path = dir.join(".katu/katu.toml");
+    std::fs::write(&path, "provider = \"custom\"\n")?;
+    let again = run_isolated(&dir, &["config", "init", "--json"])?;
+    assert!(again.status.success());
+    let text = String::from_utf8_lossy(&again.stdout);
+    assert!(text.contains("\"created\":false"), "stdout: {text}");
+    assert_eq!(
+        std::fs::read_to_string(&path)?,
+        "provider = \"custom\"\n",
+        "não devia sobrescrever"
+    );
+    let forced = run_isolated(&dir, &["config", "init", "--force"])?;
+    assert!(forced.status.success());
+    let text = std::fs::read_to_string(&path)?;
+    assert!(
+        text.contains("provider = \"llama\""),
+        "--force devia repor o default: {text}"
+    );
+    std::fs::remove_dir_all(&dir).ok();
+    Ok(())
+}
+
+/// `config login` com llama escreve provider/modelo/base e **não** cria credenciais.
+#[cfg(feature = "memory-in-process")]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[test]
+fn config_login_llama_writes_selection_without_credentials() -> Result<(), io::Error> {
+    let dir = temp_dir("config-login-llama")?;
+    let output = run_isolated(&dir, &["config", "login", "--provider", "llama", "--json"])?;
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let global = dir.join("xdg/local/katu/katu.toml");
+    let text = std::fs::read_to_string(&global)?;
+    assert!(text.contains("provider = \"llama\""), "{text}");
+    assert!(text.contains("model = \"qwen\""), "{text}");
+    assert!(
+        !text.contains("opencode_api_key"),
+        "llama não guarda chave: {text}"
+    );
+    std::fs::remove_dir_all(&dir).ok();
+    Ok(())
+}
+
+/// `config login` com opencode guarda a chave no `katu.toml` global com modo 0600.
+#[cfg(feature = "memory-in-process")]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[test]
+fn config_login_opencode_stores_the_key_with_owner_only_permissions() -> Result<(), io::Error> {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let dir = temp_dir("config-login-opencode")?;
+    let output = run_isolated(
+        &dir,
+        &[
+            "config",
+            "login",
+            "--provider",
+            "opencode",
+            "--api-key",
+            "sk-teste",
+            "--json",
+        ],
+    )?;
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let config_path = dir.join("xdg/local/katu/katu.toml");
+    let text = std::fs::read_to_string(&config_path)?;
+    assert!(text.contains("opencode_api_key = \"sk-teste\""), "{text}");
+    assert!(text.contains("provider = \"opencode-go\""), "{text}");
+    let mode = std::fs::metadata(&config_path)?.permissions().mode() & 0o777;
+    assert_eq!(mode, 0o600, "config com chave devia ser 0600, foi {mode:o}");
+    std::fs::remove_dir_all(&dir).ok();
+    Ok(())
+}
+
+/// `config login --logout` apaga a chave guardada.
+#[cfg(feature = "memory-in-process")]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[test]
+fn config_login_logout_clears_the_stored_key() -> Result<(), io::Error> {
+    let dir = temp_dir("config-login-logout")?;
+    let stored = run_isolated(
+        &dir,
+        &[
+            "config",
+            "login",
+            "--provider",
+            "opencode",
+            "--api-key",
+            "sk-teste",
+        ],
+    )?;
+    assert!(stored.status.success());
+    let config_path = dir.join("xdg/local/katu/katu.toml");
+    assert!(std::fs::read_to_string(&config_path)?.contains("sk-teste"));
+    let out = run_isolated(&dir, &["config", "login", "--logout"])?;
+    assert!(out.status.success());
+    let text = std::fs::read_to_string(&config_path)?;
+    assert!(!text.contains("sk-teste"), "chave devia sumir: {text}");
+    std::fs::remove_dir_all(&dir).ok();
+    Ok(())
+}
+
+/// `config login` com provider inválido falha e ensina os válidos.
+#[cfg(feature = "memory-in-process")]
+#[test]
+fn config_login_unknown_provider_fails_with_help() -> Result<(), io::Error> {
+    let dir = temp_dir("config-login-unknown")?;
+    let output = run_isolated(&dir, &["config", "login", "--provider", "nope"])?;
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("opencode") && stderr.contains("llama"),
+        "{stderr}"
+    );
+    std::fs::remove_dir_all(&dir).ok();
+    Ok(())
+}

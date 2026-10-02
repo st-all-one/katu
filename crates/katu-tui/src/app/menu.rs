@@ -127,6 +127,7 @@ impl App {
                 self.controls.set_thinking(thinking);
                 Some(Command::SetThinking(thinking))
             }
+            Some(MenuChoice::Login(id)) => self.begin_login(&id),
             None => None,
         }
     }
@@ -167,6 +168,8 @@ impl App {
                 self.mode = Mode::Transcript;
                 Some(Command::Transcript)
             }
+            "login" => self.slash_login(command.strip_prefix("login").unwrap_or("").trim()),
+            "logout" => Some(self.slash_logout()),
             "quit" | "q" => {
                 self.quit = true;
                 Some(Command::Quit)
@@ -187,6 +190,9 @@ impl App {
         let text = self.input.trim().to_string();
         self.input.clear();
         self.mode = Mode::Normal;
+        if self.login.is_some() {
+            return self.login_submit(&text);
+        }
         if text.is_empty() {
             return None;
         }

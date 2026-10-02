@@ -34,7 +34,8 @@ A camada de **providers**: o caminho built-in first-party é nosso; o resto é c
   no catálogo** estático; a borda regista a fonte. [`engine`](src/engine.rs)
   constrói o endpoint por dialeto (auth + afinidade: `x-opencode-session` e `affinity_headers`) e
   despacha. A **decodificação estruturada** (B1/W8-1, ADR 0025) é opt-in (`structured_output` no
-  catálogo/`ProviderSpec`/`LlamaConfig`, ligada por `provider.structured_output`): o dialeto
+  catálogo/`ProviderSpec`/`LlamaConfig`, ligada por `structured_output`, **default off**):
+  o dialeto
   `chat/completions` acrescenta um `response_format` `json_schema` derivado dos `ToolDef` do pedido
   e **fail-open** (um `400` repete o pedido sem o campo). Artefacto em
   [`bench/e18/grammar`](../../bench/e18/grammar/PROTOCOL.md).

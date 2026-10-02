@@ -17,8 +17,10 @@ use katu_providers::PriceTable;
 use katu_tui::{Command, Handler, Painter, Update};
 
 use crate::agent::{
-    Ports, SYSTEM, TurnOptions, TurnReport, TurnRequest, run_turn_with, shell_dispatch,
+    Ports, SYSTEM, TurnOptions, TurnReport, TurnRequest, build_provider, run_turn_with,
+    shell_dispatch,
 };
+use crate::login;
 use crate::ports::{StdEnv, StdFs, StdProcess};
 use crate::runtime::Runtime;
 use crate::tier::TierPolicy;
@@ -58,6 +60,7 @@ impl Handler for AgentHandler<'_> {
             Command::Plan => self.toggle_plan(),
             Command::Shell(command) => self.shell(&command),
             Command::Skill(name) => self.skill(&name, painter),
+            Command::Login(request) => self.login(&request),
         }
     }
 }
@@ -109,6 +112,62 @@ impl AgentHandler<'_> {
             }
             Err(error) => vec![Update::Error(error.to_string())],
         }
+    }
+
+    /// Faz login num provider (E21): escreve a seleção/credenciais e reconstrói o provider.
+    ///
+    /// O embedding não é tocado: o login só muda o agente principal. Depois de reconstruir, o
+    /// modelo passa a ser controlo logado e a lista de modelos é republicada.
+    fn login(&mut self, request: &katu_tui::LoginRequest) -> Vec<Update> {
+        let _span = katu_core::trace_fn!("tui::handler::login");
+
+        let intent = if request.logout {
+            login::Intent::Logout
+        } else {
+            login::Intent::Login
+        };
+        let resolved = match login::resolve(
+            Some(&request.provider),
+            request.api_key.as_deref(),
+            request.model.as_deref(),
+            request.base.as_deref(),
+            intent,
+        ) {
+            Ok(resolved) => resolved,
+            Err(error) => return vec![Update::Error(error.to_string())],
+        };
+        let outcome = match login::apply(&resolved) {
+            Ok(outcome) => outcome,
+            Err(error) => return vec![Update::Error(error.to_string())],
+        };
+        if request.logout {
+            return vec![Update::Info("sessão terminada".to_string())];
+        }
+        let provider = match build_provider(
+            outcome.provider,
+            &outcome.base,
+            &self.env,
+            self.runtime.session_id(),
+        ) {
+            Ok(provider) => provider,
+            Err(message) => return vec![Update::Error(message)],
+        };
+        self.provider = provider;
+        let models = super::models_for(self.provider.as_ref(), &outcome.model);
+        let mut updates = Vec::new();
+        if let Some(warning) = &outcome.warning {
+            updates.push(Update::Info(warning.clone()));
+        }
+        updates.push(Update::Info(format!(
+            "login: {} ({})",
+            outcome.provider, outcome.model
+        )));
+        updates.push(Update::Models(models));
+        updates.extend(self.set_model(outcome.model.clone()));
+        if let Some(message) = login::verify(&outcome) {
+            updates.push(Update::Info(message));
+        }
+        updates
     }
 
     /// Executa `!<cmd>` pela política/contenção (E20-T12).
@@ -193,7 +252,18 @@ impl AgentHandler<'_> {
         let usage = usage_line(model, &turn, &self.prices);
         let cancelled = turn.cancelled;
         let calls = turn.calls;
-        let mut updates = vec![Update::Assistant(turn.text)];
+        // Turno sem texto e sem cancelamento: quase sempre o modelo gastou o orçamento de saída em
+        // raciocínio (`max_completion_tokens`); o utilizador não pode ficar sem qualquer sinal.
+        let empty = turn.text.trim().is_empty() && !cancelled;
+        let mut updates = if empty {
+            vec![Update::Error(
+                "o modelo não devolveu texto (resposta vazia ou só raciocínio); aumenta \
+                 `--max-tokens` ou muda de modelo"
+                    .to_string(),
+            )]
+        } else {
+            vec![Update::Assistant(turn.text)]
+        };
         if let Some(usage) = usage {
             updates.push(Update::Usage(usage));
         }

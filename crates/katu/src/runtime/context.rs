@@ -15,15 +15,16 @@ pub(crate) struct ContextPolicy {
     pub(crate) selection: SelectionPolicy,
     /// Parâmetros da seleção (dados versionados).
     pub(crate) params: SelectionParams,
-    /// Incluir a secção `estado` no prime (Q-04) — **desligado** por omissão (A/B pendente).
+    /// Incluir a secção `estado` no prime (Q-04) — **ligado** por omissão (decisão do dono).
     pub(crate) prompt_state: bool,
 }
 
 impl ContextPolicy {
     /// Lê a política da config fechada do projeto (valor inválido ⇒ default, nunca invenção).
     ///
-    /// O `prompt_state` chega como `Option<bool>` da config: ausente ⇒ **desligado**, que é o default
-    /// do projeto (a adoção de Q-04 depende de A/B com o modelo).
+    /// O `prompt_state` chega como `Option<bool>` da config: ausente ⇒ **ligado** (decisão do dono).
+    /// A seleção ausente/ inválida ⇒ [`SelectionPolicy::Suffix`] (o default histórico, seguro; a
+    /// `utility` só entra por config explícita — Q-02b/Q-03).
     #[must_use]
     pub(crate) fn from_config(selection: Option<&str>, prompt_state: Option<bool>) -> Self {
         let _span = katu_core::trace_fn!("runtime::context::policy_from_config");
@@ -31,9 +32,9 @@ impl ContextPolicy {
         Self {
             selection: selection
                 .and_then(SelectionPolicy::parse)
-                .unwrap_or_default(),
+                .unwrap_or(SelectionPolicy::Suffix),
             params: SelectionParams::default(),
-            prompt_state: prompt_state.unwrap_or(false),
+            prompt_state: prompt_state.unwrap_or(true),
         }
     }
 }

@@ -909,8 +909,8 @@ número.
 
 ## 18. Referências
 
-- **MODULE.md:** [`crates/katu-core/MODULE.md`](../../crates/katu-core/MODULE.md)
-- **Políticas:** [`policy/`](../../policy/)
+- **MODULE.md:** [`crates/katu-core/MODULE.md`](../../../crates/katu-core/MODULE.md)
+- **Políticas:** [`policy/`](../../../policy/)
 - **Bench:** `bench/e18/` — `stats`, `tokens`, `select`, `loop`, `resume`, `durability`, `toon`,
   `taint`, `conformal`, `confidence`, `prompt`, `atomics`, `raw.json`
 - **ADRs:** 0005 (TOON colunar), 0006 (catálogo), 0008 (snapshot), 0009 (auditoria), 0024

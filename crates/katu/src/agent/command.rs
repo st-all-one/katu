@@ -12,6 +12,7 @@ use std::path::Path;
 
 use super::{Ports, TurnOptions, TurnRequest, run_turn};
 use crate::defaults;
+use crate::login;
 use crate::ports::{StdEnv, StdFs, StdProcess, SystemClock};
 use crate::report::Report;
 use crate::runtime::{Runtime, RuntimeError};
@@ -169,7 +170,9 @@ pub(crate) fn build_provider(
     use std::time::Duration;
 
     let transport = UreqTransport::new(Duration::from_secs(5), Duration::from_secs(120));
-    // B1/W8-1: opt-in por projeto/global (`provider.structured_output`); o local aceita-o.
+    // B1/W8-1 (ADR 0025): **opt-in** — o `response_format` derivado das tools obriga o modelo a
+    // emitir sempre uma tool call (o `oneOf` não tem variante de resposta final), pelo que ligá-lo
+    // por omissão impede o turno de terminar em texto. A adoção por omissão exige A/B.
     let structured_output = defaults::current().structured_output.unwrap_or(false);
     match name {
         "llama" => Ok(Box::new(Llama::new(
@@ -189,7 +192,14 @@ pub(crate) fn build_provider(
         "opencode-go" | "opencode-zen" => {
             let key = env
                 .var("KATU_OPENCODE_KEY")
-                .ok_or_else(|| "KATU_OPENCODE_KEY ausente (exporte a chave)".to_string())?;
+                .or_else(|| env.var("OPENCODE_API_KEY"))
+                .map(|key| key.trim().to_string())
+                .filter(|key| !key.is_empty())
+                .or_else(login::stored_key)
+                .ok_or_else(|| {
+                    "chave do opencode ausente: exporte KATU_OPENCODE_KEY ou faça `katu config login`"
+                        .to_string()
+                })?;
             let config = if name == "opencode-go" {
                 OpenCodeConfig::go(key)
             } else {
@@ -237,6 +247,7 @@ fn envelope(
         "usage": usage,
         "state": state,
         "context_selection": selection,
+        "text": turn.text,
     })
 }
 

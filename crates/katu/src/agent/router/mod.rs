@@ -121,6 +121,28 @@ pub(super) fn route<'a>(
     }
 }
 
+/// Nome canônico (`ToolName`) de uma tool do catálogo; `None` fora do catálogo.
+///
+/// Usado no caminho de **erro de argumentos**: o erro é devolvido ao modelo como resultado de tool,
+/// pelo que o `ToolCall` é logado com um `ToolUse` sintético (`ToolArgs::Other`).
+#[must_use]
+pub(super) fn tool_name_for(name: &str) -> Option<ToolName> {
+    let _span = katu_core::trace_fn!("agent::router::tool_name_for");
+
+    Some(match name {
+        "read" => ToolName::Read,
+        "write" => ToolName::Write,
+        "edit" => ToolName::Edit,
+        "move" => ToolName::Move,
+        "trash" => ToolName::Trash,
+        "bash" => ToolName::Exec,
+        "grep" | "find" | "ls" => ToolName::Search,
+        "plan" => ToolName::Plan,
+        "memory" => ToolName::MemoryRecall,
+        _ => return None,
+    })
+}
+
 /// Tool `memory` (`record`/`search`); a execução é do gate de memória (E05).
 pub(super) fn memory(args: &Value) -> Result<Routed<'static>, RouteError> {
     let _span = katu_core::trace_fn!("agent::router::memory");

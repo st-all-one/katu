@@ -18,12 +18,30 @@ fn runtime<'a>(
 }
 
 #[test]
-fn the_prompt_state_is_off_by_default_and_the_prime_stays_static()
--> Result<(), Box<dyn std::error::Error>> {
+fn the_prompt_state_is_on_by_default() -> Result<(), Box<dyn std::error::Error>> {
     let fs = StdFs;
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
-    let mut runtime = runtime(&fs, &clock, "state-off")?;
-    assert!(!runtime.prompt_state(), "Q-04 exige A/B: fica desligado");
+    let mut runtime = runtime(&fs, &clock, "state-on-default")?;
+    assert!(runtime.prompt_state(), "Q-04 ligado por omissão");
+    runtime.record_prompt_state(4)?;
+    assert!(runtime.state_text().is_some(), "ligado registra a secção");
+    drop(runtime);
+    std::fs::remove_dir_all(super::root("state-on-default")?)?;
+    Ok(())
+}
+
+#[test]
+fn the_prompt_state_can_be_disabled_by_config() -> Result<(), Box<dyn std::error::Error>> {
+    let root = super::root("state-off")?;
+    std::fs::create_dir_all(root.join(".katu"))?;
+    std::fs::write(
+        root.join(".katu").join("katu.toml"),
+        "behavior.prompt_state = false\n",
+    )?;
+    let fs = StdFs;
+    let clock = FixedClock::new(Timestamp::from_millis(1_000));
+    let mut runtime = Runtime::open(&fs, &clock, &root, "teste")?;
+    assert!(!runtime.prompt_state(), "a config desliga a secção");
     runtime.record_prompt_state(4)?;
     assert!(
         runtime.state_text().is_none(),
@@ -36,7 +54,7 @@ fn the_prompt_state_is_off_by_default_and_the_prime_stays_static()
         context.prime
     );
     drop(runtime);
-    std::fs::remove_dir_all(super::root("state-off")?)?;
+    std::fs::remove_dir_all(root)?;
     Ok(())
 }
 
@@ -77,13 +95,19 @@ fn the_prompt_state_is_logged_and_enters_the_prime() -> Result<(), Box<dyn std::
 
 #[test]
 fn the_selection_policy_reaches_the_context() -> Result<(), Box<dyn std::error::Error>> {
+    let root = super::root("selection")?;
+    std::fs::create_dir_all(root.join(".katu"))?;
+    std::fs::write(
+        root.join(".katu").join("katu.toml"),
+        "behavior.context_selection = \"suffix\"\n",
+    )?;
     let fs = StdFs;
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
-    let mut runtime = runtime(&fs, &clock, "selection")?;
+    let mut runtime = Runtime::open(&fs, &clock, &root, "teste")?;
     assert_eq!(
         runtime.selection(),
         SelectionPolicy::Suffix,
-        "default histórico"
+        "a config do projeto chega à política"
     );
     runtime.set_selection(SelectionPolicy::Utility);
     assert_eq!(runtime.selection(), SelectionPolicy::Utility);
@@ -94,6 +118,23 @@ fn the_selection_policy_reaches_the_context() -> Result<(), Box<dyn std::error::
         "o objetivo alimenta o canal `objetivo`"
     );
     drop(runtime);
-    std::fs::remove_dir_all(super::root("selection")?)?;
+    std::fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+#[test]
+fn the_selection_policy_can_be_utility_by_config() -> Result<(), Box<dyn std::error::Error>> {
+    let root = super::root("selection-utility")?;
+    std::fs::create_dir_all(root.join(".katu"))?;
+    std::fs::write(
+        root.join(".katu").join("katu.toml"),
+        "behavior.context_selection = \"utility\"\n",
+    )?;
+    let fs = StdFs;
+    let clock = FixedClock::new(Timestamp::from_millis(1_000));
+    let runtime = Runtime::open(&fs, &clock, &root, "teste")?;
+    assert_eq!(runtime.selection(), SelectionPolicy::Utility);
+    drop(runtime);
+    std::fs::remove_dir_all(root)?;
     Ok(())
 }

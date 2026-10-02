@@ -19,7 +19,7 @@ use katu_policy::{Decision, PolicyError, ToolName, ToolUse};
 use serde_json::Value;
 
 use super::{emit_outcome, retry_with_approval};
-use crate::agent::{ActivitySink, AgentError, CallOutcome, Ports, router};
+use crate::agent::{ActivitySink, AgentError, CallOutcome, Ports, route_failure, router};
 use crate::runtime::Runtime;
 
 /// Teto de calls `Shared` num lote paralelo (absorvido do PTC: pool limitado, ≤ 10).
@@ -116,26 +116,27 @@ fn parallel_or_fallback(
         root: &root,
     };
 
-    // Fase 1 — rota **sem** logar, na ordem do modelo.
+    // Fase 1 — rota **sem** logar, na ordem do modelo. Uma call com argumentos inválidos manda o
+    // lote inteiro para o caminho sequencial, que a converte em resultado de erro (o modelo vê-o).
+    let original = calls.clone();
     let mut routed = Vec::with_capacity(calls.len());
     for (call, name, arguments) in calls {
-        let router::Routed::Plain { use_, tool } = router::route(
+        match router::route(
             &route_ports,
             &runtime.cwd,
             &name,
             &arguments,
             loaded.as_ref(),
-        )?
-        else {
-            return Err(AgentError::Route(router::RouteError::UnknownTool(name)));
-        };
-        routed.push(Prepared {
-            call,
-            name,
-            arguments,
-            use_,
-            tool,
-        });
+        ) {
+            Ok(router::Routed::Plain { use_, tool }) => routed.push(Prepared {
+                call,
+                name,
+                arguments,
+                use_,
+                tool,
+            }),
+            _ => return Ok(Batch::Fallback(original)),
+        }
     }
 
     // Guarda de orçamento: o lote tem de caber **inteiro** antes de logar qualquer pedido. Um
@@ -253,6 +254,22 @@ fn commit(
     Ok(())
 }
 
+/// Trata uma call com argumentos inválidos no caminho sequencial: devolve o erro ao modelo.
+fn settle_route_failure(
+    runtime: &mut Runtime<'_>,
+    activity: &mut dyn ActivitySink,
+    call: CallId,
+    name: &str,
+    error: &router::RouteError,
+) -> Result<(), AgentError> {
+    let _span = katu_core::trace_fn!("agent::turn::batch::settle_route_failure");
+
+    let now = runtime.clock.now().as_millis();
+    let call_outcome = route_failure(runtime, call, name, error, now)?;
+    emit_outcome(activity, name, &call_outcome.outcome);
+    Ok(())
+}
+
 /// Caminho sequencial (semântica original): rota, executa e comete uma call de cada vez.
 ///
 /// Usado quando o lote não cabe no cost governor ou quando não há paralelismo a ganhar.
@@ -274,14 +291,20 @@ fn run_shared_sequential(
         root: &root,
     };
     for (call, name, arguments) in calls {
-        let router::Routed::Plain { use_, tool } = router::route(
+        let routed = match router::route(
             &route_ports,
             &runtime.cwd,
             &name,
             &arguments,
             loaded.as_ref(),
-        )?
-        else {
+        ) {
+            Ok(routed) => routed,
+            Err(error) => {
+                settle_route_failure(runtime, activity, call, &name, &error)?;
+                continue;
+            }
+        };
+        let router::Routed::Plain { use_, tool } = routed else {
             return Err(AgentError::Route(router::RouteError::UnknownTool(name)));
         };
         let now = runtime.clock.now().as_millis();

@@ -17,7 +17,12 @@ pub fn evaluate(facts: &Facts, rules: &RuleSet) -> Result<Decision, PolicyError>
     rules.check_vocab()?;
     let mut best = Decision::Allow;
     for rule in &rules.rules {
-        if rule.category == RuleCategory::Advisory {
+        // Nem `Advisory` nem `Perception` decidem: o motor só aplica `Enforced` (o audit
+        // classifica as duas primeiras como não-decisórias).
+        if matches!(
+            rule.category,
+            RuleCategory::Advisory | RuleCategory::Perception
+        ) {
             continue;
         }
         let Some(evidence) = rule.applies(facts) else {
@@ -250,6 +255,43 @@ mod tests {
         };
         let facts = facts_for(ToolName::Read, ToolArgs::Plan, "/work/x")?;
         assert!(evaluate(&facts, &rules).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn advisory_never_decides() -> Result<(), PolicyError> {
+        let root = ResolvedPath::from_canonical("/work")?;
+        let mut advisory = rule(
+            "informa",
+            RuleScope::Path { root: root.clone() },
+            Enforcement::DenyWrite { root },
+        );
+        advisory.category = RuleCategory::Advisory;
+        let rules = RuleSet {
+            vocab: 3,
+            rules: vec![advisory],
+        };
+        assert!(evaluate(&write_facts("/work/x")?, &rules)?.is_allow());
+        Ok(())
+    }
+
+    #[test]
+    fn perception_never_decides() -> Result<(), PolicyError> {
+        let root = ResolvedPath::from_canonical("/work")?;
+        let mut perception = rule(
+            "percebe",
+            RuleScope::Path { root: root.clone() },
+            Enforcement::DenyWrite { root },
+        );
+        perception.category = RuleCategory::Perception;
+        let rules = RuleSet {
+            vocab: 3,
+            rules: vec![perception],
+        };
+        assert!(
+            evaluate(&write_facts("/work/x")?, &rules)?.is_allow(),
+            "uma regra Perception não decide, mesmo com enforcement não-Advisory"
+        );
         Ok(())
     }
 }

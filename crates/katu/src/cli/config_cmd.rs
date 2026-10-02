@@ -12,15 +12,23 @@ use katu_core::error::Error;
 use katu_core::kernel::discover_root;
 use serde_json::json;
 
+use crate::bootstrap;
 use crate::config;
+#[cfg(feature = "memory-in-process")]
+use crate::login;
 use crate::ports::StdFs;
 use crate::report::Report;
 
 use super::prime::{self, Group};
 
+#[cfg(feature = "memory-in-process")]
+mod login_cmd;
+
 /// Argumentos de `katu config`.
 #[derive(Debug, Clone, Args)]
 #[command(after_help = "Ciclo de uso:\n\
+                  katu config init [--global]  prepara a config default (não sobrescreve)\n\
+                  katu config login             login do agente (opencode OU llama.cpp)\n\
                   katu config list              configuração efetiva (projeto > global)\n\
                   katu config get <chave>       lê uma chave\n\
                   katu config set <chave> <v>   escreve no projeto (ou --global)\n\
@@ -37,6 +45,38 @@ pub(crate) struct ConfigArgs {
 /// Subcomandos de `config`.
 #[derive(Debug, Clone, Subcommand)]
 pub(crate) enum ConfigCommand {
+    /// Escreve a config default no escopo (não sobrescreve sem `--force`).
+    Init {
+        /// Escreve na config global em vez da do projeto.
+        #[arg(long)]
+        global: bool,
+        /// Sobrescreve uma config existente.
+        #[arg(long)]
+        force: bool,
+    },
+    /// Faz login num provider (opencode **ou** llama.cpp) e escreve a config do agente.
+    ///
+    /// O embedding fica no `katu.toml` e **não** é tocado aqui. Sem `--provider`, pergunta
+    /// interativamente; a chave do opencode fica na config **global** (`katu.toml`, chave
+    /// `opencode_api_key`, modo 0600).
+    #[cfg(feature = "memory-in-process")]
+    Login {
+        /// Provider: `opencode`, `opencode-zen` ou `llama` (sem ele, pergunta).
+        #[arg(long)]
+        provider: Option<String>,
+        /// Chave da API do opencode (sem ela, usa `KATU_OPENCODE_KEY` ou pergunta).
+        #[arg(long)]
+        api_key: Option<String>,
+        /// Modelo (por omissão, o do provider).
+        #[arg(long)]
+        model: Option<String>,
+        /// URL base (por omissão, a do provider).
+        #[arg(long)]
+        base: Option<String>,
+        /// Termina a sessão: apaga a chave guardada.
+        #[arg(long)]
+        logout: bool,
+    },
     /// Lê uma chave (efetiva, ou global com `--global`).
     Get {
         /// Chave a ler.
@@ -137,6 +177,25 @@ impl Scope {
 pub(crate) fn execute(args: &ConfigArgs) -> Report {
     let _span = katu_core::fn_span!(Level::Debug, events::CLI_CONFIG, "config_cmd::execute");
     match &args.command {
+        Some(ConfigCommand::Init { global, force }) => init(Scope::new(*global), *force),
+        #[cfg(feature = "memory-in-process")]
+        Some(ConfigCommand::Login {
+            provider,
+            api_key,
+            model,
+            base,
+            logout,
+        }) => login_cmd::run(
+            provider.as_deref(),
+            api_key.as_deref(),
+            model.as_deref(),
+            base.as_deref(),
+            if *logout {
+                login::Intent::Logout
+            } else {
+                login::Intent::Login
+            },
+        ),
         Some(ConfigCommand::Get { key, global }) => get(key, Scope::new(*global)),
         Some(ConfigCommand::Set { key, value, global }) => set(key, value, Scope::new(*global)),
         Some(ConfigCommand::Unset { key, global }) => unset(key, Scope::new(*global)),
@@ -144,8 +203,65 @@ pub(crate) fn execute(args: &ConfigArgs) -> Report {
         Some(ConfigCommand::Prime { long }) => prime::report(Group::Config, *long),
         None => Report::failed(
             "config",
-            &Error::invalid_input("subcomando em falta: get/set/unset/list"),
+            &Error::invalid_input("subcomando em falta: init/login/get/set/unset/list"),
         ),
+    }
+}
+
+/// `config init`: escreve a config default (idempotente; só sobrescreve com `--force`).
+///
+/// Global = `default_config()`; projeto = cópia da global se existir, senão `default_config()`
+/// (o mesmo material do `katu --init`, para a instalação ficar pronta a usar).
+#[allow(
+    clippy::fn_params_excessive_bools,
+    reason = "`--force` é um flag booleano do clap"
+)]
+fn init(scope: Scope, force: bool) -> Report {
+    let _span = katu_core::fn_span!(Level::Debug, events::CONFIG_SET, "config_cmd::init");
+    let path = match scope.path() {
+        Ok(path) => path,
+        Err(error) => return Report::failed("config", &error),
+    };
+    if path.exists() && !force {
+        return Report::ok(
+            "config",
+            Some(json!({
+                "path": path.display().to_string(),
+                "created": false,
+                "scope": scope.name(),
+            })),
+        );
+    }
+    let table = match init_table(scope) {
+        Ok(table) => table,
+        Err(error) => return Report::failed("config", &error),
+    };
+    match config::save(&path, &table) {
+        Ok(()) => Report::ok(
+            "config",
+            Some(json!({
+                "path": path.display().to_string(),
+                "created": true,
+                "scope": scope.name(),
+            })),
+        ),
+        Err(error) => Report::failed("config", &error),
+    }
+}
+
+/// Tabela inicial do escopo (projeto herda a global; sem global, cai no default).
+fn init_table(scope: Scope) -> Result<toml::Table, Error> {
+    let _span = katu_core::trace_fn!("cli::config_cmd::init_table");
+
+    match scope {
+        Scope::Global => Ok(bootstrap::default_config()),
+        Scope::Project => {
+            let global = config::global_path()?;
+            if global.is_file() {
+                return config::load(&global);
+            }
+            Ok(bootstrap::default_config())
+        }
     }
 }
 

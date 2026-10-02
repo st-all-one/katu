@@ -310,11 +310,33 @@ verify_binaries() {
     ok "Binário responde: ${version}"
 }
 
-# Cria a pasta de configuração global (o ficheiro nasce ao usar `katu config set --global`).
+# Diretório da config global (espelha `config::global_path`).
+config_dir() {
+    case "$(uname -s)" in
+        Darwin) printf '%s' "${HOME}/Library/Application Support/katu" ;;
+        *)      printf '%s' "${XDG_CONFIG_HOME:-$HOME/.config}/local/katu" ;;
+    esac
+}
+
+# Prepara a configuração global (default) para o katu ficar pronto a usar.
+#
+# O ficheiro é escrito pelo próprio binário (`katu config init --global`) — fonte única dos
+# defaults — e **nunca** sobrescreve uma config existente (idempotente). A pasta é criada de
+# qualquer forma, para o `katu config set --global` funcionar depois.
 setup_global_config() {
-    local dir="${XDG_CONFIG_HOME:-$HOME/.config}/local/katu"
+    local dir bin
+    dir="$(config_dir)"
     mkdir -p "$dir" 2>/dev/null || true
-    ok "Config global: $(tilde "$dir/katu.toml")"
+    bin="${INSTALL_DIR}/katu"
+    if [ ! -x "$bin" ]; then
+        warn "Binário indisponível; rode: katu config init --global"
+        return 0
+    fi
+    if "$bin" config init --global >/dev/null 2>&1; then
+        ok "Config global preparada: $(tilde "$dir/katu.toml")"
+    else
+        warn "Não consegui preparar a config global; rode: katu config init --global"
+    fi
 }
 
 # ── PATH ─────────────────────────────────────────────────────────────────────
@@ -416,7 +438,7 @@ echo "  katu run \"...\"              # uma rodada: id da sessão + exit code"
 echo "  katu memo ask \"...\"         # consulta a memória (só leitura)"
 echo "  katu config list            # configuração efetiva (projeto > global)"
 echo ""
-echo "  # Config global: $(tilde "${XDG_CONFIG_HOME:-$HOME/.config}/local/katu/katu.toml")"
+echo "  # Config global: $(tilde "$(config_dir)/katu.toml")"
 echo "  # Config do projeto: .katu/katu.toml"
 echo ""
 if [ "$NO_MEMORY" -eq 1 ]; then

@@ -8,8 +8,10 @@ use katu_core::diag::{Level, events};
 use katu_core::error::Error;
 use serde_json::json;
 
-use crate::defaults;
 use crate::report::Report;
+
+#[cfg(feature = "memory-in-process")]
+use crate::defaults;
 
 #[cfg(feature = "memory-in-process")]
 use crate::memory::commands::{memory_drain, memory_status};
@@ -155,6 +157,7 @@ fn knowledge_report(_args: &KnowledgeArgs) -> Report {
 }
 
 /// Estado do serviço de embeddings (E20-T17): a **segunda IA**, externa e plugável.
+#[cfg(feature = "memory-in-process")]
 fn embeddings_status() -> serde_json::Value {
     let _span = katu_core::trace_fn!("cli::memo::embeddings_status");
 
@@ -165,6 +168,19 @@ fn embeddings_status() -> serde_json::Value {
         "url": embeddings.url,
         "model": embeddings.model,
         "command": embeddings.command,
+    })
+}
+
+/// Sem adaptador de memória, embeddings reporta como desligado.
+#[cfg(not(feature = "memory-in-process"))]
+fn embeddings_status() -> serde_json::Value {
+    let _span = katu_core::trace_fn!("cli::memo::embeddings_status");
+
+    json!({
+        "enabled": false,
+        "url": serde_json::Value::Null,
+        "model": serde_json::Value::Null,
+        "command": serde_json::Value::Null,
     })
 }
 

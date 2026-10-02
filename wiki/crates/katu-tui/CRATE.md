@@ -481,5 +481,5 @@ fn typing_then_submitting_emits_a_command_and_echoes_the_user() {
 
 ## 7. Referências
 
-- **MODULE.md:** [`crates/katu-tui/MODULE.md`](../../crates/katu-tui/MODULE.md)
+- **MODULE.md:** [`crates/katu-tui/MODULE.md`](../../../crates/katu-tui/MODULE.md)
 - **katu (borda):** [`wiki/crates/katu/CRATE.md`](../katu/CRATE.md)
