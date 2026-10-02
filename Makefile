@@ -1,9 +1,11 @@
 # katu — alvos de qualidade e build (E01-T03, E15).
 
 CARGO ?= cargo
+PREFIX ?= $(HOME)/.local
+BINDIR ?= $(PREFIX)/bin
 
 .PHONY: check fmt clippy test build file-length layers diag docs policy bench provider render measure \
-        measure-render clean \
+        measure-render clean install uninstall \
         deny audit machete typos miri instrument ci memory-swap
 
 ## Portão completo local: um único ponto de entrada (`cargo xtask check`), igual ao CI.
@@ -82,6 +84,17 @@ measure-render:
 
 clean:
 	$(CARGO) clean
+
+# --- Instalação local (source) ---
+
+## Compila em release e instala o binário `katu` (default: ~/.local/bin).
+## Use PREFIX=... / BINDIR=... para mudar o destino; passe EXTRA=--profile para instrumentação.
+install:
+	INSTALL_DIR="$(DESTDIR)$(BINDIR)" ./install.sh --from-source $(EXTRA)
+
+## Move o binário instalado para o lixo recuperável (preserva a config e os projetos).
+uninstall:
+	INSTALL_DIR="$(DESTDIR)$(BINDIR)" ./install.sh --uninstall
 
 # --- Alvos extras (CI / verificação). Pulam se a ferramenta não estiver instalada. ---
 
