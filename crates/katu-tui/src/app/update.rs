@@ -5,8 +5,8 @@
 
 use katu_core::diag::{Level, events};
 
+use crate::Update;
 use crate::entry::{Entry, Role, Status};
-use crate::message::Update;
 
 use super::App;
 
@@ -45,6 +45,15 @@ impl App {
             Update::Done => {
                 self.clear_live();
                 self.status = Status::Idle;
+            }
+            Update::ApprovalRequest(request) => {
+                self.status = Status::Message(format!(
+                    "aprovação necessária: {} ({})",
+                    request.tool, request.rule
+                ));
+            }
+            Update::Busy(command) => {
+                self.status = Status::Message(format!("kernel ocupado; ignorado: {command}"));
             }
         }
     }

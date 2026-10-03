@@ -2,6 +2,7 @@
 //!
 //! A lixeira é **recuperável**: restaurar nunca apaga nada e não passa pela política (E06-T09).
 
+use katu_core::api::TrashEntry;
 use katu_core::diag::{Level, events};
 use ratatui::Frame;
 use ratatui::style::{Color, Modifier, Style};
@@ -10,15 +11,6 @@ use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 
 use crate::app::App;
 use crate::layout::centered;
-
-/// Entrada da lixeira mostrada na UI (subset do índice, E06-T09).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TrashEntry {
-    /// Caminho original.
-    pub original: String,
-    /// Token guardado (usado para restaurar).
-    pub stored: String,
-}
 
 /// Estado da sobreposição da lixeira: lista + seleção.
 #[derive(Debug, Default)]

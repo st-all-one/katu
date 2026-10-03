@@ -47,7 +47,11 @@ impl Handler for AgentHandler<'_> {
     fn handle(&mut self, command: Command, painter: &mut Painter<'_>) -> Vec<Update> {
         let _span = katu_core::fn_span!(Level::Trace, events::TUI_ACTION, "handler::handle");
         match command {
-            Command::Quit => Vec::new(),
+            // K8/F1: `Shutdown`/`Cancel`/`Steer`/`Approval` são do actor (o cancelamento durante o
+            // turno é a flag partilhada que o `Painter` escreve no `Esc`/`Ctrl-C`); inertes aqui.
+            Command::Shutdown | Command::Cancel | Command::Steer(_) | Command::Approval(_) => {
+                Vec::new()
+            }
             Command::Submit(goal) => self.submit(&goal, painter),
             Command::SetModel(model) => self.set_model(model),
             Command::SetThinking(thinking) => self.set_thinking(thinking),

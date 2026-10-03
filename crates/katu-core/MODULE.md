@@ -85,6 +85,12 @@ função, o log é a fonte da verdade.
   CAS para `edit`, OA16; `Fs::remove` = remoção permanente de ficheiro, nunca de diretórios,
   E10-T07; `Process` = execução com timeout, E06-T04). `ToolOutcome::fix()` (B-03) devolve o
   remédio acionável — a negação ensina o modelo a corrigir-se.
+- Protocolo do kernel [`api`](src/api/mod.rs) (KERNEL_SURFACE F0): a fronteira entre o kernel
+  (autocontido, na sua thread) e as superfícies (CLI/TUI/futuros front-ends). `Command` (incluindo
+  `Cancel`/`Approval`/`Steer`/`Shutdown`) e `Event` são `serde`-prontos e não carregam
+  `Runtime`/`Session`/`Provider` (K2/K7); `KernelHandle`/`KernelBus`/`Flag` são o transporte em
+  memória (fila de comandos limitada com `try_send`, drenagem sem bloquear). Os dados de
+  apresentação viajam no protocolo: `Live`, `TrashEntry`, `LoginRequest`, `ApprovalRequest`.
 - Diagnóstico transversal [`diag`](src/diag/mod.rs) (DF9/E19): log estruturado + métrica de tempo,
   custo zero por defeito; catálogo de eventos em [`diag::events`](src/diag/events.rs); sink
   agregador de percentis em `diag::aggregate` (E19-T02).

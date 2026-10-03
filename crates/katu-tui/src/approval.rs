@@ -60,25 +60,8 @@ pub enum Key {
     Cancel,
 }
 
-/// Pedido de challenge apresentado ao humano.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChallengePrompt {
-    /// Nome ao modelo da tool.
-    pub tool: String,
-    /// Regra que exige a aprovação.
-    pub rule: String,
-    /// Âmbito concreto (caminho/host/comando).
-    pub scope: String,
-}
-
-/// Assinatura resultante de um challenge completo.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChallengeSignature {
-    /// Justificação (`override_reason`).
-    pub reason: String,
-    /// Quem assinou (`granted_by`).
-    pub granted_by: String,
-}
+/// Pedido de challenge apresentado ao humano (dados do protocolo, `KERNEL_SURFACE` §2.2).
+pub use katu_core::api::{ApprovalGrant as ChallengeSignature, ApprovalRequest as ChallengePrompt};
 
 /// Direção de movimento do cursor do checklist.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

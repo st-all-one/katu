@@ -17,11 +17,11 @@ use ratatui::crossterm::event::{
 use ratatui::crossterm::execute;
 use ratatui::{DefaultTerminal, restore, try_init};
 
+use crate::Live;
 use crate::action::map_key;
 use crate::app::App;
 use crate::approval::{self, Challenge, ChallengePrompt, ChallengeSignature, Step};
 use crate::copy::{self, Selection};
-use crate::live::Live;
 use crate::throttle::{FRAME_INTERVAL_MS, Throttle};
 use crate::ui::render;
 use crate::{Command, Update};

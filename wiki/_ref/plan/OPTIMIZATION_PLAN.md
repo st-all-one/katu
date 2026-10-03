@@ -90,6 +90,9 @@ remoção de complexidade; senão reverter e escrever a rejeição). Nada muda b
 | **WL4-1** L-S1 · um só ponto de fecho | ✔ feito | `record_turn_end` é o único caminho que fecha o turno (normal/erro/cancel/teto) e o único que reconcilia (`agent.reconcile`); documentado em `run_turn_with` |
 | **WL4-2** L-S2 · um só `ActivitySink` | ✖ rejeitado (escrito) | Não há um segundo motor: o canal é entre a thread de I/O e o turno; o `ActivitySink` mantém-se a única porta de observação e o `NoActivity` é o *no-op* do `katu run` não interativo. Mover o turno para outra thread exigiria um protocolo de aprovação request/response — mais código, não menos |
 | **WL4-3** L-S3 · reutilizar `turn_open` | ✖ rejeitado (escrito) | `turn_open` é estado do **processo**; não deteta outro processo no mesmo log. O `turn.lock` (L-Q6) é a única leitura **entre processos** — mantido |
+| **KS-F0** protocolo do kernel | ✔ feito | [`KERNEL_SURFACE`](KERNEL_SURFACE.md) §6: `katu-core::api` (`Command`/`Event` `serde` + `KernelHandle`/`KernelBus`/`Flag` + 6 testes de ida-e-volta); `katu-tui` deixou de ter `message.rs` e re-exporta (`Update` é o `Event`); `Live`/`TrashEntry`/`LoginRequest`/`ApprovalRequest` são dados do protocolo; **sem crate novo** (teto `crates` cheio) |
+| **KS-G4** truncagem em `length` | ✔ feito | `openai::decode::flush_tools` marca **todas** as calls pendentes como `ToolCallTruncated` em `length`, mesmo com JSON parseável (G4); teste `a_parseable_tool_call_at_length_is_still_truncated` |
+| **KS-G5** eco nunca aceite | ✔ feito | esgotado o orçamento de retries, o eco é **substituído** por nota visível (`ECHO_NOTICE`) em vez de aceite (G5); teste `a_persistent_echo_is_never_accepted` |
 
 **Nota de método (Q-07).** O `diag:coverage` conta qualquer `fn` de `crates/*/src` fora de
 `#[cfg(test)] mod` e fora de ficheiros `*tests*`/`/tests/`: um *bench* em `edit/bench.rs` fez a

@@ -212,3 +212,46 @@ fn an_echoed_tool_delta_is_nudged_and_retried() -> Result<(), Box<dyn std::error
     std::fs::remove_dir_all(&root)?;
     Ok(())
 }
+
+#[test]
+fn a_persistent_echo_is_never_accepted() -> Result<(), Box<dyn std::error::Error>> {
+    let root = root("eco-persistente")?;
+    let fs = StdFs;
+    let clock = FixedClock::new(Timestamp::from_millis(1_000));
+    let mut runtime = Runtime::open(&fs, &clock, &root, "lê")?;
+    runtime.record_user("lê a nota")?;
+    let use_ = read_use(&root)?;
+    runtime
+        .session_mut()
+        .begin_call(CallId::new("c1"), &use_, 1_000)?;
+    runtime.session_mut().settle_call(
+        CallId::new("c1"),
+        ToolOutcome::Ok,
+        Some(DELTA.to_string()),
+    )?;
+
+    // Ecoa duas vezes: o retry esgota e o eco não pode ser aceite (G5).
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
+        "fake",
+        vec![Turn::text(DELTA), Turn::text(DELTA)],
+    ));
+    let process = StdProcess;
+    let env = StdEnv;
+    let ports = Ports {
+        fs: &fs,
+        process: &process,
+        env: &env,
+    };
+
+    let report = run_turn(&mut runtime, request(&provider, ports, "lê", &options(4)))?;
+    assert_eq!(report.termination, Termination::Natural);
+    assert!(!report.text.contains(DELTA), "o eco nunca é aceite (G5)");
+    assert!(
+        report.text.contains("substituída"),
+        "fica uma nota visível no lugar do eco"
+    );
+
+    drop(runtime);
+    std::fs::remove_dir_all(&root)?;
+    Ok(())
+}

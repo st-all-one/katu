@@ -10,13 +10,14 @@
 use katu_core::diag::{Level, events};
 use katu_core::provider::Thinking;
 
+use crate::Command;
 use crate::action::{Action, Mode};
 use crate::controls::Controls;
 use crate::entry::{Entry, Status};
 use crate::menu::{Menu, MenuKind};
-use crate::message::Command;
 use crate::transcript::TranscriptView;
-use crate::trash::{Trash, TrashEntry};
+use crate::trash::Trash;
+use katu_core::api::TrashEntry;
 
 mod login;
 mod menu;
@@ -323,7 +324,7 @@ impl App {
             Action::Verify => return Some(Command::Verify),
             Action::Quit => {
                 self.quit = true;
-                return Some(Command::Quit);
+                return Some(Command::Shutdown);
             }
         }
         None

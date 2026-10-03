@@ -3,7 +3,8 @@
 use katu_core::diag::{Level, events};
 
 use crate::entry::Role;
-use crate::live::{Live, trim_tail};
+use crate::live::trim_tail;
+use katu_core::api::Live;
 
 use super::App;
 

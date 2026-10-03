@@ -155,22 +155,22 @@ impl ChatDecoder {
             } else {
                 tool.id
             });
-            // L-Q2: uma tool call truncada (`finish_reason=length`) não aborta o turno — o loop
-            // converte-a num `Unavailable{length}` e o modelo reformula. Fora de `Length`, um JSON
-            // inválido continua a ser um erro de protocolo (fail-closed).
-            let event = match parse_arguments(&tool.arguments) {
-                Ok(arguments) => ProviderEvent::ToolCall {
+            // L-Q2/G4: uma tool call truncada (`finish_reason=length`) não é executada — **todas**
+            // as calls pendentes viram `Unavailable{length}`, mesmo que o JSON parcial tenha
+            // parseado: em `length` os argumentos podem ter sido cortados a meio. Fora de `Length`,
+            // um JSON inválido continua a ser um erro de protocolo (fail-closed).
+            let event = if matches!(self.stop, Some(StopReason::Length)) {
+                ProviderEvent::ToolCallTruncated {
+                    call,
+                    name: tool.name,
+                }
+            } else {
+                let arguments = parse_arguments(&tool.arguments)?;
+                ProviderEvent::ToolCall {
                     call,
                     name: tool.name,
                     arguments,
-                },
-                Err(_) if matches!(self.stop, Some(StopReason::Length)) => {
-                    ProviderEvent::ToolCallTruncated {
-                        call,
-                        name: tool.name,
-                    }
                 }
-                Err(error) => return Err(error),
             };
             if matches!(self.announce(sink, event), Flow::Break) {
                 self.status = Status::Cancelled;

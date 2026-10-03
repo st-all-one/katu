@@ -247,6 +247,31 @@ fn a_truncated_tool_call_is_emitted_without_aborting() -> Result<(), Box<dyn std
 }
 
 #[test]
+fn a_parseable_tool_call_at_length_is_still_truncated() -> Result<(), Box<dyn std::error::Error>> {
+    use katu_core::provider::CollectSink;
+
+    let mut decoder = super::ChatDecoder::new();
+    let mut sink = CollectSink::default();
+    // JSON válido, mas `finish_reason=length`: os argumentos podem ter sido cortados a meio (G4).
+    let chunk = json!({
+        "choices": [{
+            "delta": {"tool_calls": [{
+                "index": 0,
+                "id": "call_1",
+                "function": {"name": "read", "arguments": "{\"path\":\"a.txt\"}"}
+            }]},
+            "finish_reason": "length"
+        }]
+    });
+    decoder.on_payload(&chunk.to_string(), &mut sink)?;
+    decoder.on_payload("[DONE]", &mut sink)?;
+
+    assert!(sink.calls.is_empty(), "em `length` a call não é executada");
+    assert_eq!(sink.truncated.len(), 1, "é assinalada como truncada");
+    Ok(())
+}
+
+#[test]
 fn malformed_arguments_outside_length_still_fail_closed() -> Result<(), Box<dyn std::error::Error>>
 {
     use katu_core::provider::CollectSink;

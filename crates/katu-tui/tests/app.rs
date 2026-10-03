@@ -45,7 +45,7 @@ fn updates_fill_the_transcript_and_clear_pending() {
 #[test]
 fn quit_sets_the_flag() {
     let mut app = App::new();
-    assert_eq!(app.apply_action(Action::Quit), Some(Command::Quit));
+    assert_eq!(app.apply_action(Action::Quit), Some(Command::Shutdown));
     assert!(app.should_quit());
 }
 

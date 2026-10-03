@@ -74,6 +74,10 @@ const MAX_EMPTY_RETRIES: u8 = 2;
 /// Retries de uma resposta que ecoa o `delta` de uma tool (L-Q4).
 const MAX_ECHO_RETRIES: u8 = 1;
 
+/// Nota visível quando o eco persiste após o orçamento de retries (G5): o eco **nunca** é aceite.
+const ECHO_NOTICE: &str =
+    "(o modelo repetiu o resultado de uma tool em vez de responder; resposta substituída)";
+
 /// Corre o loop de passos até ao fim (natural, cancelado, vazio, teto ou loop) e devolve o
 /// acumulado com o motivo de terminação (L-Q3).
 #[allow(
@@ -133,22 +137,26 @@ fn drive(
             settle_truncated(runtime, step.truncated)?;
         }
         if step.calls.is_empty() && !truncated {
-            // L-Q4: eco do delta de uma tool na resposta final → nudge + retry (1×).
-            if accum.echo_retries < MAX_ECHO_RETRIES
-                && super::echo::echoes_recent_delta(runtime, &step.text)?
-            {
-                accum.echo_retries = accum.echo_retries.saturating_add(1);
+            // L-Q4/G5: eco do delta de uma tool na resposta final → nudge + retry (1×); no
+            // orçamento esgotado o eco **nunca** é aceite — é substituído por nota visível.
+            if super::echo::echoes_recent_delta(runtime, &step.text)? {
                 accum
                     .text
                     .truncate(accum.text.len().saturating_sub(step.text.len()));
-                nudge(
-                    runtime,
-                    events::AGENT_ECHO,
-                    "eco",
-                    "a tua resposta repetiu o resultado de uma tool; devolve a resposta final em \
-                     texto próprio",
-                )?;
-                continue;
+                if accum.echo_retries < MAX_ECHO_RETRIES {
+                    accum.echo_retries = accum.echo_retries.saturating_add(1);
+                    nudge(
+                        runtime,
+                        events::AGENT_ECHO,
+                        "eco",
+                        "a tua resposta repetiu o resultado de uma tool; devolve a resposta final em \
+                         texto próprio",
+                    )?;
+                    continue;
+                }
+                accum.text.push_str(ECHO_NOTICE);
+                accum.termination = Termination::Natural;
+                return Ok(accum);
             }
             // L-Q3: resposta vazia → retry limitado; no limite, mensagem visível no fecho.
             // Uma truncagem (`length`) ou filtro de conteúdo não é retentável: fecha com o aviso

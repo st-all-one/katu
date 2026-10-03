@@ -15,7 +15,9 @@ A **interface de terminal** do katu (uma das duas superfícies, com a CLI — G7
 - **E10-T01 ☑** — esqueleto (`src/run.rs`): `try_init`/`restore`, guarda RAII, loop de eventos com
   `poll(50 ms)`. O panic hook reencaminha para o hook anterior depois de restaurar.
 - **E10-T02 ☑** — keymap **puro** (`src/action.rs`): `Mode`, `Action`, `map_key`; `App::apply_action`
-  devolve um `Command` só quando há efeito. Testado por modo, sem terminal.
+  devolve um `Command` só quando há efeito. Testado por modo, sem terminal. O `Command`/`Event`
+  vivem no protocolo do kernel (`katu_core::api`, KERNEL_SURFACE F0); `katu-tui` re-exporta-os
+  (`Update` é o `Event`).
 - **E10-T03 ◐** — render diferencial delegado ao `Terminal` (diff de células); **throttle** por
   `Clock` (`src/throttle.rs`; ~60 fps, forçado em cada tecla/fim de turno) e **teto de trabalho**
   por quadro (200 entradas de conversa, 100 linhas de painel, cauda de 8 KiB do stream). **Falta:**
@@ -70,6 +72,8 @@ A **interface de terminal** do katu (uma das duas superfícies, com a CLI — G7
 
 ## Fronteira
 
-- Sem servidor, sem rede (G7). Não é um protocolo.
+- **Cliente do kernel**: consome o protocolo `katu_core::api` (emite `Command`, injeta `Event` no
+  `App`); não possui `Runtime`/`Provider`/`Session` (K2). O transporte é em memória (KERNEL_SURFACE
+  F0), não um serviço: sem servidor, sem rede (G7).
 - Não depende de `katu-tools`/`katu-providers`/`knudge` (firewall `layers.toml`): a UI só vê o
   estado puro e emite `Command`s que a borda executa.

@@ -8,7 +8,7 @@ use katu_core::diag::{Level, events};
 use crate::action::Mode;
 use crate::entry::Status;
 use crate::menu::Menu;
-use crate::message::{Command, LoginRequest};
+use crate::{Command, LoginRequest};
 
 use super::App;
 

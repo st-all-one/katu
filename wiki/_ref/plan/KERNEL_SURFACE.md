@@ -14,6 +14,15 @@
 > worker) por uma fronteira explícita de kernel e fecha os pontos de falha que ficaram abertos
 > (cancelamento dentro de tools, fuga de I/O, visibilidade dupla, truncagem).
 
+> **Estado (execução).** **F0** implementado e verde (`cargo xtask check`): o protocolo vive em
+> `katu-core::api` (sem crate novo — o teto de `crates` está cheio) com `Command`/`Event`
+> (`serde`), `KernelHandle`/`KernelBus`/`Flag` e testes de ida-e-volta; `katu-tui` deixou de ter
+> `message.rs` e re-exporta o protocolo (`Update` é o `Event`). `Live`/`TrashEntry`/
+> `LoginRequest`/`ApprovalRequest` são dados do protocolo. **G4** (truncagem em `length` para todas
+> as calls) e **G5** (eco nunca aceite) fechados com teste. **F1** (actor do kernel numa thread) é o
+> próximo passo; **G2** (teto total do corpo), **G3** (visibilidade dupla) e **G6** (`normalize`)
+> ficam para F3.
+
 ---
 
 ## 0. O princípio (inflexível)

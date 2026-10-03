@@ -7,10 +7,10 @@
 use katu_core::diag::{Level, events};
 use katu_core::provider::Thinking;
 
+use crate::Command;
 use crate::action::{Action, Mode};
 use crate::entry::{Entry, Role, Status};
 use crate::menu::{Menu, MenuChoice, MenuKind};
-use crate::message::Command;
 
 use super::App;
 
@@ -172,7 +172,7 @@ impl App {
             "logout" => Some(self.slash_logout()),
             "quit" | "q" => {
                 self.quit = true;
-                Some(Command::Quit)
+                Some(Command::Shutdown)
             }
             other => {
                 self.status = Status::Failure(format!("comando desconhecido: /{other}"));
