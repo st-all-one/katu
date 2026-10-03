@@ -65,8 +65,9 @@ fn the_request_carries_the_prime_and_only_compacts_when_enabled()
         env: &env,
     };
 
-    let recorder = Recorder::default();
-    let report = run_turn(&mut runtime, request(&recorder, ports, "g", &options(2)))?;
+    let recorder = std::sync::Arc::new(Recorder::default());
+    let provider: std::sync::Arc<dyn Provider> = recorder.clone();
+    let report = run_turn(&mut runtime, request(&provider, ports, "g", &options(2)))?;
     assert_eq!(report.text, "ok");
     {
         let requests = recorder
@@ -87,10 +88,11 @@ fn the_request_carries_the_prime_and_only_compacts_when_enabled()
     // o digest por baixa divergência).
     runtime.set_selection(SelectionPolicy::Suffix);
     runtime.set_compaction(CompactionMode::Enabled);
-    let recorder = Recorder::default();
+    let recorder = std::sync::Arc::new(Recorder::default());
+    let provider: std::sync::Arc<dyn Provider> = recorder.clone();
     let report = run_turn(
         &mut runtime,
-        request(&recorder, ports, "segundo", &options(2)),
+        request(&provider, ports, "segundo", &options(2)),
     )?;
     assert_eq!(report.text, "ok");
     let requests = recorder

@@ -2,12 +2,14 @@
 
 use std::path::PathBuf;
 
-use katu_core::kernel::{Control, Message};
+use katu_core::kernel::{CallId, Control, Message};
 use katu_core::memory::NoteType;
 use katu_core::ports::{FixedClock, Timestamp};
 use katu_core::provider::{ModelCapabilities, Thinking};
+use katu_policy::{ResolvedPath, ToolArgs, ToolName, ToolUse};
 
 use super::{Runtime, RuntimeError};
+use katu_core::kernel::SessionError;
 
 mod durability;
 
@@ -95,6 +97,74 @@ fn resume_closes_an_open_turn_before_the_next() -> Result<(), Box<dyn std::error
     );
     resumed.session().verify()?;
     drop(resumed);
+    std::fs::remove_dir_all(&root)?;
+    Ok(())
+}
+
+#[test]
+fn resume_reconciles_a_pending_tool_call() -> Result<(), Box<dyn std::error::Error>> {
+    let root = root("resume-pending")?;
+    let fs = StdFs;
+    let clock = FixedClock::new(Timestamp::from_millis(1_000));
+    let mut runtime = Runtime::open(&fs, &clock, &root, "objetivo")?;
+    let path = ResolvedPath::from_canonical(runtime.root())?;
+    let use_ = ToolUse {
+        name: ToolName::Read,
+        args: ToolArgs::Read { path: path.clone() },
+        resolved_paths: vec![path.clone()],
+        argv: None,
+        cwd: path,
+    };
+    runtime.record_user("objetivo")?;
+    runtime
+        .session_mut()
+        .begin_call(CallId::new("pendente"), &use_, 1_000)?;
+    drop(runtime); // o processo "morre" a meio de uma tool call
+
+    let resumed = Runtime::resume(&fs, &clock, &root, "cli: resume", None)?;
+    resumed.session().verify()?;
+    let messages = resumed.messages()?;
+    let calls = messages
+        .iter()
+        .filter(|message| matches!(message, Message::ToolCall { .. }))
+        .count();
+    let results = messages
+        .iter()
+        .filter(|message| matches!(message, Message::ToolResult { .. }))
+        .count();
+    assert_eq!(calls, results, "a retomada não deixa órfãos (L-Q1)");
+    assert!(calls >= 1, "a call pendente ficou no histórico emparelhada");
+    drop(resumed);
+    std::fs::remove_dir_all(&root)?;
+    Ok(())
+}
+
+#[test]
+fn resume_refuses_a_session_locked_by_another_process() -> Result<(), Box<dyn std::error::Error>> {
+    let root = root("resume-locked")?;
+    let fs = StdFs;
+    let clock = FixedClock::new(Timestamp::from_millis(1_000));
+    let runtime = Runtime::open(&fs, &clock, &root, "objetivo")?;
+    let lock = runtime
+        .session()
+        .log_path()
+        .parent()
+        .ok_or("sessão sem diretório")?
+        .join("turn.lock");
+    drop(runtime);
+    // Simula outro processo vivo: lock fresco com `pid` diferente.
+    let other = std::process::id().wrapping_add(1);
+    std::fs::write(&lock, format!("{other}\n1000\n"))?;
+
+    let refused = Runtime::resume(&fs, &clock, &root, "cli: resume", None);
+    assert!(
+        matches!(
+            refused,
+            Err(RuntimeError::Session(SessionError::TurnLocked { .. }))
+        ),
+        "um lock fresco de outro processo recusa a retomada: {:?}",
+        refused.err().map(|error| error.to_string())
+    );
     std::fs::remove_dir_all(&root)?;
     Ok(())
 }

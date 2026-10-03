@@ -13,7 +13,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use katu_core::diag::{Level, events};
-use katu_core::ports::{ExecRequest, ExecResult, Process, ProcessError};
+use katu_core::ports::{Cancel, ExecRequest, ExecResult, Process, ProcessError};
 
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
@@ -32,13 +32,13 @@ impl Process for StdProcess {
         clippy::disallowed_methods,
         reason = "adaptador: relógio do SO para o timeout de execução"
     )]
-    fn run(&self, request: &ExecRequest) -> Result<ExecResult, ProcessError> {
+    fn run(&self, request: &ExecRequest, cancel: &dyn Cancel) -> Result<ExecResult, ProcessError> {
         let _span = katu_core::trace_fn!("ports::process::run");
 
         let started = Instant::now();
         let mut child = spawn_child(request)?;
         let (out_rx, err_rx) = start_readers(&mut child);
-        let (status, timed_out) = wait_with_timeout(&mut child, request.timeout_ms)?;
+        let (status, timed_out) = wait_with_timeout(&mut child, request.timeout_ms, cancel)?;
         let grace = Duration::from_millis(READ_GRACE_MS);
         Ok(ExecResult {
             exit_code: status.code(),
@@ -88,7 +88,8 @@ fn start_readers(child: &mut Child) -> (Receiver<String>, Receiver<String>) {
     (out_rx, err_rx)
 }
 
-/// Espera pelo filho com deadline; no timeout mata o **grupo** e reaproveita o filho (sem zombie).
+/// Espera pelo filho com deadline; no timeout **ou cancelamento** mata o **grupo** e reaproveita o
+/// filho (sem zombie).
 #[allow(
     clippy::disallowed_methods,
     reason = "adaptador: relógio do SO para o timeout de execução"
@@ -96,6 +97,7 @@ fn start_readers(child: &mut Child) -> (Receiver<String>, Receiver<String>) {
 fn wait_with_timeout(
     child: &mut Child,
     timeout_ms: u64,
+    cancel: &dyn Cancel,
 ) -> Result<(ExitStatus, bool), ProcessError> {
     let _span = katu_core::trace_fn!("ports::process::wait_with_timeout");
 
@@ -105,6 +107,13 @@ fn wait_with_timeout(
     loop {
         if let Some(status) = child.try_wait().map_err(|err| map_io_error(&err))? {
             return Ok((status, false));
+        }
+        // L-P3: o cancelamento do turno interrompe o `bash` longo (mata o grupo, como o timeout).
+        if cancel.cancelled() {
+            kill_group(child);
+            drop(child.kill());
+            let status = child.wait().map_err(|err| map_io_error(&err))?;
+            return Ok((status, true));
         }
         if Instant::now() >= deadline {
             kill_group(child);
@@ -202,7 +211,7 @@ fn elapsed_millis(duration: Duration) -> u64 {
 #[cfg(all(test, unix))]
 mod tests {
     use super::StdProcess;
-    use katu_core::ports::{ExecRequest, Process, ProcessError};
+    use katu_core::ports::{ExecRequest, Never, Process, ProcessError};
     use std::path::PathBuf;
 
     fn request(argv: &[&str], timeout_ms: u64) -> ExecRequest {
@@ -219,7 +228,7 @@ mod tests {
     #[test]
     fn normal_command_returns_stdout() -> Result<(), Box<dyn std::error::Error>> {
         let result = StdProcess
-            .run(&request(&["/bin/echo", "hi"], 5_000))
+            .run(&request(&["/bin/echo", "hi"], 5_000), &Never)
             .map_err(|err| format!("run: {err:?}"))?;
         assert_eq!(result.exit_code, Some(0));
         assert!(!result.timed_out);
@@ -230,7 +239,7 @@ mod tests {
     #[test]
     fn timeout_kills_the_direct_child() -> Result<(), Box<dyn std::error::Error>> {
         let result = StdProcess
-            .run(&request(&["/bin/sleep", "30"], 100))
+            .run(&request(&["/bin/sleep", "30"], 100), &Never)
             .map_err(|err| format!("run: {err:?}"))?;
         assert!(result.timed_out, "o timeout tem de disparar");
         assert_eq!(result.signal, Some(9), "SIGKILL ao filho direto");
@@ -250,7 +259,10 @@ mod tests {
         let script = "( sleep 2; echo late > \"$1\" ) & sleep 30";
         let path = marker.to_str().ok_or("caminho inválido")?;
         let result = StdProcess
-            .run(&request(&["/bin/sh", "-c", script, "sh", path], 300))
+            .run(
+                &request(&["/bin/sh", "-c", script, "sh", path], 300),
+                &Never,
+            )
             .map_err(|err| format!("run: {err:?}"))?;
         assert!(result.timed_out, "o timeout tem de disparar");
         std::thread::sleep(Duration::from_millis(2_500));
@@ -264,7 +276,33 @@ mod tests {
 
     #[test]
     fn missing_program_is_not_found() {
-        let result = StdProcess.run(&request(&["/nonexistent/prog"], 1_000));
+        let result = StdProcess.run(&request(&["/nonexistent/prog"], 1_000), &Never);
         assert_eq!(result, Err(ProcessError::NotFound));
+    }
+
+    #[test]
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "o teste mede o tempo real do cancelamento (L-P3)"
+    )]
+    fn cancel_kills_the_running_child() -> Result<(), Box<dyn std::error::Error>> {
+        use katu_core::ports::Flag;
+        use std::time::Duration;
+        let flag = Flag::new();
+        let signal = flag.clone();
+        drop(std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(100));
+            signal.request();
+        }));
+        let started = std::time::Instant::now();
+        let result = StdProcess
+            .run(&request(&["/bin/sleep", "30"], 10_000), &flag)
+            .map_err(|err| format!("run: {err:?}"))?;
+        assert!(result.timed_out, "o cancelamento interrompe o filho");
+        assert!(
+            started.elapsed() < Duration::from_millis(5_000),
+            "não espera os 30s do comando"
+        );
+        Ok(())
     }
 }

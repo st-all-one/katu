@@ -122,6 +122,7 @@ fn record_skip(
         env: ports.env,
         clock: runtime.clock,
         root: &root,
+        cancel: None,
     };
     let routed = router::route(&route_ports, &runtime.cwd, name, arguments, loaded.as_ref())?;
     let (router::Routed::Plain { use_, .. } | router::Routed::Plan { use_, .. }) = routed else {

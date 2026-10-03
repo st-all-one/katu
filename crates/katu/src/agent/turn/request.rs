@@ -78,6 +78,7 @@ mod tests {
             max_tokens: 16,
             temperature: 0.0,
             max_steps: 1,
+            idle_ms: 0,
         }
     }
 

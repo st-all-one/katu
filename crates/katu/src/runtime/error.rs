@@ -48,6 +48,8 @@ impl From<RuntimeError> for Error {
             RuntimeError::Session(source) => {
                 if matches!(source, SessionError::UnknownSession(_)) {
                     Self::invalid_input(source.to_string())
+                } else if matches!(source, SessionError::TurnLocked { .. }) {
+                    Self::conflict(source.to_string())
                 } else {
                     Self::internal(source.to_string())
                 }

@@ -165,8 +165,8 @@ impl Flags {
             model: self.model.or(model).or_else(|| defaults.model.clone()),
             base: self.base.or(base).or_else(|| defaults.base.clone()),
             thinking,
-            max_tokens: self.max_tokens.or(max_tokens).unwrap_or(4096),
-            max_steps: self.max_steps.or(max_steps).unwrap_or(8),
+            max_tokens: self.max_tokens.or(max_tokens).unwrap_or(250_000),
+            max_steps: self.max_steps.or(max_steps).unwrap_or(100),
             compact: self
                 .compact
                 .or(compact)

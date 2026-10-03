@@ -31,7 +31,7 @@
 | `mem-recall-before-write` | enforced | Memória: não gravar nota sem ter consultado o conhecimento (recall) na mesma fase | chame `memory_recall` no mesmo turno antes de `memory_write` |
 | `mem-single-claim` | enforced | Memória: uma afirmação por nota | divida em várias notas, uma afirmação por nota |
 
-## Eventos de diag (116)
+## Eventos de diag (122)
 
 - `katu.run`
 - `katu.setup`
@@ -142,6 +142,12 @@
 - `embed.request`
 - `agent.route`
 - `agent.loop`
+- `agent.reconcile`
+- `agent.turn_lock`
+- `agent.stop`
+- `agent.empty`
+- `agent.echo`
+- `agent.stall`
 - `agent.voi.skip`
 - `memory.open`
 - `bus.publish`

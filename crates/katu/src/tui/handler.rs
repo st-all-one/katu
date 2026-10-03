@@ -17,8 +17,8 @@ use katu_providers::PriceTable;
 use katu_tui::{Command, Handler, Painter, Update};
 
 use crate::agent::{
-    Ports, SYSTEM, TurnOptions, TurnReport, TurnRequest, build_provider, run_turn_with,
-    shell_dispatch,
+    DEFAULT_IDLE_MS, Ports, SYSTEM, TurnOptions, TurnReport, TurnRequest, build_provider,
+    run_turn_with, shell_dispatch,
 };
 use crate::login;
 use crate::ports::{StdEnv, StdFs, StdProcess};
@@ -32,7 +32,7 @@ use live::LivePainter;
 /// Executor do loop de turnos para a UI (dono do runtime e do provider).
 pub(super) struct AgentHandler<'a> {
     pub(super) runtime: Runtime<'a>,
-    pub(super) provider: Box<dyn Provider>,
+    pub(super) provider: std::sync::Arc<dyn Provider>,
     pub(super) fs: &'a StdFs,
     pub(super) process: StdProcess,
     pub(super) env: StdEnv,
@@ -152,7 +152,7 @@ impl AgentHandler<'_> {
             Ok(provider) => provider,
             Err(message) => return vec![Update::Error(message)],
         };
-        self.provider = provider;
+        self.provider = std::sync::Arc::from(provider);
         let models = super::models_for(self.provider.as_ref(), &outcome.model);
         let mut updates = Vec::new();
         if let Some(warning) = &outcome.warning {
@@ -225,7 +225,11 @@ impl AgentHandler<'_> {
             max_tokens: self.max_tokens,
             temperature: 0.0,
             max_steps: self.max_steps,
+            idle_ms: DEFAULT_IDLE_MS,
         };
+        // L-P1/L-P3: a flag de cancelamento é partilhada com a UI (Esc/Ctrl-C) e com as tools
+        // (o `bash` longo é interrompido). A UI sonda o input a cada `tick` do loop.
+        let cancel = painter.cancel_flag();
         let mut activity = LivePainter {
             painter,
             granted_by,
@@ -233,10 +237,11 @@ impl AgentHandler<'_> {
         match run_turn_with(
             &mut self.runtime,
             TurnRequest {
-                provider: self.provider.as_ref(),
+                provider: std::sync::Arc::clone(&self.provider),
                 ports,
                 goal,
                 options: &options,
+                cancel: Some(&cancel),
             },
             &mut activity,
         ) {

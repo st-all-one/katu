@@ -3,7 +3,7 @@
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::{CallId, Message};
 use katu_core::ports::{FixedClock, Timestamp};
-use katu_core::provider::{ProviderEvent, StopReason};
+use katu_core::provider::{Provider, ProviderEvent, StopReason};
 use katu_policy::{Evidence, RuleId};
 use katu_providers::{FakeProvider, Turn};
 use serde_json::json;
@@ -70,7 +70,7 @@ fn live_observer_sees_deltas_but_they_stay_out_of_the_log() -> Result<(), Box<dy
     let fs = StdFs;
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     let mut runtime = Runtime::open(&fs, &clock, &root, "olá")?;
-    let provider = FakeProvider::new(
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
         "fake",
         vec![
             Turn {
@@ -83,7 +83,7 @@ fn live_observer_sees_deltas_but_they_stay_out_of_the_log() -> Result<(), Box<dy
             },
             Turn::text("fim"),
         ],
-    );
+    ));
     let process = StdProcess;
     let env = StdEnv;
     let ports = Ports {
@@ -130,7 +130,7 @@ fn cancel_stops_the_turn_and_closes_it_cleanly() -> Result<(), Box<dyn std::erro
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     let mut runtime = Runtime::open(&fs, &clock, &root, "cancelar")?;
     // O provider emite texto e depois pede uma tool; o observador cancela ao ver o primeiro delta.
-    let provider = FakeProvider::new(
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
         "fake",
         vec![
             Turn {
@@ -139,7 +139,7 @@ fn cancel_stops_the_turn_and_closes_it_cleanly() -> Result<(), Box<dyn std::erro
             },
             Turn::text("nunca"),
         ],
-    );
+    ));
     let process = StdProcess;
     let env = StdEnv;
     let ports = Ports {
@@ -196,7 +196,7 @@ fn unavailable_tool_is_surfaced_to_the_observer() -> Result<(), Box<dyn std::err
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     // Sem `scope_contract.json`/`feature_list.json`: a tool `plan` fica indisponível.
     let mut runtime = Runtime::open(&fs, &clock, &root, "planear")?;
-    let provider = FakeProvider::new(
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
         "fake",
         vec![
             Turn {
@@ -205,7 +205,7 @@ fn unavailable_tool_is_surfaced_to_the_observer() -> Result<(), Box<dyn std::err
             },
             Turn::text("ok"),
         ],
-    );
+    ));
     let process = StdProcess;
     let env = StdEnv;
     let ports = Ports {
@@ -235,7 +235,7 @@ fn sensitive_read_is_denied_and_surfaced_end_to_end() -> Result<(), Box<dyn std:
     let fs = StdFs;
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     let mut runtime = Runtime::open(&fs, &clock, &root, "ler")?;
-    let provider = FakeProvider::new(
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
         "fake",
         vec![
             Turn {
@@ -248,7 +248,7 @@ fn sensitive_read_is_denied_and_surfaced_end_to_end() -> Result<(), Box<dyn std:
             },
             Turn::text("ok"),
         ],
-    );
+    ));
     let process = StdProcess;
     let env = StdEnv;
     let ports = Ports {

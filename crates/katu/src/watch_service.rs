@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 use katu_core::diag::{Level, events};
 use katu_core::error::Error;
-use katu_core::ports::{Env, ExecRequest, ExecResult, Process};
+use katu_core::ports::{Env, ExecRequest, ExecResult, Never, Process};
 use serde_json::{Value, json};
 
 use crate::ports::{StdEnv, StdProcess};
@@ -220,7 +220,7 @@ fn systemctl(context: &Context<'_>, args: &[&str]) -> Result<ExecResult, Error> 
 
     let result = context
         .process
-        .run(&systemctl_request(context, args))
+        .run(&systemctl_request(context, args), &Never)
         .map_err(|error| Error::unavailable(format!("systemctl indisponível: {error:?}")))?;
     if result.exit_code != Some(0) {
         return Err(Error::unavailable(format!(
@@ -236,10 +236,10 @@ fn systemctl(context: &Context<'_>, args: &[&str]) -> Result<ExecResult, Error> 
 fn probe_active(context: &Context<'_>) -> String {
     let _span = katu_core::trace_fn!("watch_service::probe_active");
 
-    match context
-        .process
-        .run(&systemctl_request(context, &["is-active", TIMER_NAME]))
-    {
+    match context.process.run(
+        &systemctl_request(context, &["is-active", TIMER_NAME]),
+        &Never,
+    ) {
         Ok(result) => result.stdout.trim().to_string(),
         Err(_) => "unknown".to_string(),
     }

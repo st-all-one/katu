@@ -257,6 +257,7 @@ fn deny_exec_does_not_run_the_command() -> TestResult<()> {
         root: Path::new("/work"),
         timeout_ms: 1_000,
         parent: None,
+        cancel: None,
     };
     let dispatch = dispatch(
         &State::initial(),

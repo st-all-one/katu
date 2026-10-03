@@ -2,7 +2,7 @@
 
 use katu_core::kernel::{CallId, Message};
 use katu_core::ports::{FixedClock, Timestamp};
-use katu_core::provider::{ProviderEvent, StopReason};
+use katu_core::provider::{Provider, ProviderEvent, StopReason};
 use katu_providers::{FakeProvider, Turn};
 use serde_json::json;
 
@@ -20,7 +20,7 @@ fn a_bad_argument_is_returned_to_the_model() -> Result<(), Box<dyn std::error::E
     let fs = StdFs;
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     let mut runtime = Runtime::open(&fs, &clock, &root, "lê um range inválido")?;
-    let provider = FakeProvider::new(
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
         "fake",
         vec![
             Turn {
@@ -33,7 +33,7 @@ fn a_bad_argument_is_returned_to_the_model() -> Result<(), Box<dyn std::error::E
             },
             Turn::text("corrigi"),
         ],
-    );
+    ));
     let process = StdProcess;
     let env = StdEnv;
     let ports = Ports {

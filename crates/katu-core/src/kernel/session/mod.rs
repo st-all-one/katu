@@ -25,7 +25,9 @@ mod approval;
 mod context;
 mod error;
 mod identity;
+mod lock;
 mod query;
+mod reconcile;
 mod resume;
 mod snapshot;
 

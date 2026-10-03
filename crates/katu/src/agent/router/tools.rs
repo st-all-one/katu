@@ -212,6 +212,7 @@ pub(super) fn bash<'a>(
         root: ports.root,
         timeout_ms: DEFAULT_TIMEOUT_MS,
         parent: None,
+        cancel: ports.cancel,
     };
     Ok(Routed::Plain {
         use_,

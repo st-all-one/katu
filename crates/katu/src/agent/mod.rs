@@ -13,6 +13,7 @@
 
 mod catalog;
 mod command;
+mod failure;
 mod plan;
 mod router;
 mod shell;
@@ -24,15 +25,16 @@ mod tests;
 pub(crate) use command::{
     RunArgs, SYSTEM, build_provider, default_base, default_model, open_runtime, run,
 };
+pub(crate) use failure::{route_failure, settle_truncated};
 pub(crate) use shell::dispatch as shell_dispatch;
 pub(crate) use turn::{Activity, ActivitySink, Approval, ApprovalPrompt, run_turn, run_turn_with};
 
 use katu_core::error::{Error, ToolOutcome};
 use katu_core::kernel::{CallContext, CallId, SessionError, memory_recall_use};
 use katu_core::memory::Memory;
-use katu_core::ports::{Env, Fs, Process};
-use katu_core::provider::{ModelSpec, Provider, ProviderError, TokenUsage};
-use katu_policy::{ApprovalRequest, ControlId, Decision, ToolArgs, ToolUse};
+use katu_core::ports::{Cancel, Env, Fs, Process};
+use katu_core::provider::{ModelSpec, Provider, ProviderError, StopReason, TokenUsage};
+use katu_policy::{ApprovalRequest, Decision, ToolUse};
 use katu_tools::recall::RecallTool;
 use serde_json::Value;
 
@@ -49,6 +51,10 @@ pub(crate) struct Ports<'a> {
     pub env: &'a dyn Env,
 }
 
+/// Teto de inatividade por omissão do stream do provider (L-P2), conservador: um stream que não
+/// produz nada durante 60 s é um *stall* recuperável.
+pub(crate) const DEFAULT_IDLE_MS: u64 = 60_000;
+
 /// Parâmetros de um turno.
 pub(crate) struct TurnOptions {
     /// Modelo + grau de pensamento.
@@ -61,19 +67,23 @@ pub(crate) struct TurnOptions {
     pub temperature: f32,
     /// Máximo de passos (chamadas de tool) por turno.
     pub max_steps: u32,
+    /// Teto de inatividade do stream do provider em ms (L-P2); `0` desliga o *stall*.
+    pub idle_ms: u64,
 }
 
 /// Pedido de execução de um turno (o que o loop precisa além do runtime).
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub(crate) struct TurnRequest<'a> {
-    /// Provider do endpoint de modelo.
-    pub provider: &'a dyn Provider,
+    /// Provider do endpoint de modelo (partilhado: o I/O corre fora da thread da UI, L-P1).
+    pub provider: std::sync::Arc<dyn Provider>,
     /// Portas de I/O para as tools.
     pub ports: Ports<'a>,
     /// Objetivo do utilizador.
     pub goal: &'a str,
     /// Parâmetros do turno.
     pub options: &'a TurnOptions,
+    /// Cancelamento cooperativo do turno (L-P3); `None` = nunca cancela.
+    pub cancel: Option<&'a dyn Cancel>,
 }
 
 /// Resultado observável de um turno.
@@ -88,6 +98,96 @@ pub(crate) struct TurnReport {
     pub usage: Option<TokenUsage>,
     /// `true` se o turno foi **cancelado** pelo utilizador (E: cancelamento cooperativo).
     pub cancelled: bool,
+    /// Motivo de paragem reportado pelo provider no último passo (L-Q2).
+    pub stop: StopReason,
+    /// Como o turno terminou (L-Q3): o envelope de máquina distingue o fim anormal.
+    pub termination: Termination,
+}
+
+/// Como o turno terminou (L-Q3).
+///
+/// O fim **anormal** fecha o turno com uma mensagem visível ao utilizador e mantém o motivo no
+/// envelope de máquina — nunca em silêncio, nunca como falha fatal para o humano.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Termination {
+    /// Fim natural (texto final ou tool calls concluídas).
+    Natural,
+    /// Cancelado pelo utilizador.
+    Cancelled,
+    /// Resposta vazia mesmo depois dos retries (orçamento de saída gasto em raciocínio).
+    Empty,
+    /// Teto de passos atingido sem terminar.
+    MaxSteps {
+        /// Teto atingido.
+        steps: u32,
+    },
+    /// Loop conversacional cortado pelo guard (Q-12/F7).
+    Loop {
+        /// Passo em que o detector disparou.
+        step: u32,
+        /// Motivo com a evidência (o que se repetiu).
+        reason: String,
+    },
+}
+
+impl Termination {
+    /// Nome estável para o envelope de máquina.
+    #[must_use]
+    pub(crate) const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Natural => "natural",
+            Self::Cancelled => "cancelled",
+            Self::Empty => "empty",
+            Self::MaxSteps { .. } => "max_steps",
+            Self::Loop { .. } => "loop",
+        }
+    }
+
+    /// Código de rodada do envelope (0 = fim natural/cancelado; >0 = fim anormal).
+    #[must_use]
+    pub(crate) const fn round_exit(&self) -> u8 {
+        match self {
+            Self::Natural | Self::Cancelled => 0,
+            Self::Empty => 1,
+            Self::MaxSteps { .. } => 70,
+            Self::Loop { .. } => 5,
+        }
+    }
+
+    /// Mensagem visível ao utilizador (ausente no fim natural).
+    #[must_use]
+    pub(crate) fn message(&self) -> Option<String> {
+        let _span = katu_core::trace_fn!("agent::termination::message");
+
+        match self {
+            Self::Natural | Self::Cancelled => None,
+            Self::Empty => Some(
+                "não consegui produzir uma resposta em texto (o orçamento de saída pode ter sido \
+                 gasto em raciocínio); aumenta `--max-tokens` ou muda de modelo"
+                    .to_string(),
+            ),
+            Self::MaxSteps { steps } => Some(format!(
+                "atingi o limite de {steps} passos sem terminar; responda para eu continuar"
+            )),
+            Self::Loop { reason, .. } => Some(format!(
+                "cortei o turno por repetição ({reason}); responda para eu continuar de outra forma"
+            )),
+        }
+    }
+}
+
+/// Rótulo estável do motivo de paragem do provider (L-Q2).
+#[must_use]
+pub(crate) fn stop_label(stop: &StopReason) -> &'static str {
+    let _span = katu_core::trace_fn!("agent::stop_label");
+
+    match stop {
+        StopReason::EndTurn => "end_turn",
+        StopReason::ToolCalls => "tool_calls",
+        StopReason::Length => "length",
+        StopReason::ContentFilter => "content_filter",
+        StopReason::Other(_) | _ => "other",
+    }
 }
 
 /// Falha do loop de turnos.
@@ -105,25 +205,9 @@ pub(crate) enum AgentError {
     /// Falha de roteamento (tool desconhecida ou argumento inválido).
     #[error("roteador: {0}")]
     Route(#[from] router::RouteError),
-    /// O turno excedeu o teto de passos sem terminar.
-    #[error("turno excedeu {steps} passos sem terminar")]
-    TooManySteps {
-        /// Teto atingido.
-        steps: u32,
-    },
     /// Um worker paralelo de tool call terminou abruptamente (panic vindo de uma porta).
     #[error("tool call paralela terminou abruptamente")]
     Worker,
-    /// O guard de loop cortou o turno (Q-12/F7): repetição patológica antes do teto de passos.
-    #[error("loop detectado no passo {step} ({kind}): {reason}")]
-    LoopDetected {
-        /// Passo em que o detector disparou.
-        step: u32,
-        /// Detector que disparou (`cusum`/`evalue`).
-        kind: &'static str,
-        /// Motivo com a evidência (o que se repetiu).
-        reason: String,
-    },
 }
 
 impl From<AgentError> for Error {
@@ -138,10 +222,6 @@ impl From<AgentError> for Error {
             AgentError::Route(source) => Self::invalid_input(source.to_string()),
             AgentError::Session(source) => Self::internal(source.to_string()),
             AgentError::Runtime(source) => Self::internal(source.to_string()),
-            AgentError::TooManySteps { steps } => {
-                Self::internal(format!("turno excedeu {steps} passos sem terminar"))
-            }
-            AgentError::LoopDetected { reason, .. } => Self::conflict(reason),
             AgentError::Worker => {
                 Self::internal("tool call paralela terminou abruptamente".to_string())
             }
@@ -163,9 +243,14 @@ pub(crate) struct CallOutcome {
 /// Roteia e executa uma tool call, mantendo a ordem §42 (logar → política → efeito).
 ///
 /// Devolve o resultado da tool (incluindo recusas) para o observador o poder mostrar (E10-T04).
+#[allow(
+    clippy::too_many_arguments,
+    reason = "runtime + portas + cancelamento + identidade da call + nome + argumentos são o contexto mínimo do roteamento §42"
+)]
 fn execute_call(
     runtime: &mut Runtime<'_>,
     ports: &Ports<'_>,
+    cancel: Option<&dyn Cancel>,
     call: CallId,
     name: &str,
     args: &Value,
@@ -184,6 +269,7 @@ fn execute_call(
         env: ports.env,
         clock: runtime.clock,
         root: &root,
+        cancel,
     };
     let routed = match router::route(&route_ports, &runtime.cwd, name, args, loaded.as_ref()) {
         Ok(routed) => routed,
@@ -226,44 +312,6 @@ fn execute_call(
         }
     };
     Ok(call_outcome)
-}
-
-/// Converte um erro de roteamento num resultado de tool **devolvido ao modelo**.
-///
-/// O modelo vê o erro e pode corrigir os argumentos no passo seguinte; o turno **não** aborta. Um
-/// nome fora do catálogo continua fail-closed (é um erro do turno, não um argumento corrigível).
-pub(crate) fn route_failure(
-    runtime: &mut Runtime<'_>,
-    call: CallId,
-    name: &str,
-    error: &router::RouteError,
-    now_millis: u64,
-) -> Result<CallOutcome, AgentError> {
-    let _span = katu_core::trace_fn!("agent::route_failure");
-
-    let Some(tool_name) = router::tool_name_for(name) else {
-        return Err(AgentError::Route(router::RouteError::UnknownTool(
-            name.to_string(),
-        )));
-    };
-    let use_ = router::use_of(tool_name, ToolArgs::Other, Vec::new(), None, &runtime.cwd);
-    runtime
-        .session
-        .begin_call(call.clone(), &use_, now_millis)?;
-    let outcome = ToolOutcome::Unavailable {
-        control: ControlId::new("argument"),
-        rule_id: None,
-    };
-    runtime.session.settle_call(
-        call,
-        outcome.clone(),
-        Some(format!("argumento inválido em `{name}`: {error}")),
-    )?;
-    Ok(CallOutcome {
-        outcome,
-        use_: None,
-        approval: None,
-    })
 }
 
 /// Executa a tool `memory` pelos caminhos de recall/escrita do gate de E05.

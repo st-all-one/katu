@@ -1,11 +1,11 @@
 //! Testes do executor da TUI (E12-T03): linha de uso/custo.
 
 use katu_core::evidence::EvidenceBasis;
-use katu_core::provider::TokenUsage;
+use katu_core::provider::{StopReason, TokenUsage};
 use katu_providers::{Price, PriceTable};
 
 use super::usage_line;
-use crate::agent::TurnReport;
+use crate::agent::{Termination, TurnReport};
 
 fn report(usage: Option<TokenUsage>) -> TurnReport {
     TurnReport {
@@ -14,6 +14,8 @@ fn report(usage: Option<TokenUsage>) -> TurnReport {
         calls: 0,
         usage,
         cancelled: false,
+        stop: StopReason::EndTurn,
+        termination: Termination::Natural,
     }
 }
 

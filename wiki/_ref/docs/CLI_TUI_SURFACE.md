@@ -109,8 +109,8 @@ existir** no topo → `invalid_input` (exit 2), sem retrocompatibilidade.
 | `--model <MODEL>` | `run`, `tui` | Modelo explícito (vence o tier). | pelo **tier** da fase |
 | `--base <URL>` | `run`, `tui` | Base URL do endpoint. | por provider (§2.3) |
 | `--thinking <GRAU>` | `run`, `tui` | Grau de pensamento (`off`/`low`/`medium`/`high`). | config, senão `off` |
-| `--max-tokens <N>` | `run`, `tui` | Teto de tokens de saída. | `4096` |
-| `--max-steps <N>` | `run`, `tui` | Máximo de passos (tool calls) por turno. | `8` |
+| `--max-tokens <N>` | `run`, `tui` | Teto de tokens de saída. | `250000` |
+| `--max-steps <N>` | `run`, `tui` | Máximo de passos (tool calls) por turno. | `100` |
 | `--compact` | `run`, `tui` | Liga a compactação do histórico no turno (E09-T07). | `false` |
 | `--resume [<ID>]` | `run`, `tui` | Retoma sessão. | sem valor = `last` |
 
@@ -169,15 +169,15 @@ Abre com `katu tui [flags de §2]` ou `katu` (sem verbo). A UI é **pura** (esta
 em `katu-tui`); a borda (`crates/katu/src/tui/handler.rs`) é quem fala com o modelo e executa os
 efeitos.
 
-> **Nota (E20-T10…T16, onda S3):** `/` + mini-menus + ajuda `?` (**E20-T10**), `Esc` como único
-> cancelamento (**E20-T15**), cópia por seleção de rato via OSC 52 (**E20-T14**) e *steering* FIFO
-> (**E20-T16**) já estão implementados, tal como `/plan` (**E20-T11**) e `!`/`@` (**E20-T12**).
+> **Nota (E20-T10…T16, onda S3):** `/` + mini-menus + ajuda `?` (**E20-T10**), `Esc`/`Ctrl-C` como
+> cancelamento (**E20-T15**/L-P1), cópia por seleção de rato via OSC 52 (**E20-T14**) e *steering*
+> FIFO (**E20-T16**) já estão implementados, tal como `/plan` (**E20-T11**) e `!`/`@` (**E20-T12**).
 > `?` abre a sobreposição com todos os comandos `/`, os padrões (`!<cmd>`, `@<path>`, `/<comando>`) e
 > as teclas.
 >
 > **Steering:** durante o turno, escrever e premir `Enter` enfileira um prompt que é aplicado no
-> **passo seguinte** (FIFO), sem reiniciar a rodada; o buffer aparece na linha de entrada. `Esc`
-> continua a ser o único cancelamento.
+> **passo seguinte** (FIFO), sem reiniciar a rodada; o buffer aparece na linha de entrada. `Esc` e
+> `Ctrl-C` cancelam; o input é sondado mesmo com o stream parado (L-P1).
 
 ### 4.1 Layout
 
@@ -188,7 +188,7 @@ efeitos.
   crus**), texto do modelo a chegar e recusas de política; teto de 100 linhas + cauda de 8 KiB do
   stream. Nunca entra no log nem na transcrição (§50.3).
 - **Entrada** (3 linhas): linha de mensagem; o título muda com o modo.
-- **Rodapé** (1 linha): dicas de teclas ou estado (`a trabalhar… · Esc cancela`, erros).
+- **Rodapé** (1 linha): dicas de teclas ou estado (`a trabalhar… · Esc/Ctrl-C cancela`, erros).
 
 Render governado por orçamento (`Throttle`, ~60 fps, forçado em cada tecla/fim de turno); o
 `ratatui` faz o **diff** de células.

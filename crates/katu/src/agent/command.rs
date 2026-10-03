@@ -109,10 +109,11 @@ pub(crate) fn run(args: &RunArgs<'_>) -> Report {
     match run_turn(
         &mut runtime,
         TurnRequest {
-            provider: provider.as_ref(),
+            provider: std::sync::Arc::from(provider),
             ports,
             goal: args.goal,
             options: &options,
+            cancel: None,
         },
     ) {
         Ok(turn) => Report::ok("run", Some(turn_value(&runtime, &model, &turn))),
@@ -147,6 +148,7 @@ fn turn_options(model: String, args: &RunArgs<'_>) -> TurnOptions {
         max_tokens: args.max_tokens,
         temperature: 0.0,
         max_steps: args.max_steps,
+        idle_ms: super::DEFAULT_IDLE_MS,
     }
 }
 
@@ -238,12 +240,14 @@ fn envelope(
     });
     json!({
         "session": session,
-        "round_exit": 0,
+        "round_exit": turn.termination.round_exit(),
+        "termination": turn.termination.as_str(),
         "model": model,
         "steps": turn.steps,
         "chars": turn.text.chars().count(),
         "calls": turn.calls,
         "cancelled": turn.cancelled,
+        "stop": super::stop_label(&turn.stop),
         "usage": usage,
         "state": state,
         "context_selection": selection,

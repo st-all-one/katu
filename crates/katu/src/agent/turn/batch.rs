@@ -114,6 +114,7 @@ fn parallel_or_fallback(
         env: ports.env,
         clock: runtime.clock,
         root: &root,
+        cancel: None,
     };
 
     // Fase 1 — rota **sem** logar, na ordem do modelo. Uma call com argumentos inválidos manda o
@@ -244,6 +245,7 @@ fn commit(
         retry_with_approval(
             runtime,
             ports,
+            None,
             &mut call_outcome,
             &call.call,
             &call.name,
@@ -273,6 +275,10 @@ fn settle_route_failure(
 /// Caminho sequencial (semântica original): rota, executa e comete uma call de cada vez.
 ///
 /// Usado quando o lote não cabe no cost governor ou quando não há paralelismo a ganhar.
+#[allow(
+    clippy::too_many_lines,
+    reason = "o caminho sequencial espelha a ordem §42 (rota → loga → efeito) passo a passo, incluindo o cancelamento; dividi-lo esconderia a ordem"
+)]
 fn run_shared_sequential(
     runtime: &mut Runtime<'_>,
     ports: &Ports<'_>,
@@ -289,6 +295,7 @@ fn run_shared_sequential(
         env: ports.env,
         clock: runtime.clock,
         root: &root,
+        cancel: None,
     };
     for (call, name, arguments) in calls {
         let routed = match router::route(
@@ -331,6 +338,7 @@ fn run_shared_sequential(
         retry_with_approval(
             runtime,
             ports,
+            None,
             &mut call_outcome,
             &call,
             &name,

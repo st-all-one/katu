@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 
 use katu_core::kernel::{CallId, Message, Tool};
 use katu_core::ports::{FixedClock, Timestamp};
-use katu_core::provider::{ProviderEvent, StopReason};
+use katu_core::provider::{Provider, ProviderEvent, StopReason};
 use katu_policy::{ResolvedPath, ToolArgs, ToolName, ToolUse};
 use katu_providers::{FakeProvider, Turn};
 use katu_tools::read::{ReadBudget, ReadTool, View};
@@ -65,7 +65,7 @@ fn a_step_with_several_calls_runs_them_all_in_the_model_order()
     let fs = StdFs;
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     let mut runtime = Runtime::open(&fs, &clock, &root, "lê três ficheiros")?;
-    let provider = FakeProvider::new(
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
         "fake",
         vec![
             Turn {
@@ -78,7 +78,7 @@ fn a_step_with_several_calls_runs_them_all_in_the_model_order()
             },
             Turn::text("feito"),
         ],
-    );
+    ));
     let process = StdProcess;
     let env = StdEnv;
     let ports = Ports {
@@ -119,7 +119,7 @@ fn an_exclusive_call_is_a_barrier() -> Result<(), Box<dyn std::error::Error>> {
     let fs = StdFs;
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     let mut runtime = Runtime::open(&fs, &clock, &root, "lote e barreira")?;
-    let provider = FakeProvider::new(
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
         "fake",
         vec![
             Turn {
@@ -133,7 +133,7 @@ fn an_exclusive_call_is_a_barrier() -> Result<(), Box<dyn std::error::Error>> {
             },
             Turn::text("feito"),
         ],
-    );
+    ));
     let process = StdProcess;
     let env = StdEnv;
     let ports = Ports {
@@ -318,7 +318,8 @@ fn ab_end_to_end_batch() -> Result<(), Box<dyn std::error::Error>> {
         ));
         let goal = format!("fixo-{rep}");
         let mut runtime = Runtime::open(&fs, &clock, &root, &goal)?;
-        let provider = FakeProvider::new("fake", vec![Turn::text("fim")]);
+        let provider: std::sync::Arc<dyn Provider> =
+            std::sync::Arc::new(FakeProvider::new("fake", vec![Turn::text("fim")]));
         let start = Instant::now();
         run_turn(&mut runtime, request(&provider, ports, &goal, &options(16)))?;
         fixed.push(start.elapsed());
@@ -333,7 +334,7 @@ fn ab_end_to_end_batch() -> Result<(), Box<dyn std::error::Error>> {
         let events: Vec<_> = (0..N)
             .map(|index| read_call(&format!("a{index}"), &format!("f{index}.txt")))
             .collect();
-        let provider = FakeProvider::new(
+        let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
             "fake",
             vec![
                 Turn {
@@ -342,7 +343,7 @@ fn ab_end_to_end_batch() -> Result<(), Box<dyn std::error::Error>> {
                 },
                 Turn::text("fim"),
             ],
-        );
+        ));
         let before = PARALLEL_BATCHES.load(Ordering::Relaxed);
         let start = Instant::now();
         run_turn(&mut runtime, request(&provider, ports, &goal, &options(16)))?;
@@ -367,7 +368,8 @@ fn ab_end_to_end_batch() -> Result<(), Box<dyn std::error::Error>> {
             })
             .collect();
         turns.push(Turn::text("fim"));
-        let provider = FakeProvider::new("fake", turns);
+        let provider: std::sync::Arc<dyn Provider> =
+            std::sync::Arc::new(FakeProvider::new("fake", turns));
         let start = Instant::now();
         run_turn(&mut runtime, request(&provider, ports, &goal, &options(16)))?;
         sequential.push(start.elapsed());

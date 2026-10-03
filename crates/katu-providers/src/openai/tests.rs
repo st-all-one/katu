@@ -215,3 +215,58 @@ fn tool_names_match_the_registry() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(super::encode::model_tool_name(&find), "find");
     Ok(())
 }
+
+#[test]
+fn a_truncated_tool_call_is_emitted_without_aborting() -> Result<(), Box<dyn std::error::Error>> {
+    use katu_core::provider::{CollectSink, StopReason};
+
+    let mut decoder = super::ChatDecoder::new();
+    let mut sink = CollectSink::default();
+    // Argumentos cortados a meio + `finish_reason=length`.
+    let chunk = json!({
+        "choices": [{
+            "delta": {"tool_calls": [{
+                "index": 0,
+                "id": "call_1",
+                "function": {"name": "read", "arguments": "{\"path\":\"a"}
+            }]},
+            "finish_reason": "length"
+        }]
+    });
+    decoder.on_payload(&chunk.to_string(), &mut sink)?;
+    decoder.on_payload("[DONE]", &mut sink)?;
+
+    assert!(sink.calls.is_empty(), "não há call completa");
+    assert_eq!(sink.truncated.len(), 1, "a call truncada é assinalada");
+    assert_eq!(
+        sink.truncated.first().map(|(_, name)| name.as_str()),
+        Some("read")
+    );
+    assert_eq!(decoder.outcome().stop, StopReason::Length);
+    Ok(())
+}
+
+#[test]
+fn malformed_arguments_outside_length_still_fail_closed() -> Result<(), Box<dyn std::error::Error>>
+{
+    use katu_core::provider::CollectSink;
+
+    let mut decoder = super::ChatDecoder::new();
+    let mut sink = CollectSink::default();
+    let chunk = json!({
+        "choices": [{
+            "delta": {"tool_calls": [{
+                "index": 0,
+                "id": "call_1",
+                "function": {"name": "read", "arguments": "{\"path\":\"a"}
+            }]},
+            "finish_reason": "tool_calls"
+        }]
+    });
+    decoder.on_payload(&chunk.to_string(), &mut sink)?;
+    assert!(
+        decoder.on_payload("[DONE]", &mut sink).is_err(),
+        "JSON inválido fora de `length` continua a abortar (fail-closed)"
+    );
+    Ok(())
+}

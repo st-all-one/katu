@@ -2,7 +2,7 @@
 
 use katu_core::kernel::Message;
 use katu_core::ports::{FixedClock, Timestamp};
-use katu_core::provider::StopReason;
+use katu_core::provider::{Provider, StopReason};
 use katu_providers::{FakeProvider, Turn};
 
 use super::{options, request, root, write_call};
@@ -30,7 +30,7 @@ fn steering_injects_a_user_message_between_steps() -> Result<(), Box<dyn std::er
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     let mut runtime = Runtime::open(&fs, &clock, &root, "escreve um ficheiro")?;
 
-    let provider = FakeProvider::new(
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
         "fake",
         vec![
             Turn {
@@ -39,7 +39,7 @@ fn steering_injects_a_user_message_between_steps() -> Result<(), Box<dyn std::er
             },
             Turn::text("feito"),
         ],
-    );
+    ));
     let process = StdProcess;
     let env = StdEnv;
     let ports = Ports {

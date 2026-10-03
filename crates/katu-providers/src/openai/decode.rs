@@ -150,16 +150,27 @@ impl ChatDecoder {
         }
         let pending = std::mem::take(&mut self.tools);
         for (index, tool) in pending {
-            let arguments = parse_arguments(&tool.arguments)?;
             let call = CallId::new(if tool.id.is_empty() {
                 format!("call_{index}")
             } else {
                 tool.id
             });
-            let event = ProviderEvent::ToolCall {
-                call,
-                name: tool.name,
-                arguments,
+            // L-Q2: uma tool call truncada (`finish_reason=length`) não aborta o turno — o loop
+            // converte-a num `Unavailable{length}` e o modelo reformula. Fora de `Length`, um JSON
+            // inválido continua a ser um erro de protocolo (fail-closed).
+            let event = match parse_arguments(&tool.arguments) {
+                Ok(arguments) => ProviderEvent::ToolCall {
+                    call,
+                    name: tool.name,
+                    arguments,
+                },
+                Err(_) if matches!(self.stop, Some(StopReason::Length)) => {
+                    ProviderEvent::ToolCallTruncated {
+                        call,
+                        name: tool.name,
+                    }
+                }
+                Err(error) => return Err(error),
             };
             if matches!(self.announce(sink, event), Flow::Break) {
                 self.status = Status::Cancelled;

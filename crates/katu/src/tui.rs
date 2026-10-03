@@ -60,7 +60,7 @@ pub(crate) fn run_tui(args: &RunArgs<'_>) -> Report {
     apply_initial(&mut app, &runtime);
     let mut handler = AgentHandler {
         runtime,
-        provider,
+        provider: std::sync::Arc::from(provider),
         fs: &fs,
         process,
         env,

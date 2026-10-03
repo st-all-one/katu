@@ -77,9 +77,29 @@ todo o código impuro confinado.
   O comando `katu run` exercita-o. Envelopes de `Dispatch`/memória vivem em `src/memory/commands.rs`.
   **Guard de loop** (Q-12/F7): cada passo é observado **antes** de executar
   (`kernel::guard`, CUSUM + **e-value** *anytime-valid* sobre a assinatura das chamadas); um ciclo de
-  leitura sem progresso corta o turno no 5.º passo com `AgentError::LoopDetected` (categoria
-  `conflict`, exit 5), emite `agent.loop` e **fecha** o turno. O turno fecha também nos outros
-  erros (`TooManySteps`): um `TurnStart` sem `TurnEnd` deixaria a retomada inconsistente.
+  leitura sem progresso corta o turno no 5.º passo, emite `agent.loop` e **fecha** o turno. O fim
+  anormal (vazio, teto de passos ou loop) é uma `Termination` — o turno fecha com uma **mensagem do
+  assistente visível** e o motivo fica no envelope de máquina (`termination`/`round_exit`); nunca é
+  um erro fatal para o humano (L-Q3).
+- **Resiliência do loop** (WL1/WL2, [`LOOP_RESILIENCE`](../../wiki/_ref/plan/LOOP_RESILIENCE.md)):
+  o fecho do turno reconcilia tool calls pendentes (`agent.reconcile`, L-Q1), a projeção para o
+  modelo é normalizada (`kernel::project::normalize`, L-Q5) e um `turn.lock` de sessão recusa dois
+  processos no mesmo log (`agent.turn_lock`, L-Q6). No fim do passo, uma tool call **truncada**
+  (`finish_reason=length`) é fechada sem executar (`Unavailable{length}` + delta que ensina, L-Q2),
+  uma resposta que **ecoa** o delta de uma tool leva *nudge* + retry (L-Q4) e uma resposta **vazia**
+  é retentada antes da mensagem final (L-Q3).
+- **Interrupção** (WL3, `src/agent/turn/stream.rs`): o corpo bloqueante do provider corre numa
+  thread de I/O e a thread do turno drena um canal *bounded*, sondando o input a cada 50 ms
+  **mesmo sem deltas** (`ActivitySink::tick`), pelo que `Esc`/`Ctrl-C` cancelam de imediato; a
+  `Flag` atómica (`katu_core::ports`) é partilhada com as tools, e o `StdProcess` mata o grupo de
+  processos de um `bash` longo ao cancelar (L-P3). Sem progresso durante `idle_ms` (default 60 s;
+  `0` desliga) o stream é um *stall*: emite `agent.stall` e fecha com `Timeout` (L-P2). *Spike*:
+  o `timeout_recv_body` do `ureq` é **total**, não *idle*; o teto de inatividade é imposto no dreno.
+- **Tool calls declaradas como texto** (W8-1b, `src/agent/turn/declared.rs`): modelos servidos por
+  `llama-server` sem `tool_calls` nativas (o Qwen2.5-Coder local) escrevem a chamada no `content`
+  (bloco de código JSON, `<tool_call>` ou objeto isolado). Quando o passo **não** traz chamadas
+  nativas, o loop decodifica a declaração contra o catálogo fechado (o nome tem de existir) e o JSON
+  cru **não** vira resposta final; o texto declarado não entra no log como mensagem do assistente.
 - **Lote paralelo** (B-01, `src/agent/turn/batch.rs`): as calls `Shared` de um lote correm em
   `std::thread::scope` com spawn **eager** (encadear spawn/join serializa o lote: medido 547 ms
   contra ~107 ms) e são cometidas na ordem do modelo; o teto é `MAX_PARALLEL_CALLS = 8`, um limite

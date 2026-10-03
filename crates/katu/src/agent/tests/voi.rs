@@ -3,7 +3,7 @@
 
 use katu_core::kernel::CallId;
 use katu_core::ports::{FixedClock, Timestamp};
-use katu_core::provider::{ProviderEvent, StopReason};
+use katu_core::provider::{Provider, ProviderEvent, StopReason};
 use katu_providers::{FakeProvider, Turn};
 use serde_json::json;
 
@@ -173,7 +173,7 @@ fn the_gate_can_be_disabled_by_config() -> Result<(), Box<dyn std::error::Error>
     let fs = StdFs;
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     let mut runtime = Runtime::open(&fs, &clock, &root, "lê o ficheiro")?;
-    let provider = FakeProvider::new(
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
         "fake",
         vec![
             Turn {
@@ -182,7 +182,7 @@ fn the_gate_can_be_disabled_by_config() -> Result<(), Box<dyn std::error::Error>
             },
             Turn::text("fim"),
         ],
-    );
+    ));
     let ports = Ports {
         fs: &fs,
         process: &StdProcess,
@@ -211,7 +211,7 @@ fn the_gate_is_on_with_suffix_selection() -> Result<(), Box<dyn std::error::Erro
     let fs = StdFs;
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     let mut runtime = Runtime::open(&fs, &clock, &root, "lê o ficheiro")?;
-    let provider = FakeProvider::new(
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
         "fake",
         vec![
             Turn {
@@ -220,7 +220,7 @@ fn the_gate_is_on_with_suffix_selection() -> Result<(), Box<dyn std::error::Erro
             },
             Turn::text("fim"),
         ],
-    );
+    ));
     let ports = Ports {
         fs: &fs,
         process: &StdProcess,
@@ -250,7 +250,7 @@ fn the_gate_is_off_with_utility_selection() -> Result<(), Box<dyn std::error::Er
     let fs = StdFs;
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     let mut runtime = Runtime::open(&fs, &clock, &root, "lê o ficheiro")?;
-    let provider = FakeProvider::new(
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
         "fake",
         vec![
             Turn {
@@ -259,7 +259,7 @@ fn the_gate_is_off_with_utility_selection() -> Result<(), Box<dyn std::error::Er
             },
             Turn::text("fim"),
         ],
-    );
+    ));
     let ports = Ports {
         fs: &fs,
         process: &StdProcess,

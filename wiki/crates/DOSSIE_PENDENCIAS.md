@@ -255,6 +255,13 @@ turno corre até ao teto de passos sem devolver texto. É a causa de "executa um
 com o provider `llama`. Só reativar depois de (a) o schema ter uma variante terminal de texto /
 "sem tool" e (b) A/B garantir que não parte a terminação.
 
+**Tool calls declaradas como texto (W8-1b, 2026-10-02).** O modelo local **não** emite `tool_calls`
+nativas: escreve a chamada no `content` (bloco de código JSON ou `<tool_call>`), o loop via zero
+chamadas e o JSON cru virava resposta final (`calls = 0`). O loop passou a decodificar a declaração
+contra o catálogo fechado (`agent/turn/declared.rs`) quando o passo não traz chamadas nativas; o
+texto declarado não entra no log como mensagem do assistente. Isto **não** fecha o A/B pendente das
+features opt-in — continua a faltar um modelo que emita tool calls nativas para o medir.
+
 **`tool_voi` e `context_selection` revertidos (2026-10-02).** O gate de VOI saltava uma leitura
 alegando “já presente no contexto”, mas com `context_selection = utility` a unidade lida pode ser
 descartada — o modelo repetia a leitura, o guard de loop cortava o turno (“erro e reinicia”). Os

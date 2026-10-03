@@ -27,9 +27,11 @@ A **interface de terminal** do katu (uma das duas superfícies, com a CLI — G7
   **transcrição durável** vive em `<root>/.katu/transcript.md` (a borda projeta o log e escreve-a
   atomicamente após cada turno) e o **viewer read-only** (`T` → `Action::OpenTranscript`,
   `Command::Transcript`, `src/transcript.rs`) lê o ficheiro com scroll e sem edição — o live nunca
-  entra na transcrição (§50.3). O **cancelamento** (**só `Esc`** durante o stream) é cooperativo
-  (`Painter::cancelled`/`poll_input` → `ActivitySink::cancelled`): o turno fecha limpo e a UI
-  mostra `Update::Cancelled`. O **steering** (E20-T16) usa a mesma sondagem não bloqueante: o que se
+  entra na transcrição (§50.3). O **cancelamento** (**`Esc` e `Ctrl-C`** durante o stream) é
+  cooperativo (`Painter::cancelled`/`poll_input` → `ActivitySink::cancelled`): o turno fecha limpo
+  e a UI mostra `Update::Cancelled`. O `Painter::tick` (chamado pelo loop enquanto o provider cala)
+  sonda o input **sem deltas**, e a `Flag` partilhada (`Painter::cancel_flag`) interrompe também as
+  tools longas (L-P1/L-P3). O **steering** (E20-T16) usa a mesma sondagem não bloqueante: o que se
   escreve aparece na linha de entrada e o `Enter` enfileira um prompt (FIFO) que a borda aplica no
   passo seguinte (`ActivitySink::steer`). Os **argumentos crus** do modelo (`Live::Tool { name, args }`) aparecem
   no painel ao lado da tool.
@@ -48,10 +50,11 @@ A **interface de terminal** do katu (uma das duas superfícies, com a CLI — G7
   e `x` esvazia com challenge, `src/trash.rs`), **compactação** (`c` → liga/desliga o contexto
   efetivo, E09-T07) e **gate de verificação** (`v`, E09-T03). A borda aplica o modelo ao **próximo**
   turno e publica a lista via `Update::Models` (do **catálogo** do provider, E12-T02/T10). O turno
-  corre de forma **síncrona** no handler da borda (executor em background é trabalho futuro).
+  corre no handler da borda, mas o **I/O do provider** corre numa thread própria (L-P1): a UI
+  continua a sondar input durante o stream.
 - **E20-T10 ☑ / E20-T15 ☑ (TUI v2)** — comandos `/` na linha de mensagem (`src/menu.rs` +
   `src/overlay.rs` + `src/app/menu.rs`): mini-menus de `/model` e `/thinking` (adaptados às
-  **capacidades** via `Update::ThinkingOptions`), ajuda `?`, e `Esc` como **único** cancelamento da
+  **capacidades** via `Update::ThinkingOptions`), ajuda `?`, e `Esc`/`Ctrl-C` como cancelamento da
   rodada (`src/run.rs`); os atalhos antigos saíram do keymap. A cópia por seleção de rato usa
   **OSC 52** (`src/copy.rs`, E20-T14). O **steering** e a **citação** vivem na linha de entrada:
   `@<path>` enfileira caminhos (`src/app/menu.rs`, E20-T12) que são prefixados ao próximo turno, e

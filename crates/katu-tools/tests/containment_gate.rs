@@ -7,7 +7,7 @@
 use katu_core::containment::{ContainmentStatus, Jail, NoJail, SandboxEnforcement};
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::{State, Tool, ToolOutput, dispatch};
-use katu_core::ports::{Env, ExecRequest, FakeEnv, MemFs, MemProcess, Process};
+use katu_core::ports::{Env, ExecRequest, FakeEnv, MemFs, MemProcess, Never, Process};
 use katu_policy::{
     Enforcement, PolicyError, ResolvedArgv, ResolvedPath, Rule, RuleCategory, RuleExamples, RuleId,
     RuleScope, RuleSet, Severity, ToolArgs, ToolName, ToolUse,
@@ -55,6 +55,7 @@ fn unknown_vocabulary_never_runs() -> TestResult<()> {
         root: Path::new("/work"),
         timeout_ms: 1_000,
         parent: None,
+        cancel: None,
     };
     let rules = RuleSet {
         vocab: 999,
@@ -81,6 +82,7 @@ fn missing_argv_is_unavailable_and_does_not_run() -> TestResult<()> {
         root: Path::new("/work"),
         timeout_ms: 1_000,
         parent: None,
+        cancel: None,
     };
     let mut use_ = exec_use(&["ls"])?;
     use_.argv = None;
@@ -163,6 +165,7 @@ fn soft_containment_does_not_confine_the_host() -> TestResult<()> {
         root: Path::new("/work"),
         timeout_ms: 1_000,
         parent: None,
+        cancel: None,
     };
 
     // Dentro das tools do katu, a política nega e o comando não corre.
@@ -198,12 +201,15 @@ fn soft_containment_does_not_confine_the_host() -> TestResult<()> {
     // Fora das tools do katu, o mesmo comando corre: a contenção é **soft** (não há isolamento).
     assert!(
         process
-            .run(&ExecRequest {
-                argv: vec!["bash".to_string(), "-c".to_string(), "rm -rf /".to_string()],
-                cwd: "/".into(),
-                env: env.vars(),
-                timeout_ms: 1_000,
-            })
+            .run(
+                &ExecRequest {
+                    argv: vec!["bash".to_string(), "-c".to_string(), "rm -rf /".to_string()],
+                    cwd: "/".into(),
+                    env: env.vars(),
+                    timeout_ms: 1_000,
+                },
+                &Never
+            )
             .is_ok()
     );
     assert_eq!(process.runs().len(), 1, "o host não é confinado (soft)");

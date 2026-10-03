@@ -9,7 +9,7 @@ use std::io;
 use std::time::Duration;
 
 use katu_core::diag::{Level, events};
-use katu_core::ports::Clock;
+use katu_core::ports::{Cancel, Clock, Flag};
 use ratatui::crossterm::event::{
     self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind,
     KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -45,7 +45,7 @@ pub struct Painter<'a> {
     terminal: &'a mut DefaultTerminal,
     throttle: &'a Throttle<'a>,
     error: Option<io::Error>,
-    cancel: bool,
+    cancel: Flag,
     /// Prompts de *steering* enfileirados, por ordem (FIFO; E20-T16).
     steer: Vec<String>,
     /// Buffer de *steering* em edição durante o turno.
@@ -62,12 +62,28 @@ impl Painter<'_> {
         self.redraw();
     }
 
-    /// `true` se o utilizador pediu para **cancelar** o turno (Esc durante o stream).
+    /// `true` se o utilizador pediu para **cancelar** o turno (Esc/Ctrl-C durante o stream).
     #[must_use]
     pub fn cancelled(&self) -> bool {
         let _span = katu_core::trace_fn!("run::cancelled");
 
-        self.cancel
+        self.cancel.cancelled()
+    }
+
+    /// Cópia da flag de cancelamento (partilhada com o loop do turno, L-P1/L-P3).
+    #[must_use]
+    pub fn cancel_flag(&self) -> Flag {
+        let _span = katu_core::trace_fn!("run::cancel_flag");
+
+        self.cancel.clone()
+    }
+
+    /// Sonda input e redesenha sem haver delta (L-P1): o loop chama-o enquanto o provider cala.
+    pub fn tick(&mut self) {
+        let _span = katu_core::trace_fn!("run::tick");
+
+        self.poll_input();
+        self.redraw();
     }
 
     /// Retira o próximo prompt de *steering* enfileirado, se houver (E20-T16).
@@ -114,8 +130,8 @@ impl Painter<'_> {
         let _span = katu_core::trace_fn!("run::on_key");
 
         if is_cancel_key(key) {
-            if !self.cancel {
-                self.cancel = true;
+            if !self.cancel.cancelled() {
+                self.cancel.request();
                 katu_core::event!(Level::Info, events::TUI_CANCEL);
             }
             return;
@@ -207,11 +223,12 @@ impl Painter<'_> {
     }
 }
 
-/// `true` se a tecla pede o cancelamento do turno: **só `Esc`** (E20-T15).
+/// `true` se a tecla pede o cancelamento do turno: **Esc** ou **Ctrl-C** (E20-T15/L-P1).
 fn is_cancel_key(key: KeyEvent) -> bool {
     let _span = katu_core::trace_fn!("run::is_cancel_key");
 
     matches!(key.code, KeyCode::Esc)
+        || (matches!(key.code, KeyCode::Char('c')) && key.modifiers.contains(KeyModifiers::CONTROL))
 }
 
 /// Guarda RAII do terminal: restaura em qualquer saída (o `panic` já é coberto pelo hook).
@@ -272,7 +289,7 @@ pub fn run<H: Handler>(mut app: App, handler: &mut H, clock: &dyn Clock) -> io::
                                 terminal: &mut guard.terminal,
                                 throttle: &throttle,
                                 error: None,
-                                cancel: false,
+                                cancel: Flag::default(),
                                 steer: Vec::new(),
                                 steer_buffer: String::new(),
                             };

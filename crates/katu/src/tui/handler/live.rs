@@ -23,6 +23,12 @@ impl ActivitySink for LivePainter<'_, '_> {
         self.painter.take_steer()
     }
 
+    fn tick(&mut self) {
+        let _span = katu_core::trace_fn!("tui::handler::live::tick");
+
+        self.painter.tick();
+    }
+
     fn approve(&mut self, prompt: &ApprovalPrompt<'_>) -> Option<Approval> {
         let _span = katu_core::trace_fn!("tui::handler::live::approve");
 

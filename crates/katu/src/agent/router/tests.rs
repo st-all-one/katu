@@ -46,6 +46,7 @@ impl Fixture {
             env: &self.env,
             clock: &self.clock,
             root: &self.root,
+            cancel: None,
         }
     }
 }

@@ -11,6 +11,8 @@ arranque (`cargo xtask check`).
   **superfície CLI/TUI**: [`CLI_TUI_SURFACE`](wiki/_ref/docs/CLI_TUI_SURFACE.md).
 - **Otimização (Q/P/S)**: [`OPTIMIZATION_PLAN`](wiki/_ref/plan/OPTIMIZATION_PLAN.md) ·
   [`leituras de hoje`](bench/e18/pos/PROTOCOL.md).
+- **Kernel e loop**: [`KERNEL_SURFACE`](wiki/_ref/plan/KERNEL_SURFACE.md) ·
+  [`LOOP_RESILIENCE`](wiki/_ref/plan/LOOP_RESILIENCE.md).
 
 ## Por crate (o lar de cada módulo)
 

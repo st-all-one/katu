@@ -3,12 +3,12 @@
 //! Provam a ordem §42 (logar → política → efeito), que o resultado volta ao modelo e que o turno
 //! termina de forma determinística; a memória real in-process já é coberta pelo runtime.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use katu_core::kernel::{CallId, Event, Message, read_records};
 use katu_core::memory::{Memory, RecallReq};
 use katu_core::ports::{FixedClock, Timestamp};
-use katu_core::provider::{ModelSpec, Provider, ProviderEvent, StopReason};
+use katu_core::provider::{Provider, ProviderEvent, StopReason};
 use katu_providers::{FakeProvider, Turn};
 use serde_json::json;
 
@@ -19,62 +19,16 @@ use crate::runtime::Runtime;
 mod args;
 mod calls;
 mod context;
+mod declared;
 mod guard;
 mod live;
 mod steering;
+mod stream;
+mod support;
+mod termination;
 mod verify;
 mod voi;
-
-/// Pedido de turno a partir dos componentes (o `ports` é `Copy`).
-pub(super) fn request<'a>(
-    provider: &'a dyn Provider,
-    ports: Ports<'a>,
-    goal: &'a str,
-    options: &'a TurnOptions,
-) -> TurnRequest<'a> {
-    TurnRequest {
-        provider,
-        ports,
-        goal,
-        options,
-    }
-}
-
-/// Raiz temporária única por teste.
-pub(super) fn root(label: &str) -> Result<PathBuf, std::io::Error> {
-    let path = std::env::temp_dir().join(format!("katu-agent-{}-{label}", std::process::id()));
-    std::fs::create_dir_all(&path)?;
-    Ok(path)
-}
-
-/// Ferramenta de escrita que o modelo pede no guião.
-pub(super) fn write_call() -> ProviderEvent {
-    ProviderEvent::ToolCall {
-        call: CallId::new("c1"),
-        name: "write".to_string(),
-        arguments: json!({"path": "new.txt", "content": "olá"}),
-    }
-}
-
-/// Ferramenta de leitura que o modelo pede no guião.
-pub(super) fn read_call() -> ProviderEvent {
-    ProviderEvent::ToolCall {
-        call: CallId::new("c1"),
-        name: "read".to_string(),
-        arguments: json!({"path": "nota.txt", "view": "full"}),
-    }
-}
-
-/// Opções mínimas de turno.
-pub(super) fn options(max_steps: u32) -> TurnOptions {
-    TurnOptions {
-        model: ModelSpec::new("fake"),
-        system: None,
-        max_tokens: 128,
-        temperature: 0.0,
-        max_steps,
-    }
-}
+pub(crate) use support::{options, options_idle, read_call, request, root, write_call};
 
 #[test]
 fn loop_executes_a_tool_then_stops() -> Result<(), Box<dyn std::error::Error>> {
@@ -83,7 +37,7 @@ fn loop_executes_a_tool_then_stops() -> Result<(), Box<dyn std::error::Error>> {
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     let mut runtime = Runtime::open(&fs, &clock, &root, "escreve um ficheiro")?;
 
-    let provider = FakeProvider::new(
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
         "fake",
         vec![
             Turn {
@@ -92,7 +46,7 @@ fn loop_executes_a_tool_then_stops() -> Result<(), Box<dyn std::error::Error>> {
             },
             Turn::text("feito"),
         ],
-    );
+    ));
     let process = StdProcess;
     let env = StdEnv;
     let ports = Ports {
@@ -141,7 +95,7 @@ fn the_tool_payload_reaches_the_model() -> Result<(), Box<dyn std::error::Error>
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     let mut runtime = Runtime::open(&fs, &clock, &root, "lê a nota")?;
 
-    let provider = FakeProvider::new(
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
         "fake",
         vec![
             Turn {
@@ -150,7 +104,7 @@ fn the_tool_payload_reaches_the_model() -> Result<(), Box<dyn std::error::Error>
             },
             Turn::text("li"),
         ],
-    );
+    ));
     let process = StdProcess;
     let env = StdEnv;
     let ports = Ports {
@@ -199,7 +153,7 @@ fn loop_refuses_to_spin_past_the_step_budget() -> Result<(), Box<dyn std::error:
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     let mut runtime = Runtime::open(&fs, &clock, &root, "insiste")?;
 
-    let provider = FakeProvider::new(
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
         "fake",
         vec![
             Turn {
@@ -211,7 +165,7 @@ fn loop_refuses_to_spin_past_the_step_budget() -> Result<(), Box<dyn std::error:
                 stop: StopReason::ToolCalls,
             },
         ],
-    );
+    ));
     let process = StdProcess;
     let env = StdEnv;
     let ports = Ports {
@@ -220,14 +174,14 @@ fn loop_refuses_to_spin_past_the_step_budget() -> Result<(), Box<dyn std::error:
         env: &env,
     };
 
-    let result = run_turn(
+    let report = run_turn(
         &mut runtime,
         request(&provider, ports, "insiste", &options(1)),
+    )?;
+    assert_eq!(
+        report.termination,
+        super::Termination::MaxSteps { steps: 1 }
     );
-    assert!(matches!(
-        result,
-        Err(super::AgentError::TooManySteps { .. })
-    ));
 
     drop(runtime);
     std::fs::remove_dir_all(&root)?;
@@ -267,7 +221,7 @@ fn plan_artifact_is_recorded_through_the_loop() -> Result<(), Box<dyn std::error
         "o artefacto foi carregado no arranque"
     );
 
-    let provider = FakeProvider::new(
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
         "fake",
         vec![
             Turn {
@@ -276,7 +230,7 @@ fn plan_artifact_is_recorded_through_the_loop() -> Result<(), Box<dyn std::error
             },
             Turn::text("plano registado"),
         ],
-    );
+    ));
     let process = StdProcess;
     let env = StdEnv;
     let ports = Ports {
@@ -307,7 +261,10 @@ fn two_turns_run_back_to_back_without_reopening() -> Result<(), Box<dyn std::err
     let fs = StdFs;
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     let mut runtime = Runtime::open(&fs, &clock, &root, "primeiro")?;
-    let provider = FakeProvider::new("fake", vec![Turn::text("um"), Turn::text("dois")]);
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
+        "fake",
+        vec![Turn::text("um"), Turn::text("dois")],
+    ));
     let process = StdProcess;
     let env = StdEnv;
     let ports = Ports {
@@ -354,7 +311,7 @@ fn agent_writes_memory_through_runtime_remember() -> Result<(), Box<dyn std::err
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     let mut runtime = Runtime::open(&fs, &clock, &root, "escreve na memória")?;
 
-    let provider = FakeProvider::new(
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
         "fake",
         vec![
             Turn {
@@ -363,7 +320,7 @@ fn agent_writes_memory_through_runtime_remember() -> Result<(), Box<dyn std::err
             },
             Turn::text("memória escrita"),
         ],
-    );
+    ));
     let process = StdProcess;
     let env = StdEnv;
     let ports = Ports {

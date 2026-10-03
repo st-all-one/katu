@@ -3,6 +3,8 @@
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
 
+use super::Cancel;
+
 /// Pedido de execução: `argv` resolvido, `cwd` fixado e ambiente **já filtrado** de segredos.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExecRequest {
@@ -51,7 +53,10 @@ pub enum ProcessError {
 /// a porta nunca eleva privilégio.
 pub trait Process: Send + Sync {
     /// Corre o pedido e devolve o resultado.
-    fn run(&self, request: &ExecRequest) -> Result<ExecResult, ProcessError>;
+    ///
+    /// `cancel` é consultado durante a execução: um `bash` longo é interrompido (o grupo de
+    /// processos é morto) quando o utilizador cancela o turno (L-P3).
+    fn run(&self, request: &ExecRequest, cancel: &dyn Cancel) -> Result<ExecResult, ProcessError>;
 }
 
 /// Processo falso e determinístico: regista pedidos e devolve um resultado fixo.
@@ -106,7 +111,7 @@ impl MemProcess {
 }
 
 impl Process for MemProcess {
-    fn run(&self, request: &ExecRequest) -> Result<ExecResult, ProcessError> {
+    fn run(&self, request: &ExecRequest, _cancel: &dyn Cancel) -> Result<ExecResult, ProcessError> {
         let _span = crate::trace_fn!("ports::process::run");
 
         lock(&self.runs).push(request.clone());
@@ -126,6 +131,7 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 #[cfg(test)]
 mod tests {
     use super::{ExecRequest, ExecResult, MemProcess, Process, ProcessError};
+    use crate::ports::Never;
     use std::path::PathBuf;
 
     fn request() -> ExecRequest {
@@ -140,8 +146,8 @@ mod tests {
     #[test]
     fn mem_process_records_runs() {
         let process = MemProcess::ok("hi\n");
-        let first = process.run(&request());
-        let second = process.run(&request());
+        let first = process.run(&request(), &Never);
+        let second = process.run(&request(), &Never);
         assert_eq!(first, second);
         assert_eq!(process.runs().len(), 2);
     }
@@ -149,7 +155,7 @@ mod tests {
     #[test]
     fn mem_process_returns_configured_error() {
         let process = MemProcess::failing(ProcessError::NotFound);
-        assert_eq!(process.run(&request()), Err(ProcessError::NotFound));
+        assert_eq!(process.run(&request(), &Never), Err(ProcessError::NotFound));
     }
 
     #[test]
@@ -162,7 +168,7 @@ mod tests {
             stdout: String::new(),
             stderr: String::new(),
         }));
-        let result = process.run(&request());
+        let result = process.run(&request(), &Never);
         assert!(
             matches!(result, Ok(outcome) if outcome.timed_out && outcome.signal == Some(9) && outcome.duration_ms == 42)
         );

@@ -118,6 +118,14 @@ gate de decisão de E05**. O que não serve o core de [`00b`](00b-objetivos.md) 
 > `[prime, upgrade, config, memo, run, tui]`, config global/local e TUI por `/`):
 > [`../SURFACE_IMPLEMENTATION.md`](SURFACE_IMPLEMENTATION.md).
 
+> **LOOP_RESILIENCE** (interrupção, fim de turno e sessão do loop; derivado do
+> [`GOOSE_VS_KATU_LOOP`](../brainstorm/goose-rs/GOOSE_VS_KATU_LOOP.md) e regido pelo método do
+> [`OPTIMIZATION_PLAN`](OPTIMIZATION_PLAN.md) §0): [`LOOP_RESILIENCE.md`](LOOP_RESILIENCE.md).
+
+> **KERNEL_SURFACE** (kernel autocontido na sua thread e superfícies de interação como clientes;
+> fecha as lacunas de interrupção/visibilidade do goose e substitui a decisão de L-S2):
+> [`KERNEL_SURFACE.md`](KERNEL_SURFACE.md).
+
 ---
 
 ## 4. Grafo de dependências

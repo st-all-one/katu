@@ -163,6 +163,15 @@ pub enum ProviderEvent {
         /// Argumentos já decodificados como JSON.
         arguments: Value,
     },
+    /// Tool call **truncada** (L-Q2): o `finish_reason` foi `length` e os argumentos acumulados
+    /// não formam JSON válido. O loop converte-a em `ToolResult { Unavailable { length } }` e
+    /// **não** a executa — o modelo recebe o erro e pode reformular.
+    ToolCallTruncated {
+        /// Identificador da chamada.
+        call: CallId,
+        /// Nome ao modelo da tool pedida.
+        name: String,
+    },
 }
 
 /// Resultado final de uma chamada ao modelo.

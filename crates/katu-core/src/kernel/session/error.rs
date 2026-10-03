@@ -39,4 +39,15 @@ pub enum SessionError {
     /// Invariante `Model-visible ⟺ logged` violada (§42).
     #[error("invariante: {0}")]
     Invariant(String),
+    /// Outro processo detém o turno da sessão (L-Q6): recusado para não escrever o mesmo log em
+    /// paralelo. A mensagem diz qual o `pid` detentor e a idade do lock.
+    #[error(
+        "turno já aberto noutro processo (pid {pid}, há {age_ms} ms): aguarde ou retome noutra sessão"
+    )]
+    TurnLocked {
+        /// `pid` do processo detentor.
+        pid: u32,
+        /// Idade do lock em milissegundos.
+        age_ms: u64,
+    },
 }

@@ -204,6 +204,36 @@ catalog! {
         "Corte por repetição patológica do turno (Q-12/F7)."
     ),
     (
+        AGENT_RECONCILE,
+        "agent.reconcile",
+        "Fecho de tool calls pendentes no fim do turno (L-Q1)."
+    ),
+    (
+        AGENT_TURN_LOCK,
+        "agent.turn_lock",
+        "Aquisição/recusa do lock de turno por sessão (L-Q6)."
+    ),
+    (
+        AGENT_STOP,
+        "agent.stop",
+        "Fim de turno decidido pelo `StopReason` do provider (L-Q2/L-Q3)."
+    ),
+    (
+        AGENT_EMPTY,
+        "agent.empty",
+        "Resposta vazia detetada: retry limitado ou mensagem final (L-Q3)."
+    ),
+    (
+        AGENT_ECHO,
+        "agent.echo",
+        "Eco de delta de tool detetado na resposta final (L-Q4)."
+    ),
+    (
+        AGENT_STALL,
+        "agent.stall",
+        "Stream do provider sem progresso durante o teto de inatividade (L-P2)."
+    ),
+    (
         AGENT_VOI_SKIP,
         "agent.voi.skip",
         "Chamada de só-leitura não repetida: a informação já está no contexto (A3/W8-4)."

@@ -4,12 +4,14 @@
 //! acesso ao mundo atravessa uma porta. Os testes usam as *fakes*; as implementações reais vivem no
 //! binário (adaptadores finos). O diagnóstico estruturado vive em [`crate::diag`].
 
+pub mod cancel;
 pub mod clock;
 pub mod env;
 pub mod fs;
 pub mod process;
 pub mod rng;
 
+pub use cancel::{Cancel, Flag, Never};
 pub use clock::{Clock, FixedClock, Timestamp};
 pub use env::{Env, FakeEnv};
 pub use fs::{Fs, FsError, MemFs};

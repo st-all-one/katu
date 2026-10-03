@@ -205,7 +205,13 @@ impl<'a> Runtime<'a> {
         // O runtime é um agente a atuar: define o workspace (destranca o normal dentro da raiz e
         // exige aprovação fora) antes de qualquer tool call (§42).
         session.set_workspace(&cwd)?;
+        // L-Q6: só um processo escreve no mesmo log de cada vez. O lock é do turno (não da
+        // sessão): entre turnos a UI está ociosa e outro processo pode retomar.
+        session.acquire_turn_lock(clock.now().as_millis())?;
         if session.state().turn_open {
+            // L-Q1: um turno aberto por um processo morto fecha com as calls pendentes
+            // reconciliadas — o próximo pedido nunca leva um par desalinhado.
+            session.reconcile_pending()?;
             let open = session.state().turn;
             session.apply(&Event::TurnEnd { turn: open })?;
         }
@@ -253,6 +259,8 @@ impl<'a> Runtime<'a> {
     pub(crate) fn begin_turn(&mut self) -> Result<(), SessionError> {
         let _span = katu_core::trace_fn!("runtime::begin_turn");
 
+        self.session
+            .acquire_turn_lock(self.clock.now().as_millis())?;
         let next = self.session.state().turn.saturating_add(1);
         self.session.apply(&Event::TurnStart { turn: next })
     }
@@ -335,13 +343,23 @@ impl<'a> Runtime<'a> {
     pub(crate) fn record_turn_end(&mut self, turn: u32) -> Result<(), SessionError> {
         let _span = katu_core::trace_fn!("runtime::record_turn_end");
 
-        self.session.apply(&Event::TurnEnd { turn })
+        // L-Q1/L-S1: **único** ponto de fecho — reconcilia as calls pendentes (erro, cancel, teto
+        // ou morte a meio) antes de fechar o turno; um turno normal não acrescenta eventos.
+        self.session.reconcile_pending()?;
+        self.session.apply(&Event::TurnEnd { turn })?;
+        self.session.release_turn_lock()
     }
 
     /// Sessão (log e estado) do runtime — usada pelos testes e pelo loop real (E12).
     #[cfg(test)]
     pub(crate) fn session(&self) -> &Session<'a> {
         &self.session
+    }
+
+    /// Sessão mutável (só testes: montar um turno a meio, ex.: uma call pendente para L-Q1).
+    #[cfg(test)]
+    pub(crate) fn session_mut(&mut self) -> &mut Session<'a> {
+        &mut self.session
     }
 
     /// Identificador de chamada único e determinístico dentro da sessão.

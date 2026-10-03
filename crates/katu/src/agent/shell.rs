@@ -30,6 +30,7 @@ pub(crate) fn dispatch(
         env: ports.env,
         clock: runtime.clock,
         root: &root,
+        cancel: None,
     };
     let now = runtime.clock.now().as_millis();
     match router::route(&route_ports, &runtime.cwd, "exec", &args, None)? {

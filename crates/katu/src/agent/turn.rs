@@ -3,6 +3,7 @@
 use katu_core::diag::{Level, events};
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::CallId;
+use katu_core::ports::Cancel;
 use katu_policy::ApprovalRequest;
 use katu_tools::schema::concurrency_of;
 use serde_json::Value;
@@ -12,8 +13,13 @@ use crate::defaults;
 use crate::runtime::Runtime;
 
 mod batch;
+mod declared;
+mod echo;
+mod looping;
 mod request;
 mod run;
+mod sink;
+mod stream;
 pub(crate) mod voi;
 
 #[cfg(test)]
@@ -61,6 +67,14 @@ pub(crate) enum Activity<'a> {
 pub(crate) trait ActivitySink {
     /// Recebe um evento efémero.
     fn activity(&mut self, activity: Activity<'_>);
+
+    /// Oportunidade de **sondar input** sem haver delta (L-P1).
+    ///
+    /// O loop chama-o a cada `STREAM_POLL_MS` enquanto o provider não emite nada, pelo que
+    /// `Esc`/`Ctrl-C` são vistos mesmo com o stream parado. Por omissão, não faz nada.
+    fn tick(&mut self) {
+        let _span = katu_core::trace_fn!("agent::turn::tick");
+    }
 
     /// Pede **aprovação humana** (challenge-and-response, §33). Devolve o override assinado ou
     /// `None` (fail-closed: sem resposta, a recusa mantém-se). Por omissão, não aprova nada.
@@ -138,6 +152,7 @@ pub(crate) fn run_turn(
 fn run_calls(
     runtime: &mut Runtime<'_>,
     ports: &Ports<'_>,
+    cancel: Option<&dyn Cancel>,
     calls: Vec<(CallId, String, Value)>,
     activity: &mut dyn ActivitySink,
 ) -> Result<bool, AgentError> {
@@ -164,11 +179,12 @@ fn run_calls(
                 return Ok(false);
             }
         }
-        let mut outcome = execute_call(runtime, ports, call.clone(), &name, &arguments)?;
+        let mut outcome = execute_call(runtime, ports, cancel, call.clone(), &name, &arguments)?;
         emit_outcome(activity, &name, &outcome.outcome);
         retry_with_approval(
             runtime,
             ports,
+            cancel,
             &mut outcome,
             &call,
             &name,
@@ -217,6 +233,7 @@ pub(super) fn emit_outcome(activity: &mut dyn ActivitySink, name: &str, outcome:
 fn retry_with_approval(
     runtime: &mut Runtime<'_>,
     ports: &Ports<'_>,
+    cancel: Option<&dyn Cancel>,
     outcome: &mut CallOutcome,
     call: &CallId,
     name: &str,
@@ -263,7 +280,7 @@ fn retry_with_approval(
         &mac_key,
     )?;
     let retry = CallId::new(format!("{}#approved", call.as_str()));
-    *outcome = execute_call(runtime, ports, retry, name, arguments)?;
+    *outcome = execute_call(runtime, ports, cancel, retry, name, arguments)?;
     emit_outcome(activity, name, &outcome.outcome);
     // B-06: a aprovação é **one-shot** — depois de usada, a capacidade é revogada. A próxima
     // escalação exige nova aprovação (não é herdada).

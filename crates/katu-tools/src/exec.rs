@@ -10,7 +10,7 @@ use katu_core::diag::{Level, events};
 use katu_core::error::ToolOutcome;
 use katu_core::feedback::{CommandRecord, Ledger, redact};
 use katu_core::kernel::{Tool, ToolOutput};
-use katu_core::ports::{Env, ExecRequest, ExecResult, Fs, Process, ProcessError};
+use katu_core::ports::{Cancel, Env, ExecRequest, ExecResult, Fs, Never, Process, ProcessError};
 use katu_core::report::{ToolReport, content_hash, content_id};
 use katu_core::toon::Value;
 use katu_policy::{ControlId, ToolArgs, ToolName, ToolUse};
@@ -40,6 +40,8 @@ pub struct ExecTool<'a> {
     pub timeout_ms: u64,
     /// Comando pai, se aninhado (E06-T07).
     pub parent: Option<String>,
+    /// Cancelamento cooperativo do turno (L-P3); `None` = nunca cancela.
+    pub cancel: Option<&'a dyn Cancel>,
 }
 
 impl Tool for ExecTool<'_> {
@@ -63,7 +65,7 @@ impl Tool for ExecTool<'_> {
             env: scrub_env(&self.env.vars()),
             timeout_ms: self.timeout_ms,
         };
-        match self.process.run(&request) {
+        match self.process.run(&request, self.cancel.unwrap_or(&Never)) {
             Ok(result) => {
                 let record = self.build(&request, &result);
                 ToolOutput::report(report(&record))
@@ -238,6 +240,7 @@ mod tests {
             root: std::path::Path::new("/work"),
             timeout_ms: DEFAULT_TIMEOUT_MS,
             parent: None,
+            cancel: None,
         }
     }
 

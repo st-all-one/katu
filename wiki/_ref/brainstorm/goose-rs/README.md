@@ -46,6 +46,8 @@
 | 13 | [Desktop UI](13-desktop-ui.md) | Electron + React, `goose serve`, modelo de processo |
 | 14 | [Testes e qualidade](14-testes-e-qualidade.md) | Suítes, cenários, self-test, replay MCP |
 | 15 | [Decisões e lições](15-decisoes-e-licoes.md) | O que copiar, o que evitar, aplicação em `katu` |
+| — | [GOOSE_LOOP](GOOSE_LOOP.md) | **Deep dive:** o loop, os turnos, a sessão e o I/O do modelo, código a código |
+| — | [GOOSE_VS_KATU_LOOP](GOOSE_VS_KATU_LOOP.md) | Comparação com o loop do `katu`: lacunas e o que incorporar (interrupção, fim de turno, sessão) |
 
 ---
 

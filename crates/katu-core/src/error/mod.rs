@@ -293,6 +293,14 @@ fn control_fix(control: &ControlId) -> Option<&'static str> {
             "forneça uma aprovação humana (reason + granted_by) para desbloquear esta operação",
         ),
         "budget" => Some("o orçamento esgotou; não são permitidas mais operações nesta tarefa"),
+        "interrupted" => Some(
+            "a tool foi interrompida antes de concluir (turno fechado); repete a chamada se ainda \
+             for necessária",
+        ),
+        "length" => Some(
+            "a resposta foi truncada pelo teto de tokens de saída; reformula a chamada ou aumenta \
+             `--max-tokens`",
+        ),
         _ => None,
     }
 }

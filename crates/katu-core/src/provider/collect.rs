@@ -14,6 +14,8 @@ pub struct CollectSink {
     pub thinking: String,
     /// Tool calls completas, na ordem de chegada.
     pub calls: Vec<(CallId, String, Value)>,
+    /// Tool calls truncadas (`finish_reason=length`), na ordem de chegada.
+    pub truncated: Vec<(CallId, String)>,
 }
 
 impl ProviderSink for CollectSink {
@@ -28,6 +30,9 @@ impl ProviderSink for CollectSink {
                 name,
                 arguments,
             } => self.calls.push((call, name, arguments)),
+            ProviderEvent::ToolCallTruncated { call, name } => {
+                self.truncated.push((call, name));
+            }
         }
         Flow::Continue
     }

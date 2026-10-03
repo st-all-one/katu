@@ -18,7 +18,7 @@ use katu_core::diag::{Level, events};
 use katu_core::kernel::Tool;
 use katu_core::memory::{Anchor, NoteType, PreWriteReq, RecallReq};
 use katu_core::plan::Plan;
-use katu_core::ports::{Clock, Env, Fs, Process};
+use katu_core::ports::{Cancel, Clock, Env, Fs, Process};
 use katu_policy::{ResolvedArgv, ResolvedPath, SearchMode, ToolArgs, ToolName, ToolUse};
 use katu_tools::read::LineRange;
 use katu_tools::resolve::resolve as resolve_via_port;
@@ -39,6 +39,8 @@ pub(super) struct Ports<'a> {
     pub clock: &'a dyn Clock,
     /// Raiz do projeto (lixeira).
     pub root: &'a Path,
+    /// Cancelamento cooperativo do turno (L-P3), lido pelo `bash`.
+    pub cancel: Option<&'a dyn Cancel>,
 }
 
 /// Resultado do roteamento.

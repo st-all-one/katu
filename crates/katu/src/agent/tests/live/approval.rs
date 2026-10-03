@@ -5,7 +5,7 @@ use std::path::Path;
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::{CallId, Message};
 use katu_core::ports::{FixedClock, Timestamp};
-use katu_core::provider::{ProviderEvent, StopReason};
+use katu_core::provider::{Provider, ProviderEvent, StopReason};
 use katu_providers::{FakeProvider, Turn};
 use serde_json::json;
 
@@ -77,7 +77,7 @@ fn approval_unlocks_an_outside_read_and_is_logged() -> Result<(), Box<dyn std::e
     let fs = StdFs;
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     let mut runtime = Runtime::open(&fs, &clock, &workspace, "ler fora")?;
-    let provider = FakeProvider::new(
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
         "fake",
         vec![
             Turn {
@@ -86,7 +86,7 @@ fn approval_unlocks_an_outside_read_and_is_logged() -> Result<(), Box<dyn std::e
             },
             Turn::text("ok"),
         ],
-    );
+    ));
     let process = StdProcess;
     let env = StdEnv;
     let ports = Ports {
@@ -134,7 +134,7 @@ fn an_approval_is_not_inherited_by_a_different_path() -> Result<(), Box<dyn std:
     let fs = StdFs;
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     let mut runtime = Runtime::open(&fs, &clock, &workspace, "ler dois")?;
-    let provider = FakeProvider::new(
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
         "fake",
         vec![
             Turn {
@@ -143,7 +143,7 @@ fn an_approval_is_not_inherited_by_a_different_path() -> Result<(), Box<dyn std:
             },
             Turn::text("ok"),
         ],
-    );
+    ));
     let process = StdProcess;
     let env = StdEnv;
     let ports = Ports {
@@ -192,7 +192,7 @@ fn an_outside_read_without_approval_stays_unavailable() -> Result<(), Box<dyn st
     let fs = StdFs;
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     let mut runtime = Runtime::open(&fs, &clock, &workspace, "sem aprovação")?;
-    let provider = FakeProvider::new(
+    let provider: std::sync::Arc<dyn Provider> = std::sync::Arc::new(FakeProvider::new(
         "fake",
         vec![
             Turn {
@@ -201,7 +201,7 @@ fn an_outside_read_without_approval_stays_unavailable() -> Result<(), Box<dyn st
             },
             Turn::text("ok"),
         ],
-    );
+    ));
     let process = StdProcess;
     let env = StdEnv;
     let ports = Ports {

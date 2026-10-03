@@ -51,15 +51,55 @@ pub enum Message {
 }
 
 /// Projeta o histórico visível ao modelo a partir dos eventos (ordem do log).
+///
+/// A projeção é **normalizada** (L-Q5): um `ToolCall` sem `ToolResult` (ou o inverso) não chega ao
+/// modelo e a lista começa sempre em [`Message::User`]. Num log saudável nada muda byte-a-byte;
+/// a normalização é a rede de segurança para logs antigos ou truncados.
 #[must_use]
 pub fn derive_messages(events: &[Event]) -> Vec<Message> {
     let _span = crate::trace_fn!("kernel::project::derive_messages");
 
     let mut tool_names: std::collections::BTreeMap<CallId, ToolName> =
         std::collections::BTreeMap::new();
-    events
+    let messages: Vec<Message> = events
         .iter()
         .filter_map(|event| project_event(event, &mut tool_names))
+        .collect();
+    normalize(messages)
+}
+
+/// Remove pares desalinhados e garante que a lista começa em `User` (L-Q5).
+///
+/// `Model-visible ⟺ logged`: **não** inventa nem reescreve mensagens, só descarta o que o
+/// protocolo do endpoint recusaria (uma tool call sem resultado e vice-versa).
+fn normalize(messages: Vec<Message>) -> Vec<Message> {
+    let _span = crate::fn_span!(
+        Level::Trace,
+        events::MODEL_PROJECT,
+        "kernel::project::normalize"
+    );
+    let calls: std::collections::BTreeSet<CallId> = messages
+        .iter()
+        .filter_map(|message| match message {
+            Message::ToolCall { call, .. } => Some(call.clone()),
+            _ => None,
+        })
+        .collect();
+    let results: std::collections::BTreeSet<CallId> = messages
+        .iter()
+        .filter_map(|message| match message {
+            Message::ToolResult { call, .. } => Some(call.clone()),
+            _ => None,
+        })
+        .collect();
+    messages
+        .into_iter()
+        .filter(|message| match message {
+            Message::ToolCall { call, .. } => results.contains(call),
+            Message::ToolResult { call, .. } => calls.contains(call),
+            _ => true,
+        })
+        .skip_while(|message| !matches!(message, Message::User { .. }))
         .collect()
 }
 
@@ -238,9 +278,72 @@ mod tests {
     }
 
     #[test]
+    fn orphan_tool_call_is_dropped_from_the_projection() -> Result<(), Box<dyn std::error::Error>> {
+        let path = katu_policy::ResolvedPath::from_canonical("/work/src/main.rs")?;
+        let events = vec![
+            Event::UserMessage { text: "lê".into() },
+            Event::ToolCall {
+                call: CallId::new("c1"),
+                tool: katu_policy::ToolUse {
+                    name: katu_policy::ToolName::Read,
+                    args: katu_policy::ToolArgs::Read { path: path.clone() },
+                    resolved_paths: vec![path.clone()],
+                    argv: None,
+                    cwd: path,
+                },
+            },
+        ];
+        let messages = derive_messages(&events);
+        assert_eq!(
+            messages.len(),
+            1,
+            "a call sem resultado não chega ao modelo"
+        );
+        assert!(matches!(messages.first(), Some(Message::User { .. })));
+        Ok(())
+    }
+
+    #[test]
+    fn orphan_tool_result_is_dropped_from_the_projection() {
+        let events = vec![
+            Event::UserMessage { text: "lê".into() },
+            Event::ToolResult {
+                call: CallId::new("c1"),
+                outcome: ToolOutcome::Ok,
+                delta: Some("conteúdo".into()),
+            },
+        ];
+        let messages = derive_messages(&events);
+        assert_eq!(
+            messages.len(),
+            1,
+            "o resultado sem pedido não chega ao modelo"
+        );
+        assert!(matches!(messages.first(), Some(Message::User { .. })));
+    }
+
+    #[test]
+    fn the_projection_starts_at_the_first_user_message() {
+        let events = vec![
+            Event::AssistantMessage {
+                text: "pré-rolo".into(),
+            },
+            Event::UserMessage {
+                text: "olá".into()
+            },
+            Event::AssistantMessage { text: "oi".into() },
+        ];
+        let messages = derive_messages(&events);
+        assert_eq!(messages.len(), 2);
+        assert!(matches!(messages.first(), Some(Message::User { .. })));
+        assert!(matches!(messages.get(1), Some(Message::Assistant { .. })));
+    }
+
+    #[test]
     fn tool_result_carries_the_tool_name_from_the_call() -> Result<(), Box<dyn std::error::Error>> {
         let path = katu_policy::ResolvedPath::from_canonical("/work/src/main.rs")?;
         let events = vec![
+            Event::UserMessage { text: "lê".into() },
             Event::ToolCall {
                 call: CallId::new("c1"),
                 tool: katu_policy::ToolUse {
@@ -258,7 +361,7 @@ mod tests {
             },
         ];
         let messages = derive_messages(&events);
-        let Some(Message::ToolResult { tool_name, .. }) = messages.get(1) else {
+        let Some(Message::ToolResult { tool_name, .. }) = messages.get(2) else {
             return Err("esperado um ToolResult".into());
         };
         assert_eq!(*tool_name, Some(katu_policy::ToolName::Read));
