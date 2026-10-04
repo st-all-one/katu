@@ -11,6 +11,7 @@
 
 mod corpus;
 
+use katu_core::kernel::Visibility;
 use std::time::Instant;
 
 use katu_core::context::{
@@ -198,6 +199,7 @@ fn session() -> Result<Vec<Event>, String> {
     for turn in 0..3_u32 {
         events.push(Event::UserMessage {
             text: format!("pedido {turn}: analisa o dispatch e o custo por chamada"),
+            visibility: Visibility::User,
         });
         events.push(Event::AssistantMessage {
             text: format!("resposta {turn}: o custo é advisory e vive na borda do dispatch"),

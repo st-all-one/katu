@@ -82,7 +82,8 @@ ADR 0013); os cabeçalhos de afinidade extra (`x-client-request-id`/`x-session-a
 `pi`; o `chat/completions` serializa direto, sem árvore `Value`. A **compressão do pedido** foi
 **rejeitada** pelos endpoints (opencode `401`, llama `415`) e fica opt-in desligada; HTTP/2 está
 bloqueado pelo `ureq` (HTTP/1.1). Os dialetos `responses`/`messages`/`google` estão implementados;
-**por adotar:** WebSocket, `dynamic_models` e `Control::SetModel` (E12-T10).
+**por adotar:** WebSocket (único item real — `dynamic_models` e `Control::SetModel` já estão
+feitos). Transporte fechado em [ADR 0027](../adr/0027-fronteiras-de-transporte.md).
 
 ---
 
@@ -96,7 +97,7 @@ bloqueado pelo `ureq` (HTTP/1.1). Os dialetos `responses`/`messages`/`google` es
    afinado** (coluna tese de [`00`](00-tese-e-escopo.md) §2); os demais providers entram pelo
    GDK/declarativo, isolados atrás do mesmo trait `Provider` do katu.
 4. **Latência > compressão no caminho built-in.** O transporte otimiza **TTFT** e throughput:
-   keep-alive/pooling de conexão, `TCP_NODELAY`/HTTP2 quando disponível, streaming incremental
+   keep-alive/pooling de conexão, `TCP_NODELAY` (HTTP/2 **bloqueado**; ADR 0013/0027), streaming incremental
    emitido por delta (sem buffer integral), parse SSE incremental, zero re-encode, cancelamento
    imediato, **sem compressão de transporte** (`Accept-Encoding: identity`) para não pagar
    CPU/latência. Compactação/sumarização de contexto **não** entra no hot path — é off-path/opt-in
@@ -182,7 +183,7 @@ bloqueado pelo `ureq` (HTTP/1.1). Os dialetos `responses`/`messages`/`google` es
 ### E12-T06 ◐ Adaptador built-in `opencode go/zen` (hot path)
 - **Entregáveis:** cliente dos quatro dialetos do gateway (`zen/v1/{responses,messages,
   chat/completions,models/<id>}` e `zen/go/v1/…`) normalizados no trait `Provider`; transporte
-  HTTP/SSE **e** WebSocket; keep-alive/pooling, `TCP_NODELAY`/HTTP2, sem `Accept-Encoding`,
+  HTTP/SSE **e** WebSocket; keep-alive/pooling, `TCP_NODELAY` (HTTP/2 bloqueado, ADR 0027), sem `Accept-Encoding`,
   `chunkTimeout` próprio; header `x-opencode-session` para afinidade; streaming incremental por
   delta (texto parcial) e tool calls **completas** (paridade com `MessageStream` do GDK);
   cancelamento imediato; zero re-encode; reconexão explícita.
@@ -190,7 +191,7 @@ bloqueado pelo `ureq` (HTTP/1.1). Os dialetos `responses`/`messages`/`google` es
   (`models/<id>:streamGenerateContent?alt=sse`; `thought: true` vira thinking, `functionCall`
   completo) normalizados pelo mesmo `wire`, com retry/erro partilhados; `x-opencode-session`,
   keep-alive/`TCP_NODELAY`, sem compressão; catálogo `model → dialeto` (ADR 0012). WebSocket/HTTP2
-  são explícitos `Unsupported`; `responses`/`messages`/`google` têm **smoke ao vivo** por dialeto
+  são explícitos `Unsupported` ([ADR 0027](../adr/0027-fronteiras-de-transporte.md)); `responses`/`messages`/`google` têm **smoke ao vivo** por dialeto
   (`tests/live.rs`, auto-*skip*) e `dynamic_models` ao vivo.
 - **Aceite:** TTFT dentro do orçamento (E12-T07); nenhum buffer integral da resposta; cancelar
   interrompe o stream e não vaza conexão/tarefa; a sessão mantém afinidade via

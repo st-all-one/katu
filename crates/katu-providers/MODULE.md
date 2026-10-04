@@ -54,6 +54,10 @@ A camada de **providers**: o caminho built-in first-party é nosso; o resto é c
 - **Cache de prefixo (por modelo).** `prompt_cache`/`prompt_cache_retention` vêm do catálogo; o
   `prompt_cache_key` deriva da sessão. Medido em `deepseek-v4.1-flash` (2.º turno `cached=896/1004`;
   ADR 0013).
+- **Transporte.** [`http`](src/http.rs) sobre `ureq`: `connect` e `recv_response` têm timeout e o
+  corpo tem um teto **total** (`DEFAULT_BODY_TIMEOUT`, 600 s). O `timeout_recv_body` do `ureq` é
+  total, não *idle* (L-P2): sem teto, uma leitura pendurada deixaria a thread de I/O viva para
+  sempre (G2); o *timeout* de corpo é desembrulhado e mapeado para `TransportError::Timeout`.
 - **Erros.** [`error`](src/error.rs) normaliza a mensagem (`error.message`/`message`/`detail`) e
   retira credenciais/*query* de `URL`s antes de logar; [`retry`](src/retry.rs) respeita
   `x-should-retry`, `Retry-After` (segundos/ms/data) e classifica limites de conta como
@@ -75,4 +79,4 @@ delegados. A HttpApi v2 do agente OpenCode **não** é o seam.
 - `katu-core`/`katu-policy`/`katu-tools` nunca dependem deste crate.
 - WebSocket/HTTP2 são explicitamente `Unsupported`: o `ureq` 3 é HTTP/1.1 e a troca de stack não
   se justifica para um só stream (`responses`/`messages`/`google` estão implementados mas sem
-  validação ao vivo; ADR 0012/0013).
+  validação ao vivo; ADR 0012/0013/0027).

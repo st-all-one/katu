@@ -1,6 +1,7 @@
 //! Testes do dialeto Google Gemini (encode + decode).
 
 use katu_core::error::ToolOutcome;
+use katu_core::kernel::Visibility;
 use katu_core::kernel::{CallId, Message};
 use katu_core::provider::{
     CollectSink, ModelSpec, ProviderOutcome, ProviderRequest, StopReason, Thinking, TokenUsage,
@@ -35,6 +36,7 @@ fn request(model: &str) -> ProviderRequest {
         system: Some("seja breve".to_string()),
         messages: vec![Message::User {
             text: "oi".to_string(),
+            visibility: Visibility::User,
         }],
         tools: Vec::new(),
         max_tokens: Some(64),

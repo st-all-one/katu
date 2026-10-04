@@ -111,7 +111,9 @@ pub(crate) enum Command {
 
 impl Cli {
     /// Se o comando pede envelope JSON em `stdout` (**por comando**, não global).
-    pub(crate) const fn json(&self) -> bool {
+    pub(crate) fn json(&self) -> bool {
+        let _span = katu_core::trace_fn!("cli::json");
+
         match &self.command {
             Some(command) => command.json(),
             None => false,
@@ -121,14 +123,16 @@ impl Cli {
 
 impl Command {
     /// Se o verbo pede envelope JSON.
-    pub(crate) const fn json(&self) -> bool {
+    pub(crate) fn json(&self) -> bool {
+        let _span = katu_core::trace_fn!("cli::command::json");
+
         match self {
             Self::Prime(args) => args.json,
             Self::Upgrade(args) => args.json,
             Self::Config(args) => args.json,
             Self::Memo(args) => args.json,
             #[cfg(feature = "memory-in-process")]
-            Self::Run(args) => args.json,
+            Self::Run(args) => args.wants_json(),
             #[cfg(feature = "memory-in-process")]
             Self::Tui(_) => false,
         }

@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use katu_core::kernel::{State, dispatch};
 use katu_core::plan::{Feature, FeatureStatus, Plan, ScopeContract};
-use katu_core::ports::{FakeEnv, FixedClock, Fs, MemFs, MemProcess, Timestamp};
+use katu_core::ports::{FakeEnv, FixedClock, Fs, MemFs, MemProcess, NO_PROGRESS, Timestamp};
 use katu_policy::{
     Enforcement, PolicyError, ResolvedArgv, ResolvedPath, Rule, RuleCategory, RuleExamples, RuleId,
     RuleScope, RuleSet, Severity, ToolArgs, ToolName, ToolUse,
@@ -258,6 +258,7 @@ fn deny_exec_does_not_run_the_command() -> TestResult<()> {
         timeout_ms: 1_000,
         parent: None,
         cancel: None,
+        progress: &NO_PROGRESS,
     };
     let dispatch = dispatch(
         &State::initial(),

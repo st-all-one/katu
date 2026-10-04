@@ -4,6 +4,7 @@
 //! emitiria); a memória é a porta real (`FakeMemory`). Prova que recall → write → close fecham o
 //! caminho único com o gate de E05 e o log verificável. (O trait de provider é E12-T05.)
 
+use katu_core::kernel::Visibility;
 use katu_core::kernel::{
     CallContext, CallId, Event, MemoryWriteRequest, Message, Session, memory_recall_use,
 };
@@ -154,6 +155,7 @@ fn loop_runs_from_task_to_closed_with_fake_memory() -> TestResult<()> {
     session.apply(&Event::TurnStart { turn: 1 })?;
     session.apply(&Event::UserMessage {
         text: "guarda a decisão da cache".to_string(),
+        visibility: Visibility::User,
     })?;
 
     recall(&mut session, &memory, &rules, &cwd)?;

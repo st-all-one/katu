@@ -2,25 +2,37 @@
 //!
 //! A borda CLI decide; aqui vive a composição (runtime + provider) e a conversão do resultado no
 //! envelope de máquina. Sem o adaptador de memória, o runtime **recusa** (fail-closed, E03-T07).
+//!
+//! `KERNEL_SURFACE` F2: o CLI é um **cliente** do kernel. O `Kernel` é a thread que possui o
+//! runtime/provider; o CLI envia `Submit` e bloqueia no evento terminal (é naturalmente sequencial).
 
+use std::path::Path;
+use std::time::Duration;
+
+use katu_core::api::{Command, Event, KernelBus, KernelHandle, RecvError, TurnSummary, channel};
 use katu_core::context::CompactionMode;
 use katu_core::diag::{Level, events};
-use katu_core::error::Error;
+use katu_core::error::{Error, ErrorKind};
 use katu_core::provider::{ModelSpec, Provider, Thinking};
+use katu_providers::PriceTable;
 use serde_json::{Value, json};
-use std::path::Path;
 
-use super::{Ports, TurnOptions, TurnRequest, run_turn};
 use crate::defaults;
+use crate::kernel::Kernel;
 use crate::login;
 use crate::ports::{StdEnv, StdFs, StdProcess, SystemClock};
-use crate::report::Report;
+use crate::report::{Output, Report};
 use crate::runtime::{Runtime, RuntimeError};
 use crate::tier::TierPolicy;
+
+mod progress;
 
 /// Instrução de sistema (prime) enviada ao modelo no turno.
 pub(crate) const SYSTEM: &str =
     "És o katu, um agente de código. Usa as tools quando precisares e responde de forma concisa.";
+
+/// Período de espera por um evento do kernel (ms).
+const EVENT_POLL_MS: u64 = 20;
 
 /// Argumentos do comando `run` (um por flag).
 pub(crate) struct RunArgs<'a> {
@@ -42,6 +54,8 @@ pub(crate) struct RunArgs<'a> {
     pub compact: bool,
     /// Retoma a sessão: `None` cria nova; `Some("last")` retoma a mais recente; `Some(id)` a indicada.
     pub resume: Option<&'a str>,
+    /// Formato de saída do comando (`LIVE_FLOW` LF5).
+    pub output: Output,
 }
 
 /// Abre o runtime: sessão **nova** (`resume == None`) ou **retomada** (`last`/id).
@@ -64,7 +78,7 @@ pub(crate) fn open_runtime<'a>(
     }
 }
 
-/// Executa um turno do agente e devolve o relatório do comando.
+/// Executa um turno do agente (pelo kernel) e devolve o relatório do comando.
 pub(crate) fn run(args: &RunArgs<'_>) -> Report {
     let _span = katu_core::fn_span!(Level::Debug, events::CLI_RUN, "command::run");
     let fs = StdFs;
@@ -100,56 +114,118 @@ pub(crate) fn run(args: &RunArgs<'_>) -> Report {
         },
         str::to_string,
     );
-    let options = turn_options(model.clone(), args);
-    let ports = Ports {
+    // K1: o kernel é a thread dona do runtime/provider; o CLI só envia comandos e consome eventos.
+    let kernel = Kernel {
+        runtime,
+        provider: std::sync::Arc::from(provider),
         fs: &fs,
-        process: &process,
-        env: &env,
+        process,
+        env,
+        model: ModelSpec::new(model.clone()),
+        turn_model: Some(ModelSpec {
+            model,
+            thinking: args.thinking.unwrap_or_default(),
+        }),
+        tiers,
+        // O envelope do CLI não mostra custo; a linha de uso da TUI é que o usa.
+        prices: PriceTable::new(),
+        max_tokens: args.max_tokens,
+        max_steps: args.max_steps,
     };
-    match run_turn(
-        &mut runtime,
-        TurnRequest {
-            provider: std::sync::Arc::from(provider),
-            ports,
-            goal: args.goal,
-            options: &options,
-            cancel: None,
-        },
-    ) {
-        Ok(turn) => Report::ok("run", Some(turn_value(&runtime, &model, &turn))),
-        Err(error) => Report::failed("run", &error.into()),
+    let result = run_scoped(
+        |bus| kernel.run(bus),
+        |handle| drive(handle, args.goal, args.output),
+    );
+    match result {
+        Ok(summary) => Report::ok("run", Some(envelope(&summary))),
+        Err((kind, message)) => Report::failed_parts("run", kind, &message),
     }
+}
+
+/// Corre o kernel na sua thread e o `drive` na thread da superfície, fechando o canal no fim.
+///
+/// O `handle` nasce **dentro** do escopo: quando o `drive` termina, o canal fecha e a thread do
+/// kernel termina, pelo que o `join` implícito do escopo nunca fica pendurado. Criar o `handle`
+/// **fora** do escopo faria o `join` esperar para sempre (o kernel bloqueado em `recv`) — era o
+/// travamento do CLI no fim do turno.
+fn run_scoped<K, F, T>(kernel: K, drive: F) -> T
+where
+    K: FnOnce(KernelBus) + Send,
+    F: FnOnce(&KernelHandle) -> T,
+{
+    let _span = katu_core::trace_fn!("agent::command::run_scoped");
+
+    std::thread::scope(|scope| {
+        let (bus, handle) = channel();
+        let _kernel = scope.spawn(move || kernel(bus));
+        drive(&handle)
+    })
+}
+
+/// Envia `Submit` e bloqueia no evento terminal (o kernel é a thread; o CLI é sequencial).
+fn drive(
+    handle: &KernelHandle,
+    goal: &str,
+    output: Output,
+) -> Result<TurnSummary, (ErrorKind, String)> {
+    let _span = katu_core::trace_fn!("agent::command::drive");
+
+    if handle.send(Command::Submit(goal.to_string())).is_err() {
+        return Err((
+            ErrorKind::Internal,
+            "kernel terminou antes do turno".to_string(),
+        ));
+    }
+    let mut summary = None;
+    let mut progress = progress::Progress::new(output);
+    loop {
+        match handle.recv(Duration::from_millis(EVENT_POLL_MS)) {
+            Ok(Event::Turn(turn)) => summary = Some(*turn),
+            Ok(Event::Failure { kind, message }) => return Err((kind, message)),
+            // CLI não é interativo: uma escalação é recusada (fail-closed), como o `NoActivity`.
+            Ok(Event::ApprovalRequest(_)) => {
+                let _sent = handle.send(Command::Approval(None));
+            }
+            Ok(Event::Done) | Err(RecvError::Closed) => break,
+            Ok(event) => progress.show(&event),
+            Err(RecvError::Timeout) => {}
+        }
+    }
+    summary.ok_or_else(|| {
+        (
+            ErrorKind::Internal,
+            "o turno não devolveu resultado".to_string(),
+        )
+    })
 }
 
 /// Envelope de máquina de um turno concluído: o que o modelo viu (estado, política) e o que gastou.
-fn turn_value(runtime: &Runtime<'_>, model: &str, turn: &super::TurnReport) -> Value {
-    let _span = katu_core::trace_fn!("agent::command::turn_value");
+fn envelope(turn: &TurnSummary) -> Value {
+    let _span = katu_core::trace_fn!("agent::command::envelope");
 
-    let state = runtime.state_text().map(str::to_string);
-    envelope(
-        model,
-        turn,
-        runtime.session_id(),
-        state.as_deref(),
-        runtime.selection().as_str(),
-    )
-}
-
-/// Opções do turno (modelo + pensamento resolvidos, E20-T17).
-fn turn_options(model: String, args: &RunArgs<'_>) -> TurnOptions {
-    let _span = katu_core::trace_fn!("agent::command::turn_options");
-
-    TurnOptions {
-        model: ModelSpec {
-            model,
-            thinking: args.thinking.unwrap_or_default(),
-        },
-        system: Some(SYSTEM.to_string()),
-        max_tokens: args.max_tokens,
-        temperature: 0.0,
-        max_steps: args.max_steps,
-        idle_ms: super::DEFAULT_IDLE_MS,
-    }
+    let usage = turn.usage.as_ref().map(|usage| {
+        json!({
+            "input": usage.input,
+            "output": usage.output,
+            "cached": usage.cached_input,
+            "basis": usage.basis.as_str(),
+        })
+    });
+    json!({
+        "session": turn.session,
+        "round_exit": turn.round_exit,
+        "termination": turn.termination,
+        "model": turn.model,
+        "steps": turn.steps,
+        "chars": turn.text.chars().count(),
+        "calls": turn.calls,
+        "cancelled": turn.cancelled,
+        "stop": turn.stop,
+        "usage": usage,
+        "state": turn.state,
+        "context_selection": turn.selection,
+        "text": turn.text,
+    })
 }
 
 /// Converte a falha do runtime na taxonomia estável de erro do katu.
@@ -220,41 +296,6 @@ pub(crate) fn build_provider(
     }
 }
 
-/// Envelope do resultado de um turno (id da sessão + exit da rodada).
-fn envelope(
-    model: &str,
-    turn: &super::TurnReport,
-    session: Option<&str>,
-    state: Option<&str>,
-    selection: &str,
-) -> Value {
-    let _span = katu_core::trace_fn!("agent::command::envelope");
-
-    let usage = turn.usage.as_ref().map(|usage| {
-        json!({
-            "input": usage.input,
-            "output": usage.output,
-            "cached": usage.cached_input,
-            "basis": usage.basis.as_str(),
-        })
-    });
-    json!({
-        "session": session,
-        "round_exit": turn.termination.round_exit(),
-        "termination": turn.termination.as_str(),
-        "model": model,
-        "steps": turn.steps,
-        "chars": turn.text.chars().count(),
-        "calls": turn.calls,
-        "cancelled": turn.cancelled,
-        "stop": super::stop_label(&turn.stop),
-        "usage": usage,
-        "state": state,
-        "context_selection": selection,
-        "text": turn.text,
-    })
-}
-
 /// Base URL por omissão de cada provider.
 pub(crate) fn default_base(provider: &str) -> &'static str {
     let _span = katu_core::trace_fn!("agent::command::default_base");
@@ -275,3 +316,6 @@ pub(crate) fn default_model(provider: &str) -> &'static str {
         _ => "qwen",
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -30,13 +30,18 @@ A **interface de terminal** do katu (uma das duas superfícies, com a CLI — G7
   atomicamente após cada turno) e o **viewer read-only** (`T` → `Action::OpenTranscript`,
   `Command::Transcript`, `src/transcript.rs`) lê o ficheiro com scroll e sem edição — o live nunca
   entra na transcrição (§50.3). O **cancelamento** (**`Esc` e `Ctrl-C`** durante o stream) é
-  cooperativo (`Painter::cancelled`/`poll_input` → `ActivitySink::cancelled`): o turno fecha limpo
-  e a UI mostra `Update::Cancelled`. O `Painter::tick` (chamado pelo loop enquanto o provider cala)
-  sonda o input **sem deltas**, e a `Flag` partilhada (`Painter::cancel_flag`) interrompe também as
-  tools longas (L-P1/L-P3). O **steering** (E20-T16) usa a mesma sondagem não bloqueante: o que se
-  escreve aparece na linha de entrada e o `Enter` enfileira um prompt (FIFO) que a borda aplica no
-  passo seguinte (`ActivitySink::steer`). Os **argumentos crus** do modelo (`Live::Tool { name, args }`) aparecem
-  no painel ao lado da tool.
+  cooperativo: o loop principal (`run`) escreve a `Flag` partilhada via `Handler::cancel_flag`
+  (→ `ActivitySink::cancelled`), o turno fecha limpo e a UI mostra `Update::Cancelled`. A `Flag`
+  partilhada interrompe também as tools longas (L-P1/L-P3). O **steering** (E20-T16) usa o mesmo
+  loop: o que se escreve aparece na linha de entrada (`App::steering`) e o `Enter` envia
+  `Command::Steer` (FIFO) que a borda aplica no passo seguinte (`ActivitySink::steer`). O loop
+  principal **nunca** bloqueia no kernel (`Handler::poll` drena sem bloquear), pelo que rato/resize/
+  cópia continuam vivos durante o turno (G7); o `Painter` só pinta o `Live` e apresenta o challenge.
+  Os **argumentos crus** do modelo (`Live::Tool { name, args }`) aparecem
+  no painel ao lado da tool; a tool concluída mostra `✓ <nome>: <resumo>` (`Live::ToolDone`,
+  `LIVE_FLOW` LF4); o **raciocínio** (`Live::Thinking`) é desenhado em tom esbatido
+  (`LIVE_FLOW` LF2) e o painel **persiste** após o turno até ao próximo `submit` (LF3), pelo que o
+  fluxo fica relível.
 - **E10-T06 ☑** — cabeçalho mostra fase + pendência + **próxima ação** do checkpoint
   (`Update::NextAction`) a partir do `App` (alimentado pelo binário com `Runtime::phase`), e o
   **uso/custo** do turno (`Update::Usage`, formatado pela borda).
@@ -52,8 +57,8 @@ A **interface de terminal** do katu (uma das duas superfícies, com a CLI — G7
   e `x` esvazia com challenge, `src/trash.rs`), **compactação** (`c` → liga/desliga o contexto
   efetivo, E09-T07) e **gate de verificação** (`v`, E09-T03). A borda aplica o modelo ao **próximo**
   turno e publica a lista via `Update::Models` (do **catálogo** do provider, E12-T02/T10). O turno
-  corre no handler da borda, mas o **I/O do provider** corre numa thread própria (L-P1): a UI
-  continua a sondar input durante o stream.
+  corre na **thread do kernel** (a borda é só cliente) e a UI nunca bloqueia: drena eventos e
+  continua a sondar input durante o stream (L-P1/F2).
 - **E20-T10 ☑ / E20-T15 ☑ (TUI v2)** — comandos `/` na linha de mensagem (`src/menu.rs` +
   `src/overlay.rs` + `src/app/menu.rs`): mini-menus de `/model` e `/thinking` (adaptados às
   **capacidades** via `Update::ThinkingOptions`), ajuda `?`, e `Esc`/`Ctrl-C` como cancelamento da

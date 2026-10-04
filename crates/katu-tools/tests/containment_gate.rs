@@ -7,7 +7,7 @@
 use katu_core::containment::{ContainmentStatus, Jail, NoJail, SandboxEnforcement};
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::{State, Tool, ToolOutput, dispatch};
-use katu_core::ports::{Env, ExecRequest, FakeEnv, MemFs, MemProcess, Never, Process};
+use katu_core::ports::{Env, ExecRequest, FakeEnv, MemFs, MemProcess, NO_PROGRESS, Never, Process};
 use katu_policy::{
     Enforcement, PolicyError, ResolvedArgv, ResolvedPath, Rule, RuleCategory, RuleExamples, RuleId,
     RuleScope, RuleSet, Severity, ToolArgs, ToolName, ToolUse,
@@ -56,6 +56,7 @@ fn unknown_vocabulary_never_runs() -> TestResult<()> {
         timeout_ms: 1_000,
         parent: None,
         cancel: None,
+        progress: &NO_PROGRESS,
     };
     let rules = RuleSet {
         vocab: 999,
@@ -83,6 +84,7 @@ fn missing_argv_is_unavailable_and_does_not_run() -> TestResult<()> {
         timeout_ms: 1_000,
         parent: None,
         cancel: None,
+        progress: &NO_PROGRESS,
     };
     let mut use_ = exec_use(&["ls"])?;
     use_.argv = None;
@@ -166,6 +168,7 @@ fn soft_containment_does_not_confine_the_host() -> TestResult<()> {
         timeout_ms: 1_000,
         parent: None,
         cancel: None,
+        progress: &NO_PROGRESS,
     };
 
     // Dentro das tools do katu, a política nega e o comando não corre.

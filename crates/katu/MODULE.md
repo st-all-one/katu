@@ -74,7 +74,11 @@ todo o código impuro confinado.
   E07-T02) e no executor; a tool `memory` passa pelos caminhos de recall/escrita do gate de E05.
   Um argumento malformado do modelo **não** aborta o turno: vira `ToolOutcome::Unavailable`
   (`control = "argument"`) com o erro no delta, pelo que o modelo o vê e corrige no passo seguinte.
-  O comando `katu run` exercita-o. Envelopes de `Dispatch`/memória vivem em `src/memory/commands.rs`.
+  O comando `katu run` exercita-o como cliente do kernel e mostra o fluxo (raciocínio, tools com
+  resumo, texto) **ao vivo** em `stderr` ou como JSONL (`--output stream-json`;
+  `src/agent/command/progress.rs`, `LIVE_FLOW` LF1/LF4/LF5), com `stdout` só para os dados. O
+  `handle` do cliente nasce **dentro** do escopo (`run_scoped`), pelo que o `join` do kernel nunca
+  fica pendurado no fim do turno (K4). Envelopes de `Dispatch`/memória vivem em `src/memory/commands.rs`.
   **Guard de loop** (Q-12/F7): cada passo é observado **antes** de executar
   (`kernel::guard`, CUSUM + **e-value** *anytime-valid* sobre a assinatura das chamadas); um ciclo de
   leitura sem progresso corta o turno no 5.º passo, emite `agent.loop` e **fecha** o turno. O fim
@@ -88,6 +92,14 @@ todo o código impuro confinado.
   (`finish_reason=length`) é fechada sem executar (`Unavailable{length}` + delta que ensina, L-Q2),
   uma resposta que **ecoa** o delta de uma tool leva *nudge* + retry (L-Q4) e uma resposta **vazia**
   é retentada antes da mensagem final (L-Q3).
+- **Melhorias do loop derivadas do pi** ([`PI_GAINS`](../../wiki/_ref/plan/PI_GAINS.md)): uma tool
+  pode pedir o fim **normal** do turno (`ToolOutput.terminate` → `CallsOutcome::Terminate`, só se
+  **todas** as calls do passo o pedem; `Termination::Terminal`); o modelo pode mudar **por passo**
+  (`StepModel`/`PhaseModel` em `tier.rs`, consultado em `drive` — hoje inerte porque a fase não
+  avança); o output de uma tool longa flui **efémero** (`Process::run_streaming` → `Progress` →
+  `Live::ToolOutput`, publicado em paralelo pelo `Publisher` do canal, **nunca** no log); e a
+  superfície pode pedir **um** passo extra antes do fim natural (`Command::Continue` + flag one-shot
+  `Flag::take`, consultada por `ActivitySink::continue_once`).
 - **Interrupção** (WL3, `src/agent/turn/stream.rs`): o corpo bloqueante do provider corre numa
   thread de I/O e a thread do turno drena um canal *bounded*, sondando o input a cada 50 ms
   **mesmo sem deltas** (`ActivitySink::tick`), pelo que `Esc`/`Ctrl-C` cancelam de imediato; a
@@ -115,11 +127,13 @@ todo o código impuro confinado.
   **one-shot** — depois de usada, a capacidade é revogada e a próxima escalação exige nova
   aprovação. Medido em [`bench/e18/approval`](../../bench/e18/approval/PROTOCOL.md).
 - **UI de terminal** (`src/tui.rs`, feature `memory-in-process`, E10-T01/T02/T05): comando
-  `katu tui`. A UI (`katu-tui`) é pura (estado central + keymap + render) e a borda implementa o
-  `Handler` que corre o turno e injeta `Update`s; `Runtime::begin_turn` abre o próximo turno
+  `katu tui`. A UI (`katu-tui`) é pura (estado central + keymap + render); o **kernel** corre na
+  sua thread (`src/kernel.rs`, `KERNEL_SURFACE` F1/F2) e é o dono do runtime/provider, e a borda é
+  só um cliente (`KernelClient` em `src/tui/handler.rs`) que envia `Command` e injeta `Event`s;
+  `Runtime::begin_turn` abre o próximo turno
   (multi-turno) e `Runtime::phase` alimenta o indicador de fase (E10-T06). O streaming do modelo e
   as tools em curso vão **ao vivo** para o painel de atividade via `run_turn_with` + `ActivitySink`
-  (`LivePainter`/`Painter`), sem entrarem no log. O **steering** (E20-T16) é consultado **entre
+  (`BusSink`/`Painter`), sem entrarem no log. O **steering** (E20-T16) é consultado **entre
   passos** (`ActivitySink::steer`) e injetado como mensagem de utilizador no passo seguinte. O
   **modo de planeamento** (`/plan`, E20-T11) vive em `src/runtime/plan_mode.rs` (regras
   `plan-write-only-katu`/`plan-no-shell` + artefacto `.katu/plan/<UTC>.md`), e `!<cmd>` (E20-T12)
@@ -128,10 +142,11 @@ todo o código impuro confinado.
   sistema (fonte de verdade máxima) e as skills `.agents/skill{,s}/*/SKILL.md` entram como
   catálogo (nome/descrição/caminho); `/skill:<nome>` força o carregamento. A **transcrição durável** é projetada do log
   (`Runtime::transcript`, `src/runtime/transcript.rs`) e escrita atomicamente em
-  `<root>/.katu/transcript.md` após cada turno (`src/tui/transcript.rs`); a TUI serve-a numa vista
+  `<root>/.katu/transcript.md` após cada turno (`src/kernel/transcript.rs`); a TUI serve-a numa vista
   read-only (`T`, E10-T05). As **recusas de política**
   (`Denied`/`Unavailable`) chegam ao painel/transcript com regra + evidência, e uma
-  `RequireApproval` abre um **challenge-and-response** na TUI: o humano assina
+  `RequireApproval` abre um **challenge-and-response** na TUI: o kernel publica `ApprovalRequest` e
+  o cliente responde com `Command::Approval`; o humano assina
   (`reason`+`granted_by`), o kernel regista `ApprovalGranted` e concede a capacidade mínima
   (`katu-policy::capability_for`), re-executando a chamada (E10-T04/E07-T05, §33). O runtime
   carrega as regras de **memória + contenção** e define o **workspace** no arranque (`Runtime::open`),
@@ -145,13 +160,18 @@ todo o código impuro confinado.
   E12-T03). O turno
   seguinte usa o estado de controlo (o agente nunca se auto-escala). O **checkpoint** de fase é
   escrito no fim de cada turno (`Runtime::write_checkpoint`, próxima ação de `next_phase`) e lido no
-  arranque (`Runtime::checkpoint`); o cabeçalho mostra a próxima ação (E10-T06). O handler vive em
-  `src/tui/handler.rs` (a borda ficou sob o teto de linhas). O utilizador pode **cancelar** o turno
-  (Esc/Ctrl-C durante o stream → `ActivitySink::cancelled` → `Flow::Break`, diag `tui.cancel`); o
+  arranque (`Runtime::checkpoint`); o cabeçalho mostra a próxima ação (E10-T06). O actor vive em
+  `src/kernel.rs` (`Kernel`, dono do runtime/provider); os clientes são a TUI (`KernelClient` em
+  `src/tui/handler.rs`) e o CLI `katu run` (`src/agent/command.rs`, envia `Submit` e bloqueia no
+  evento terminal). O utilizador pode **cancelar** o turno
+  (Esc/Ctrl-C durante o stream → `ActivitySink::cancelled` → `Flow::Break`, diag `tui.cancel`); a
+  flag é **partilhada** com o kernel, pelo que o cancelamento é visto mesmo **dentro** de uma tool
+  longa (`Esc` a meio de um `bash`); o
   **uso/custo** do turno aparece no cabeçalho (`usage_line`, `src/pricing.rs` + `policy/prices.toml`)
   e os **argumentos crus** do modelo no painel (`Activity::Tool { args }`). `--resume [last|id]`
-  retoma uma sessão e `memo sessions` lista-as. O turno é **síncrono** nesta fatia (executor em
-  background é trabalho futuro).
+  retoma uma sessão e `memo sessions` lista-as. O kernel corre na sua thread; a superfície drena
+  eventos sem bloquear (o turno deixa de bloquear o loop de eventos da UI: rato/resize/cópia e
+  *steering* continuam vivos durante o turno, G7).
 - Exit codes na borda (a lógica propaga `Result`).
 - Harness de medição do MVK (`examples/measure_mvk.rs`, feature `profile`, E05-T06): corre o
   caminho real e grava `bench/mvk/raw.json` (evidência tipada, DF5).

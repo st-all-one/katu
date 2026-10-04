@@ -34,6 +34,11 @@ pub enum Command {
     Cancel,
     /// Prompt de *steering* aplicado no passo seguinte do turno (E20-T16).
     Steer(String),
+    /// Pede **um** passo extra antes do fim natural do turno (`S1/PI_GAINS`); one-shot.
+    ///
+    /// Só tem efeito durante um turno (a flag partilhada é consumida pelo loop); fora dele é
+    /// no-op, como [`Command::Steer`].
+    Continue,
     /// Resposta a um [`Event::ApprovalRequest`](super::Event::ApprovalRequest) pendente.
     ///
     /// `None` = recusado/cancelado (fail-closed, §33); `Some` = concessão assinada.

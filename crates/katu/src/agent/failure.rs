@@ -47,6 +47,8 @@ pub(crate) fn route_failure(
         outcome,
         use_: None,
         approval: None,
+        delta: None,
+        terminate: false,
     })
 }
 

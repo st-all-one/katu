@@ -5,23 +5,23 @@
 
 use std::path::PathBuf;
 
+use katu_core::api::Event as Update;
 use katu_core::kernel::katu_dir;
 use katu_core::ports::Fs;
-use katu_tui::Update;
 
-use super::AgentHandler;
+use super::Kernel;
 
-impl AgentHandler<'_> {
+impl Kernel<'_> {
     /// Caminho do ficheiro de transcrição (`<root>/.katu/transcript.md`).
     fn transcript_path(&self) -> PathBuf {
-        let _span = katu_core::trace_fn!("tui::transcript::transcript_path");
+        let _span = katu_core::trace_fn!("kernel::transcript::transcript_path");
 
         katu_dir(self.runtime.root()).join("transcript.md")
     }
 
     /// Escreve a transcrição durável no ficheiro; devolve um `Update` de erro, se falhar.
     pub(super) fn write_transcript(&self) -> Option<Update> {
-        let _span = katu_core::trace_fn!("tui::transcript::write_transcript");
+        let _span = katu_core::trace_fn!("kernel::transcript::write_transcript");
 
         let lines = match self.runtime.transcript() {
             Ok(lines) => lines,
@@ -43,7 +43,7 @@ impl AgentHandler<'_> {
 
     /// Serve a vista read-only: garante o ficheiro e lê-o de volta (E10-T05).
     pub(super) fn transcript_view(&self) -> Vec<Update> {
-        let _span = katu_core::trace_fn!("tui::transcript::transcript_view");
+        let _span = katu_core::trace_fn!("kernel::transcript::transcript_view");
 
         let mut updates = Vec::new();
         if let Some(error) = self.write_transcript() {
@@ -59,7 +59,7 @@ impl AgentHandler<'_> {
 
 /// Divide o ficheiro em linhas (lossy: nunca rebenta com bytes inválidos).
 fn split_lines(bytes: &[u8]) -> Vec<String> {
-    let _span = katu_core::trace_fn!("tui::transcript::split_lines");
+    let _span = katu_core::trace_fn!("kernel::transcript::split_lines");
 
     String::from_utf8_lossy(bytes)
         .lines()

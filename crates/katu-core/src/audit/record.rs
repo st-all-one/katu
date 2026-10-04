@@ -61,7 +61,7 @@ impl AuditRecord {
                 record.kind = "turn";
                 record.text = format!("turn {turn} end");
             }
-            Event::UserMessage { text } => {
+            Event::UserMessage { text, .. } => {
                 record.kind = "user";
                 record.text.clone_from(text);
             }

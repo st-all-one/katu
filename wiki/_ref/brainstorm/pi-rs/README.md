@@ -30,6 +30,8 @@ Este diretório contém a análise do monorepo TypeScript `_REF/pi` (Pi Agent Ha
 | 13 | [Roadmap de migração](13-roadmap-migracao.md) | Fases, marcos e critérios de saída |
 | 14 | [Estratégia de testes](14-estrategia-testes.md) | Conformance, fixtures, golden files, evals |
 | 15 | [Riscos e decisões (ADRs)](15-riscos-e-decisoes.md) | Riscos técnicos e decisões arquiteturais |
+| — | [PI_LOOP](PI_LOOP.md) | **Deep dive:** o loop, os turnos, as tools e o I/O do modelo, código a código |
+| — | [PI_VS_KATU_LOOP](PI_VS_KATU_LOOP.md) | Comparação com o loop do `katu`: diferenças provadas e o que incorporar |
 
 ## Resumo executivo
 

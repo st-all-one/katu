@@ -7,7 +7,7 @@
 
 - **Ficheiro:** `NNNN-titulo-em-kebab.md`, com `NNNN` zero-padded (`0001`, `0002`, …). Números
   **nunca** se reutilizam.
-- **Secções obrigatórias:** `## Contexto`, `## Decisão`, `## Alternativas consideradas`,
+- **Secções obrigatórias:** `## Contexto`, `## Decisão`, `## Alternatives considered`,
   `## Consequências`.
 - **Imutáveis:** uma ADR **não** se edita para outra decisão. Substitui-se por uma nova e liga-se
   a ambas (`Supersedes` / `Superseded by`).
@@ -46,6 +46,7 @@
 | [0024](0024-durabilidade-do-log.md) | Durabilidade do log: `fsync` por evento ou por turno (opt-in) | aceite |
 | [0025](0025-decodificacao-estruturada-por-schema.md) | Decodificação estruturada por JSON Schema: opt-in, fail-open | aceite |
 | [0026](0026-modo-batch-declarativo-manter-loop-nativo.md) | Modo `batch` declarativo: manter o loop nativo (B-08) | aceite |
+| [0027](0027-fronteiras-de-transporte.md) | Fronteiras de transporte fechadas: SSE no provider, kernel in-process | aceite |
 
 ## Template
 

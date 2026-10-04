@@ -1,16 +1,19 @@
 //! Montagem do pedido ao provider (E09-T01/T07): contexto efetivo com orçamento.
 
 use katu_core::context::Context;
-use katu_core::provider::{ProviderRequest, ToolDef};
+use katu_core::provider::{ModelSpec, ProviderRequest, ToolDef};
 
 use crate::agent::{AgentError, TurnOptions};
 use crate::runtime::Runtime;
 
 /// Monta o pedido ao provider para um passo (histórico = projeção do log).
+///
+/// O `model` vem resolvido do passo (`Q2/PI_GAINS`): pode mudar entre passos do mesmo turno.
 pub(super) fn build_request(
     runtime: &Runtime<'_>,
     options: &TurnOptions,
     tools: &[ToolDef],
+    model: &ModelSpec,
 ) -> Result<ProviderRequest, AgentError> {
     let _span = katu_core::trace_fn!("agent::turn::request::build_request");
 
@@ -22,7 +25,7 @@ pub(super) fn build_request(
         &runtime.skills_catalog(),
     );
     Ok(ProviderRequest {
-        model: options.model.clone(),
+        model: model.clone(),
         system,
         messages: context.messages,
         tools: tools.to_vec(),
@@ -79,6 +82,7 @@ mod tests {
             temperature: 0.0,
             max_steps: 1,
             idle_ms: 0,
+            step_model: None,
         }
     }
 

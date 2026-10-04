@@ -1,5 +1,6 @@
 use super::{CallContext, Session, SessionError};
 use crate::error::ToolOutcome;
+use crate::kernel::Visibility;
 use crate::kernel::budget::BudgetCap;
 use crate::kernel::event::{CallId, Event};
 use crate::kernel::log::read_records;
@@ -84,7 +85,10 @@ fn denied_tool_call_is_logged_but_not_executed() -> Result<(), Box<dyn std::erro
     let dir = Path::new("/sessions");
     let mut session = Session::open(&fs, dir)?;
     session.apply(&Event::TurnStart { turn: 1 })?;
-    session.apply(&Event::UserMessage { text: "x".into() })?;
+    session.apply(&Event::UserMessage {
+        text: "x".into(),
+        visibility: Visibility::User,
+    })?;
 
     let probe = Probe {
         calls: AtomicUsize::new(0),

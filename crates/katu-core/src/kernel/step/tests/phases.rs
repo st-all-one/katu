@@ -1,5 +1,6 @@
 use super::{complete, pass_report, plan, read_tool, step, tool};
 use crate::feedback::CommandRecord;
+use crate::kernel::Visibility;
 use crate::kernel::event::Event;
 use crate::kernel::state::{RefusalReason, State};
 use katu_policy::{Phase, ResolvedPath, ToolName};
@@ -8,7 +9,13 @@ use katu_policy::{Phase, ResolvedPath, ToolName};
 fn happy_path_reaches_closed() -> Result<(), Box<dyn std::error::Error>> {
     let mut state = State::initial();
     state = step(&state, &Event::TurnStart { turn: 1 })?;
-    state = step(&state, &Event::UserMessage { text: "oi".into() })?;
+    state = step(
+        &state,
+        &Event::UserMessage {
+            text: "oi".into(),
+            visibility: Visibility::User,
+        },
+    )?;
     state = complete(&state, "c0", read_tool()?)?;
     state = complete(&state, "c1", tool()?)?;
     state = step(&state, &Event::PlanRecorded { plan: plan() })?;

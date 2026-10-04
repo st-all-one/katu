@@ -19,9 +19,18 @@
 > (`serde`), `KernelHandle`/`KernelBus`/`Flag` e testes de ida-e-volta; `katu-tui` deixou de ter
 > `message.rs` e re-exporta o protocolo (`Update` é o `Event`). `Live`/`TrashEntry`/
 > `LoginRequest`/`ApprovalRequest` são dados do protocolo. **G4** (truncagem em `length` para todas
-> as calls) e **G5** (eco nunca aceite) fechados com teste. **F1** (actor do kernel numa thread) é o
-> próximo passo; **G2** (teto total do corpo), **G3** (visibilidade dupla) e **G6** (`normalize`)
-> ficam para F3.
+> as calls) e **G5** (eco nunca aceite) fechados com teste. **F1** implementado: o **actor do kernel**
+> (`crates/katu/src/kernel.rs`) corre na sua thread e é o dono do `Runtime`/`Provider`; a TUI é
+> um cliente (`KernelClient` em `crates/katu/src/tui/handler.rs`) que envia `Command` e consome
+> `Event`; a aprovação é request/response (`Event::ApprovalRequest` ↔ `Command::Approval`,
+> `BusSink::ask`); o cancelamento é a flag partilhada (visto **dentro** das tools, fecha o P0).
+> **F2** implementado: o loop da TUI (`katu-tui::run`) **nunca** bloqueia no kernel — o `Handler`
+> passou a `send`/`poll`/`busy` e o loop principal drena eventos, trata teclado/rato/resize e
+> redesenha durante o turno (**G7** fechado); o CLI `katu run` é cliente do **mesmo** actor (envia
+> `Submit`, bloqueia no evento terminal e reconstrói o envelope de `Event::Turn`/`Event::Failure`);
+> o `Kernel` mudou de `src/tui/` para `src/kernel/` (partilhado, sem depender da UI). **G2** (teto **total** do corpo no transporte + mapeamento do
+> *timeout* de corpo), **G3** (`Visibility::{User,Agent}` no log/projeção; o nudge chega ao modelo e
+> não à transcrição) e **G6** (`normalize`: pareamento, vazios, adjacência e lead) fechados com teste.
 
 ---
 
@@ -41,7 +50,7 @@ Três consequências que governam todo o plano:
    instante**, mesmo que o kernel esteja ocupado.
 3. **A fronteira é serializável.** O protocolo não transporta `Runtime`, `Session` nem `Provider`;
    transporta dados. Assim a thread pode tornar-se **processo** (`katu serve`) sem reescrever o
-   protocolo.
+   protocolo — uma **opção** futura, não comprometida ([ADR 0027](../adr/0027-fronteiras-de-transporte.md)).
 
 ---
 
@@ -167,7 +176,7 @@ loop {
 ## 6. Fases
 
 ```
-F0 (protocolo) → F1 (actor do kernel) → F2 (re-ligar CLI/TUI) → F3 (lacunas goose) → F4 (processo)
+F0 (protocolo) → F1 (actor do kernel) → F2 (re-ligar CLI/TUI) → F3 (lacunas goose) → F4 (processo, **rejeitada**)
 ```
 
 ### F0 — Congelar a fronteira
@@ -184,7 +193,8 @@ F0 (protocolo) → F1 (actor do kernel) → F2 (re-ligar CLI/TUI) → F3 (lacuna
 
 ### F2 — Re-ligar as superfícies
 - `katu run`: cria o handle, envia `Submit`, bloqueia no evento terminal (o CLI é naturalmente
-  sequencial; o kernel é a thread).
+  sequencial; o kernel é a thread). O `handle` nasce **dentro** do escopo (`run_scoped`): ao
+  terminar o `drive`, o canal fecha e o `join` do kernel **não** pendura (K4).
 - `katu tui`: o loop principal drena o canal do kernel **enquanto** processa teclado/rato/resize e
   redesenha; `handler.handle` deixa de bloquear.
 - Remover qualquer acesso directo a `Runtime` dos front-ends (K2).
@@ -193,9 +203,14 @@ F0 (protocolo) → F1 (actor do kernel) → F2 (re-ligar CLI/TUI) → F3 (lacuna
 - Teto do corpo; `Visibility`; `length` para todas as calls; eco nunca aceite; `normalize` reforçado.
 - Cada uma com teste e, onde há alvo, artefacto.
 
-### F4 — Fronteira de processo (opcional, se o roteiro pedir)
-- `katu serve`: o mesmo protocolo sobre Unix socket/stdio; ACP/outros front-ends.
-- Só se justifica com mais de um cliente ou isolamento de falhas; o protocolo já está preparado.
+### F4 — Fronteira de processo — **rejeitada** ([ADR 0027](../adr/0027-fronteiras-de-transporte.md))
+
+> Um só front-end (a TUI) e um CLI sequencial não justificam IPC + versionamento de protocolo +
+> um modo de falha novo. O protocolo mantém-se `serde`-pronto como **opção barata de futuro**, não
+> como fase comprometida. Reabre só com um **segundo front-end real** (ADR 0027).
+
+- ~~`katu serve`: o mesmo protocolo sobre Unix socket/stdio; ACP/outros front-ends.~~
+- ~~Só se justifica com mais de um cliente ou isolamento de falhas.~~
 
 ---
 
@@ -247,7 +262,7 @@ F0 (protocolo) → F1 (actor do kernel) → F2 (re-ligar CLI/TUI) → F3 (lacuna
   single-threaded e determinístico.
 - Copiar o loop monolítico ou os dois motores do goose ([`GOOSE_LOOP`](../brainstorm/goose-rs/GOOSE_LOOP.md) §7).
 - Mover o loop para `async`/Tokio.
-- Processo/socket **antes** de a fronteira in-process estar travada (F4 é condicional).
+- Processo/socket: **rejeitado** enquanto não houver um segundo front-end real (F4; [ADR 0027](../adr/0027-fronteiras-de-transporte.md)).
 
 ---
 
@@ -262,4 +277,4 @@ F0 (protocolo) → F1 (actor do kernel) → F2 (re-ligar CLI/TUI) → F3 (lacuna
 | "executou uma tool com argumentos cortados" | F3 · G4 |
 | "aceitou o eco como resposta" | F3 · G5 |
 | "o CLI e a TUI comportam-se diferente" | F0/F2 · K4 |
-| "quero um front-end novo (ACP/serve)" | F4 |
+| "quero um front-end novo (ACP/serve)" | F4 — **rejeitada** ([ADR 0027](../adr/0027-fronteiras-de-transporte.md)) |

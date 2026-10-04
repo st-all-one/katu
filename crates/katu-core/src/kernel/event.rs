@@ -32,6 +32,20 @@ impl CallId {
     }
 }
 
+/// Visibilidade de uma mensagem do utilizador (G3).
+///
+/// `User` é uma mensagem **humana** (aparece na transcrição); `Agent` é um *nudge* do loop — chega
+/// ao modelo (`Model-visible ⟺ logged`), mas não é do utilizador e **não** aparece na transcrição.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Visibility {
+    /// Mensagem do humano.
+    #[default]
+    User,
+    /// Instrução do loop (*nudge*), invisível para o humano na transcrição.
+    Agent,
+}
+
 /// Evento append-only de uma sessão (E04-T01).
 ///
 /// A ordem no log é a ordem causal; a projeção para o modelo ignora os eventos de controlo.
@@ -44,10 +58,13 @@ pub enum Event {
         /// Número do turno.
         turn: u32,
     },
-    /// Mensagem do utilizador.
+    /// Mensagem do utilizador (humana ou *nudge* do loop; ver [`Visibility`]).
     UserMessage {
         /// Texto.
         text: String,
+        /// Quem a produziu (G3); `User` por omissão (compatível com logs antigos).
+        #[serde(default)]
+        visibility: Visibility,
     },
     /// Mensagem do assistente.
     AssistantMessage {

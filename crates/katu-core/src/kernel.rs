@@ -32,7 +32,7 @@ pub use cost::{
     CostCaps, CostCharge, CostGovernor, CostLayer, CostRefusal, KillSwitch, Reenable,
     ReenableError, RollingWindowCap, VelocityCap, cost_charge_for,
 };
-pub use event::{CallId, Event};
+pub use event::{CallId, Event, Visibility};
 pub use guard::{Alarm, AlarmKind, Call, Fingerprint, Guard, GuardParams};
 pub use hash::{canonical as canonical_hash, fnv1a};
 pub use log::{

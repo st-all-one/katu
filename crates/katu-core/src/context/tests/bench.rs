@@ -11,6 +11,7 @@
 //! --nocapture ab_context_selection_by_information`; o artefacto é publicado e `bench/published.toml`
 //! cita-o (DF5). `check-diag` proíbe `println!` em `crates/`: o número sai para **ficheiro**.
 
+use crate::kernel::Visibility;
 mod rate_distortion;
 
 use rate_distortion::{distortion, intra_similarity, probe_swaps, rate, tokens_total};
@@ -127,6 +128,7 @@ pub(super) fn scenario() -> Result<Vec<Event>, Box<dyn std::error::Error>> {
     ];
     let mut events = vec![Event::UserMessage {
         text: GOAL.to_string(),
+        visibility: Visibility::User,
     }];
     for turn in 0..40_u32 {
         events.push(Event::AssistantMessage {
@@ -134,6 +136,7 @@ pub(super) fn scenario() -> Result<Vec<Event>, Box<dyn std::error::Error>> {
         });
         events.push(Event::UserMessage {
             text: format!("pedido {turn} katu repetido katu repetido"),
+            visibility: Visibility::User,
         });
         if turn % 10 == 3 {
             let index = usize::try_from(turn / 10).unwrap_or(0);
@@ -176,6 +179,7 @@ fn push_tool_batch(events: &mut Vec<Event>, turn: u32, use_: &katu_policy::ToolU
 fn uniform_scenario() -> Vec<Event> {
     let mut events = vec![Event::UserMessage {
         text: GOAL.to_string(),
+        visibility: Visibility::User,
     }];
     for turn in 0..40_u32 {
         events.push(Event::AssistantMessage {
@@ -183,6 +187,7 @@ fn uniform_scenario() -> Vec<Event> {
         });
         events.push(Event::UserMessage {
             text: format!("pedido{turn} delta{turn} epsilon{turn} zeta{turn}"),
+            visibility: Visibility::User,
         });
     }
     events

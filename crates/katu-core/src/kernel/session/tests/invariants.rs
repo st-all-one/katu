@@ -4,6 +4,7 @@
 //!   aparecem e o estado confere com o log (`Session::verify`).
 //! - "nunca `Ok` com erros": um evento recusado não muda estado nem log (escrita atómica).
 
+use crate::kernel::Visibility;
 use std::path::Path;
 
 use super::{Session, SessionError};
@@ -18,7 +19,8 @@ fn model_visible_is_exactly_the_logged_messages() -> Result<(), Box<dyn std::err
     let mut session = Session::open(&fs, dir)?;
     session.apply(&Event::TurnStart { turn: 1 })?;
     session.apply(&Event::UserMessage {
-        text: "olá".into()
+        text: "olá".into(),
+        visibility: Visibility::User,
     })?;
     session.apply(&Event::AssistantMessage { text: "oi".into() })?;
     // Eventos que não são mensagens não entram no histórico.

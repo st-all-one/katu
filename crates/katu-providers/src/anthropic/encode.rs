@@ -95,7 +95,7 @@ fn encode_message(message: &Message) -> Option<Value> {
         "anthropic::encode_message"
     );
     let encoded = match message {
-        Message::User { text } => {
+        Message::User { text, .. } => {
             json!({"role": "user", "content": [{"type": "text", "text": text}]})
         }
         Message::Assistant { text } => {

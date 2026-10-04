@@ -15,6 +15,7 @@
 
 use katu_core::diag::{Level, events};
 use katu_core::kernel::{CallContext, CallId, Dispatch, Tool, dispatch};
+use katu_core::ports::Progress;
 use katu_policy::{Decision, PolicyError, ToolName, ToolUse};
 use serde_json::Value;
 
@@ -73,9 +74,10 @@ enum Batch {
 pub(super) fn run_shared(
     runtime: &mut Runtime<'_>,
     ports: &Ports<'_>,
+    progress: &dyn Progress,
     calls: Vec<(CallId, String, Value)>,
     activity: &mut dyn ActivitySink,
-) -> Result<(), AgentError> {
+) -> Result<bool, AgentError> {
     let _span = katu_core::fn_span!(
         Level::Debug,
         events::TOOL_CALL,
@@ -84,11 +86,11 @@ pub(super) fn run_shared(
     );
     // Um lote de uma só call não ganha com threads: segue o caminho sequencial.
     if calls.len() < 2 {
-        return run_shared_sequential(runtime, ports, calls, activity);
+        return run_shared_sequential(runtime, ports, progress, calls, activity);
     }
-    match parallel_or_fallback(runtime, ports, calls)? {
-        Batch::Settled(settled) => commit(runtime, ports, settled, activity),
-        Batch::Fallback(calls) => run_shared_sequential(runtime, ports, calls, activity),
+    match parallel_or_fallback(runtime, ports, progress, calls)? {
+        Batch::Settled(settled) => commit(runtime, ports, progress, settled, activity),
+        Batch::Fallback(calls) => run_shared_sequential(runtime, ports, progress, calls, activity),
     }
 }
 
@@ -101,6 +103,7 @@ pub(super) fn run_shared(
 fn parallel_or_fallback(
     runtime: &mut Runtime<'_>,
     ports: &Ports<'_>,
+    progress: &dyn Progress,
     calls: Vec<(CallId, String, Value)>,
 ) -> Result<Batch, AgentError> {
     let _span = katu_core::trace_fn!("agent::turn::batch::parallel_or_fallback");
@@ -115,6 +118,7 @@ fn parallel_or_fallback(
         clock: runtime.clock,
         root: &root,
         cancel: None,
+        progress,
     };
 
     // Fase 1 — rota **sem** logar, na ordem do modelo. Uma call com argumentos inválidos manda o
@@ -219,20 +223,26 @@ fn in_parallel(
 }
 
 /// Fase 3 — comete na ordem do modelo (a ordem é a do log, não a de conclusão das threads).
+///
+/// Devolve `true` se **todas** as calls do lote declararam `terminate` (`Q1/PI_GAINS`).
 fn commit(
     runtime: &mut Runtime<'_>,
     ports: &Ports<'_>,
+    progress: &dyn Progress,
     settled: Vec<Settled>,
     activity: &mut dyn ActivitySink,
-) -> Result<(), AgentError> {
+) -> Result<bool, AgentError> {
     let _span = katu_core::trace_fn!("agent::turn::batch::commit");
 
+    let mut all_terminate = true;
     for call in settled {
         let outcome = call.dispatch.outcome();
+        let delta = call.dispatch.delta();
+        let terminate = call.dispatch.terminate();
         runtime
             .session
-            .settle_call(call.call.clone(), outcome.clone(), call.dispatch.delta())?;
-        emit_outcome(activity, &call.name, &outcome);
+            .settle_call(call.call.clone(), outcome.clone(), delta.clone())?;
+        emit_outcome(activity, &call.name, &outcome, delta.as_deref());
         let approval = match &call.dispatch.decision {
             Decision::RequireApproval { request } => Some(request.clone()),
             _ => None,
@@ -241,19 +251,23 @@ fn commit(
             outcome,
             use_: Some(call.use_),
             approval,
+            delta,
+            terminate,
         };
         retry_with_approval(
             runtime,
             ports,
             None,
+            progress,
             &mut call_outcome,
             &call.call,
             &call.name,
             &call.arguments,
             activity,
         )?;
+        all_terminate &= call_outcome.terminate;
     }
-    Ok(())
+    Ok(all_terminate)
 }
 
 /// Trata uma call com argumentos inválidos no caminho sequencial: devolve o erro ao modelo.
@@ -268,7 +282,7 @@ fn settle_route_failure(
 
     let now = runtime.clock.now().as_millis();
     let call_outcome = route_failure(runtime, call, name, error, now)?;
-    emit_outcome(activity, name, &call_outcome.outcome);
+    emit_outcome(activity, name, &call_outcome.outcome, None);
     Ok(())
 }
 
@@ -282,9 +296,10 @@ fn settle_route_failure(
 fn run_shared_sequential(
     runtime: &mut Runtime<'_>,
     ports: &Ports<'_>,
+    progress: &dyn Progress,
     calls: Vec<(CallId, String, Value)>,
     activity: &mut dyn ActivitySink,
-) -> Result<(), AgentError> {
+) -> Result<bool, AgentError> {
     let _span = katu_core::trace_fn!("agent::turn::batch::run_shared_sequential");
 
     let root = runtime.root().to_path_buf();
@@ -296,7 +311,9 @@ fn run_shared_sequential(
         clock: runtime.clock,
         root: &root,
         cancel: None,
+        progress,
     };
+    let mut all_terminate = true;
     for (call, name, arguments) in calls {
         let routed = match router::route(
             &route_ports,
@@ -308,6 +325,7 @@ fn run_shared_sequential(
             Ok(routed) => routed,
             Err(error) => {
                 settle_route_failure(runtime, activity, call, &name, &error)?;
+                all_terminate = false;
                 continue;
             }
         };
@@ -325,7 +343,9 @@ fn run_shared_sequential(
             },
         )?;
         let outcome = dispatch.outcome();
-        emit_outcome(activity, &name, &outcome);
+        let delta = dispatch.delta();
+        let terminate = dispatch.terminate();
+        emit_outcome(activity, &name, &outcome, delta.as_deref());
         let approval = match &dispatch.decision {
             Decision::RequireApproval { request } => Some(request.clone()),
             _ => None,
@@ -334,17 +354,21 @@ fn run_shared_sequential(
             outcome,
             use_: Some(use_),
             approval,
+            delta,
+            terminate,
         };
         retry_with_approval(
             runtime,
             ports,
             None,
+            progress,
             &mut call_outcome,
             &call,
             &name,
             &arguments,
             activity,
         )?;
+        all_terminate &= call_outcome.terminate;
     }
-    Ok(())
+    Ok(all_terminate)
 }

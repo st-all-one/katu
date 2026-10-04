@@ -8,7 +8,7 @@ use clap::Args;
 use katu_core::diag::{Level, events};
 
 use crate::agent::{RunArgs, run};
-use crate::report::Report;
+use crate::report::{Output, Report};
 use crate::tui::run_tui;
 
 use super::run_params;
@@ -51,6 +51,18 @@ pub(crate) struct RunCli {
     /// Emite envelope JSON em `stdout`.
     #[arg(long)]
     pub(crate) json: bool,
+    /// Formato de saída (`text`/`json`/`stream-json`); `stream-json` emite um evento por linha.
+    #[arg(long, value_name = "FORMATO")]
+    pub(crate) output: Option<String>,
+}
+
+impl RunCli {
+    /// `true` se o envelope final é JSON (`--json` ou `--output json|stream-json`).
+    pub(crate) fn wants_json(&self) -> bool {
+        let _span = katu_core::trace_fn!("cli::run_cmd::wants_json");
+
+        self.json || matches!(self.output.as_deref(), Some("json" | "stream-json"))
+    }
 }
 
 /// Argumentos de `katu tui`.
@@ -106,6 +118,7 @@ pub(crate) fn execute_tui(args: &TuiCli) -> Report {
             max_steps: config.max_steps,
             compact: config.compact,
             resume: config.resume.as_deref(),
+            output: Output::Text,
         }),
         Err(error) => Report::failed("tui", &error),
     }
@@ -124,5 +137,6 @@ pub(crate) fn run_once(config: &run_params::RunConfig) -> Report {
         max_steps: config.max_steps,
         compact: config.compact,
         resume: config.resume.as_deref(),
+        output: config.output,
     })
 }

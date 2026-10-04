@@ -5,7 +5,7 @@
 //! nunca do painel efémero.
 
 use katu_core::error::ToolOutcome;
-use katu_core::kernel::Message;
+use katu_core::kernel::{Message, Visibility};
 use katu_policy::{ResolvedPath, ToolUse};
 
 use super::{Runtime, RuntimeError};
@@ -29,7 +29,12 @@ fn render(messages: &[Message]) -> Vec<String> {
     let mut lines = vec!["# katu — transcrição durável".to_string(), String::new()];
     for message in messages {
         match message {
-            Message::User { text } => {
+            // G3: um *nudge* do loop chega ao modelo mas não é do utilizador — não se mostra.
+            Message::User {
+                visibility: Visibility::Agent,
+                ..
+            } => {}
+            Message::User { text, .. } => {
                 lines.push("**utilizador**".to_string());
                 lines.push(text.clone());
             }
@@ -95,5 +100,33 @@ fn outcome_label(outcome: &ToolOutcome) -> String {
             format!("indisponível (falta {})", control.as_str())
         }
         _ => "desconhecido".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use katu_core::kernel::{Message, Visibility};
+
+    use super::render;
+
+    #[test]
+    fn an_agent_nudge_is_not_shown_in_the_transcript() {
+        let messages = vec![
+            Message::User {
+                text: "olá".to_string(),
+                visibility: Visibility::User,
+            },
+            Message::User {
+                text: "nudge".to_string(),
+                visibility: Visibility::Agent,
+            },
+            Message::Assistant {
+                text: "resposta".to_string(),
+            },
+        ];
+        let body = render(&messages).join("\n");
+        assert!(body.contains("olá"), "a mensagem humana aparece");
+        assert!(!body.contains("nudge"), "o nudge do loop não aparece (G3)");
+        assert!(body.contains("resposta"));
     }
 }

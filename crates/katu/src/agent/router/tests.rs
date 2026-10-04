@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use katu_core::ports::{Clock, FakeEnv, Fs, MemFs, MemProcess, Timestamp};
+use katu_core::ports::{Clock, FakeEnv, Fs, MemFs, MemProcess, NO_PROGRESS, Timestamp};
 use katu_policy::{ResolvedPath, SearchMode, ToolArgs, ToolName};
 use serde_json::json;
 
@@ -47,6 +47,7 @@ impl Fixture {
             clock: &self.clock,
             root: &self.root,
             cancel: None,
+            progress: &NO_PROGRESS,
         }
     }
 }

@@ -6,6 +6,7 @@
 //! Sem rede, ambos os testes devolvem `Ok(())` — o loop determinístico é coberto pelos testes do
 //! crate com [`katu_providers::MockTransport`].
 
+use katu_core::kernel::Visibility;
 use std::time::Duration;
 
 use katu_core::kernel::Message;
@@ -19,6 +20,7 @@ fn request(model: &str, prompt: &str) -> ProviderRequest {
         system: Some("Responde em uma frase curta.".to_string()),
         messages: vec![Message::User {
             text: prompt.to_string(),
+            visibility: Visibility::User,
         }],
         tools: Vec::new(),
         max_tokens: Some(64),

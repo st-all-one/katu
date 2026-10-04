@@ -5,6 +5,7 @@ use crate::audit::bloom::Bloom;
 use crate::audit::index::Index;
 use crate::audit::record::AuditRecord;
 use crate::kernel::Event;
+use crate::kernel::Visibility;
 
 /// Linhas de auditoria sintéticas com termos partilhados.
 fn records() -> Vec<AuditRecord> {
@@ -14,6 +15,7 @@ fn records() -> Vec<AuditRecord> {
                 i,
                 &Event::UserMessage {
                     text: format!("linha {i} parser de toon"),
+                    visibility: Visibility::User,
                 },
             )
         })

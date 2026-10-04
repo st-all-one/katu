@@ -24,6 +24,9 @@ const POLL_MS: u64 = 5;
 /// Espera máxima pelos leitores **depois** de o filho terminar.
 const READ_GRACE_MS: u64 = 1_000;
 
+/// Tamanho de cada leitura incremental do `stdout`/`stderr` (`P1/PI_GAINS`).
+const CHUNK_BYTES: usize = 4_096;
+
 /// Processo real: o filho herda o **utilizador** que evocou o katu (sem `sudo`/setuid).
 pub(crate) struct StdProcess;
 
@@ -47,6 +50,47 @@ impl Process for StdProcess {
             duration_ms: elapsed_millis(started.elapsed()),
             stdout: out_rx.recv_timeout(grace).unwrap_or_default(),
             stderr: err_rx.recv_timeout(grace).unwrap_or_default(),
+        })
+    }
+
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "adaptador: relógio do SO para o timeout de execução"
+    )]
+    fn run_streaming(
+        &self,
+        request: &ExecRequest,
+        cancel: &dyn Cancel,
+        on_chunk: &(dyn Fn(&str) + Send + Sync),
+    ) -> Result<ExecResult, ProcessError> {
+        let _span = katu_core::trace_fn!("ports::process::run_streaming");
+
+        let started = Instant::now();
+        let mut child = spawn_child(request)?;
+        let (out_rx, err_rx) = start_streaming_readers(&mut child);
+        let mut out_text = String::new();
+        let mut err_text = String::new();
+        let (status, timed_out) = wait_streaming(
+            &mut child,
+            request.timeout_ms,
+            cancel,
+            &out_rx,
+            &err_rx,
+            on_chunk,
+            &mut out_text,
+            &mut err_text,
+        )?;
+        // Grace: drena o que ficou nos canais (um neto pode segurar o `stdout`).
+        let grace = Duration::from_millis(READ_GRACE_MS);
+        drain_streaming(&out_rx, grace, on_chunk, &mut out_text);
+        drain_streaming(&err_rx, grace, on_chunk, &mut err_text);
+        Ok(ExecResult {
+            exit_code: status.code(),
+            signal: signal_of(status),
+            timed_out,
+            duration_ms: elapsed_millis(started.elapsed()),
+            stdout: out_text,
+            stderr: err_text,
         })
     }
 }
@@ -183,6 +227,127 @@ fn read_stream(stream: &mut Option<impl Read>) -> String {
     String::from_utf8_lossy(&bytes).into_owned()
 }
 
+/// Leitores **destacados** que entregam cada fragmento por canal (`P1/PI_GAINS`).
+fn start_streaming_readers(child: &mut Child) -> (Receiver<String>, Receiver<String>) {
+    let _span = katu_core::trace_fn!("ports::process::start_streaming_readers");
+
+    let mut out = child.stdout.take();
+    let mut err = child.stderr.take();
+    let (out_tx, out_rx) = mpsc::channel();
+    let (err_tx, err_rx) = mpsc::channel();
+    drop(thread::spawn(move || read_streaming(&mut out, &out_tx)));
+    drop(thread::spawn(move || read_streaming(&mut err, &err_tx)));
+    (out_rx, err_rx)
+}
+
+/// Lê um fluxo em fragmentos, enviando cada um pelo canal (para o *streaming* em tempo real).
+fn read_streaming(stream: &mut Option<impl Read>, tx: &mpsc::Sender<String>) {
+    let _span = katu_core::trace_fn!("ports::process::read_streaming");
+
+    let mut buf = [0u8; CHUNK_BYTES];
+    if let Some(reader) = stream.as_mut() {
+        loop {
+            match reader.read(&mut buf) {
+                Ok(0) | Err(_) => break,
+                Ok(n) => {
+                    let text =
+                        String::from_utf8_lossy(buf.get(..n).unwrap_or_default()).into_owned();
+                    if tx.send(text).is_err() {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Espera pelo filho drenando os fragmentos em tempo real (timeout/cancelamento matam o grupo).
+#[allow(
+    clippy::disallowed_methods,
+    reason = "adaptador: relógio do SO para o timeout de execução"
+)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "o passo de streaming recebe os dois canais, o observador e os dois acumuladores — eixos distintos do mesmo laço"
+)]
+fn wait_streaming(
+    child: &mut Child,
+    timeout_ms: u64,
+    cancel: &dyn Cancel,
+    out_rx: &Receiver<String>,
+    err_rx: &Receiver<String>,
+    on_chunk: &(dyn Fn(&str) + Send + Sync),
+    out_text: &mut String,
+    err_text: &mut String,
+) -> Result<(ExitStatus, bool), ProcessError> {
+    let _span = katu_core::trace_fn!("ports::process::wait_streaming");
+
+    let Some(deadline) = Instant::now().checked_add(Duration::from_millis(timeout_ms)) else {
+        return Err(ProcessError::Io("timeout inválido".to_string()));
+    };
+    loop {
+        drain_ready(out_rx, on_chunk, out_text);
+        drain_ready(err_rx, on_chunk, err_text);
+        if let Some(status) = child.try_wait().map_err(|err| map_io_error(&err))? {
+            return Ok((status, false));
+        }
+        if cancel.cancelled() {
+            kill_group(child);
+            drop(child.kill());
+            let status = child.wait().map_err(|err| map_io_error(&err))?;
+            return Ok((status, true));
+        }
+        if Instant::now() >= deadline {
+            kill_group(child);
+            drop(child.kill());
+            let status = child.wait().map_err(|err| map_io_error(&err))?;
+            return Ok((status, true));
+        }
+        thread::sleep(Duration::from_millis(POLL_MS));
+    }
+}
+
+/// Drena os fragmentos já disponíveis, sem bloquear (chamado no laço de espera).
+fn drain_ready(rx: &Receiver<String>, on_chunk: &(dyn Fn(&str) + Send + Sync), text: &mut String) {
+    let _span = katu_core::trace_fn!("ports::process::drain_ready");
+
+    while let Ok(chunk) = rx.try_recv() {
+        on_chunk(&chunk);
+        text.push_str(&chunk);
+    }
+}
+
+/// Drena o que resta nos canais com um prazo (grace após o filho terminar).
+#[allow(
+    clippy::disallowed_methods,
+    reason = "adaptador: relógio do SO para o grace de leitura"
+)]
+fn drain_streaming(
+    rx: &Receiver<String>,
+    grace: Duration,
+    on_chunk: &(dyn Fn(&str) + Send + Sync),
+    text: &mut String,
+) {
+    let _span = katu_core::trace_fn!("ports::process::drain_streaming");
+
+    let Some(deadline) = Instant::now().checked_add(grace) else {
+        return;
+    };
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        match rx.recv_timeout(remaining) {
+            Ok(chunk) => {
+                on_chunk(&chunk);
+                text.push_str(&chunk);
+            }
+            Err(_) => break,
+        }
+    }
+}
+
 /// Mapeia um erro de `spawn` (programa ausente/permissão) para a porta.
 fn map_spawn_error(err: &std::io::Error) -> ProcessError {
     let _span = katu_core::trace_fn!("ports::process::map_spawn_error");
@@ -209,100 +374,4 @@ fn elapsed_millis(duration: Duration) -> u64 {
 }
 
 #[cfg(all(test, unix))]
-mod tests {
-    use super::StdProcess;
-    use katu_core::ports::{ExecRequest, Never, Process, ProcessError};
-    use std::path::PathBuf;
-
-    fn request(argv: &[&str], timeout_ms: u64) -> ExecRequest {
-        let _span = katu_core::trace_fn!("ports::process::request");
-
-        ExecRequest {
-            argv: argv.iter().map(|arg| (*arg).to_string()).collect(),
-            cwd: PathBuf::from("/tmp"),
-            env: Vec::new(),
-            timeout_ms,
-        }
-    }
-
-    #[test]
-    fn normal_command_returns_stdout() -> Result<(), Box<dyn std::error::Error>> {
-        let result = StdProcess
-            .run(&request(&["/bin/echo", "hi"], 5_000), &Never)
-            .map_err(|err| format!("run: {err:?}"))?;
-        assert_eq!(result.exit_code, Some(0));
-        assert!(!result.timed_out);
-        assert_eq!(result.stdout, "hi\n");
-        Ok(())
-    }
-
-    #[test]
-    fn timeout_kills_the_direct_child() -> Result<(), Box<dyn std::error::Error>> {
-        let result = StdProcess
-            .run(&request(&["/bin/sleep", "30"], 100), &Never)
-            .map_err(|err| format!("run: {err:?}"))?;
-        assert!(result.timed_out, "o timeout tem de disparar");
-        assert_eq!(result.signal, Some(9), "SIGKILL ao filho direto");
-        assert!(result.duration_ms < 10_000, "não pode bloquear 30s");
-        Ok(())
-    }
-
-    #[test]
-    fn timeout_kills_the_process_group() -> Result<(), Box<dyn std::error::Error>> {
-        use std::time::Duration;
-        let dir = std::env::temp_dir().join(format!("katu-pgid-{}", std::process::id()));
-        drop(std::fs::create_dir_all(&dir));
-        let marker = dir.join("late.txt");
-        drop(std::fs::remove_file(&marker));
-        // O neto dorme 2s e só depois escreve o marcador. Se o grupo for morto no timeout (~300ms),
-        // o neto nunca chega a escrever; se só o filho direto morrer, o neto sobrevive e escreve.
-        let script = "( sleep 2; echo late > \"$1\" ) & sleep 30";
-        let path = marker.to_str().ok_or("caminho inválido")?;
-        let result = StdProcess
-            .run(
-                &request(&["/bin/sh", "-c", script, "sh", path], 300),
-                &Never,
-            )
-            .map_err(|err| format!("run: {err:?}"))?;
-        assert!(result.timed_out, "o timeout tem de disparar");
-        std::thread::sleep(Duration::from_millis(2_500));
-        assert!(
-            !marker.exists(),
-            "o neto sobreviveu ao timeout (grupo não morto)"
-        );
-        drop(std::fs::remove_dir_all(&dir));
-        Ok(())
-    }
-
-    #[test]
-    fn missing_program_is_not_found() {
-        let result = StdProcess.run(&request(&["/nonexistent/prog"], 1_000), &Never);
-        assert_eq!(result, Err(ProcessError::NotFound));
-    }
-
-    #[test]
-    #[allow(
-        clippy::disallowed_methods,
-        reason = "o teste mede o tempo real do cancelamento (L-P3)"
-    )]
-    fn cancel_kills_the_running_child() -> Result<(), Box<dyn std::error::Error>> {
-        use katu_core::ports::Flag;
-        use std::time::Duration;
-        let flag = Flag::new();
-        let signal = flag.clone();
-        drop(std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(100));
-            signal.request();
-        }));
-        let started = std::time::Instant::now();
-        let result = StdProcess
-            .run(&request(&["/bin/sleep", "30"], 10_000), &flag)
-            .map_err(|err| format!("run: {err:?}"))?;
-        assert!(result.timed_out, "o cancelamento interrompe o filho");
-        assert!(
-            started.elapsed() < Duration::from_millis(5_000),
-            "não espera os 30s do comando"
-        );
-        Ok(())
-    }
-}
+mod tests;

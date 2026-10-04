@@ -10,7 +10,7 @@
 crates = 6
 tools = 11
 rules = 8
-adrs = 26
+adrs = 27  # +1 ADR 0027 (fronteiras de transporte fechadas: SSE no provider, kernel in-process)
 diag_events = 122  # +5 loop resilience (L-Q1 reconcile · L-Q6 turn_lock · L-Q2 stop · L-Q3 empty · L-Q4 echo)  # +1 agent.stall (L-P2)
 xtask_commands = 32  # +1 `check-paths` (invariante §42: nada fora do projecto excepto a config global)
 bench_artifacts = 30  # +1 `bench/e18/pos/` (leitura pós-optimização)  # +1 `bench/render/alloc.json` (E18-T10)  # +1 `bench/e18/taint/` (D1) · +1 `bench/e18/pool/` (E1) · +1 `bench/e18/conformal/` (C2)

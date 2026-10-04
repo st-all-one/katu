@@ -15,6 +15,7 @@
     reason = "micro-bench dev-only: imprime a tabela"
 )]
 
+use katu_core::kernel::Visibility;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -189,6 +190,7 @@ fn one_turn(session: &mut Session<'_>, turn: u32, calls: u32) -> Result<(), Stri
     session
         .apply(&Event::UserMessage {
             text: format!("pedido {turn}: densidade e retomada"),
+            visibility: Visibility::User,
         })
         .map_err(stringify)?;
     for index in 0..calls {

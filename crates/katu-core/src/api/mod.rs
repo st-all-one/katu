@@ -14,7 +14,9 @@ mod live;
 mod trash;
 
 pub use command::{Command, LoginRequest};
-pub use event::{ApprovalGrant, ApprovalRequest, Event};
-pub use handle::{COMMAND_QUEUE, KernelBus, KernelHandle, RecvError, SendError, channel};
+pub use event::{ApprovalGrant, ApprovalRequest, Event, TurnSummary};
+pub use handle::{
+    COMMAND_QUEUE, KernelBus, KernelHandle, Publisher, RecvError, SendError, channel,
+};
 pub use live::Live;
 pub use trash::TrashEntry;

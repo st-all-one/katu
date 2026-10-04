@@ -3,6 +3,7 @@ use super::{
     SelectionParams, SelectionPolicy, assemble, assemble_with_prime, compact, message_id, prime,
     prime_for, prime_long, prime_with_catalog, recover, tokens_from_bytes,
 };
+use crate::kernel::Visibility;
 
 mod bench;
 mod selection;
@@ -22,12 +23,14 @@ fn conversation() -> Vec<Event> {
     vec![
         Event::UserMessage {
             text: "primeiro pedido".into(),
+            visibility: Visibility::User,
         },
         Event::AssistantMessage {
             text: "primeira resposta".into(),
         },
         Event::UserMessage {
             text: "segundo pedido".into(),
+            visibility: Visibility::User,
         },
     ]
 }
@@ -74,6 +77,7 @@ fn budget_is_respected_and_keeps_the_latest() {
 fn exact_limit_keeps_and_limit_minus_one_drops() {
     let events = vec![Event::UserMessage {
         text: "12345678".into(),
+        visibility: Visibility::User,
     }];
     let weight = tokens_from_bytes(8);
     assert_eq!(assemble(&events, budget(weight)).messages.len(), 1);
@@ -106,6 +110,7 @@ fn batched_tool_events() -> Result<Vec<Event>, katu_policy::PolicyError> {
     let rule_id = katu_policy::RuleId::from("test");
     let mut events = vec![Event::UserMessage {
         text: "objetivo".into(),
+        visibility: Visibility::User,
     }];
     for call in ["c1", "c2"] {
         events.push(Event::ToolCall {
@@ -166,6 +171,7 @@ fn long_conversation() -> Vec<Event> {
     for turn in 0..6_u32 {
         events.push(Event::UserMessage {
             text: format!("pedido numero {turn} com algum detalhe para pesar"),
+            visibility: Visibility::User,
         });
         events.push(Event::AssistantMessage {
             text: format!("resposta numero {turn} igualmente longa para pesar"),

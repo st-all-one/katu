@@ -7,6 +7,7 @@
     reason = "micro-bench dev-only: imprime a tabela"
 )]
 
+use katu_core::kernel::Visibility;
 use std::time::Instant;
 
 use katu_core::audit::{AuditRecord, Index, decode_index, encode_index};
@@ -51,6 +52,7 @@ fn corpus(size: usize) -> Vec<AuditRecord> {
             let event = if i.checked_rem(4).unwrap_or(0) == 0 {
                 Event::UserMessage {
                     text: format!("pedido {i}: ajustar o parser de toon e a densidade"),
+                    visibility: Visibility::User,
                 }
             } else if i.checked_rem(4).unwrap_or(0) == 1 {
                 Event::AssistantMessage {

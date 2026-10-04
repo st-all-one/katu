@@ -85,7 +85,7 @@ fn encode_message(message: &Message) -> Option<Value> {
     let _span = katu_core::trace_fn!("responses::encode::encode_message");
 
     let encoded = match message {
-        Message::User { text } => json!({"role": "user", "content": text}),
+        Message::User { text, .. } => json!({"role": "user", "content": text}),
         Message::Assistant { text } => json!({"role": "assistant", "content": text}),
         Message::ToolCall { call, tool } => json!({
             "type": "function_call",

@@ -2,6 +2,7 @@
 
 use super::AuditRecord;
 use crate::kernel::Event;
+use crate::kernel::Visibility;
 
 #[test]
 fn user_message_becomes_searchable_text() {
@@ -9,6 +10,7 @@ fn user_message_becomes_searchable_text() {
         3,
         &Event::UserMessage {
             text: "Corrige o parser".to_string(),
+            visibility: Visibility::User,
         },
     );
     assert_eq!(record.seq, 3);

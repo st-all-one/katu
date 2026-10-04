@@ -238,7 +238,7 @@ fn encode_message(message: &Message) -> Option<MessageJson<'_>> {
         "openai::encode_message"
     );
     let encoded = match message {
-        Message::User { text } => MessageJson::Text(TextMessage {
+        Message::User { text, .. } => MessageJson::Text(TextMessage {
             role: "user",
             content: text,
         }),

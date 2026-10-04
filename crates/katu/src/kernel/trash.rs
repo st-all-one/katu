@@ -3,13 +3,13 @@
 //! Restaurar é **sempre** permitido (recuperável). Esvaziar é **destrutivo**: exige um
 //! challenge-and-response (§33) — só um humano assina e a remoção é permanente.
 
+use katu_core::api::{Event as Update, TrashEntry};
 use katu_core::diag::{Level, events};
 use katu_tools::trash;
-use katu_tui::{ChallengePrompt, Painter, TrashEntry, Update};
 
-use super::AgentHandler;
+use super::{BusSink, Kernel};
 
-impl AgentHandler<'_> {
+impl Kernel<'_> {
     /// Lista a lixeira do projeto para a UI (E10-T07/E06-T09).
     pub(super) fn trash_list(&self) -> Vec<Update> {
         let _span = katu_core::fn_span!(Level::Trace, events::TOOL_TRASH, "trash::trash_list");
@@ -37,21 +37,16 @@ impl AgentHandler<'_> {
     }
 
     /// Esvazia a lixeira **permanentemente**, após challenge humano (E10-T07, §33).
-    pub(super) fn empty_trash(&self, painter: &mut Painter<'_>) -> Vec<Update> {
+    pub(super) fn empty_trash(&self, sink: &mut BusSink<'_>) -> Vec<Update> {
         let _span = katu_core::fn_span!(Level::Trace, events::TOOL_TRASH, "trash::empty_trash");
         let count = trash::list(self.fs, self.runtime.root()).len();
         if count == 0 {
             return vec![Update::Info("lixeira vazia".to_string())];
         }
-        let request = ChallengePrompt {
-            tool: "trash".to_string(),
-            rule: "trash-empty".to_string(),
-            scope: format!("{count} item(ns)"),
-        };
-        let granted_by = self.granted_by();
-        let Some(_signature) = painter.challenge(request, &granted_by) else {
+        let scope = format!("{count} item(ns)");
+        if sink.ask("trash", "trash-empty", &scope).is_none() {
             return vec![Update::Info("esvaziamento cancelado".to_string())];
-        };
+        }
         match trash::empty(self.fs, self.runtime.root()) {
             Ok(removed) => {
                 katu_core::event!(Level::Warn, events::TUI_TRASH_EMPTY);

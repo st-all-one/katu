@@ -3,12 +3,14 @@
 use katu_core::diag::{Level, events};
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::CallId;
-use katu_core::ports::Cancel;
+use katu_core::ports::{Cancel, Progress};
 use katu_policy::ApprovalRequest;
 use katu_tools::schema::concurrency_of;
 use serde_json::Value;
 
-use super::{AgentError, CallOutcome, Ports, TurnReport, TurnRequest, execute_call};
+use super::{AgentError, CallOutcome, Ports, execute_call};
+#[cfg(test)]
+use super::{TurnReport, TurnRequest};
 use crate::defaults;
 use crate::runtime::Runtime;
 
@@ -40,10 +42,12 @@ pub(crate) enum Activity<'a> {
         /// Argumentos **crus** enviados pelo modelo (transparência/diagnóstico).
         args: &'a str,
     },
-    /// Tool concluída (sucesso/parcial).
+    /// Tool concluída (sucesso/parcial), com um **resumo** do resultado (`LIVE_FLOW` LF4).
     ToolDone {
         /// Nome ao modelo da tool.
         name: &'a str,
+        /// Resumo de uma linha do resultado (vazio quando não há envelope).
+        summary: &'a str,
     },
     /// Recusa determinística com a regra e a evidência (E10-T04).
     Refused {
@@ -102,6 +106,15 @@ pub(crate) trait ActivitySink {
 
         None
     }
+
+    /// `true` se a superfície pediu **um** passo extra antes do fim natural (`S1/PI_GAINS`).
+    ///
+    /// One-shot: consumido na leitura (um pedido vale um passo). Por omissão, nunca.
+    fn continue_once(&mut self) -> bool {
+        let _span = katu_core::trace_fn!("agent::turn::continue_once");
+
+        false
+    }
 }
 
 /// Pedido de aprovação apresentado ao humano (E07-T05, §33).
@@ -120,19 +133,22 @@ pub(crate) struct Approval {
     pub granted_by: String,
 }
 
-/// Observador que ignora tudo (`katu run`).
+/// Observador que ignora tudo (usado pelos testes do turno).
+#[cfg(test)]
 struct NoActivity;
 
+#[cfg(test)]
 impl ActivitySink for NoActivity {
     fn activity(&mut self, _activity: Activity<'_>) {
         let _span = katu_core::trace_fn!("agent::turn::activity");
     }
 }
 
-/// Executa um turno completo sem observador externo.
+/// Executa um turno completo sem observador externo (conveniência dos testes).
 ///
 /// # Errors
 /// [`AgentError`] em falha do provider, da sessão ou do roteamento (fail-closed).
+#[cfg(test)]
 pub(crate) fn run_turn(
     runtime: &mut Runtime<'_>,
     request: TurnRequest<'_>,
@@ -142,65 +158,119 @@ pub(crate) fn run_turn(
     run_turn_with(runtime, request, &mut NoActivity)
 }
 
+/// Desfecho da execução das tool calls de um passo (`Q1/PI_GAINS`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CallsOutcome {
+    /// Segue para o próximo passo (comportamento normal).
+    Continue,
+    /// **Todas** as calls do passo pediram o fim normal do turno.
+    Terminate,
+    /// O utilizador cancelou a meio.
+    Cancelled,
+}
+
 /// Executa as tool calls de um passo pela ordem §42, com o caminho de aprovação (E07-T05).
 ///
 /// As calls **consecutivas** classificadas `Shared` (só-leitura) formam um lote: são preparadas
 /// pela ordem do modelo, executadas num pool limitado e cometidas nessa ordem (B-01/B-02). Uma
 /// call exclusiva **esvazia** o lote antes de correr — é uma barreira, como no contrato do PTC.
 ///
-/// Devolve `false` se o utilizador cancelou a meio (o chamador fecha o turno).
+/// `Q1/PI_GAINS`: se **todas** as calls do passo declararem `terminate`, o passo termina o turno (a
+/// regra "todas" espelha o `shouldTerminateToolBatch` do pi).
+#[allow(
+    clippy::too_many_arguments,
+    clippy::too_many_lines,
+    reason = "as tool calls de um passo (runtime, portas, cancelamento, progresso, calls, observador) e o seu desfecho terminal vivem juntos para a ordem §42 ser legível"
+)]
 fn run_calls(
     runtime: &mut Runtime<'_>,
     ports: &Ports<'_>,
     cancel: Option<&dyn Cancel>,
+    progress: &dyn Progress,
     calls: Vec<(CallId, String, Value)>,
     activity: &mut dyn ActivitySink,
-) -> Result<bool, AgentError> {
+) -> Result<CallsOutcome, AgentError> {
     let _span = katu_core::trace_fn!("agent::turn::run_calls");
 
+    // Um passo sem calls (ex.: só calls truncadas) não termina o turno (`Q1/PI_GAINS`).
+    if calls.is_empty() {
+        return Ok(CallsOutcome::Continue);
+    }
     let mut batch: Vec<(CallId, String, Value)> = Vec::new();
+    let mut all_terminate = true;
     for (call, name, arguments) in calls {
         if activity.cancelled() {
-            return Ok(false);
+            return Ok(CallsOutcome::Cancelled);
         }
         if concurrency_of(&name).is_shared() {
             batch.push((call, name, arguments));
             if batch.len() >= batch::MAX_PARALLEL_CALLS {
-                batch::run_shared(runtime, ports, std::mem::take(&mut batch), activity)?;
+                all_terminate &= batch::run_shared(
+                    runtime,
+                    ports,
+                    progress,
+                    std::mem::take(&mut batch),
+                    activity,
+                )?;
                 if activity.cancelled() {
-                    return Ok(false);
+                    return Ok(CallsOutcome::Cancelled);
                 }
             }
             continue;
         }
         if !batch.is_empty() {
-            batch::run_shared(runtime, ports, std::mem::take(&mut batch), activity)?;
+            all_terminate &= batch::run_shared(
+                runtime,
+                ports,
+                progress,
+                std::mem::take(&mut batch),
+                activity,
+            )?;
             if activity.cancelled() {
-                return Ok(false);
+                return Ok(CallsOutcome::Cancelled);
             }
         }
-        let mut outcome = execute_call(runtime, ports, cancel, call.clone(), &name, &arguments)?;
-        emit_outcome(activity, &name, &outcome.outcome);
+        let mut outcome = execute_call(
+            runtime,
+            ports,
+            cancel,
+            progress,
+            call.clone(),
+            &name,
+            &arguments,
+        )?;
+        emit_outcome(activity, &name, &outcome.outcome, outcome.delta.as_deref());
         retry_with_approval(
             runtime,
             ports,
             cancel,
+            progress,
             &mut outcome,
             &call,
             &name,
             &arguments,
             activity,
         )?;
+        all_terminate &= outcome.terminate;
     }
     if !batch.is_empty() {
-        batch::run_shared(runtime, ports, batch, activity)?;
+        all_terminate &= batch::run_shared(runtime, ports, progress, batch, activity)?;
     }
-    Ok(true)
+    Ok(if all_terminate {
+        CallsOutcome::Terminate
+    } else {
+        CallsOutcome::Continue
+    })
 }
 
 /// Reencaminha o resultado de uma tool ao observador: sucesso, recusa ou indisponibilidade
 /// (E10-T04). Uma recusa **não** mostra "concluída".
-pub(super) fn emit_outcome(activity: &mut dyn ActivitySink, name: &str, outcome: &ToolOutcome) {
+pub(super) fn emit_outcome(
+    activity: &mut dyn ActivitySink,
+    name: &str,
+    outcome: &ToolOutcome,
+    delta: Option<&str>,
+) {
     let _span = katu_core::trace_fn!("agent::turn::emit_outcome");
 
     match outcome {
@@ -217,8 +287,33 @@ pub(super) fn emit_outcome(activity: &mut dyn ActivitySink, name: &str, outcome:
                 control: control.as_str(),
             });
         }
-        _ => activity.activity(Activity::ToolDone { name }),
+        _ => {
+            // LF4: o painel mostra uma linha do resultado, não o envelope inteiro.
+            let summary = summarize(delta);
+            activity.activity(Activity::ToolDone {
+                name,
+                summary: &summary,
+            });
+        }
     }
+}
+
+/// Teto do resumo de uma tool no painel efémero (uma linha legível).
+const MAX_SUMMARY_CHARS: usize = 200;
+
+/// Resume o `delta` de uma tool numa linha curta (`LIVE_FLOW` LF4).
+pub(super) fn summarize(delta: Option<&str>) -> String {
+    let _span = katu_core::trace_fn!("agent::turn::summarize");
+
+    let Some(delta) = delta else {
+        return String::new();
+    };
+    let first = delta.lines().next().unwrap_or_default().trim();
+    if first.chars().count() <= MAX_SUMMARY_CHARS {
+        return first.to_string();
+    }
+    let head: String = first.chars().take(MAX_SUMMARY_CHARS).collect();
+    format!("{head}…")
 }
 
 /// Re-executa uma chamada recusada por falta de aprovação.
@@ -234,6 +329,7 @@ fn retry_with_approval(
     runtime: &mut Runtime<'_>,
     ports: &Ports<'_>,
     cancel: Option<&dyn Cancel>,
+    progress: &dyn Progress,
     outcome: &mut CallOutcome,
     call: &CallId,
     name: &str,
@@ -280,8 +376,8 @@ fn retry_with_approval(
         &mac_key,
     )?;
     let retry = CallId::new(format!("{}#approved", call.as_str()));
-    *outcome = execute_call(runtime, ports, cancel, retry, name, arguments)?;
-    emit_outcome(activity, name, &outcome.outcome);
+    *outcome = execute_call(runtime, ports, cancel, progress, retry, name, arguments)?;
+    emit_outcome(activity, name, &outcome.outcome, outcome.delta.as_deref());
     // B-06: a aprovação é **one-shot** — depois de usada, a capacidade é revogada. A próxima
     // escalação exige nova aprovação (não é herdada).
     runtime.session.revoke_approval(&capability)?;

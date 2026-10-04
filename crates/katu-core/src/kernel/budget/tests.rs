@@ -1,4 +1,5 @@
 use super::{Budget, BudgetCap, BudgetGate, BudgetRefusal, Charge, charge_for};
+use crate::kernel::Visibility;
 use crate::kernel::event::{CallId, Event};
 use katu_policy::{ResolvedPath, ToolArgs, ToolName, ToolUse};
 
@@ -89,7 +90,10 @@ fn each_axis_has_its_own_refusal() {
 fn events_reconstruct_turn_and_call_usage() -> Result<(), Box<dyn std::error::Error>> {
     let events = vec![
         Event::TurnStart { turn: 1 },
-        Event::UserMessage { text: "oi".into() },
+        Event::UserMessage {
+            text: "oi".into(),
+            visibility: Visibility::User,
+        },
         Event::ToolCall {
             call: CallId::new("c1"),
             tool: write_tool()?,

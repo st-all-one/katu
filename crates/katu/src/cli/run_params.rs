@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 
 use crate::defaults;
 use crate::defaults::Defaults;
-use crate::report::Report;
+use crate::report::{Output, Report};
 
 use super::input;
 use super::params;
@@ -63,6 +63,8 @@ pub(crate) struct RunConfig {
     pub(crate) compact: bool,
     /// Retomada de sessão.
     pub(crate) resume: Option<String>,
+    /// Formato de saída (`LIVE_FLOW` LF5).
+    pub(crate) output: Output,
 }
 
 /// Flags explícitas de uma rodada (para o XOR com `--params`).
@@ -76,6 +78,9 @@ struct Flags {
     max_steps: Option<u32>,
     compact: Option<bool>,
     resume: Option<String>,
+    /// Formato de saída (`--json`/`--output`); fora do XOR com `--params`.
+    json: bool,
+    output: Option<String>,
 }
 
 impl Flags {
@@ -92,6 +97,8 @@ impl Flags {
             max_steps: args.max_steps,
             compact: args.compact,
             resume: args.resume.clone(),
+            json: args.json,
+            output: args.output.clone(),
         }
     }
 
@@ -108,6 +115,8 @@ impl Flags {
             max_steps: args.max_steps,
             compact: args.compact,
             resume: args.resume.clone(),
+            json: false,
+            output: None,
         }
     }
 
@@ -155,6 +164,16 @@ impl Flags {
             })?),
             None => None,
         };
+        let output = match (self.json, self.output.as_deref()) {
+            (true, None | Some("json")) => Output::Json,
+            (true, Some(other)) => {
+                return Err(Error::invalid_input(format!(
+                    "--json é exclusivo com --output {other}"
+                )));
+            }
+            (false, Some(raw)) => Output::parse(raw)?,
+            (false, None) => Output::Text,
+        };
         Ok(RunConfig {
             goal,
             provider: self
@@ -173,6 +192,7 @@ impl Flags {
                 .or(defaults.auto_compact)
                 .unwrap_or(false),
             resume: self.resume.or(resume),
+            output,
         })
     }
 }
@@ -238,6 +258,12 @@ fn parse_params(raw: Option<&str>, explicit: bool) -> Result<RunParams, Error> {
 /// Processa um lote JSONL: valida tudo **antes** de executar.
 fn batch(args: &RunCli, path: &str) -> Report {
     let _span = katu_core::fn_span!(Level::Debug, events::CLI_RUN, "run_params::batch");
+    if args.output.is_some() {
+        return Report::failed(
+            "run",
+            &Error::invalid_input("--output é exclusivo com --batch"),
+        );
+    }
     if args.params.is_some() || Flags::from_run(args).any() || args.body.is_some() {
         return Report::failed(
             "run",

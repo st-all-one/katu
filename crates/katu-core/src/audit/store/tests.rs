@@ -1,5 +1,6 @@
 //! Testes do armazenamento de auditoria (selagem, manifesto, consulta).
 
+use crate::kernel::Visibility;
 use std::path::Path;
 
 use super::{AuditStore, Query};
@@ -17,6 +18,7 @@ fn seal_then_search_round_trips() -> Result<(), Box<dyn std::error::Error>> {
             1,
             &Event::UserMessage {
                 text: "corrige o parser de toon".to_string(),
+                visibility: Visibility::User,
             },
         )?;
         store.append_event(
@@ -49,7 +51,13 @@ fn searches_across_sealed_segments() -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 format!("beta evento {i}")
             };
-            store.append_event(i.saturating_add(1), &Event::UserMessage { text })?;
+            store.append_event(
+                i.saturating_add(1),
+                &Event::UserMessage {
+                    text,
+                    visibility: Visibility::User,
+                },
+            )?;
         }
         store.flush()?;
     }
@@ -84,6 +92,7 @@ fn verify_detects_tampered_segment() -> Result<(), Box<dyn std::error::Error>> {
             1,
             &Event::UserMessage {
                 text: "mensagem original".to_string(),
+                visibility: Visibility::User,
             },
         )?;
         store.flush()?;
@@ -117,6 +126,7 @@ fn verify_detects_removed_segment() -> Result<(), Box<dyn std::error::Error>> {
                 i.saturating_add(1),
                 &Event::UserMessage {
                     text: format!("evento {i}"),
+                    visibility: Visibility::User,
                 },
             )?;
         }
@@ -151,6 +161,7 @@ fn ab_audit_by_artifact() -> Result<(), Box<dyn std::error::Error>> {
                 i.saturating_add(1),
                 &Event::UserMessage {
                     text: format!("evento {i}"),
+                    visibility: Visibility::User,
                 },
             )?;
         }

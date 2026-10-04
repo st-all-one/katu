@@ -20,6 +20,9 @@ mod defaults;
 #[cfg(feature = "memory-in-process")]
 mod agent;
 
+#[cfg(feature = "memory-in-process")]
+mod kernel;
+
 #[cfg(feature = "profile")]
 mod diag;
 

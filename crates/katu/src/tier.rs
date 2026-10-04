@@ -4,10 +4,14 @@
 //! determinística e **nunca** sobrepõe um modelo explícito do utilizador (E12-T10): só corre quando
 //! o controlo não fixou modelo.
 
+use std::sync::Arc;
+
 use katu_core::diag::{Level, events};
-use katu_core::provider::{Provider, Tier};
+use katu_core::provider::{ModelSpec, Provider, Thinking, Tier};
 use katu_policy::Phase;
 use serde::Deserialize;
+
+use crate::agent::StepModel;
 
 /// Versão do vocabulário de tiers (`policy/tiers.toml`); recusada se desconhecida (fail-closed).
 pub(crate) const TIER_VOCAB_VERSION: u32 = 1;
@@ -33,7 +37,7 @@ struct TierDoc {
 }
 
 /// Política de tiers carregada: rotas (primeira que casa vence) + tier por omissão.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct TierPolicy {
     routes: Vec<(Phase, Tier)>,
     default: Tier,
@@ -106,6 +110,49 @@ impl TierPolicy {
             "model" => selected.as_deref().unwrap_or(default),
         );
         selected.unwrap_or_else(|| default.to_string())
+    }
+}
+
+/// Resolver do modelo de cada passo a partir da **fase** (`Q2/PI_GAINS`).
+///
+/// Equivale ao `prepareRequest` do pi: o modelo pode mudar entre passos do mesmo turno. Só é
+/// construído quando o utilizador **não** fixou modelo (E12-T10) — um modelo explícito vence.
+pub(crate) struct PhaseModel {
+    provider: Arc<dyn Provider>,
+    policy: TierPolicy,
+    default: String,
+    thinking: Thinking,
+}
+
+impl PhaseModel {
+    /// Constrói o resolver com o provider, a política e o modelo por omissão.
+    pub(crate) fn new(
+        provider: Arc<dyn Provider>,
+        policy: TierPolicy,
+        default: String,
+        thinking: Thinking,
+    ) -> Self {
+        let _span = katu_core::trace_fn!("tier::PhaseModel::new");
+
+        Self {
+            provider,
+            policy,
+            default,
+            thinking,
+        }
+    }
+}
+
+impl StepModel for PhaseModel {
+    fn model_for(&self, phase: Phase, _step: u32) -> Option<ModelSpec> {
+        let _span = katu_core::trace_fn!("tier::PhaseModel::model_for");
+
+        Some(ModelSpec {
+            model: self
+                .policy
+                .model_for(self.provider.as_ref(), phase, &self.default),
+            thinking: self.thinking,
+        })
     }
 }
 

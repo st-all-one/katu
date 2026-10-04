@@ -79,7 +79,10 @@ existir** no topo → `invalid_input` (exit 2), sem retrocompatibilidade.
   A **escrita** de memória é do **agente** (tools no loop) e do `kd`; o `memo` nunca cria notas.
 - **`run`** — monta o runtime, escolhe o modelo (explícito ou por **tier**), corre **uma** rodada;
   as tool calls passam pela ordem §42. Saída humana: texto + **id da sessão em destaque** (após uma
-  linha em branco); envelope: `text` + `session` + `round_exit`. O `usage` vem com `basis`.
+  linha em branco); envelope: `text` + `session` + `round_exit`. O `usage` vem com `basis`. Com
+  `stderr` interactivo, o fluxo (raciocínio, tools com resumo, texto) é mostrado **ao vivo** em
+  `stderr` (`LIVE_FLOW` LF1/LF4); `stdout` fica só com os dados. `--output stream-json` emite um
+  evento JSON por linha em `stdout` (LF5).
 - **`tui`** — igual ao `run`, mas entra no loop de eventos da UI (multi-turno). O `goal` interno é
   `"tui"`; o objetivo real de cada turno é a mensagem escrita na UI.
 
@@ -100,6 +103,7 @@ existir** no topo → `invalid_input` (exit 2), sem retrocompatibilidade.
 | Flag | Comandos | O que faz | Default |
 | --- | --- | --- | --- |
 | `--json` | `prime`, `upgrade`, `config`, `memo`, `run` | Envelope de máquina em `stdout`. | `false` |
+| `--output <FORMATO>` | `run` | `text` (progresso humano em `stderr`), `json` (envelope) ou `stream-json` (um evento JSON por linha em `stdout`; `LIVE_FLOW` LF5). | `text` |
 | `--long` | `prime` | Acrescenta gramática e escopo. | `false` |
 | `--group <g>` | `prime` | Grupo a emitir. | `global` |
 | `--limit <N>` | `memo ask` | Máximo de resultados do recall. | `5` |

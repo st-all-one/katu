@@ -97,12 +97,13 @@ fn bottom_offset(total: usize, area: Rect) -> u16 {
     total.saturating_sub(inner)
 }
 
-/// Número de linhas do painel de atividade (sem o histórico de raciocínio).
+/// Número de linhas do painel de atividade (raciocínio + tools + texto).
 fn activity_len(app: &App) -> usize {
     let _span = katu_core::trace_fn!("ui::activity_len");
 
     let live = usize::min(app.live().len(), MAX_ACTIVITY_LINES);
     live.saturating_add(app.streaming().lines().count())
+        .saturating_add(app.thinking().lines().count())
 }
 
 /// Cabeçalho: identidade, modelo, pensamento, fase, pendência e próxima ação.
@@ -208,26 +209,34 @@ fn transcript_lines(app: &App) -> Vec<Line<'static>> {
     lines
 }
 
-/// Painel de atividade (E10-T05): tools em curso + texto do modelo a chegar (efémero).
+/// Painel de atividade (E10-T05): raciocínio em curso + tools + texto do modelo (efémero).
 fn activity_lines(app: &App) -> Vec<Line<'static>> {
     let _span = katu_core::trace_fn!("ui::activity_lines");
 
-    let start = app.live().len().saturating_sub(MAX_ACTIVITY_LINES);
+    // O raciocínio abre o painel (LIVE_FLOW LF2): é a fase mais longa e a que parecia travada.
     let mut lines: Vec<Line<'static>> = app
-        .live()
-        .iter()
-        .skip(start)
-        .map(|line| {
-            let color = if line.starts_with('⛔') {
-                Color::Red
-            } else if line.starts_with('⚠') {
-                Color::LightYellow
-            } else {
-                Color::Yellow
-            };
-            Line::from(Span::styled(line.clone(), Style::default().fg(color)))
+        .thinking()
+        .lines()
+        .map(|raw| {
+            Line::from(Span::styled(
+                raw.to_string(),
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::ITALIC),
+            ))
         })
         .collect();
+    let start = app.live().len().saturating_sub(MAX_ACTIVITY_LINES);
+    lines.extend(app.live().iter().skip(start).map(|line| {
+        let color = if line.starts_with('⛔') {
+            Color::Red
+        } else if line.starts_with('⚠') {
+            Color::LightYellow
+        } else {
+            Color::Yellow
+        };
+        Line::from(Span::styled(line.clone(), Style::default().fg(color)))
+    }));
     for raw in app.streaming().lines() {
         lines.push(Line::from(Span::styled(
             raw.to_string(),

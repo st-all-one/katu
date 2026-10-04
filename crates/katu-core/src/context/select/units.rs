@@ -24,7 +24,7 @@ pub fn message_text(message: &Message) -> Cow<'_, str> {
     let _span = crate::trace_fn!("context::select::message_text");
 
     match message {
-        Message::User { text } | Message::Assistant { text } => Cow::Borrowed(text),
+        Message::User { text, .. } | Message::Assistant { text } => Cow::Borrowed(text),
         Message::ToolCall { tool, .. } => Cow::Owned(tool_text(tool)),
         Message::ToolResult {
             delta: Some(delta), ..
@@ -103,7 +103,7 @@ fn message_bytes(message: &Message) -> usize {
     let _span = crate::trace_fn!("context::select::message_bytes");
 
     match message {
-        Message::User { text } | Message::Assistant { text } => text.len(),
+        Message::User { text, .. } | Message::Assistant { text } => text.len(),
         Message::ToolCall { tool, .. } => tool_text(tool).len(),
         Message::ToolResult { outcome, delta, .. } => {
             outcome_weight(outcome).saturating_add(delta.as_deref().map_or(0, str::len))

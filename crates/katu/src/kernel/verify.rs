@@ -4,19 +4,18 @@
 //! cada verificação bloqueada pede um override por challenge-and-response (§33); só um humano
 //! assina (`granted_by`) e o registo fica append-only em `overrides.jsonl`.
 
+use katu_core::api::Event as Update;
 use katu_core::diag::{Level, events};
 use katu_core::error::Error;
 use katu_core::kernel::audit_dir;
-use katu_core::ports::Env;
 use katu_core::verify::{CheckStatus, Override, VerificationReport, append_override, save};
-use katu_tui::{ChallengePrompt, Painter, Update};
 
-use super::AgentHandler;
+use super::{BusSink, Kernel};
 use crate::runtime::VerifyRequest;
 
-impl AgentHandler<'_> {
+impl Kernel<'_> {
     /// Corre o gate de verificação (E09-T03) e, se bloquear, pede override humano assinado.
-    pub(super) fn verify(&mut self, painter: &mut Painter<'_>) -> Vec<Update> {
+    pub(super) fn verify(&mut self, sink: &mut BusSink<'_>) -> Vec<Update> {
         let _span = katu_core::fn_span!(Level::Debug, events::VERIFY_REPORT, "verify::verify");
         let report = match self.runtime.verify(VerifyRequest {
             coverage_floor_bps: 0,
@@ -48,7 +47,7 @@ impl AgentHandler<'_> {
             }
         }
         if report.is_blocked() {
-            updates.extend(self.overrides(painter, &report));
+            updates.extend(self.overrides(sink, &report));
         }
         updates
     }
@@ -56,12 +55,11 @@ impl AgentHandler<'_> {
     /// Pede um override por cada bloqueio e regista-o em `overrides.jsonl` (E09-T03, §33).
     pub(super) fn overrides(
         &self,
-        painter: &mut Painter<'_>,
+        sink: &mut BusSink<'_>,
         report: &VerificationReport,
     ) -> Vec<Update> {
         let _span = katu_core::trace_fn!("tui::verify::overrides");
 
-        let granted_by = self.granted_by();
         let dir = audit_dir(self.runtime.root());
         let now = self.runtime.clock.now().as_millis();
         let mut updates = Vec::new();
@@ -69,21 +67,11 @@ impl AgentHandler<'_> {
             if check.status != CheckStatus::Block {
                 continue;
             }
-            let request = ChallengePrompt {
-                tool: "verify".to_string(),
-                rule: check.id.clone(),
-                scope: check.detail.clone(),
-            };
-            let Some(signature) = painter.challenge(request, &granted_by) else {
+            let Some(grant) = sink.ask("verify", &check.id, &check.detail) else {
                 updates.push(Update::Info(format!("{}: bloqueio mantido", check.id)));
                 continue;
             };
-            match Override::new(
-                check.id.clone(),
-                signature.reason,
-                signature.granted_by,
-                now,
-            ) {
+            match Override::new(check.id.clone(), grant.reason, grant.granted_by, now) {
                 Ok(signed) => match append_override(self.fs, &dir, &signed) {
                     Ok(()) => {
                         katu_core::event!(
@@ -99,15 +87,5 @@ impl AgentHandler<'_> {
             }
         }
         updates
-    }
-
-    /// Quem assina (`USER`/`USERNAME`, ou `local`); o agente **nunca** assina.
-    pub(super) fn granted_by(&self) -> String {
-        let _span = katu_core::trace_fn!("tui::verify::granted_by");
-
-        self.env
-            .var("USER")
-            .or_else(|| self.env.var("USERNAME"))
-            .unwrap_or_else(|| "local".to_string())
     }
 }

@@ -52,6 +52,15 @@ fn renders_model_and_thinking_in_the_header() -> Result<(), Box<dyn std::error::
 }
 
 #[test]
+fn renders_the_reasoning_in_the_activity_panel() -> Result<(), Box<dyn std::error::Error>> {
+    let mut app = App::new();
+    app.apply_update(Update::Live(Live::Thinking("a ponderar".to_string())));
+    let text = draw(&app)?;
+    assert!(text.contains("a ponderar"), "{text}");
+    Ok(())
+}
+
+#[test]
 fn renders_the_help_overlay() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = App::new();
     app.apply_action(Action::OpenHelp);

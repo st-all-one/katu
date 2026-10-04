@@ -59,10 +59,16 @@ fn live_stream_accumulates_outside_the_transcript() {
         name: "grep".to_string(),
         args: "{}".to_string(),
     }));
-    app.apply_update(Update::Live(Live::ToolDone("grep".to_string())));
+    app.apply_update(Update::Live(Live::ToolDone {
+        name: "grep".to_string(),
+        summary: "3 linhas".to_string(),
+    }));
     assert_eq!(app.streaming(), "olá mundo");
     assert_eq!(app.thinking(), "hmm");
-    assert_eq!(app.live(), ["→ grep".to_string(), "✓ grep".to_string()]);
+    assert_eq!(
+        app.live(),
+        ["→ grep".to_string(), "✓ grep: 3 linhas".to_string()]
+    );
     assert!(
         app.transcript().is_empty(),
         "o live não entra no transcript"
@@ -82,8 +88,9 @@ fn usage_and_cancellation_updates_are_visible() {
 }
 
 #[test]
-fn done_clears_the_live_panel() {
+fn done_keeps_the_live_panel_until_the_next_submit() {
     let mut app = App::new();
+    app.apply_update(Update::Live(Live::Thinking("hmm".to_string())));
     app.apply_update(Update::Live(Live::Text("parcial".to_string())));
     app.apply_update(Update::Live(Live::Tool {
         name: "read".to_string(),
@@ -91,10 +98,17 @@ fn done_clears_the_live_panel() {
     }));
     app.apply_update(Update::Assistant("final".to_string()));
     app.apply_update(Update::Done);
-    assert!(app.streaming().is_empty());
-    assert!(app.live().is_empty());
-    assert!(app.thinking().is_empty());
+    assert_eq!(app.streaming(), "parcial", "o fluxo fica relível (LF3)");
+    assert_eq!(app.thinking(), "hmm");
+    assert_eq!(app.live(), ["→ read".to_string()]);
     assert_eq!(app.transcript().len(), 1);
+    // O turno seguinte limpa o painel antes de o preencher.
+    app.apply_action(Action::EnterInsert);
+    app.apply_action(Action::Insert('x'));
+    app.apply_action(Action::Submit);
+    assert!(app.streaming().is_empty());
+    assert!(app.thinking().is_empty());
+    assert!(app.live().is_empty());
 }
 
 #[test]
@@ -120,7 +134,10 @@ fn refusal_is_shown_and_kept_in_the_transcript() {
         "a recusa fica no transcript como erro"
     );
     app.apply_update(Update::Done);
-    assert!(app.live().is_empty(), "o painel limpa no fim do turno");
+    assert!(
+        !app.live().is_empty(),
+        "o painel fica relível no fim do turno (LF3)"
+    );
     assert_eq!(app.transcript().len(), 1, "o transcript mantém a recusa");
 }
 

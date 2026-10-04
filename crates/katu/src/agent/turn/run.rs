@@ -9,7 +9,7 @@ use std::sync::Arc;
 use katu_core::context::SelectionPolicy;
 use katu_core::diag::{Level, events};
 use katu_core::kernel::{CallId, Guard};
-use katu_core::ports::Cancel;
+use katu_core::ports::{Cancel, Progress};
 use katu_core::provider::{
     Provider, ProviderError, ProviderRequest, StopReason, TokenUsage, ToolDef,
 };
@@ -20,7 +20,7 @@ use super::looping::cut_if_looping;
 use super::request::build_request;
 use super::sink::TurnSink;
 use super::stream::drain_stream;
-use super::{ActivitySink, run_calls};
+use super::{ActivitySink, CallsOutcome, run_calls};
 use crate::agent::{
     AgentError, Ports, Termination, TurnOptions, TurnReport, TurnRequest, catalog, settle_truncated,
 };
@@ -44,6 +44,7 @@ pub(crate) fn run_turn_with(
         goal,
         options,
         cancel,
+        progress,
     } = request;
     let _span = katu_core::fn_span!(Level::Info, events::KERNEL_TURN, "run::run_turn_with");
     if !runtime.session.state().turn_open {
@@ -55,7 +56,9 @@ pub(crate) fn run_turn_with(
     runtime.record_prompt_state(options.max_steps)?;
     // Q-12: o turno fecha **sempre**, mesmo quando o loop guard corta a meio (ou o teto de passos
     // estoura): um `TurnStart` sem `TurnEnd` deixaria o log inconsistente para a retomada.
-    let driven = drive(runtime, &ports, &provider, options, activity, cancel);
+    let driven = drive(
+        runtime, &ports, &provider, options, activity, cancel, progress,
+    );
     // L-S1: `record_turn_end` é o **único** ponto que fecha o turno (normal, erro, cancel, teto),
     // já com a reconciliação de calls pendentes (L-Q1).
     match driven {
@@ -92,6 +95,7 @@ fn drive(
     options: &TurnOptions,
     activity: &mut dyn ActivitySink,
     cancel: Option<&dyn Cancel>,
+    progress: &dyn Progress,
 ) -> Result<Accum, AgentError> {
     let _span = katu_core::trace_fn!("agent::turn::run::drive");
 
@@ -106,6 +110,7 @@ fn drive(
         .unwrap_or(false)
         && runtime.selection() == SelectionPolicy::Suffix;
     let mut accum = Accum::new();
+    accum.model.clone_from(&options.model.model);
     loop {
         if activity.cancelled() {
             accum.cancelled = true;
@@ -113,7 +118,15 @@ fn drive(
             return Ok(accum);
         }
         accum.steps = accum.steps.saturating_add(1);
-        let request = build_request(runtime, options, &tools)?;
+        // `Q2/PI_GAINS`: o modelo pode mudar **entre passos** (resolver por fase). Quando o
+        // utilizador fixou um modelo, o kernel não fornece resolver e `options.model` vence.
+        let model = options
+            .step_model
+            .as_ref()
+            .and_then(|resolver| resolver.model_for(runtime.phase(), accum.steps))
+            .unwrap_or_else(|| options.model.clone());
+        accum.model.clone_from(&model.model);
+        let request = build_request(runtime, options, &tools, &model)?;
         let step = stream_step(
             runtime,
             provider,
@@ -177,6 +190,11 @@ fn drive(
                 accum.termination = Termination::Empty;
                 return Ok(accum);
             }
+            // `S1/PI_GAINS`: a superfície pode pedir **um** passo extra antes do fim natural
+            // (one-shot). Sem pedido, o turno fecha como sempre.
+            if accum.steps < options.max_steps && activity.continue_once() {
+                continue;
+            }
             accum.termination = Termination::Natural;
             return Ok(accum);
         }
@@ -191,10 +209,19 @@ fn drive(
         } else {
             step.calls
         };
-        if !run_calls(runtime, ports, cancel, calls, activity)? {
-            accum.cancelled = true;
-            accum.termination = Termination::Cancelled;
-            return Ok(accum);
+        // `Q1/PI_GAINS`: um passo terminal (todas as calls pediram o fim) fecha o turno **normal**
+        // sem um passo extra ao modelo; um cancelamento fecha-o como cancelado.
+        match run_calls(runtime, ports, cancel, progress, calls, activity)? {
+            CallsOutcome::Cancelled => {
+                accum.cancelled = true;
+                accum.termination = Termination::Cancelled;
+                return Ok(accum);
+            }
+            CallsOutcome::Terminate => {
+                accum.termination = Termination::Terminal;
+                return Ok(accum);
+            }
+            CallsOutcome::Continue => {}
         }
         if let Some(prompt) = activity.steer() {
             runtime.record_user(&prompt)?;
@@ -229,7 +256,8 @@ fn nudge(
     message: &str,
 ) -> Result<(), AgentError> {
     let _span = katu_core::fn_span!(Level::Debug, events::AGENT_EMPTY, "run::nudge");
-    runtime.record_user(message)?;
+    // G3: o nudge é do **loop**, não do utilizador — chega ao modelo mas não à transcrição.
+    runtime.record_agent(message)?;
     katu_core::event!(Level::Debug, event, "reason" => reason);
     Ok(())
 }
@@ -319,6 +347,7 @@ fn stream_step(
 /// Acumulado do turno até ao fecho, com o motivo de terminação (L-Q3).
 struct Accum {
     text: String,
+    model: String,
     calls: usize,
     usage: Option<TokenUsage>,
     steps: u32,
@@ -336,6 +365,7 @@ impl Accum {
 
         Self {
             text: String::new(),
+            model: String::new(),
             calls: 0,
             usage: None,
             steps: 0,
@@ -348,50 +378,6 @@ impl Accum {
     }
 }
 
-/// Fecha o turno e devolve o relatório (comum a todos os finais).
-///
-/// L-Q3: um fim **anormal** (vazio, teto ou loop) acrescenta uma mensagem do assistente visível ao
-/// utilizador — o motivo continua no envelope de máquina, nunca em silêncio.
-fn finish(runtime: &mut Runtime<'_>, accum: Accum) -> Result<TurnReport, AgentError> {
-    let _span = katu_core::fn_span!(Level::Debug, events::KERNEL_STOP, "run::finish");
-    // L-Q2: o motivo de paragem do provider e a terminação ficam no diagnóstico (um facto, um id).
-    katu_core::event!(
-        Level::Debug,
-        events::AGENT_STOP,
-        "stop" => crate::agent::stop_label(&accum.stop),
-        "termination" => accum.termination.as_str(),
-        "steps" => accum.steps
-    );
-    let turn = runtime.turn();
-    let mut text = accum.text;
-    // L-Q3: fim anormal (vazio/teto/loop) tem mensagem própria; L-Q2: `length`/`content_filter`
-    // sem outra terminação acrescenta o aviso correspondente. A mensagem é logada (visível).
-    let note = accum.termination.message().or_else(|| match accum.stop {
-        StopReason::Length => Some(
-            "a resposta foi truncada pelo teto de tokens de saída; aumenta `--max-tokens` ou divide \
-             o pedido"
-                .to_string(),
-        ),
-        StopReason::ContentFilter => Some(
-            "a resposta foi interrompida pelo filtro de conteúdo do provider".to_string(),
-        ),
-        _ => None,
-    });
-    if let Some(message) = note {
-        runtime.record_assistant(&message)?;
-        if !text.is_empty() {
-            text.push_str("\n\n");
-        }
-        text.push_str(&message);
-    }
-    runtime.record_turn_end(turn)?;
-    Ok(TurnReport {
-        steps: accum.steps,
-        text,
-        calls: accum.calls,
-        usage: accum.usage,
-        cancelled: accum.cancelled,
-        stop: accum.stop,
-        termination: accum.termination,
-    })
-}
+mod finish;
+
+use finish::finish;

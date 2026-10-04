@@ -112,7 +112,7 @@ fn encode_message(message: &Message, names: &mut BTreeMap<String, String>) -> Op
         "google::encode_message"
     );
     let encoded = match message {
-        Message::User { text } => json!({"role": "user", "parts": [{"text": text}]}),
+        Message::User { text, .. } => json!({"role": "user", "parts": [{"text": text}]}),
         Message::Assistant { text } => json!({"role": "model", "parts": [{"text": text}]}),
         Message::ToolCall { call, tool } => {
             let name = model_tool_name(tool);

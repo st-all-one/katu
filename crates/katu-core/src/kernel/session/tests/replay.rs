@@ -1,5 +1,6 @@
 use super::{Probe, plan, use_write};
 use crate::kernel::Message;
+use crate::kernel::Visibility;
 use crate::kernel::event::{CallId, Event};
 use crate::kernel::session::{CallContext, Session};
 use crate::ports::MemFs;
@@ -49,6 +50,7 @@ fn full_loop_verifies_and_messages_come_from_the_log() -> Result<(), Box<dyn std
     session.apply(&Event::TurnStart { turn: 1 })?;
     session.apply(&Event::UserMessage {
         text: "faz isto".into(),
+        visibility: Visibility::User,
     })?;
     run_allowed_tool(&mut session)?;
     session.apply(&Event::AssistantMessage {
@@ -124,6 +126,7 @@ fn fork_and_resume_share_the_log_prefix() -> Result<(), Box<dyn std::error::Erro
     session.apply(&Event::TurnStart { turn: 1 })?;
     session.apply(&Event::UserMessage {
         text: "base".into(),
+        visibility: Visibility::User,
     })?;
 
     let mut forked = session.fork(dst)?;

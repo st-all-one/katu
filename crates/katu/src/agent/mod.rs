@@ -14,6 +14,7 @@
 mod catalog;
 mod command;
 mod failure;
+mod model;
 mod plan;
 mod router;
 mod shell;
@@ -26,13 +27,16 @@ pub(crate) use command::{
     RunArgs, SYSTEM, build_provider, default_base, default_model, open_runtime, run,
 };
 pub(crate) use failure::{route_failure, settle_truncated};
+pub(crate) use model::StepModel;
 pub(crate) use shell::dispatch as shell_dispatch;
-pub(crate) use turn::{Activity, ActivitySink, Approval, ApprovalPrompt, run_turn, run_turn_with};
+#[cfg(test)]
+pub(crate) use turn::run_turn;
+pub(crate) use turn::{Activity, ActivitySink, Approval, ApprovalPrompt, run_turn_with};
 
 use katu_core::error::{Error, ToolOutcome};
 use katu_core::kernel::{CallContext, CallId, SessionError, memory_recall_use};
 use katu_core::memory::Memory;
-use katu_core::ports::{Cancel, Env, Fs, Process};
+use katu_core::ports::{Cancel, Env, Fs, Process, Progress};
 use katu_core::provider::{ModelSpec, Provider, ProviderError, StopReason, TokenUsage};
 use katu_policy::{ApprovalRequest, Decision, ToolUse};
 use katu_tools::recall::RecallTool;
@@ -69,6 +73,8 @@ pub(crate) struct TurnOptions {
     pub max_steps: u32,
     /// Teto de inatividade do stream do provider em ms (L-P2); `0` desliga o *stall*.
     pub idle_ms: u64,
+    /// Resolve o modelo de **cada passo** (`Q2/PI_GAINS`); `None` mantém [`TurnOptions::model`] fixo.
+    pub step_model: Option<Box<dyn StepModel>>,
 }
 
 /// Pedido de execução de um turno (o que o loop precisa além do runtime).
@@ -84,10 +90,14 @@ pub(crate) struct TurnRequest<'a> {
     pub options: &'a TurnOptions,
     /// Cancelamento cooperativo do turno (L-P3); `None` = nunca cancela.
     pub cancel: Option<&'a dyn Cancel>,
+    /// Progresso efémero do output das tools (`P1/PI_GAINS`); nunca entra no log.
+    pub progress: &'a dyn Progress,
 }
 
 /// Resultado observável de um turno.
 pub(crate) struct TurnReport {
+    /// Modelo usado no **último** passo (`Q2/PI_GAINS`; pode mudar a meio do turno).
+    pub model: String,
     /// Passos dados (uma chamada ao modelo cada).
     pub steps: u32,
     /// Texto final acumulado do assistente.
@@ -112,6 +122,8 @@ pub(crate) struct TurnReport {
 pub(crate) enum Termination {
     /// Fim natural (texto final ou tool calls concluídas).
     Natural,
+    /// Fim pedido por uma tool **terminal** (`Q1/PI_GAINS`): o verbo cortou o loop.
+    Terminal,
     /// Cancelado pelo utilizador.
     Cancelled,
     /// Resposta vazia mesmo depois dos retries (orçamento de saída gasto em raciocínio).
@@ -136,6 +148,7 @@ impl Termination {
     pub(crate) const fn as_str(&self) -> &'static str {
         match self {
             Self::Natural => "natural",
+            Self::Terminal => "terminal",
             Self::Cancelled => "cancelled",
             Self::Empty => "empty",
             Self::MaxSteps { .. } => "max_steps",
@@ -147,7 +160,7 @@ impl Termination {
     #[must_use]
     pub(crate) const fn round_exit(&self) -> u8 {
         match self {
-            Self::Natural | Self::Cancelled => 0,
+            Self::Natural | Self::Terminal | Self::Cancelled => 0,
             Self::Empty => 1,
             Self::MaxSteps { .. } => 70,
             Self::Loop { .. } => 5,
@@ -160,7 +173,7 @@ impl Termination {
         let _span = katu_core::trace_fn!("agent::termination::message");
 
         match self {
-            Self::Natural | Self::Cancelled => None,
+            Self::Natural | Self::Terminal | Self::Cancelled => None,
             Self::Empty => Some(
                 "não consegui produzir uma resposta em texto (o orçamento de saída pode ter sido \
                  gasto em raciocínio); aumenta `--max-tokens` ou muda de modelo"
@@ -238,6 +251,10 @@ pub(crate) struct CallOutcome {
     pub use_: Option<ToolUse>,
     /// Pedido de aprovação, quando a política o exigiu.
     pub approval: Option<ApprovalRequest>,
+    /// Delta **model-visible** do efeito (resumo de uma linha para o painel; `LIVE_FLOW` LF4).
+    pub delta: Option<String>,
+    /// `true` se a tool pediu o fim normal do turno (`Q1/PI_GAINS`).
+    pub terminate: bool,
 }
 
 /// Roteia e executa uma tool call, mantendo a ordem §42 (logar → política → efeito).
@@ -251,6 +268,7 @@ fn execute_call(
     runtime: &mut Runtime<'_>,
     ports: &Ports<'_>,
     cancel: Option<&dyn Cancel>,
+    progress: &dyn Progress,
     call: CallId,
     name: &str,
     args: &Value,
@@ -270,6 +288,7 @@ fn execute_call(
         clock: runtime.clock,
         root: &root,
         cancel,
+        progress,
     };
     let routed = match router::route(&route_ports, &runtime.cwd, name, args, loaded.as_ref()) {
         Ok(routed) => routed,
@@ -283,6 +302,8 @@ fn execute_call(
                 outcome,
                 use_: Some(use_),
                 approval: None,
+                delta: None,
+                terminate: false,
             }
         }
         router::Routed::Plain { use_, tool } => {
@@ -303,6 +324,8 @@ fn execute_call(
                 outcome: dispatch.outcome(),
                 use_: Some(use_),
                 approval,
+                delta: dispatch.delta(),
+                terminate: dispatch.terminate(),
             }
         }
         _ => {
@@ -348,6 +371,8 @@ fn execute_memory(
                 outcome: dispatch.outcome(),
                 use_: None,
                 approval: None,
+                delta: dispatch.delta(),
+                terminate: dispatch.terminate(),
             }
         }
         router::Routed::MemoryRecord { req } => {
@@ -357,6 +382,8 @@ fn execute_memory(
                 outcome: dispatch.outcome(),
                 use_: None,
                 approval: None,
+                delta: dispatch.delta(),
+                terminate: dispatch.terminate(),
             }
         }
         router::Routed::Plain { .. } | router::Routed::Plan { .. } => {

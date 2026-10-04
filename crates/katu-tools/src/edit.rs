@@ -339,6 +339,7 @@ fn rejected(path: &ResolvedPath, failure: &EditFailure, total: usize) -> ToolOut
             rule_id: None,
         },
         report: Some(report),
+        terminate: false,
     }
 }
 

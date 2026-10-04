@@ -297,7 +297,7 @@ fn message_weight(message: &Message) -> usize {
     let _span = crate::trace_fn!("context::message_weight");
 
     let bytes = match message {
-        Message::User { text } | Message::Assistant { text } => text.len(),
+        Message::User { text, .. } | Message::Assistant { text } => text.len(),
         Message::ToolCall { tool, .. } => tool_weight(tool),
         // O **delta** é o payload model-visible (§18/G6): conta para o orçamento como qualquer
         // outra mensagem — se não contasse, o contexto excedia o teto em silêncio.

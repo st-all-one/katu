@@ -1,5 +1,6 @@
 //! Testes de criação/retoma/ordenação/snapshot (ADR 0008).
 
+use crate::kernel::Visibility;
 use std::path::Path;
 
 use super::Session;
@@ -73,6 +74,7 @@ fn snapshot_offset_resumes_the_tail_and_cost() -> Result<(), Box<dyn std::error:
         // Cauda depois do snapshot: tem de ser reaplicada a partir do offset.
         session.apply(&Event::UserMessage {
             text: "depois".to_string(),
+            visibility: Visibility::User,
         })?;
         session.apply(&Event::TurnEnd { turn: 1 })?;
         id
@@ -108,6 +110,7 @@ fn the_tail_stays_under_the_cap_and_the_state_survives() -> Result<(), Box<dyn s
             session.apply(&Event::TurnStart { turn })?;
             session.apply(&Event::UserMessage {
                 text: format!("pedido {turn} com algum texto para gastar bytes no log"),
+                visibility: Visibility::User,
             })?;
             session.apply(&Event::TurnEnd { turn })?;
             let tail = session.tail_bytes();
@@ -141,6 +144,7 @@ fn the_turn_boundary_closes_the_durability_barrier() -> Result<(), Box<dyn std::
     session.apply(&Event::TurnStart { turn: 1 })?;
     session.apply(&Event::UserMessage {
         text: "pedido".to_string(),
+        visibility: Visibility::User,
     })?;
     assert!(session.is_dirty(), "a meio do turno há barreira pendente");
     session.apply(&Event::TurnEnd { turn: 1 })?;

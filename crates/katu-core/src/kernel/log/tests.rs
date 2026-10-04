@@ -1,5 +1,6 @@
 //! Testes do log append-only (round-trip, sequência, corrupção, replay estável).
 
+use crate::kernel::Visibility;
 use std::path::Path;
 
 use super::{Durability, Log, LogErrorKind, read_records, session_path};
@@ -113,6 +114,7 @@ fn replay_from_log_is_byte_stable() -> Result<(), Box<dyn std::error::Error>> {
         Event::TurnStart { turn: 7 },
         Event::UserMessage {
             text: "escreve".into(),
+            visibility: Visibility::User,
         },
         Event::ToolCall {
             call: call.clone(),

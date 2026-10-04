@@ -9,6 +9,7 @@ pub mod clock;
 pub mod env;
 pub mod fs;
 pub mod process;
+pub mod progress;
 pub mod rng;
 
 pub use cancel::{Cancel, Flag, Never};
@@ -16,4 +17,5 @@ pub use clock::{Clock, FixedClock, Timestamp};
 pub use env::{Env, FakeEnv};
 pub use fs::{Fs, FsError, MemFs};
 pub use process::{ExecRequest, ExecResult, MemProcess, Process, ProcessError};
+pub use progress::{NO_PROGRESS, NoProgress, Progress};
 pub use rng::{Rng, SeqRng};

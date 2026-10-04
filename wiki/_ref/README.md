@@ -13,6 +13,7 @@
 | [`plan/IMPLEMENTATION_PLAN.md`](plan/IMPLEMENTATION_PLAN.md) | ordem de implementação e ondas | quem pega num épico |
 | [`plan/SURFACE_IMPLEMENTATION.md`](plan/SURFACE_IMPLEMENTATION.md) | reforma da superfície CLI/TUI (E20) | quem toca no CLI |
 | [`plan/KERNEL_SURFACE.md`](plan/KERNEL_SURFACE.md) | kernel autocontido na sua thread; superfícies como clientes | quem mexe no loop ou num front-end |
+| [`plan/LIVE_FLOW.md`](plan/LIVE_FLOW.md) | fluxo do turno (raciocínio, tools, execução) visível no CLI/TUI | quem mexe na apresentação do turno |
 | [`brainstorm/`](brainstorm/katu-brainstorm-decisoes.md) | a origem das ideias: Alternative A, o *deepseek harness*, o PTC | quem procura o porque |
 | [`docs/`](docs/) | regras, catálogo gerado, superfície do utilizador, tópicos, postmortems | o agente e quem investiga |
 

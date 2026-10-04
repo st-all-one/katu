@@ -17,6 +17,7 @@
 //!   cargo test -q --release -p katu --bin katu -- --ignored ab_durability
 //! ```
 
+use katu_core::kernel::Visibility;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -117,6 +118,7 @@ fn apply_turn(session: &mut Session<'_>, turn: u32) -> Result<(), Box<dyn std::e
     session.apply(&Event::TurnStart { turn })?;
     session.apply(&Event::UserMessage {
         text: format!("pedido {turn}"),
+        visibility: Visibility::User,
     })?;
     let call = CallId::new(format!("c{turn}"));
     session.apply(&Event::ToolCall {

@@ -3,6 +3,7 @@
 //! Pura computação, sem I/O: mantém o instrumento ([`super`]) sob o limite de 400 linhas e torna
 //! o corpus e os percentis testáveis isoladamente.
 
+use katu_core::kernel::Visibility;
 use std::time::Duration;
 
 use katu_core::kernel::Message;
@@ -42,6 +43,7 @@ pub(super) fn request(model: &str) -> ProviderRequest {
         system: Some("Responde de forma curta.".to_string()),
         messages: vec![Message::User {
             text: "ola".to_string(),
+            visibility: Visibility::User,
         }],
         tools: Vec::new(),
         max_tokens: Some(64),

@@ -1,4 +1,4 @@
-//! Testes do executor da TUI (E12-T03): linha de uso/custo.
+//! Testes do actor do kernel (E12-T03): linha de uso/custo.
 
 use katu_core::evidence::EvidenceBasis;
 use katu_core::provider::{StopReason, TokenUsage};
@@ -9,6 +9,7 @@ use crate::agent::{Termination, TurnReport};
 
 fn report(usage: Option<TokenUsage>) -> TurnReport {
     TurnReport {
+        model: "fake".to_string(),
         steps: 1,
         text: String::new(),
         calls: 0,

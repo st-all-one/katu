@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use katu_core::kernel::CallId;
+use katu_core::ports::NO_PROGRESS;
 use katu_core::provider::{ModelSpec, Provider, ProviderEvent};
 use serde_json::json;
 
@@ -21,6 +22,7 @@ pub(crate) fn request<'a>(
         goal,
         options,
         cancel: None,
+        progress: &NO_PROGRESS,
     }
 }
 
@@ -58,6 +60,7 @@ pub(crate) fn options(max_steps: u32) -> TurnOptions {
         temperature: 0.0,
         max_steps,
         idle_ms: 0,
+        step_model: None,
     }
 }
 

@@ -4,6 +4,7 @@ use katu_core::provider::Thinking;
 
 use super::{Flags, RunParams};
 use crate::defaults::Defaults;
+use crate::report::Output;
 
 /// Flags com só o pensamento definido.
 fn thinking_flag(value: Option<&str>) -> Flags {
@@ -70,4 +71,37 @@ fn invalid_thinking_is_refused() {
         &Defaults::default(),
     );
     assert!(refused.is_err());
+}
+
+#[test]
+fn output_defaults_to_text_and_stream_json_resolves() -> Result<(), Box<dyn std::error::Error>> {
+    let plain =
+        Flags::default().assemble("g".to_string(), RunParams::default(), &Defaults::default())?;
+    assert_eq!(plain.output, Output::Text);
+    let stream = Flags {
+        output: Some("stream-json".to_string()),
+        ..Flags::default()
+    }
+    .assemble("g".to_string(), RunParams::default(), &Defaults::default())?;
+    assert_eq!(stream.output, Output::StreamJson);
+    Ok(())
+}
+
+#[test]
+fn json_conflicts_with_a_different_output() {
+    let flags = Flags {
+        json: true,
+        output: Some("text".to_string()),
+        ..Flags::default()
+    };
+    assert!(
+        flags
+            .assemble("g".to_string(), RunParams::default(), &Defaults::default())
+            .is_err()
+    );
+}
+
+#[test]
+fn an_unknown_output_is_rejected() {
+    assert!(Output::parse("bogus").is_err());
 }

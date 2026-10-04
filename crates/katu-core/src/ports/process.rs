@@ -57,6 +57,21 @@ pub trait Process: Send + Sync {
     /// `cancel` é consultado durante a execução: um `bash` longo é interrompido (o grupo de
     /// processos é morto) quando o utilizador cancela o turno (L-P3).
     fn run(&self, request: &ExecRequest, cancel: &dyn Cancel) -> Result<ExecResult, ProcessError>;
+
+    /// Como [`run`](Process::run), mas entrega o output **incrementalmente** (`P1/PI_GAINS`).
+    ///
+    /// A implementação por omissão delega em `run` e não emite fragmentos: as *fakes* e os
+    /// adaptadores que não suportam *streaming* mantêm-se válidos (retrocompatível).
+    fn run_streaming(
+        &self,
+        request: &ExecRequest,
+        cancel: &dyn Cancel,
+        _on_chunk: &(dyn Fn(&str) + Send + Sync),
+    ) -> Result<ExecResult, ProcessError> {
+        let _span = crate::trace_fn!("ports::process::run_streaming");
+
+        self.run(request, cancel)
+    }
 }
 
 /// Processo falso e determinístico: regista pedidos e devolve um resultado fixo.

@@ -31,7 +31,6 @@ impl App {
             Update::Trash(items) => self.trash.set_items(items),
             Update::Transcript(lines) => self.viewer.set_lines(lines),
             Update::Cancelled => {
-                self.clear_live();
                 self.status = Status::Message("turno cancelado".to_string());
             }
             Update::Plan(on) => {
@@ -43,7 +42,6 @@ impl App {
                 });
             }
             Update::Done => {
-                self.clear_live();
                 self.status = Status::Idle;
             }
             Update::ApprovalRequest(request) => {
@@ -54,6 +52,13 @@ impl App {
             }
             Update::Busy(command) => {
                 self.status = Status::Message(format!("kernel ocupado; ignorado: {command}"));
+            }
+            Update::Turn(_) => {
+                // Envelope de máquina do CLI; a TUI já recebe `Assistant`/`Usage`/`Phase`.
+            }
+            Update::Failure { message, .. } => {
+                self.status = Status::Failure(message.clone());
+                self.push(Role::Error, message);
             }
         }
     }

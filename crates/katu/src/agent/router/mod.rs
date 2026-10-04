@@ -18,12 +18,14 @@ use katu_core::diag::{Level, events};
 use katu_core::kernel::Tool;
 use katu_core::memory::{Anchor, NoteType, PreWriteReq, RecallReq};
 use katu_core::plan::Plan;
-use katu_core::ports::{Cancel, Clock, Env, Fs, Process};
+use katu_core::ports::{Cancel, Clock, Env, Fs, Process, Progress};
 use katu_policy::{ResolvedArgv, ResolvedPath, SearchMode, ToolArgs, ToolName, ToolUse};
 use katu_tools::read::LineRange;
 use katu_tools::resolve::resolve as resolve_via_port;
 use serde_json::Value;
 
+#[cfg(test)]
+use tools::finish;
 use tools::{bash, edit, move_, plan, read, search, trash, write};
 
 /// Portas que o roteador precisa (todas por referência; `Copy`).
@@ -41,6 +43,8 @@ pub(super) struct Ports<'a> {
     pub root: &'a Path,
     /// Cancelamento cooperativo do turno (L-P3), lido pelo `bash`.
     pub cancel: Option<&'a dyn Cancel>,
+    /// Progresso efémero do output (`P1/PI_GAINS`), lido pelo `bash`.
+    pub progress: &'a dyn Progress,
 }
 
 /// Resultado do roteamento.
@@ -118,6 +122,8 @@ pub(super) fn route<'a>(
         "find" => search(ports, cwd, args, SearchMode::Find),
         "ls" => search(ports, cwd, args, SearchMode::Ls),
         "plan" => Ok(plan(cwd, loaded)),
+        #[cfg(test)]
+        "finish" => Ok(finish(cwd)),
         "memory" => memory(args),
         other => Err(RouteError::UnknownTool(other.to_string())),
     }

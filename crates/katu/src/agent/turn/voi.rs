@@ -21,6 +21,7 @@
 use katu_core::diag::{Level, events};
 use katu_core::error::ToolOutcome;
 use katu_core::kernel::{CallId, Fingerprint};
+use katu_core::ports::NO_PROGRESS;
 use katu_tools::schema::concurrency_of;
 use serde_json::Value;
 
@@ -123,6 +124,7 @@ fn record_skip(
         clock: runtime.clock,
         root: &root,
         cancel: None,
+        progress: &NO_PROGRESS,
     };
     let routed = router::route(&route_ports, &runtime.cwd, name, arguments, loaded.as_ref())?;
     let (router::Routed::Plain { use_, .. } | router::Routed::Plan { use_, .. }) = routed else {

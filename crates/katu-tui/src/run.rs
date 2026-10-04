@@ -1,9 +1,10 @@
 //! Loop de eventos, restauro do terminal (E10-T01) e pintor de streaming (E10-T05).
 //!
 //! `try_init` liga o modo cru, o ecrã alternativo e um **panic hook** que restaura o terminal; a
-//! guarda RAII (`Drop`) restaura em qualquer saída normal. A UI nunca bloqueia o render: os efeitos
-//! são pedidos por [`Command`] e executados pela borda ([`Handler`]), que pode emitir observação
-//! efémera através do [`Painter`] enquanto o turno corre.
+//! guarda RAII (`Drop`) restaura em qualquer saída normal. A UI **nunca** bloqueia no kernel
+//! (`KERNEL_SURFACE` F2): o loop principal drena o canal de eventos e continua a tratar teclado,
+//! rato e resize **enquanto** o turno corre; os efeitos são pedidos por [`Command`] e executados
+//! pela borda ([`Handler`]), que emite observação efémera através do [`Painter`].
 
 use std::io;
 use std::time::Duration;
@@ -27,10 +28,23 @@ use crate::ui::render;
 use crate::{Command, Update};
 
 /// Executor dos efeitos pedidos pela UI (implementado pela borda do binário).
+///
+/// É **não bloqueante** (`KERNEL_SURFACE` F2): `send` só enfileira o comando e `poll` drena os
+/// eventos disponíveis; o loop principal mantém-se livre para tratar input e render.
 pub trait Handler {
-    /// Executa o comando; pode emitir observação incremental via [`Painter`] e devolve as
-    /// atualizações finais a injetar no [`App`].
-    fn handle(&mut self, command: Command, painter: &mut Painter<'_>) -> Vec<Update>;
+    /// Enfileira um comando no kernel sem bloquear; devolve eventos imediatos (ex.: erro de envio).
+    fn send(&mut self, command: Command) -> Vec<Update>;
+
+    /// Drena os eventos pendentes sem bloquear. `Live`/`ApprovalRequest` passam pelo [`Painter`].
+    fn poll(&mut self, painter: &mut Painter<'_>) -> Vec<Update>;
+
+    /// `true` enquanto um comando de trabalho está em curso (o kernel ainda não emitiu `Done`).
+    fn busy(&self) -> bool;
+
+    /// Flag de cancelamento partilhada com o kernel (K8): o `Esc`/`Ctrl-C` escreve-a e o kernel lê-a.
+    fn cancel_flag(&self) -> Flag {
+        Flag::default()
+    }
 }
 
 /// Período de sondagem de eventos (ms): mantém o CPU baixo sem parecer travado.
@@ -39,25 +53,39 @@ const POLL_MILLIS: u64 = 50;
 /// Pintor do painel de atividade durante um turno (E10-T05).
 ///
 /// Recebe só eventos **efémeros** e redesenha no terminal (governado pelo [`Throttle`], E10-T03);
-/// nunca escreve no log nem no transcript.
+/// nunca escreve no log nem no transcript. É também a única peça da borda que toca no terminal para
+/// o **challenge-and-response** (E10-T04), que é modal e bloqueia até o humano responder.
 pub struct Painter<'a> {
     app: &'a mut App,
     terminal: &'a mut DefaultTerminal,
     throttle: &'a Throttle<'a>,
     error: Option<io::Error>,
     cancel: Flag,
-    /// Prompts de *steering* enfileirados, por ordem (FIFO; E20-T16).
-    steer: Vec<String>,
-    /// Buffer de *steering* em edição durante o turno.
-    steer_buffer: String,
 }
 
-impl Painter<'_> {
+impl<'a> Painter<'a> {
+    /// Constrói o pintor sobre o estado, o terminal e a flag de cancelamento partilhada.
+    pub(crate) fn new(
+        app: &'a mut App,
+        terminal: &'a mut DefaultTerminal,
+        throttle: &'a Throttle<'a>,
+        cancel: Flag,
+    ) -> Self {
+        let _span = katu_core::trace_fn!("run::painter::new");
+
+        Self {
+            app,
+            terminal,
+            throttle,
+            error: None,
+            cancel,
+        }
+    }
+
     /// Regista um evento efémero e redesenha.
     pub fn live(&mut self, live: Live) {
         let _span = katu_core::trace_fn!("run::live");
 
-        self.poll_input();
         self.app.apply_update(Update::Live(live));
         self.redraw();
     }
@@ -76,87 +104,6 @@ impl Painter<'_> {
         let _span = katu_core::trace_fn!("run::cancel_flag");
 
         self.cancel.clone()
-    }
-
-    /// Sonda input e redesenha sem haver delta (L-P1): o loop chama-o enquanto o provider cala.
-    pub fn tick(&mut self) {
-        let _span = katu_core::trace_fn!("run::tick");
-
-        self.poll_input();
-        self.redraw();
-    }
-
-    /// Retira o próximo prompt de *steering* enfileirado, se houver (E20-T16).
-    #[must_use]
-    pub fn take_steer(&mut self) -> Option<String> {
-        let _span = katu_core::trace_fn!("run::take_steer");
-
-        if self.steer.is_empty() {
-            return None;
-        }
-        Some(self.steer.remove(0))
-    }
-
-    /// Sonda o teclado (não bloqueante) durante o turno.
-    ///
-    /// **Esc** pede cancelamento (E20-T15); as restantes teclas alimentam o buffer de *steering*
-    /// (E20-T16), que `Enter` enfileira e a borda aplica no passo seguinte. `Ctrl-C`/`q` saem da UI
-    /// no loop principal (não aqui).
-    fn poll_input(&mut self) {
-        let _span = katu_core::trace_fn!("run::poll_input");
-
-        loop {
-            match event::poll(Duration::ZERO) {
-                Ok(true) => {}
-                Ok(false) => return,
-                Err(error) => {
-                    self.error = Some(error);
-                    return;
-                }
-            }
-            match event::read() {
-                Ok(Event::Key(key)) if key.kind == KeyEventKind::Press => self.on_key(key),
-                Ok(_) => {}
-                Err(error) => {
-                    self.error = Some(error);
-                    return;
-                }
-            }
-        }
-    }
-
-    /// Trata uma tecla durante o turno (cancelamento ou *steering*).
-    fn on_key(&mut self, key: KeyEvent) {
-        let _span = katu_core::trace_fn!("run::on_key");
-
-        if is_cancel_key(key) {
-            if !self.cancel.cancelled() {
-                self.cancel.request();
-                katu_core::event!(Level::Info, events::TUI_CANCEL);
-            }
-            return;
-        }
-        match key.code {
-            KeyCode::Enter => {
-                let prompt = self.steer_buffer.trim().to_string();
-                if !prompt.is_empty() {
-                    self.steer.push(prompt);
-                    self.steer_buffer.clear();
-                    self.app.set_steering("");
-                }
-            }
-            KeyCode::Backspace => {
-                self.steer_buffer.pop();
-                let buffer = self.steer_buffer.clone();
-                self.app.set_steering(&buffer);
-            }
-            KeyCode::Char(character) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.steer_buffer.push(character);
-                let buffer = self.steer_buffer.clone();
-                self.app.set_steering(&buffer);
-            }
-            _ => {}
-        }
     }
 
     /// Toma o erro de desenho acumulado, se houver (a borda decide abortar).
@@ -258,7 +205,9 @@ impl Drop for TerminalGuard {
 /// Corre a UI até o utilizador sair; o handler executa os efeitos.
 ///
 /// O desenho é governado pelo [`Throttle`] (E10-T03): quadros coalescidos por [`Clock`], forçados
-/// em cada tecla e fim de turno. O `ratatui` aplica o **diff** das células entre quadros.
+/// em cada tecla e fim de turno. O `ratatui` aplica o **diff** das células entre quadros. O loop
+/// **nunca** bloqueia no kernel: cada iteração drena os eventos pendentes e volta a sondar o
+/// terminal, pelo que rato/resize/cópia continuam a funcionar durante um turno (G7).
 ///
 /// # Errors
 /// [`io::Error`] em falha de terminal (setup, desenho ou leitura de eventos).
@@ -269,41 +218,36 @@ pub fn run<H: Handler>(mut app: App, handler: &mut H, clock: &dyn Clock) -> io::
     let throttle = Throttle::new(clock, FRAME_INTERVAL_MS);
     let mut selection = Selection::default();
     loop {
+        // 1. Drena o kernel **sem bloquear** (K5): a superfície fica sempre livre.
+        let mut painter = Painter::new(
+            &mut app,
+            &mut guard.terminal,
+            &throttle,
+            handler.cancel_flag(),
+        );
+        let updates = handler.poll(&mut painter);
+        let error = painter.take_error();
+        drop(painter);
+        if let Some(error) = error {
+            return Err(error);
+        }
+        for update in updates {
+            app.apply_update(update);
+        }
+
+        // 2. Redesenha se o orçamento o permitir.
         if throttle.due() {
             guard.terminal.draw(|frame| render(frame, &app))?;
         }
+
+        // 3. Sonda o terminal: teclado, rato e resize (G7).
         if event::poll(Duration::from_millis(POLL_MILLIS))? {
             match event::read()? {
                 Event::Key(key) if key.kind == KeyEventKind::Press => {
-                    if let Some(action) = map_key(key, app.mode()) {
-                        katu_core::event!(Level::Trace, events::TUI_INPUT);
-                        let command = app.apply_action(action);
-                        throttle.request();
-                        if let Some(command) = command {
-                            // Desenha já o estado (mensagem do utilizador + `a trabalhar…`) antes
-                            // de bloquear no turno: sem isto, o ecrã fica no quadro anterior até ao
-                            // primeiro delta do modelo.
-                            guard.terminal.draw(|frame| render(frame, &app))?;
-                            let mut painter = Painter {
-                                app: &mut app,
-                                terminal: &mut guard.terminal,
-                                throttle: &throttle,
-                                error: None,
-                                cancel: Flag::default(),
-                                steer: Vec::new(),
-                                steer_buffer: String::new(),
-                            };
-                            let updates = handler.handle(command, &mut painter);
-                            if let Some(error) = painter.take_error() {
-                                return Err(error);
-                            }
-                            for update in updates {
-                                app.apply_update(update);
-                            }
-                        }
-                    }
+                    handle_key(key, &mut app, handler, &mut guard.terminal)?;
                 }
                 Event::Mouse(mouse) => handle_mouse(mouse, &mut selection, &mut guard.terminal)?,
+                Event::Resize(_, _) => throttle.request(),
                 _ => {}
             }
         }
@@ -312,6 +256,71 @@ pub fn run<H: Handler>(mut app: App, handler: &mut H, clock: &dyn Clock) -> io::
         }
     }
     Ok(())
+}
+
+/// Trata uma tecla: durante um turno alimenta o cancelamento/*steering*; em repouso, o keymap.
+fn handle_key<H: Handler>(
+    key: KeyEvent,
+    app: &mut App,
+    handler: &mut H,
+    terminal: &mut DefaultTerminal,
+) -> io::Result<()> {
+    let _span = katu_core::trace_fn!("run::handle_key");
+
+    if handler.busy() {
+        turn_key(key, app, handler);
+        return Ok(());
+    }
+    let Some(action) = map_key(key, app.mode()) else {
+        return Ok(());
+    };
+    katu_core::event!(Level::Trace, events::TUI_INPUT);
+    let command = app.apply_action(action);
+    if let Some(command) = command {
+        // Desenha já o estado (mensagem do utilizador + `a trabalhar…`) antes de o kernel
+        // responder: sem isto, o ecrã fica no quadro anterior até ao primeiro delta do modelo.
+        terminal.draw(|frame| render(frame, app))?;
+        let updates = handler.send(command);
+        for update in updates {
+            app.apply_update(update);
+        }
+    }
+    Ok(())
+}
+
+/// Trata uma tecla **durante** um turno: `Esc`/`Ctrl-C` cancelam (L-P1), o resto alimenta o
+/// *steering* (E20-T16), que `Enter` envia como [`Command::Steer`].
+fn turn_key<H: Handler>(key: KeyEvent, app: &mut App, handler: &mut H) {
+    let _span = katu_core::trace_fn!("run::turn_key");
+
+    if is_cancel_key(key) {
+        let flag = handler.cancel_flag();
+        if !flag.cancelled() {
+            flag.request();
+            katu_core::event!(Level::Info, events::TUI_CANCEL);
+        }
+        return;
+    }
+    match key.code {
+        KeyCode::Enter => {
+            let prompt = app.steering().trim().to_string();
+            if !prompt.is_empty() {
+                let _sent = handler.send(Command::Steer(prompt));
+                app.set_steering("");
+            }
+        }
+        KeyCode::Backspace => {
+            let mut buffer = app.steering().to_string();
+            buffer.pop();
+            app.set_steering(&buffer);
+        }
+        KeyCode::Char(character) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+            let mut buffer = app.steering().to_string();
+            buffer.push(character);
+            app.set_steering(&buffer);
+        }
+        _ => {}
+    }
 }
 
 /// Trata um evento de rato: seleção e cópia por OSC 52 (E20-T14).

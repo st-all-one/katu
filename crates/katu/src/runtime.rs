@@ -11,7 +11,7 @@ use katu_core::diag::{Level, events};
 #[cfg(test)]
 use katu_core::kernel::Message;
 use katu_core::kernel::{
-    CallId, Durability, Event, Session, SessionError, SessionId, discover_root,
+    CallId, Durability, Event, Session, SessionError, SessionId, Visibility, discover_root,
 };
 use katu_core::memory::Memory;
 use katu_core::plan::Plan;
@@ -321,6 +321,20 @@ impl<'a> Runtime<'a> {
 
         self.session.apply(&Event::UserMessage {
             text: text.to_string(),
+            visibility: Visibility::User,
+        })
+    }
+
+    /// Loga uma instrução do **loop** (*nudge*): chega ao modelo mas não é do utilizador (G3).
+    ///
+    /// # Errors
+    /// [`SessionError`] se o evento não puder ser logado.
+    pub(crate) fn record_agent(&mut self, text: &str) -> Result<(), SessionError> {
+        let _span = katu_core::trace_fn!("runtime::record_agent");
+
+        self.session.apply(&Event::UserMessage {
+            text: text.to_string(),
+            visibility: Visibility::Agent,
         })
     }
 

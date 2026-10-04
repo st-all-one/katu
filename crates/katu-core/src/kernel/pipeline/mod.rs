@@ -21,6 +21,9 @@ pub struct ToolOutput {
     pub outcome: ToolOutcome,
     /// Envelope de sucesso (opcional; ausente em recusas).
     pub report: Option<ToolReport>,
+    /// `true` se a tool pede o fim **normal** do turno depois de correr (`Q1/PI_GAINS`): o verbo
+    /// terminal corta o loop sem um passo extra ao modelo. Por omissão `false`.
+    pub terminate: bool,
 }
 
 impl ToolOutput {
@@ -30,6 +33,7 @@ impl ToolOutput {
         Self {
             outcome,
             report: None,
+            terminate: false,
         }
     }
 
@@ -39,6 +43,7 @@ impl ToolOutput {
         Self {
             outcome: ToolOutcome::Ok,
             report: None,
+            terminate: false,
         }
     }
 
@@ -50,7 +55,15 @@ impl ToolOutput {
         Self {
             outcome: ToolOutcome::Ok,
             report: Some(report),
+            terminate: false,
         }
+    }
+
+    /// Marca a saída como **terminal**: o turno fecha normalmente depois desta call (`Q1/PI_GAINS`).
+    #[must_use]
+    pub const fn with_terminate(mut self) -> Self {
+        self.terminate = true;
+        self
     }
 }
 
@@ -81,6 +94,16 @@ impl Dispatch {
     #[must_use]
     pub const fn ran(&self) -> bool {
         matches!(&self.effect, Effect::Ran { .. })
+    }
+
+    /// `true` se a tool pediu o fim **normal** do turno (`Q1/PI_GAINS`): só quando correu e o
+    /// resultado o declarou. Uma recusa de política nunca termina o turno.
+    #[must_use]
+    pub const fn terminate(&self) -> bool {
+        match &self.effect {
+            Effect::Ran { output } => output.terminate,
+            Effect::Skipped => false,
+        }
     }
 
     /// Efeito a devolver ao modelo: o da execução, ou o derivado do veredicto quando nada correu.

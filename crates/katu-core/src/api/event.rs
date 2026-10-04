@@ -5,7 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::provider::Thinking;
+use crate::error::ErrorKind;
+use crate::provider::{Thinking, TokenUsage};
 
 use super::{Live, TrashEntry};
 
@@ -27,6 +28,38 @@ pub struct ApprovalGrant {
     pub reason: String,
     /// Quem assinou (`granted_by`).
     pub granted_by: String,
+}
+
+/// Resumo estruturado de um turno concluído (envelope de máquina das superfícies).
+///
+/// É o que a superfície precisa para reconstruir o resultado de um `Submit` sem possuir o
+/// `Runtime`: o CLI usa-o para o envelope `--json`; a TUI ignora-o (já recebe `Assistant`/`Usage`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TurnSummary {
+    /// Modelo usado no turno.
+    pub model: String,
+    /// Texto final do assistente.
+    pub text: String,
+    /// Passos dados (uma chamada ao modelo cada).
+    pub steps: u32,
+    /// Tool calls executadas.
+    pub calls: usize,
+    /// `true` se o turno foi cancelado pelo utilizador.
+    pub cancelled: bool,
+    /// Motivo de paragem do provider (rótulo estável).
+    pub stop: String,
+    /// Como o turno terminou (rótulo estável).
+    pub termination: String,
+    /// Código de rodada do envelope (0 = fim natural/cancelado).
+    pub round_exit: u8,
+    /// Contabilização do provider (base de evidência incluída).
+    pub usage: Option<TokenUsage>,
+    /// Id da sessão.
+    pub session: Option<String>,
+    /// Estado/estratégia em texto.
+    pub state: Option<String>,
+    /// Seleção de contexto.
+    pub selection: String,
 }
 
 /// Evento injetado pela superfície no estado central da UI (E10-T02).
@@ -67,4 +100,13 @@ pub enum Event {
     ApprovalRequest(ApprovalRequest),
     /// O kernel está ocupado com um turno e recusou um comando que muta o estado.
     Busy(String),
+    /// Turno concluído com o resumo estruturado (envelope de máquina; a TUI ignora-o).
+    Turn(Box<TurnSummary>),
+    /// Falha estruturada do kernel: a superfície reconstrói o envelope de máquina pela taxonomia.
+    Failure {
+        /// Categoria estável.
+        kind: ErrorKind,
+        /// Mensagem legível.
+        message: String,
+    },
 }

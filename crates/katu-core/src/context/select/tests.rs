@@ -1,5 +1,6 @@
 //! Testes da seleção por informação (Q-02b/Q-03).
 
+use crate::kernel::Visibility;
 use std::collections::BTreeSet;
 
 use super::{
@@ -27,12 +28,14 @@ fn conversation() -> Vec<Message> {
     derive_messages(&[
         Event::UserMessage {
             text: "primeiro pedido".into(),
+            visibility: Visibility::User,
         },
         Event::AssistantMessage {
             text: "primeira resposta".into(),
         },
         Event::UserMessage {
             text: "segundo pedido".into(),
+            visibility: Visibility::User,
         },
     ])
 }
@@ -57,6 +60,7 @@ fn a_tool_batch_is_one_unit() -> Result<(), Box<dyn std::error::Error>> {
     let use_ = read_use()?;
     let mut events = vec![Event::UserMessage {
         text: "objetivo".into(),
+        visibility: Visibility::User,
     }];
     for call in ["c1", "c2"] {
         events.push(Event::ToolCall {
@@ -133,6 +137,7 @@ fn the_utility_policy_keeps_information_that_the_suffix_drops() {
     // O prefixo é o único que fala de `zircao` (termo raro); o sufixo é todo sobre `katu`.
     let mut messages = vec![Message::User {
         text: "investiga o zircao".into(),
+        visibility: Visibility::User,
     }];
     for index in 0..6 {
         messages.push(Message::Assistant {

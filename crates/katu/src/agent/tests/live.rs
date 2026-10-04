@@ -36,7 +36,13 @@ impl ActivitySink for Recorder {
                 self.tools.push(format!("→ {name}"));
                 self.args.push(args.to_string());
             }
-            Activity::ToolDone { name } => self.tools.push(format!("✓ {name}")),
+            Activity::ToolDone { name, summary } => {
+                if summary.is_empty() {
+                    self.tools.push(format!("✓ {name}"));
+                } else {
+                    self.tools.push(format!("✓ {name}: {summary}"));
+                }
+            }
             Activity::Refused { rule, .. } => self.refusals.push(rule.to_string()),
             Activity::Unavailable { control, .. } => self.unavailable.push(control.to_string()),
         }
@@ -101,9 +107,14 @@ fn live_observer_sees_deltas_but_they_stay_out_of_the_log() -> Result<(), Box<dy
     assert_eq!(report.text, "oláfim");
     assert_eq!(recorder.text, "oláfim");
     assert_eq!(recorder.thinking, "penso");
-    assert_eq!(
-        recorder.tools,
-        ["→ write".to_string(), "✓ write".to_string()]
+    assert_eq!(recorder.tools.first().map(String::as_str), Some("→ write"));
+    assert!(
+        recorder
+            .tools
+            .get(1)
+            .is_some_and(|line| line.starts_with("✓ write")),
+        "tools={:?}",
+        recorder.tools
     );
     assert_eq!(
         recorder.args,
@@ -174,7 +185,7 @@ fn refused_outcome_is_reported_with_rule_and_evidence() {
         evidence: Evidence::new("leitura sensível", ".env", rule),
     };
     let mut recorder = Recorder::default();
-    emit_outcome(&mut recorder, "read", &outcome);
+    emit_outcome(&mut recorder, "read", &outcome, None);
     assert_eq!(
         recorder.refusals,
         ["contain-sensitive-read".to_string()],
@@ -187,6 +198,18 @@ fn refused_outcome_is_reported_with_rule_and_evidence() {
         recorder.tools.is_empty(),
         "uma recusa não é mostrada como concluída"
     );
+}
+
+#[test]
+fn a_tool_done_carries_a_one_line_summary() {
+    let mut recorder = Recorder::default();
+    emit_outcome(
+        &mut recorder,
+        "read",
+        &ToolOutcome::Ok,
+        Some("linha 1\nlinha 2"),
+    );
+    assert_eq!(recorder.tools, ["✓ read: linha 1".to_string()]);
 }
 
 #[test]

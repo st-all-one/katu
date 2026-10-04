@@ -125,6 +125,44 @@ fn allow_invokes_tool_once() -> Result<(), PolicyError> {
     Ok(())
 }
 
+/// Tool que pede o fim normal do turno (`Q1/PI_GAINS`).
+struct TerminalTool;
+
+impl Tool for TerminalTool {
+    fn name(&self) -> ToolName {
+        ToolName::Write
+    }
+
+    fn execute(&self, _use_: &ToolUse) -> ToolOutput {
+        ToolOutput::ok().with_terminate()
+    }
+}
+
+#[test]
+fn a_terminal_output_marks_the_dispatch_and_a_denial_never_does() -> Result<(), PolicyError> {
+    let allow = RuleSet {
+        vocab: 3,
+        rules: Vec::new(),
+    };
+    let ran = dispatch(
+        &State::initial(),
+        &use_write("/work/src/main.rs")?,
+        &allow,
+        0,
+        &TerminalTool,
+    )?;
+    assert!(ran.terminate(), "a tool terminal marca o dispatch");
+    let denied = dispatch(
+        &State::initial(),
+        &use_write("/work/secrets/token")?,
+        &deny_secrets()?,
+        0,
+        &TerminalTool,
+    )?;
+    assert!(!denied.terminate(), "uma recusa nunca termina o turno");
+    Ok(())
+}
+
 #[test]
 fn unknown_vocab_fails_closed_without_effect() -> Result<(), PolicyError> {
     let tool = tool();

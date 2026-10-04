@@ -12,7 +12,8 @@ função, o log é a fonte da verdade.
     `State::waivers` (exceções explícitas), `State::plan` (E06-T06), `State::last_command`
     (E06-T07), `State::workspace` (raiz do workspace, E07-T05) e `State::verification`
     (relatório do gate, E09-T03); `UnmetPrecondition` (E05-T02/T04).
-  - `kernel::event` — `Event`, `CallId`, `Event::kind` (`Waiver`, `PlanRecorded`, `CommandRecorded`,
+  - `kernel::event` — `Event`, `CallId`, `Visibility::{User,Agent}` (G3: `UserMessage` humana vs.
+    *nudge* do loop), `Event::kind` (`Waiver`, `PlanRecorded`, `CommandRecorded`,
     `WorkspaceSet`, `ApprovalGranted`, `VerificationRecorded`).
   - `kernel::step` — `step(State, Event) -> Result<State, Refusal>` (puro) + pré-condições de fase
     (`Verified` exige relatório não bloqueado, E09-T03).
@@ -28,7 +29,9 @@ função, o log é a fonte da verdade.
     Duas fronteiras: `PhaseTransition` e fim de turno com cauda ≥ `MAX_TAIL_BYTES` (128 KiB). O que a
     retomada relê tem teto: 20 000 turnos retomam em **321 µs** contra 23 839 µs de replay total
     ([`bench/e18/resume`](../../bench/e18/resume/PROTOCOL.md)).
-  - `kernel::project` — `derive_messages`, `state_of`, `snapshot` (projeções puras).
+  - `kernel::project` — `derive_messages`, `state_of`, `snapshot` (projeções puras); `normalize`
+    (L-Q5/G6) pareia `ToolCall`↔`ToolResult`, descarta vazios e resultados fora de ordem e garante
+    início em `User`.
   - `State.pending` (Q-15) — o estado guarda **só** as chamadas pendentes: o efeito vive no log e o
     nome concluído em `completed_tools`. Guardar as concluídas fazia o replay ser quadrático (cada
     `step` clona o estado) e recusava `call_0` repetido entre turnos, que é legítimo quando o provider
@@ -83,14 +86,18 @@ função, o log é a fonte da verdade.
 - Modelo de erro [`error`](../katu-policy/src/error.rs) (E01-T06) e ports determinísticos
   [`ports`](src/ports/mod.rs) (`Clock`/`Rng`/`Fs`/`Env`/`Process` + fakes; `Fs::write_atomic_if` =
   CAS para `edit`, OA16; `Fs::remove` = remoção permanente de ficheiro, nunca de diretórios,
-  E10-T07; `Process` = execução com timeout, E06-T04). `ToolOutcome::fix()` (B-03) devolve o
+  E10-T07; `Process` = execução com timeout (`run`) **e** com output incremental (`run_streaming`,
+  P1/PI_GAINS); `Progress`/`NoProgress` = observador **efémero** do output de uma tool). `ToolOutcome::fix()` (B-03) devolve o
   remédio acionável — a negação ensina o modelo a corrigir-se.
 - Protocolo do kernel [`api`](src/api/mod.rs) (KERNEL_SURFACE F0): a fronteira entre o kernel
   (autocontido, na sua thread) e as superfícies (CLI/TUI/futuros front-ends). `Command` (incluindo
-  `Cancel`/`Approval`/`Steer`/`Shutdown`) e `Event` são `serde`-prontos e não carregam
+  `Cancel`/`Approval`/`Steer`/`Continue`/`Shutdown`) e `Event` são `serde`-prontos e não carregam
   `Runtime`/`Session`/`Provider` (K2/K7); `KernelHandle`/`KernelBus`/`Flag` são o transporte em
   memória (fila de comandos limitada com `try_send`, drenagem sem bloquear). Os dados de
-  apresentação viajam no protocolo: `Live`, `TrashEntry`, `LoginRequest`, `ApprovalRequest`.
+  apresentação viajam no protocolo: `Live`, `TrashEntry`, `LoginRequest`, `ApprovalRequest`. O
+  resultado estruturado do turno viaja em `Event::Turn(TurnSummary)` (envelope de máquina das
+  superfícies) e as falhas em `Event::Failure { kind, message }` (taxonomia `ErrorKind`), pelo que
+  o CLI reconstrói o envelope sem possuir o `Runtime` (F2).
 - Diagnóstico transversal [`diag`](src/diag/mod.rs) (DF9/E19): log estruturado + métrica de tempo,
   custo zero por defeito; catálogo de eventos em [`diag::events`](src/diag/events.rs); sink
   agregador de percentis em `diag::aggregate` (E19-T02).

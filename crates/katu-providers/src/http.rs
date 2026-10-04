@@ -1,8 +1,9 @@
 //! Transporte real (ureq, bloqueante): pooling, `TCP_NODELAY` e sem compressão.
 //!
 //! O hot path não paga compressão de transporte nem re-encode: pedimos `identity` e lemos o corpo
-//! por deltas. `connect` e `recv_response` têm timeout; o corpo pode ser longo (streaming) e é
-//! cancelável pelo `sink`.
+//! por deltas. `connect` e `recv_response` têm timeout; o corpo tem um teto **total**
+//! ([`DEFAULT_BODY_TIMEOUT`], G2) — o `timeout_recv_body` do `ureq` é total, não *idle*, e sem teto
+//! uma leitura pendurada deixaria a thread de I/O viva para sempre.
 
 use std::io::Read;
 use std::time::Duration;
@@ -22,24 +23,43 @@ use super::transport::{
 /// Tamanho do buffer de leitura por iteração (reutilizado; sem alocação por chunk).
 const READ_BUFFER: usize = 4096;
 
+/// Teto **total** do corpo (anti-fuga), por omissão.
+///
+/// O `timeout_recv_body` do `ureq` é **total**, não *idle* (L-P2): sem teto, uma leitura pendurada
+/// deixa a thread de I/O viva para sempre. O *idle* por passo (60 s, `DEFAULT_IDLE_MS`) é imposto no
+/// dreno; este teto é a rede de segurança do **transporte** — generoso para um stream saudável e
+/// finito para um pendurado. É um limite de segurança, não um alvo de performance.
+pub const DEFAULT_BODY_TIMEOUT: Duration = Duration::from_secs(600);
+
 /// Transporte real sobre `ureq`.
 pub struct UreqTransport {
     agent: Agent,
     recv_millis: u64,
+    /// Teto total do corpo em milissegundos (relatado como timeout; G2).
+    body_millis: u64,
     /// Comprime o corpo do `POST` (gzip) acima deste tamanho; `None` desliga.
     compress_above: Option<usize>,
 }
 
 impl UreqTransport {
-    /// Constrói com os timeouts de ligação e de resposta (segundos do corpo ficam a cargo do sink).
+    /// Constrói com os timeouts de ligação e de resposta e o teto total do corpo por omissão.
     #[must_use]
     pub fn new(connect: Duration, recv_response: Duration) -> Self {
         let _span = katu_core::trace_fn!("http::new");
 
-        let config = Self::config(connect, recv_response);
+        Self::with_body_timeout(connect, recv_response, DEFAULT_BODY_TIMEOUT)
+    }
+
+    /// Constrói com um teto total do corpo explícito (anti-fuga; ver [`DEFAULT_BODY_TIMEOUT`]).
+    #[must_use]
+    pub fn with_body_timeout(connect: Duration, recv_response: Duration, body: Duration) -> Self {
+        let _span = katu_core::trace_fn!("http::with_body_timeout");
+
+        let config = Self::config(connect, recv_response, body);
         Self {
             agent: Agent::new_with_config(config),
             recv_millis: u64::try_from(recv_response.as_millis()).unwrap_or(u64::MAX),
+            body_millis: u64::try_from(body.as_millis()).unwrap_or(u64::MAX),
             compress_above: None,
         }
     }
@@ -77,7 +97,7 @@ impl UreqTransport {
     }
 
     /// Configuração afinada para um endpoint de modelo.
-    fn config(connect: Duration, recv_response: Duration) -> Config {
+    fn config(connect: Duration, recv_response: Duration, body: Duration) -> Config {
         let _span = katu_core::trace_fn!("http::config");
 
         Agent::config_builder()
@@ -86,8 +106,8 @@ impl UreqTransport {
             .max_idle_connections_per_host(4)
             .timeout_connect(Some(connect))
             .timeout_recv_response(Some(recv_response))
-            // O corpo do stream pode demorar: sem teto global; o consumidor cancela.
-            .timeout_recv_body(None)
+            // O corpo do stream pode ser longo; o teto **total** evita a fuga de thread (G2).
+            .timeout_recv_body(Some(body))
             .build()
     }
 }
@@ -123,7 +143,15 @@ impl Transport for UreqTransport {
         let mut reader = response.body_mut().as_reader();
         let mut buffer = [0_u8; READ_BUFFER];
         loop {
-            let read = reader.read(&mut buffer).map_err(TransportError::Io)?;
+            let read = reader.read(&mut buffer).map_err(|error| {
+                if is_body_timeout(&error) {
+                    TransportError::Timeout {
+                        millis: self.body_millis,
+                    }
+                } else {
+                    TransportError::Io(error)
+                }
+            })?;
             if read == 0 {
                 break;
             }
@@ -138,6 +166,19 @@ impl Transport for UreqTransport {
             bytes,
         })
     }
+}
+
+/// `true` se o erro de leitura é o teto **total** do corpo do `ureq` (G2).
+///
+/// O `ureq` embrulha o timeout do corpo num [`std::io::Error`] (`kind: Other`), pelo que não chega
+/// pelo `ureq::Error::Timeout` do [`map_error`]: é preciso desembrulhar o erro interno.
+fn is_body_timeout(error: &std::io::Error) -> bool {
+    let _span = katu_core::trace_fn!("http::is_body_timeout");
+
+    error
+        .get_ref()
+        .and_then(|inner| inner.downcast_ref::<ureq::Error>())
+        .is_some_and(|inner| matches!(inner, ureq::Error::Timeout(_)))
 }
 
 /// Aplica os cabeçalhos a um pedido ureq (genérico no tipo-estado).
@@ -179,7 +220,7 @@ mod tests {
     use flate2::read::GzDecoder;
 
     use super::{UreqTransport, gzip};
-    use crate::transport::HttpRequest;
+    use crate::transport::{HttpRequest, Transport, TransportError};
 
     #[test]
     fn gzip_roundtrips_and_shrinks() -> Result<(), Box<dyn std::error::Error>> {
@@ -210,5 +251,46 @@ mod tests {
                 .iter()
                 .any(|(key, value)| key == "content-encoding" && value == "gzip")
         );
+    }
+
+    #[test]
+    fn a_stalled_body_times_out_instead_of_leaking() -> Result<(), Box<dyn std::error::Error>> {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+
+        use katu_core::provider::Flow;
+
+        let listener = TcpListener::bind("127.0.0.1:0")?;
+        let addr = listener.local_addr()?;
+        let server = std::thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                // Cabeçalhos + um chunk; depois nunca fecha nem envia o resto do corpo.
+                let _written =
+                    stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\nhello");
+                let _flushed = stream.flush();
+                // Drena o pedido e bloqueia até o cliente desistir (teto do corpo) e fechar.
+                loop {
+                    let mut buffer = [0_u8; 16];
+                    match stream.read(&mut buffer) {
+                        Ok(0) | Err(_) => break,
+                        Ok(_) => {}
+                    }
+                }
+            }
+        });
+        let transport = UreqTransport::with_body_timeout(
+            Duration::from_secs(1),
+            Duration::from_secs(1),
+            Duration::from_millis(200),
+        );
+        let request = HttpRequest::post(format!("http://{addr}/v1"), "{}", Vec::new());
+        let mut sink = |_bytes: &[u8]| Flow::Continue;
+        let result = transport.send(&request, &mut sink);
+        assert!(
+            matches!(result, Err(TransportError::Timeout { .. })),
+            "corpo pendurado expira em vez de vazar: {result:?}"
+        );
+        server.join().ok();
+        Ok(())
     }
 }

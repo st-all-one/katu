@@ -20,7 +20,10 @@ impl App {
                 self.streaming.push_str(&delta);
                 trim_tail(&mut self.streaming, STREAM_TAIL_BYTES);
             }
-            Live::Thinking(delta) => self.thinking.push_str(&delta),
+            Live::Thinking(delta) => {
+                self.thinking.push_str(&delta);
+                trim_tail(&mut self.thinking, STREAM_TAIL_BYTES);
+            }
             Live::Tool { name, args } => {
                 if args.is_empty() || args == "{}" {
                     self.live.push(format!("→ {name}"));
@@ -28,7 +31,19 @@ impl App {
                     self.live.push(format!("→ {name} {args}"));
                 }
             }
-            Live::ToolDone(name) => self.live.push(format!("✓ {name}")),
+            Live::ToolDone { name, summary } => {
+                if summary.is_empty() {
+                    self.live.push(format!("✓ {name}"));
+                } else {
+                    self.live.push(format!("✓ {name}: {summary}"));
+                }
+            }
+            Live::ToolOutput { name, chunk } => {
+                // `P1/PI_GAINS`: sinal de vida — mostra só a última linha não vazia do fragmento.
+                if let Some(line) = chunk.lines().rev().find(|line| !line.trim().is_empty()) {
+                    self.live.push(format!("… {name}: {}", line.trim_end()));
+                }
+            }
             Live::Refused { rule, evidence } => {
                 let text = format!("⛔ {rule}: {evidence}");
                 self.live.push(text.clone());

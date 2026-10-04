@@ -126,6 +126,13 @@ gate de decisão de E05**. O que não serve o core de [`00b`](00b-objetivos.md) 
 > fecha as lacunas de interrupção/visibilidade do goose e substitui a decisão de L-S2):
 > [`KERNEL_SURFACE.md`](KERNEL_SURFACE.md).
 
+> **LIVE_FLOW** (o fluxo do turno — raciocínio, tools e execução — visível no CLI e na TUI;
+> derivado do goose): [`LIVE_FLOW.md`](LIVE_FLOW.md).
+
+> **PI_GAINS** (melhorias do loop derivadas do `pi` — `terminate`, modelo por passo, streaming do
+> output das tools, `Command::Continue`; rejeita o RPC/árvore por não caberem no kernel de uma
+> thread): [`PI_GAINS.md`](PI_GAINS.md).
+
 ---
 
 ## 4. Grafo de dependências

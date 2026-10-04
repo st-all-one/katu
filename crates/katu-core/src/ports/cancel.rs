@@ -46,6 +46,16 @@ impl Flag {
 
         self.inner.store(true, Ordering::SeqCst);
     }
+
+    /// Consome um pedido **one-shot**: devolve `true` e limpa a flag (`S1/PI_GAINS`).
+    ///
+    /// Usado pela flag de `Command::Continue`: cada pedido vale **um** passo extra. Para o
+    /// cancelamento, usa-se [`Cancel::cancelled`] (nunca se consome).
+    pub fn take(&self) -> bool {
+        let _span = crate::trace_fn!("ports::cancel::take");
+
+        self.inner.swap(false, Ordering::SeqCst)
+    }
 }
 
 impl Cancel for Flag {
@@ -73,5 +83,14 @@ mod tests {
     #[test]
     fn never_never_cancels() {
         assert!(!Never.cancelled());
+    }
+
+    #[test]
+    fn take_consumes_a_one_shot_request() {
+        let flag = Flag::new();
+        assert!(!flag.take());
+        flag.request();
+        assert!(flag.take());
+        assert!(!flag.take(), "one-shot: o segundo take é vazio");
     }
 }

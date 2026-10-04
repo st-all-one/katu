@@ -9,6 +9,7 @@
 //! built-in `opencode go/zen` (`KATU_OPENCODE_KEY`). Sem artefacto commitado: a medição entra em
 //! `bench/` só quando a série for estável (E12-T07).
 
+use katu_core::kernel::Visibility;
 use std::time::{Duration, Instant};
 
 use katu_core::kernel::Message;
@@ -164,6 +165,7 @@ fn measure<P: Provider>(
         system: Some("Responde em uma frase curta.".to_string()),
         messages: vec![Message::User {
             text: prompt.to_string(),
+            visibility: Visibility::User,
         }],
         tools: Vec::new(),
         max_tokens: Some(max_tokens),

@@ -38,6 +38,7 @@ pub struct KernelHandle {
     commands: SyncSender<Command>,
     events: Receiver<Event>,
     cancel: Flag,
+    continue_once: Flag,
 }
 
 impl KernelHandle {
@@ -104,6 +105,18 @@ impl KernelHandle {
 
         self.cancel.clone()
     }
+
+    /// Pede **um** passo extra antes do fim natural (`S1/PI_GAINS`): arma a flag one-shot **e** envia
+    /// o comando (no-op fora de um turno).
+    ///
+    /// # Errors
+    /// Como [`send`](KernelHandle::send); a flag é armada mesmo que o comando não caiba.
+    pub fn request_continue(&self) -> Result<(), SendError> {
+        let _span = crate::trace_fn!("api::handle::request_continue");
+
+        self.continue_once.request();
+        self.send(Command::Continue)
+    }
 }
 
 /// Extremo do **kernel**: lê comandos e publica eventos (usado pela thread do kernel).
@@ -111,6 +124,26 @@ pub struct KernelBus {
     commands: Receiver<Command>,
     events: mpsc::Sender<Event>,
     cancel: Flag,
+    continue_once: Flag,
+}
+
+/// Handle de **publicação** clonável e `Send + Sync` (`P1/PI_GAINS`).
+///
+/// O [`KernelBus`] não é `Sync` (segura o `Receiver` dos comandos), mas o progresso das tools
+/// corre em threads paralelas e só precisa de **publicar** eventos: este handle leve isola o
+/// `Sender` (que é `Send + Sync`).
+#[derive(Clone)]
+pub struct Publisher {
+    events: mpsc::Sender<Event>,
+}
+
+impl Publisher {
+    /// Publica um evento; `false` se a superfície já fechou.
+    pub fn publish(&self, event: Event) -> bool {
+        let _span = crate::trace_fn!("api::handle::publisher_publish");
+
+        self.events.send(event).is_ok()
+    }
 }
 
 impl KernelBus {
@@ -146,6 +179,24 @@ impl KernelBus {
 
         self.cancel.clone()
     }
+
+    /// Cópia da flag de `Command::Continue` (one-shot; `S1/PI_GAINS`).
+    #[must_use]
+    pub fn continue_flag(&self) -> Flag {
+        let _span = crate::trace_fn!("api::handle::continue_flag");
+
+        self.continue_once.clone()
+    }
+
+    /// Handle `Send + Sync` para publicar eventos de threads paralelas (`P1/PI_GAINS`).
+    #[must_use]
+    pub fn publisher(&self) -> Publisher {
+        let _span = crate::trace_fn!("api::handle::publisher");
+
+        Publisher {
+            events: self.events.clone(),
+        }
+    }
 }
 
 /// Cria o par (kernel, superfície) sobre canais em memória.
@@ -156,15 +207,18 @@ pub fn channel() -> (KernelBus, KernelHandle) {
     let (command_tx, command_rx) = mpsc::sync_channel(COMMAND_QUEUE);
     let (event_tx, event_rx) = mpsc::channel();
     let cancel = Flag::new();
+    let continue_once = Flag::new();
     let bus = KernelBus {
         commands: command_rx,
         events: event_tx,
         cancel: cancel.clone(),
+        continue_once: continue_once.clone(),
     };
     let handle = KernelHandle {
         commands: command_tx,
         events: event_rx,
         cancel,
+        continue_once,
     };
     (bus, handle)
 }
@@ -217,6 +271,16 @@ mod tests {
     }
 
     #[test]
+    fn continue_arms_the_flag_and_sends_the_command() {
+        let (bus, handle) = channel();
+        let flag = bus.continue_flag();
+        assert!(!flag.take());
+        assert!(handle.request_continue().is_ok());
+        assert!(flag.take(), "a flag é armada mesmo antes do comando");
+        assert!(matches!(bus.try_recv(), Some(Command::Continue)));
+    }
+
+    #[test]
     fn a_closed_kernel_is_detected_on_both_ends() {
         let (bus, handle) = channel();
         drop(handle);
@@ -234,5 +298,16 @@ mod tests {
             handle.recv(Duration::from_millis(1)),
             Err(RecvError::Timeout)
         ));
+    }
+
+    #[test]
+    fn a_zero_timeout_drains_ready_events_without_blocking() {
+        let (bus, handle) = channel();
+        assert!(bus.publish(Event::Done));
+        assert_eq!(handle.recv(Duration::ZERO), Ok(Event::Done));
+        assert!(
+            matches!(handle.recv(Duration::ZERO), Err(RecvError::Timeout)),
+            "sem eventos, um prazo zero devolve imediatamente"
+        );
     }
 }

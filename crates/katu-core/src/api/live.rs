@@ -19,8 +19,20 @@ pub enum Live {
         /// Argumentos crus enviados pelo modelo.
         args: String,
     },
-    /// Tool concluída (sucesso/parcial).
-    ToolDone(String),
+    /// Tool concluída (sucesso/parcial), com um **resumo** do resultado (`LIVE_FLOW` LF4).
+    ToolDone {
+        /// Nome ao modelo da tool.
+        name: String,
+        /// Resumo de uma linha do resultado (vazio quando não há envelope).
+        summary: String,
+    },
+    /// Fragmento de output de uma tool longa (`P1/PI_GAINS`): sinal de vida efémero.
+    ToolOutput {
+        /// Nome ao modelo da tool.
+        name: String,
+        /// Fragmento de output (texto *lossy*).
+        chunk: String,
+    },
     /// **Recusa de política** com a regra e a evidência (E10-T04); fica no painel e no transcript.
     Refused {
         /// Regra que negou.

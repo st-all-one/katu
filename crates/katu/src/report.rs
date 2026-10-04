@@ -5,7 +5,7 @@
 
 use std::io::{self, Write};
 
-use katu_core::error::Error;
+use katu_core::error::{Error, ErrorKind};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -63,6 +63,53 @@ impl Report {
             }),
             data: None,
             exit: error.kind().exit_code(),
+        }
+    }
+
+    /// Relatório de falha a partir de partes já estruturadas (reconstrução na fronteira do kernel).
+    pub(crate) fn failed_parts(command: &'static str, kind: ErrorKind, message: &str) -> Self {
+        let _span = katu_core::trace_fn!("report::failed_parts");
+
+        Self {
+            success: false,
+            command,
+            error: Some(ErrorBody {
+                kind: kind.as_str(),
+                message: message.to_string(),
+            }),
+            data: None,
+            exit: kind.exit_code(),
+        }
+    }
+}
+
+/// Formato de saída do comando (`LIVE_FLOW` LF5).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) enum Output {
+    /// Texto humano (default): progresso em `stderr`, dados em `stdout`.
+    #[default]
+    Text,
+    /// Envelope JSON único em `stdout` (o `--json`).
+    Json,
+    /// Stream JSONL: um evento por linha em `stdout`, seguido do envelope (`--output stream-json`).
+    StreamJson,
+}
+
+impl Output {
+    /// Interpreta `--output` (recusa valores desconhecidos).
+    ///
+    /// # Errors
+    /// [`Error::invalid_input`] se o formato não for `text`/`json`/`stream-json`.
+    pub(crate) fn parse(raw: &str) -> Result<Self, Error> {
+        let _span = katu_core::trace_fn!("report::output_parse");
+
+        match raw {
+            "text" => Ok(Self::Text),
+            "json" => Ok(Self::Json),
+            "stream-json" => Ok(Self::StreamJson),
+            other => Err(Error::invalid_input(format!(
+                "output inválido: `{other}` (text/json/stream-json)"
+            ))),
         }
     }
 }

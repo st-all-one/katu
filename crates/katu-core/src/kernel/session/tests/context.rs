@@ -3,6 +3,7 @@
 use super::Session;
 use crate::context::{CompactionMode, ContextBudget, message_id, recover};
 use crate::kernel::Event;
+use crate::kernel::Visibility;
 use crate::kernel::derive_messages;
 use crate::ports::MemFs;
 use std::path::Path;
@@ -23,6 +24,7 @@ fn context_keeps_the_recent_suffix_and_compacts_only_when_enabled()
     for index in 0..6_u32 {
         session.apply(&Event::UserMessage {
             text: format!("mensagem numero {index} com texto suficiente"),
+            visibility: Visibility::User,
         })?;
         session.apply(&Event::AssistantMessage {
             text: format!("resposta numero {index}"),
@@ -65,7 +67,10 @@ fn context_without_overflow_is_plain_even_when_enabled() -> Result<(), Box<dyn s
     let dir = Path::new("/sessions");
     let mut session = Session::open(&fs, dir)?;
     session.apply(&Event::TurnStart { turn: 1 })?;
-    session.apply(&Event::UserMessage { text: "oi".into() })?;
+    session.apply(&Event::UserMessage {
+        text: "oi".into(),
+        visibility: Visibility::User,
+    })?;
 
     let compacted = session.context(BUDGET, CompactionMode::Enabled)?;
     assert!(

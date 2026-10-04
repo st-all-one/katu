@@ -213,6 +213,7 @@ pub(super) fn bash<'a>(
         timeout_ms: DEFAULT_TIMEOUT_MS,
         parent: None,
         cancel: ports.cancel,
+        progress: ports.progress,
     };
     Ok(Routed::Plain {
         use_,
@@ -290,5 +291,45 @@ impl Tool for Unavailable {
             control: ControlId::new(self.control),
             rule_id: None,
         })
+    }
+}
+
+/// Seam de teste (`Q1/PI_GAINS`): uma tool **terminal** que corta o turno sem passo extra.
+///
+/// Só existe sob `cfg(test)`: o catálogo de produção não tem um verbo terminal, pelo que o
+/// mecanismo `terminate` é exercitado ponta-a-ponta por este caminho sem alargar a superfície.
+#[cfg(test)]
+pub(super) fn finish(cwd: &ResolvedPath) -> Routed<'static> {
+    let _span = katu_core::trace_fn!("agent::router::tools::finish");
+
+    let use_ = use_of(
+        ToolName::Read,
+        ToolArgs::Read { path: cwd.clone() },
+        vec![cwd.clone()],
+        None,
+        cwd,
+    );
+    Routed::Plain {
+        use_,
+        tool: Box::new(Finish),
+    }
+}
+
+/// Executor terminal de teste.
+#[cfg(test)]
+struct Finish;
+
+#[cfg(test)]
+impl Tool for Finish {
+    fn name(&self) -> ToolName {
+        let _span = katu_core::trace_fn!("agent::router::tools::finish_name");
+
+        ToolName::Read
+    }
+
+    fn execute(&self, _use_: &ToolUse) -> ToolOutput {
+        let _span = katu_core::trace_fn!("agent::router::tools::finish_execute");
+
+        ToolOutput::ok().with_terminate()
     }
 }

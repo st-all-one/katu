@@ -6,6 +6,7 @@
 
 use katu_core::diag::{Level, events};
 use katu_core::kernel::{CallContext, CallId, Dispatch};
+use katu_core::ports::NO_PROGRESS;
 use serde_json::json;
 
 use super::router;
@@ -31,6 +32,7 @@ pub(crate) fn dispatch(
         clock: runtime.clock,
         root: &root,
         cancel: None,
+        progress: &NO_PROGRESS,
     };
     let now = runtime.clock.now().as_millis();
     match router::route(&route_ports, &runtime.cwd, "exec", &args, None)? {

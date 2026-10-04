@@ -61,7 +61,7 @@ fn steering_injects_a_user_message_between_steps() -> Result<(), Box<dyn std::er
     // O steer vira mensagem de utilizador **entre** o primeiro e o segundo passo.
     let messages = runtime.messages()?;
     let steered = messages.iter().any(|message| {
-        matches!(message, Message::User { text } if text.contains("afinal usa outro nome"))
+        matches!(message, Message::User { text, .. } if text.contains("afinal usa outro nome"))
     });
     assert!(steered, "o steer entra no log como mensagem de utilizador");
 

@@ -172,6 +172,16 @@ fn params_unknown_field_is_rejected() -> Result<(), io::Error> {
     Ok(())
 }
 
+/// `--output` recusa um formato desconhecido (fail-closed; `LIVE_FLOW` LF5).
+#[test]
+fn an_unknown_output_format_is_rejected() -> Result<(), io::Error> {
+    let dir = temp_dir("output-bad")?;
+    let output = run_in(&dir, &["run", "--output", "bogus", "olá"])?;
+    assert_eq!(output.status.code(), Some(2));
+    std::fs::remove_dir_all(&dir).ok();
+    Ok(())
+}
+
 /// `katu --init` cria o layout `.katu/` e o snapshot da config (T19/T18).
 #[test]
 fn init_creates_project_layout() -> Result<(), io::Error> {

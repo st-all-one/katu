@@ -1,5 +1,6 @@
 //! Testes de fecho do turno (L-Q1) e do lock de sessão (L-Q6).
 
+use crate::kernel::Visibility;
 use std::path::Path;
 
 use super::{Session, SessionError};
@@ -59,7 +60,8 @@ fn reconcile_on_a_clean_turn_adds_nothing() -> Result<(), Box<dyn std::error::Er
     let mut session = Session::open(&fs, dir)?;
     session.apply(&Event::TurnStart { turn: 1 })?;
     session.apply(&Event::UserMessage {
-        text: "olá".into()
+        text: "olá".into(),
+        visibility: Visibility::User,
     })?;
     let before = read_records(&fs, session.log_path())?.len();
     assert_eq!(session.reconcile_pending()?, 0);

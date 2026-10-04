@@ -6,6 +6,7 @@ use crate::context::{
     SelectionPolicy, StateView, Stats, assemble_all, chosen_units, digest, kept_messages, prime,
     state_section, tokens_from_bytes, units,
 };
+use crate::kernel::Visibility;
 use crate::kernel::{Event, derive_messages};
 
 use super::bench::{GOAL, RAW_MIN, SUMMARY_MAX, efficiency, retained_terms, scenario};
@@ -40,11 +41,13 @@ fn a_utility_digest_retains_more_information_than_the_chronological_one()
     for index in 0..12 {
         events.push(Event::UserMessage {
             text: format!("katu passo {index} katu passo"),
+            visibility: Visibility::User,
         });
     }
     // O que informa está no **fim** do prefixo — e é exatamente o que a truncagem cronológica corta.
     events.push(Event::UserMessage {
         text: "investiga o zircao e o seu ciclo".into(),
+        visibility: Visibility::User,
     });
     events.push(Event::AssistantMessage {
         text: "o zircao cristaliza a 1855 graus".into(),
@@ -91,6 +94,7 @@ fn the_utility_digest_is_skipped_when_the_prefix_is_redundant() {
     for index in 0..8 {
         events.push(Event::UserMessage {
             text: format!("katu passo {index}"),
+            visibility: Visibility::User,
         });
     }
     let budget = compaction_budget(2, 200);
