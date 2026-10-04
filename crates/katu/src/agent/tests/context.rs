@@ -54,8 +54,8 @@ fn the_request_carries_the_prime_and_only_compacts_when_enabled()
     let fs = StdFs;
     let clock = FixedClock::new(Timestamp::from_millis(1_000));
     let mut runtime = Runtime::open(&fs, &clock, &root, "g")?;
-    // Prefixo grande o suficiente para sair do orçamento (`raw_min = 4096` tokens).
-    runtime.record_user(&"a".repeat(20_000))?;
+    // Prefixo grande o suficiente para sair do orçamento cru (`raw_min` default: 65 536 tokens).
+    runtime.record_user(&"a".repeat(300_000))?;
 
     let process = StdProcess;
     let env = StdEnv;

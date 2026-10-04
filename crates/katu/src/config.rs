@@ -87,6 +87,11 @@ pub(crate) const KEYS: &[KeySpec] = &[
         doc: "Política de seleção do contexto: `suffix` (default, histórico) ou `utility` (Q-02b/Q-03).",
     },
     KeySpec {
+        key: "behavior.context_budget",
+        kind: Kind::Integer,
+        doc: "Teto cru do contexto em tokens (default 65 536); com compactação desligada o histórico além do teto é descartado.",
+    },
+    KeySpec {
         key: "behavior.durability",
         kind: Kind::Text,
         doc: "Durabilidade do log: `turn` (*group commit*, default) ou `event` (ADR 0024).",

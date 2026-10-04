@@ -28,6 +28,8 @@ pub(crate) struct Defaults {
     pub(crate) prompt_state: Option<bool>,
     /// Política de seleção do contexto (Q-02b/Q-03): `suffix`/`utility`.
     pub(crate) context_selection: Option<String>,
+    /// Teto cru do contexto em tokens (`behavior.context_budget`); ausente ⇒ default do binário.
+    pub(crate) context_budget: Option<usize>,
     /// Gate de Value of Information para tool calls (A3/W8-4): `true`/`false`.
     pub(crate) tool_voi: Option<bool>,
     /// Durabilidade do log (ADR 0024/P-01): `event`/`turn`.
@@ -80,6 +82,8 @@ pub(crate) fn from_root(root: &Path) -> Defaults {
         auto_compact: boolean(&table, "behavior.auto_compact"),
         prompt_state: boolean(&table, "behavior.prompt_state"),
         context_selection: text(&table, "behavior.context_selection"),
+        context_budget: integer(&table, "behavior.context_budget")
+            .and_then(|value| usize::try_from(value).ok()),
         tool_voi: boolean(&table, "behavior.tool_voi"),
         durability: text(&table, "behavior.durability"),
         structured_output: boolean(&table, "structured_output"),

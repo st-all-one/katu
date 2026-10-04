@@ -31,7 +31,9 @@ função, o log é a fonte da verdade.
     ([`bench/e18/resume`](../../bench/e18/resume/PROTOCOL.md)).
   - `kernel::project` — `derive_messages`, `state_of`, `snapshot` (projeções puras); `normalize`
     (L-Q5/G6) pareia `ToolCall`↔`ToolResult`, descarta vazios e resultados fora de ordem e garante
-    início em `User`.
+    início em `User`; `wire_messages` (PX-WIRE) agrupa cada passo do assistente (texto + N calls)
+    numa `WireMessage::Assistant` — a forma que o wire exige
+    ([`PROVIDER_WIRE`](../../wiki/_ref/brainstorm/PROVIDER_WIRE.md)).
   - `State.pending` (Q-15) — o estado guarda **só** as chamadas pendentes: o efeito vive no log e o
     nome concluído em `completed_tools`. Guardar as concluídas fazia o replay ser quadrático (cada
     `step` clona o estado) e recusava `call_0` repetido entre turnos, que é legítimo quando o provider
@@ -124,7 +126,9 @@ função, o log é a fonte da verdade.
   ([`context/select/greedy`](src/context/select/greedy.rs)), informação e divergência **JS**
   ([`context/select/info`](src/context/select/info.rs)). Política por omissão: `Suffix` (histórica,
   byte a byte); `Utility` mede-se em `bench/e18/select/` (**+1037,9 %** de `I_ret`/token, controlo
-  negativo 0,0 %) mas só se adota com A/B de tarefa.
+  negativo 0,0 %) mas só se adota com A/B de tarefa. A montagem **pina** a instrução corrente
+  (`pin_unit`): a última `Message::User` nunca sai, mesmo quando o sufixo teria de a evictar —
+  sem isto o modelo perde a tarefa a meio do turno.
 - Compactação [`context/compact`](src/context/compact.rs) (E09-T07, Q-03): determinística e opt-in
   (`CompactionMode`, default `Disabled`); digest do prefixo + mapeamento original→substituto,
   `recover` pelo log, ganho como `Metric` `inferred`. Com a política de utilidade as linhas do digest

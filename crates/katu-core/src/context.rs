@@ -33,7 +33,7 @@ pub use prime::{PRIME_VERSION, PrimeMode, prime, prime_for, prime_long, prime_wi
 pub use select::{
     CHANNELS, Candidate, SELECTION_SCHEMA_VERSION, SelectionParams, SelectionPolicy, Stats,
     chosen_units, dropped_messages, greedy, jaccard_milli, js_milli, kept_messages, message_text,
-    suffix_start, term_counts, terms, units,
+    pin_unit, suffix_start, term_counts, terms, units,
 };
 pub use state::{
     MAX_SECTION_BYTES, MAX_WORKING_SET, STATE_SCHEMA_VERSION, StateView, section as state_section,
@@ -160,13 +160,31 @@ pub fn assemble_all(
     );
     let all = derive_messages(events);
     let units = units(&all);
-    let chosen = chosen_units(
+    let mut chosen = chosen_units(
         &units,
         budget.raw_min,
         options.selection,
         options.goal,
         options.params,
     );
+    // A instrução corrente (a última mensagem do utilizador) é **sempre** visível: o sufixo pode
+    // evictá-la quando os resultados das tools enchem o orçamento, e o modelo perde a tarefa.
+    // Reserva-se o seu custo (o sufixo recua o suficiente) sem exceder `raw_min`; se nem ela cabe,
+    // o orçamento manda e nada é pinado.
+    if let Some(pin) = pin_unit(&all, &units) {
+        let pin_tokens = units.get(pin).map_or(0, |unit| unit.candidate.tokens);
+        if !chosen.contains(&pin) && pin_tokens <= budget.raw_min {
+            chosen = chosen_units(
+                &units,
+                budget.raw_min.saturating_sub(pin_tokens),
+                options.selection,
+                options.goal,
+                options.params,
+            );
+            chosen.push(pin);
+            chosen.sort_unstable();
+        }
+    }
     let messages = kept_messages(&all, &units, &chosen);
     let prefix = dropped_messages(&all, &units, &chosen);
     let raw_tokens = messages.iter().map(message_weight).sum::<usize>();

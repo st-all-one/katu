@@ -46,7 +46,9 @@ pub use pipeline::{
     Dispatch, DispatchRequest, Effect, Tool, ToolOutput, dispatch, dispatch_with, facts_for,
     facts_from,
 };
-pub use project::{Message, Snapshot, derive_messages, snapshot, state_of};
+pub use project::{
+    Message, Snapshot, WireMessage, derive_messages, snapshot, state_of, wire_messages,
+};
 pub use session::{
     CallContext, MAX_TAIL_BYTES, Session, SessionError, SessionId, SessionMeta, StateSnapshot,
     audit_dir, discover_root, katu_dir,

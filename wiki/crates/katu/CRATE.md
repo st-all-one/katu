@@ -469,7 +469,7 @@ Toda a execução de tools segue a ordem:
 | Limitação | Descrição |
 |-----------|-----------|
 | `MAX_PARALLEL_CALLS = 8` | Limite de **custo**, não de paralelismo; medido em máquina com 16 cores |
-| `DEFAULT_CONTEXT_BUDGET` | Teto fixo; não adaptativo |
+| `DEFAULT_CONTEXT_BUDGET` | Teto cru default 65 536, configurável por `behavior.context_budget`; não adaptativo à janela do modelo |
 | `StdProcess` | Só unix (process group) |
 | `watch_service` | Só Linux (systemd) |
 | `KnudgeMemory` | `!Sync`; protegido por `Mutex` |

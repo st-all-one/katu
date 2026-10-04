@@ -249,3 +249,5 @@ Nesse modo, o agente externo executa tools internamente; o goose repassa as exte
 5. **Fábricas + inventário** desacoplam descoberta, configuração e instanciação.
 6. **`toolshim`** estende o alcance a modelos sem function calling.
 7. **Delegação via ACP** reaproveita agentes externos como "providers".
+
+> O detalhe do **wire** (agrupamento do passo, `reasoning_content`, `merge_split_tool_call_messages`) está em [`PROVIDER_WIRE`](../PROVIDER_WIRE.md).

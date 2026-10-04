@@ -222,6 +222,11 @@ pub(crate) fn default_config() -> toml::Table {
         "behavior.context_selection",
         toml::Value::String("suffix".to_owned()),
     );
+    config::set_key(
+        &mut table,
+        "behavior.context_budget",
+        toml::Value::Integer(65_536),
+    );
     // A3/W8-4: o gate de VOI fica **desligado** por omissão (exige A/B com o modelo); quando
     // ligado, só atua com a seleção `suffix` (com `utility` podia descartar a unidade lida).
     config::set_key(&mut table, "behavior.tool_voi", toml::Value::Boolean(false));

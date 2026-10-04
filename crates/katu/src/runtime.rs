@@ -42,8 +42,14 @@ const MEMORY_POLICY: &str = include_str!("../../../policy/memory.toml");
 const CONTAINMENT_POLICY: &str = include_str!("../../../policy/containment.toml");
 
 /// Orçamento de contexto do turno — o **único dono do teto** (E09-T01/T07).
+///
+/// O teto cru default é 65 536 tokens (metade de uma janela conservadora de 128K): com o teto
+/// antigo (4 096) uma tarefa de investigação (resumo do repositório) esgotava o orçamento, o
+/// sufixo evictava os resultados das tools e o modelo **relia os mesmos ficheiros em ciclo**
+/// (medido: a tarefa só fecha com ~48 817 tokens de input). Ajustável por
+/// `behavior.context_budget`.
 pub(crate) const DEFAULT_CONTEXT_BUDGET: ContextBudget = ContextBudget {
-    raw_min: 4096,
+    raw_min: 65_536,
     summary_max: 1024,
 };
 
@@ -192,6 +198,8 @@ impl<'a> Runtime<'a> {
         let (rules, enforced) = load_rules(clock.now().as_millis())?;
         // Q-04/Q-02b: as duas opções são **dados** do projeto (config fechada), lidas uma vez.
         let defaults = defaults::from_root(&root);
+        // Q-04/Q-02b: o teto cru é dado do projeto (`behavior.context_budget`); ausente ⇒ default.
+        let budget = context::context_budget(&defaults);
         // ADR 0024 (P-01): a política de durabilidade é dado do projeto; o default passou a ser
         // `turn` (*group commit*, decisão do dono). Um valor desconhecido cai no default.
         let durability = defaults
@@ -240,7 +248,7 @@ impl<'a> Runtime<'a> {
             instructions,
             skills,
             goal,
-            budget: DEFAULT_CONTEXT_BUDGET,
+            budget,
             compaction: CompactionMode::Disabled,
             policy: context::ContextPolicy::from_config(
                 defaults.context_selection.as_deref(),

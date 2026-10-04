@@ -226,6 +226,7 @@ Rejeições documentadas com o número: **conformal** (cobertura colapsa com res
 | `behavior.tool_voi` | Gate de VOI — default **off** (só atua com `suffix`) |
 | `behavior.prompt_state` | Secção `estado` no prime — default **on** (Q-04) |
 | `behavior.context_selection` | `suffix` vs `utility` — default `suffix` |
+| `behavior.context_budget` | Teto cru do contexto em tokens — default 65 536 |
 
 **Dívida registada:** `upgrade` sem canal configurado (recusa), validação e2e em falta para
 `responses`/`messages`/`google`, `PriceTable` vazia (`unpriced`), `outline` heurístico (tree-sitter

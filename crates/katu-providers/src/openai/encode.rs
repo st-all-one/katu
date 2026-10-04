@@ -1,7 +1,7 @@
 //! Codificação do pedido no dialeto `chat/completions`.
 
 use katu_core::diag::{Level, events};
-use katu_core::kernel::Message;
+use katu_core::kernel::{WireMessage, wire_messages};
 use katu_core::provider::{ProviderError, ProviderRequest, Thinking, ToolDef};
 use katu_core::report::tool_content;
 use katu_policy::{SearchMode, ToolArgs, ToolName, ToolUse};
@@ -98,7 +98,7 @@ struct TextMessage<'a> {
 #[derive(Serialize)]
 struct ToolCallMessage<'a> {
     role: &'static str,
-    content: Option<()>,
+    content: Option<&'a str>,
     tool_calls: Vec<ToolCallJson<'a>>,
 }
 
@@ -146,10 +146,9 @@ pub(crate) fn encode_request(
             content: system,
         }));
     }
-    for message in &request.messages {
-        if let Some(encoded) = encode_message(message) {
-            messages.push(encoded);
-        }
+    let wire = wire_messages(&request.messages);
+    for message in &wire {
+        messages.push(encode_wire(message));
     }
 
     let max_tokens = request.max_tokens.or(options.default_max_tokens);
@@ -230,35 +229,40 @@ pub(crate) fn tool_call_schema(tools: &[ToolDef]) -> Value {
     })
 }
 
-/// Codifica uma mensagem do histórico (ou ignora se desconhecida).
-fn encode_message(message: &Message) -> Option<MessageJson<'_>> {
+/// Codifica uma unidade de wire (um passo do assistente = **uma** mensagem).
+fn encode_wire<'a>(message: &'a WireMessage<'_>) -> MessageJson<'a> {
     let _span = katu_core::fn_span!(
         Level::Trace,
         events::PROVIDER_REQUEST,
         "openai::encode_message"
     );
-    let encoded = match message {
-        Message::User { text, .. } => MessageJson::Text(TextMessage {
+    match message {
+        WireMessage::User { text } => MessageJson::Text(TextMessage {
             role: "user",
             content: text,
         }),
-        Message::Assistant { text } => MessageJson::Text(TextMessage {
+        WireMessage::Assistant { text, calls } if calls.is_empty() => {
+            MessageJson::Text(TextMessage {
+                role: "assistant",
+                content: text.as_ref(),
+            })
+        }
+        WireMessage::Assistant { text, calls } => MessageJson::ToolCall(ToolCallMessage {
             role: "assistant",
-            content: text,
+            content: (!text.trim().is_empty()).then(|| text.as_ref()),
+            tool_calls: calls
+                .iter()
+                .map(|(call, tool)| ToolCallJson {
+                    id: call.as_str(),
+                    kind: "function",
+                    function: ToolCallFunction {
+                        name: model_tool_name(tool),
+                        arguments: tool_arguments(tool).to_string(),
+                    },
+                })
+                .collect(),
         }),
-        Message::ToolCall { call, tool } => MessageJson::ToolCall(ToolCallMessage {
-            role: "assistant",
-            content: Some(()),
-            tool_calls: vec![ToolCallJson {
-                id: call.as_str(),
-                kind: "function",
-                function: ToolCallFunction {
-                    name: model_tool_name(tool),
-                    arguments: tool_arguments(tool).to_string(),
-                },
-            }],
-        }),
-        Message::ToolResult {
+        WireMessage::ToolResult {
             call,
             outcome,
             delta,
@@ -268,9 +272,7 @@ fn encode_message(message: &Message) -> Option<MessageJson<'_>> {
             tool_call_id: call.as_str(),
             content: tool_content(outcome, delta.as_deref()),
         }),
-        _ => return None,
-    };
-    Some(encoded)
+    }
 }
 
 /// Nome ao modelo de um uso de tool (registry: `exec`→`bash`, `search`→`grep|find|ls`).

@@ -120,6 +120,66 @@ fn tool_call_message_has_null_content() -> Result<(), Box<dyn std::error::Error>
     Ok(())
 }
 
+#[test]
+fn a_step_with_two_calls_is_one_assistant_message() -> Result<(), Box<dyn std::error::Error>> {
+    use std::path::PathBuf;
+
+    use katu_core::kernel::{CallId, Message, Visibility};
+    use katu_policy::{ResolvedPath, SearchMode, ToolArgs, ToolName, ToolUse};
+
+    // Regressão: um passo com texto + 2 calls tem de virar **um** assistant message com 2
+    // `tool_calls`. O upstream (DeepSeek via opencode-go) recusa a forma dividida
+    // `asst(tc1); asst(tc2); tool; tool` com «An assistant message with 'tool_calls' must be
+    // followed by tool messages responding to each 'tool_call_id'».
+    let cwd = ResolvedPath::from_canonical(PathBuf::from("/work"))?;
+    let call = |id: &str, query: &str| Message::ToolCall {
+        call: CallId::new(id),
+        tool: ToolUse {
+            name: ToolName::Search,
+            args: ToolArgs::Search {
+                root: cwd.clone(),
+                query: query.to_string(),
+                mode: SearchMode::Ls,
+            },
+            resolved_paths: Vec::new(),
+            argv: None,
+            cwd: cwd.clone(),
+        },
+    };
+    let mut request = request("m");
+    request.system = None;
+    request.messages = vec![
+        Message::User {
+            text: "oi".to_string(),
+            visibility: Visibility::User,
+        },
+        Message::Assistant {
+            text: "vou listar".to_string(),
+        },
+        call("call_1", "a"),
+        call("call_2", "b"),
+    ];
+    let body = super::encode_request(&request, &super::EncodeOptions::default())?;
+    let value: serde_json::Value = serde_json::from_str(&body)?;
+    let messages = value
+        .get("messages")
+        .and_then(|value| value.as_array())
+        .ok_or("sem messages")?;
+    assert_eq!(messages.len(), 2, "user + um só assistant: {messages:?}");
+    let assistant = messages.get(1).ok_or("sem assistant")?;
+    assert_eq!(assistant.get("role"), Some(&json!("assistant")));
+    assert_eq!(assistant.get("content"), Some(&json!("vou listar")));
+    assert_eq!(
+        assistant
+            .get("tool_calls")
+            .and_then(|calls| calls.as_array())
+            .map(Vec::len),
+        Some(2),
+        "{assistant:?}"
+    );
+    Ok(())
+}
+
 /// Conteúdo da mensagem de resultado de tool no corpo codificado.
 fn tool_content(body: &serde_json::Value) -> Option<&str> {
     body.get("messages")

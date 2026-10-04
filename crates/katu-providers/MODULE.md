@@ -51,6 +51,10 @@ A camada de **providers**: o caminho built-in first-party é nosso; o resto é c
   (`reasoning.effort`/`reasoning_effort`/`thinking.budget_tokens`/`thinkingConfig`); `usage` com base
   `provider_reported`; preços [`usage`](src/usage.rs) devolvem `unpriced` sem tabela (DF5) e ligam
   ao `Metric` (`Cost::metric`/`usage_metrics`, `Unit::Micros`/`Tokens`, base de evidência).
+  Os encoders consomem `katu_core::kernel::wire_messages` (PX-WIRE): um passo com N tool calls vira
+  **uma** mensagem `assistant` — o upstream recusa a forma dividida (ver
+  [`PROVIDER_WIRE`](../../wiki/_ref/brainstorm/PROVIDER_WIRE.md)); Anthropic/Google ainda por agrupar
+  (mesma classe, faltam os tool results).
 - **Cache de prefixo (por modelo).** `prompt_cache`/`prompt_cache_retention` vêm do catálogo; o
   `prompt_cache_key` deriva da sessão. Medido em `deepseek-v4.1-flash` (2.º turno `cached=896/1004`;
   ADR 0013).

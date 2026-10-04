@@ -123,7 +123,8 @@ flags explícitas; `-` = stdin) existe em `prime`/`run`/`tui`/`memo ask`; `--bat
 (JSONL; valida tudo antes de executar) em `prime`/`run`/`memo ask`.
 
 **Defaults da config (E20-T17):** `provider`, `model`, `base`, `structured_output`,
-`behavior.auto_compact`, `behavior.context_selection` (`suffix`/`utility`), `behavior.prompt_state`,
+`behavior.auto_compact`, `behavior.context_selection` (`suffix`/`utility`),
+`behavior.context_budget` (teto cru em tokens; default 65 536), `behavior.prompt_state`,
 `behavior.tool_voi` (só atua com `suffix`), `behavior.durability` (`event`/`turn`; ADR 0024) e
 `recall.default_limit` da
 config efetiva (projeto > global) são o default de `run`/`tui`/`memo ask` (flags > `--params` >
@@ -133,7 +134,10 @@ config > default do comando). O `install.sh` prepara a global com `katu config i
 
 **Contexto do turno (Q-02b/Q-03/Q-04, só por config):** `behavior.context_selection` escolhe a
 política de seleção do contexto (`suffix` é o default, histórico e seguro; `utility` entra por
-config explícita) e `behavior.prompt_state` liga a secção `estado` no prime (default **on**). O gate
+config explícita) e `behavior.prompt_state` liga a secção `estado` no prime (default **on**).
+`behavior.context_budget` fixa o teto cru (default 65 536 tokens): com a compactação desligada o
+histórico além do teto é **descartado**, e um teto pequeno faz o modelo reler as mesmas tools em
+ciclo. O gate
 de VOI (`behavior.tool_voi`, default **off**) só atua com `suffix`: com `utility` a unidade lida pode
 ser descartada e o gate diria “já presente no contexto” sem o estar. Os números publicados são um
 *proxy* de informação (`bench/e18/select/`) e a adoção pode ser revertida pela própria chave de

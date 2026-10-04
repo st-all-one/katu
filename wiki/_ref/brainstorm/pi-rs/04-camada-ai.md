@@ -114,3 +114,5 @@ OpenAI (completions/responses/codex/azure), Anthropic messages, Google generativ
 ## 10. Thinking/reasoning
 
 Níveis unificados `off|minimal|low|medium|high|xhigh|max`, mapeados por `thinkingLevelMap` para valores provider-specific; `thinkingBudgets` para providers por token. `streamSimple` recebe `reasoning`; `stream` recebe opções específicas (`AnthropicOptions`, `GoogleOptions`, etc.).
+
+> O detalhe do **wire** (agrupamento do passo, compat por provider, o caso `opencode-go`) está em [`PROVIDER_WIRE`](../PROVIDER_WIRE.md).

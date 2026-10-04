@@ -4,6 +4,7 @@
 //! ao modelo; os eventos de controlo (`TurnStart`, `TurnEnd`, `PhaseTransition`) **não** entram.
 
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 use super::event::{CallId, Event, Visibility};
 use super::state::{Refusal, State};
@@ -173,6 +174,96 @@ fn project_event(
         }),
         _ => None,
     }
+}
+
+/// Unidade de wire: um passo do assistente é **uma** unidade (texto + todas as calls).
+///
+/// A projeção ([`derive_messages`]) mantém um `ToolCall` por evento (fidelidade ao log, um facto
+/// por call). Os dialetos OpenAI/Anthropic/Google exigem, no wire, **um** assistant message com
+/// todas as tool calls do passo: o upstream recusa `asst(tc1); asst(tc2); tool; tool` com
+/// «An assistant message with `tool_calls` must be followed by tool messages responding to each
+/// `tool_call_id`». Esta view agrupa o passo sem tocar no log.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WireMessage<'a> {
+    /// Mensagem do utilizador.
+    User {
+        /// Texto.
+        text: &'a str,
+    },
+    /// Passo do assistente: texto (vazio se não houver) e todas as calls, na ordem do log.
+    Assistant {
+        /// Texto visível.
+        text: Cow<'a, str>,
+        /// Calls do passo.
+        calls: Vec<(&'a CallId, &'a ToolUse)>,
+    },
+    /// Resultado de tool.
+    ToolResult {
+        /// Identificador da chamada.
+        call: &'a CallId,
+        /// Efeito.
+        outcome: &'a ToolOutcome,
+        /// Delta model-visible.
+        delta: Option<&'a str>,
+        /// Nome da tool (dialetos que o exigem).
+        tool_name: Option<ToolName>,
+    },
+}
+
+/// Agrupa a projeção em unidades de wire (um passo do assistente = uma unidade).
+#[must_use]
+pub fn wire_messages(messages: &[Message]) -> Vec<WireMessage<'_>> {
+    let _span = crate::trace_fn!("kernel::project::wire_messages");
+
+    let mut out: Vec<WireMessage<'_>> = Vec::with_capacity(messages.len());
+    let mut text: Option<Cow<'_, str>> = None;
+    let mut calls: Vec<(&CallId, &ToolUse)> = Vec::new();
+    for message in messages {
+        match message {
+            Message::User { text: body, .. } => {
+                flush_step(&mut out, &mut text, &mut calls);
+                out.push(WireMessage::User { text: body });
+            }
+            Message::ToolResult {
+                call,
+                outcome,
+                delta,
+                tool_name,
+            } => {
+                flush_step(&mut out, &mut text, &mut calls);
+                out.push(WireMessage::ToolResult {
+                    call,
+                    outcome,
+                    delta: delta.as_deref(),
+                    tool_name: *tool_name,
+                });
+            }
+            Message::Assistant { text: body } => {
+                text = Some(match text.take() {
+                    Some(existing) => Cow::Owned(format!("{existing}\n\n{body}")),
+                    None => Cow::Borrowed(body.as_str()),
+                });
+            }
+            Message::ToolCall { call, tool } => calls.push((call, tool)),
+        }
+    }
+    flush_step(&mut out, &mut text, &mut calls);
+    out
+}
+
+/// Fecha o passo do assistente pendente (texto e/ou calls), se tiver conteúdo.
+fn flush_step<'a>(
+    out: &mut Vec<WireMessage<'a>>,
+    text: &mut Option<Cow<'a, str>>,
+    calls: &mut Vec<(&'a CallId, &'a ToolUse)>,
+) {
+    if calls.is_empty() && text.as_deref().is_none_or(|body| body.trim().is_empty()) {
+        return;
+    }
+    out.push(WireMessage::Assistant {
+        text: text.take().unwrap_or(Cow::Borrowed("")),
+        calls: std::mem::take(calls),
+    });
 }
 
 /// Reproduz o estado a partir dos eventos (a fonte da verdade).

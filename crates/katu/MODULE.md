@@ -60,7 +60,8 @@ todo o código impuro confinado.
   (por id ou a mais recente) retoma o log durável e **fecha** um turno aberto antes do seguinte.
   Os submodules `src/runtime/context.rs` (contexto efetivo + compactação, E09-T01/T07),
   `src/runtime/verify.rs` (gate de verificação sobre o log, E09-T03) e `src/runtime/memory.rs`
-  estendem o runtime; o teto de contexto tem **um único dono** (`DEFAULT_CONTEXT_BUDGET`).
+  estendem o runtime; o teto de contexto tem **um único dono** (`DEFAULT_CONTEXT_BUDGET`, cru
+  default 65 536, ajustável por `behavior.context_budget`).
 - **Contrato de escopo** (`src/scope.rs`, E09-T04): carrega `scope_contract.json` +
   `feature_list.json` da raiz no arranque e valida o `Plan` (schema + "≤ 1 `in_progress`"),
   **antes de qualquer turno** (fail-closed: artefacto pela metade ou inválido recusa o arranque).

@@ -220,6 +220,22 @@ pub fn suffix_start(units: &[Unit], budget: usize) -> usize {
     index
 }
 
+/// Unidade que contém a instrução corrente (a última mensagem do utilizador).
+///
+/// É a única unidade que a montagem **não** deixa cair: sem ela o modelo perde a tarefa (o sufixo
+/// puro evictava-a quando os resultados das tools enchiam `raw_min`).
+#[must_use]
+pub fn pin_unit(messages: &[Message], units: &[Unit]) -> Option<usize> {
+    let _span = crate::trace_fn!("context::select::pin_unit");
+
+    let index = messages
+        .iter()
+        .rposition(|message| matches!(message, Message::User { .. }))?;
+    units
+        .iter()
+        .position(|unit| unit.start <= index && index < unit.end)
+}
+
 /// Unidades escolhidas sob `policy`, em ordem crescente de índice.
 ///
 /// `Suffix` é a política histórica (sufixo contíguo mais recente). `Utility` (Q-02b) fixa a

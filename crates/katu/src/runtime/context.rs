@@ -1,12 +1,25 @@
 //! Contexto efetivo do turno e compactação (E09-T01/T07).
 
 use katu_core::context::{
-    AssembleOptions, Assembly, Compaction, CompactionMode, Context, PrimeMode, SelectionParams,
-    SelectionPolicy, StateView, state_section,
+    AssembleOptions, Assembly, Compaction, CompactionMode, Context, ContextBudget, PrimeMode,
+    SelectionParams, SelectionPolicy, StateView, state_section,
 };
 use katu_core::kernel::{Event, SessionError};
 
 use super::Runtime;
+use crate::defaults::Defaults;
+
+/// Teto cru do contexto: dado do projeto (`behavior.context_budget`) ou default do binário.
+pub(crate) fn context_budget(defaults: &Defaults) -> ContextBudget {
+    let _span = katu_core::trace_fn!("runtime::context_budget");
+
+    ContextBudget {
+        raw_min: defaults
+            .context_budget
+            .unwrap_or(super::DEFAULT_CONTEXT_BUDGET.raw_min),
+        summary_max: super::DEFAULT_CONTEXT_BUDGET.summary_max,
+    }
+}
 
 /// Política do contexto do turno (Q-02b/Q-03/Q-04) — **dados** do projeto, não interruptores soltos.
 #[derive(Debug, Clone, Copy)]

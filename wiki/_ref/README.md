@@ -15,6 +15,7 @@
 | [`plan/KERNEL_SURFACE.md`](plan/KERNEL_SURFACE.md) | kernel autocontido na sua thread; superfícies como clientes | quem mexe no loop ou num front-end |
 | [`plan/LIVE_FLOW.md`](plan/LIVE_FLOW.md) | fluxo do turno (raciocínio, tools, execução) visível no CLI/TUI | quem mexe na apresentação do turno |
 | [`brainstorm/`](brainstorm/katu-brainstorm-decisoes.md) | a origem das ideias: Alternative A, o *deepseek harness*, o PTC | quem procura o porque |
+| [`brainstorm/PROVIDER_WIRE.md`](brainstorm/PROVIDER_WIRE.md) | o wire dos providers (goose/pi/katu) e o 400 do passo com N tool calls | quem mexe no encoder |
 | [`docs/`](docs/) | regras, catálogo gerado, superfície do utilizador, tópicos, postmortems | o agente e quem investiga |
 
 **Regra:** material movido para cá não volta ao topo do repositório. A raiz é o que se usa; isto é o

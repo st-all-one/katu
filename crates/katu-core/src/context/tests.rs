@@ -6,6 +6,7 @@ use super::{
 use crate::kernel::Visibility;
 
 mod bench;
+mod instruction;
 mod selection;
 
 use crate::error::ToolOutcome;
